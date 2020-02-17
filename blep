@@ -59,9 +59,21 @@ def bounce(stdscr, state):
     state["motion"] = motion
     state["cur_color"] = cur_color
 
+def life(stdscr, state):
+    stdscr.clear()
+    stdscr.addstr(0, 0, "life");
+    pass
+
 def main(stdscr):
+
+    modes = ["bounce", "life"]
+    mode_funcs = [bounce, life]
+    mode_states = [{}] * len(modes)
+    mode = 0
+
     curses.curs_set(0)
     height, width = stdscr.getmaxyx()
+    stdscr.nodelay(1) # set getch() non-blocking
 
     curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
     curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
@@ -73,9 +85,12 @@ def main(stdscr):
     bounce_state = {}
     while(True):
         #update height and width
-        bounce(stdscr, bounce_state)
+        mode_funcs[mode](stdscr, mode_states[mode])
         stdscr.refresh()
         time.sleep(1.0 / REFERSH_RATE)
+        c = stdscr.getch()
+        if (c == 32): #space
+            mode = (mode + 1) % len(modes)
 
 if __name__=='__main__':
     #general globals
