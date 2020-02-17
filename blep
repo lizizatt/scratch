@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import curses
+import math
 import random
 import sys
 import time
@@ -60,21 +61,30 @@ def bounce(stdscr, state):
     state["motion"] = motion
     state["cur_color"] = cur_color
 
+def dist(a, b):
+    return math.sqrt(math.pow(a[0] - b[0], 2) + math.pow(a[1] - b[1], 2))
+
 def dodge(stdscr, state, getchs):
 
     SPEED = 1
+    PLAYER_INVULN_LEN = .5
+    INIT_SAFE_TIME = 2.0
 
     height, width = stdscr.getmaxyx()
     stdscr.clear()
-    stdscr.addstr(0, 0, "blm simulator 2020", curses.color_pair(1))
 
-    if not "init" in state:
+    if not "init" in state or not state["init"]:
         state["init"] = True
+        state["init_time"] = time.time()
         state["player_pos"] = [int(width / 2), int(height / 2)]
         state["explosions"] = []
         state["next_exp_time"] = time.time() - 1
+        state["total_movement"] = 0
+        state["player_health"] = 3
+        state["player_hit_time"] = 0
+        state["num_explosions_survived"] = 0
 
-    #move
+    #move, using local variables so we can compute the delta to compute score
     i, j = state["player_pos"]
     if (119 in getchs): #w
         j -= SPEED
@@ -87,30 +97,40 @@ def dodge(stdscr, state, getchs):
 
     if (100 in getchs): #d
         i += SPEED
+    state["total_movement"] += dist((i, j), state["player_pos"])
+    state["player_pos"] = [i, j]
 
     i = min(max(i, 0), width - 1)
     j = min(max(j, 0), height - 1)
 
-    #spawn explosions
-    #process explosions
     #explosion will go off at the indicated time.time()
     #after that, it will be around for 1 second as a danger zone, anything in danger zone dies
     explosions = state["explosions"]
     next_exp_time = state["next_exp_time"]
     t = time.time()
-    if t > next_exp_time:
-        explosions.append([int(random.random() * width / 4 + i),
-                           int(random.random() * height / 4 + j),
+    #spawn explosions, only after some time has passed since start
+    if t > (state["init_time"] + INIT_SAFE_TIME) and t > next_exp_time:
+        explosions.append([int(random.random() * width / 4 + i - width / 4),
+                           int(random.random() * height / 4 + j - height / 4),
                            int(random.random() * 10 + 3),
                            time.time() + 1.0])
         state["next_exp_time"] = time.time() + .5 + random.random()
 
+
+    #player turns red while invuln
+    player_col = 0
+    player_invuln = state["player_hit_time"] > 0 and (t - state["player_hit_time"]) < PLAYER_INVULN_LEN
+    if player_invuln:
+        player_col = 1
+
+    #process explosions
     for explosion in explosions:
         exp_i, exp_j, exp_rad, ep_det_t = explosion
 
-        #remove if expired, dont draw or compute damage
-        if (t > ep_det_t + 1):
+        #explosion hangs around for 5 frames
+        if (t > ep_det_t + 1.0 / REFERSH_RATE * 5.0):
             explosions.remove(explosion)
+            state["num_explosions_survived"] += 1
             continue
 
         #draw
@@ -119,19 +139,38 @@ def dodge(stdscr, state, getchs):
             color_id = 1
         for exp_ii in range(max(exp_i - exp_rad, 0), min(exp_i + exp_rad, width - 1)):
             for exp_jj in range(max(exp_j - exp_rad, 0), min(exp_j + exp_rad, height - 1)):
-                stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
+                if (dist((exp_ii, exp_jj), (exp_i, exp_j)) < exp_rad):
+                    stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
 
-        #todo, compute damage
+        #compute damage, end if game death
+        if t > ep_det_t and not player_invuln and  dist((i, j), (exp_i, exp_j)) < exp_rad:
+            state["player_health"] = state["player_health"] - 1
+            state["player_hit_time"] = time.time()
+            if (state["player_health"] <= 0):
+                #game over screen -- wait for keypress
+                game_over_str = "Game Over!  moved: {}, survived: {}".format(state["total_movement"], state["num_explosions_survived"])
+                stdscr.clear()
+                stdscr.addstr(int(height / 2), int(width / 2 - len(game_over_str) / 2), game_over_str, curses.color_pair(0))
+                #block until player hits a key
+                stdscr.nodelay(0)
+                stdscr.getch()
+                stdscr.nodelay(1)
+                #force reinit
+                state["init"] = False
+                pass
 
 
     state["explosions"] = explosions
 
+    #draw status and gui
+    stdscr.addstr(0, 0, "blm simulator 2020", curses.color_pair(1))
+    health_str = "<3 " * state["player_health"]
+    score_str = "moved: {}, survived: {}".format(state["total_movement"], state["num_explosions_survived"])
+    stdscr.addstr(0, width - len(score_str) - len(health_str), health_str, curses.color_pair(1))
+    stdscr.addstr(0, width - len(score_str), score_str, curses.color_pair(2))
 
     #draw player, overwriting explosion if in it
-    #todo, clear out surrounding few pixels to make it clearer where you are in a fire
-    stdscr.addstr(j, i, "*", curses.color_pair(0))
-
-    state["player_pos"] = [i, j]
+    stdscr.addstr(j, i, "*", curses.color_pair(player_col))
 
     pass
 
