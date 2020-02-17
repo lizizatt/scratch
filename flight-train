@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+
+import random
+import math
+import pygame as pg
+
+# constants
+WINSIZE = [640, 480]
+WINCENTER = [WINSIZE[0] / 2, WINSIZE[1] / 2]
+white = 255, 240, 200
+black = 20, 20, 40
+gray = 100, 100, 120
+
+class Aircraft:
+    def __init__(self):
+        #all in radians and radians / s
+        self.roll = 0 
+        self.roll_rate = 0
+        self.pitch = 0
+        self.pitch_rate = 0
+        self.heading = 0
+        self.heading_rate = 0
+
+    def increment(self, dt):
+        self.roll += self.roll_rate * dt
+        self.pitch += self.pitch_rate * dt
+        self.heading += self.heading_rate * dt
+
+
+def draw_altimeter(screen, pos, rad):
+    pg.draw.circle(screen, black, [int(p) for p in pos], int(rad))
+
+def draw_horizon_indicator(screen, pos, rad):
+    pg.draw.circle(screen, black, [int(p) for p in pos], int(rad))
+
+def draw_heading_compass(screen, pos, rad):
+    pg.draw.circle(screen, black, [int(p) for p in pos], int(rad))
+
+def main():
+    "This is the starfield code"
+    clock = pg.time.Clock()
+    # initialize and prepare screen
+    pg.init()
+    screen = pg.display.set_mode(WINSIZE)
+    pg.display.set_caption("fly")
+    screen.fill(gray)
+
+    # main game loop
+    done = 0
+    while not done:
+
+        #draw joystick (line from center to mouse)
+        #roll indicator with horizon line)
+        #altimeter
+        #heading compass
+        #airspeed indicator
+
+        rad = WINSIZE[1] / 5
+
+        draw_altimeter(screen, [WINCENTER[0] * 7 / 4, WINCENTER[1] / 2], rad)
+        draw_horizon_indicator(screen, [WINCENTER[0], WINCENTER[1] / 2], rad)
+        draw_heading_compass(screen, [WINCENTER[0], WINCENTER[1] * 3 / 2], rad)
+
+        pg.display.update()
+        for e in pg.event.get():
+            if e.type == pg.QUIT or (e.type == pg.KEYUP and e.key == pg.K_ESCAPE):
+                done = 1
+                break
+        clock.tick(50)
+
+
+if __name__ == "__main__":
+    main()

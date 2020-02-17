@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+
+import curses
+import sys
+import time
+
+REFERSH_RATE = 120
+TRAIL_LEN = 10
+
+
+def bound(a, min, max):
+    if a < min:
+        return min
+    if a >= max:
+        return max - 1
+    return a
+
+def bounce(stdscr, state):
+    height, width = stdscr.getmaxyx()
+
+    if not "init" in state:
+        state["init"] = True
+        state["trail"] = []
+        state["i"] = int(width / 2)
+        state["j"] = int(width / 2)
+        state["motion"] = [1, 1]
+        state["cur_color"] = 0
+            
+    
+    trail = state["trail"]
+    i = state["i"]
+    j = state["j"]
+    motion = state["motion"]
+    cur_color = state["cur_color"]
+
+    if i >= width - 1 or i <= 0:
+        motion[0] *= -1
+    if j >= height - 1 or j <= 0:
+        motion[1] *= -1
+
+    i += motion[0]
+    j += motion[1]
+    
+    i = bound(i, 0, width)
+    j = bound(j, 0, height)
+
+    cur_color = (cur_color + 1) % n_colors
+    trail.append((i, j, cur_color))
+    if (len(trail) > TRAIL_LEN):
+        trail = trail[1:]
+
+    stdscr.clear()
+    for (i, j, c) in trail:
+        stdscr.addstr(j, i, "*", curses.color_pair(c + 1))
+
+    state["trail"] = trail
+    state["i"] = i
+    state["j"] = j
+    state["motion"] = motion
+    state["cur_color"] = cur_color
+
+def main(stdscr):
+    curses.curs_set(0)
+    height, width = stdscr.getmaxyx()
+
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    curses.init_pair(4, curses.COLOR_BLUE, curses.COLOR_BLACK)
+    curses.init_pair(5, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+    n_colors = 5
+
+    bounce_state = {}
+    while(True):
+        #update height and width
+        bounce(stdscr, bounce_state)
+        stdscr.refresh()
+        time.sleep(1.0 / REFERSH_RATE)
+
+if __name__=='__main__':
+    #general globals
+    height = 0
+    width = 0
+    n_colors = 5
+
+    #global needed for bounce
+
+    curses.wrapper(main)
+
