@@ -114,6 +114,8 @@ def dodge(stdscr, state, getchs):
                            int(random.random() * height / 4 + j - height / 4),
                            int(random.random() * 10 + 3),
                            time.time() + 1.0])
+        if random.random() < 0.5:
+            explosions[len(explosions) - 1][2] = -2
         state["next_exp_time"] = time.time() + .5 + random.random()
 
 
@@ -137,10 +139,17 @@ def dodge(stdscr, state, getchs):
         color_id = 2
         if (t > ep_det_t): #red if fire, yellow if telegraph
             color_id = 1
-        for exp_ii in range(max(exp_i - exp_rad, 0), min(exp_i + exp_rad, width - 1)):
-            for exp_jj in range(max(exp_j - exp_rad, 0), min(exp_j + exp_rad, height - 1)):
-                if (dist((exp_ii, exp_jj), (exp_i, exp_j)) < exp_rad):
-                    stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
+        if exp_rad > 0:
+            for exp_ii in range(max(exp_i - exp_rad, 0), min(exp_i + exp_rad, width - 1)):
+                for exp_jj in range(max(exp_j - exp_rad, 0), min(exp_j + exp_rad, height - 1)):
+                    if (dist((exp_ii, exp_jj), (exp_i, exp_j)) < exp_rad):
+                        stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
+        else:
+            d = abs(exp_rad)
+            for exp_ii in range(0, width):
+                for exp_jj in range(0, height):
+                    if abs(exp_ii - exp_i) < d or abs(exp_jj - exp_j) < d:
+                        stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
 
         #compute damage, end if game death
         if t > ep_det_t and not player_invuln and  dist((i, j), (exp_i, exp_j)) < exp_rad:
@@ -163,7 +172,7 @@ def dodge(stdscr, state, getchs):
     state["explosions"] = explosions
 
     #draw status and gui
-    stdscr.addstr(0, 0, "blm simulator 2020", curses.color_pair(1))
+    stdscr.addstr(0, 0, "blm simulator 2021", curses.color_pair(1))
     health_str = "<3 " * state["player_health"]
     score_str = "moved: {}, survived: {}".format(state["total_movement"], state["num_explosions_survived"])
     stdscr.addstr(0, width - len(score_str) - len(health_str), health_str, curses.color_pair(1))
