@@ -8,7 +8,7 @@ import time
 
 REFERSH_RATE = 120
 TRAIL_LEN = 10
-
+EXPLOSION_FRAMES = 6
 
 def bound(a, min, max):
     if a < min:
@@ -115,7 +115,7 @@ def dodge(stdscr, state, getchs):
                            int(random.random() * 10 + 3),
                            time.time() + 1.0])
         if random.random() < 0.5:
-            explosions[len(explosions) - 1][2] = -2
+            explosions[len(explosions) - 1][2] = int(random.random() * -4)
         state["next_exp_time"] = time.time() + .5 + random.random()
 
 
@@ -129,8 +129,8 @@ def dodge(stdscr, state, getchs):
     for explosion in explosions:
         exp_i, exp_j, exp_rad, ep_det_t = explosion
 
-        #explosion hangs around for 5 frames
-        if (t > ep_det_t + 1.0 / REFERSH_RATE * 5.0):
+        #explosion hangs around for N frames
+        if (t > ep_det_t + 1.0 / REFERSH_RATE * EXPLOSION_FRAMES):
             explosions.remove(explosion)
             state["num_explosions_survived"] += 1
             continue
@@ -146,9 +146,14 @@ def dodge(stdscr, state, getchs):
                         stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
         else:
             d = abs(exp_rad)
-            for exp_ii in range(0, width):
-                for exp_jj in range(0, height):
-                    if abs(exp_ii - exp_i) < d or abs(exp_jj - exp_j) < d:
+            r = (ep_det_t - t) * math.pi * 0.5 if abs(exp_rad) <= 2 else 0
+            for exp_ii in range(0, width - 1):
+                for exp_jj in range(0, height - 1):
+                    x_rel = exp_ii - exp_i
+                    y_rel = exp_jj - exp_j
+                    x_rel_rot = x_rel * math.cos(r) - y_rel * math.sin(r)
+                    y_rel_rot = y_rel * math.cos(r) + x_rel * math.sin(r)
+                    if abs(x_rel_rot) < d or abs(y_rel_rot) < d:
                         stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
 
         #compute damage, end if game death
