@@ -1,11 +1,12 @@
 # scratch
 
-### type
-display typed text centered in the terminal window
+### blep
+black mage simulator 2021
+wasd to move, avoid AOEs with minimum movement
 requirements: python3/ncurses
 
-### blep
-various colorful curses effects
+### type
+display typed text centered in the terminal window
 requirements: python3/ncurses
 
 ### flight-train
