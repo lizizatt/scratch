@@ -3,13 +3,31 @@
 import time
 from pynput import keyboard
 import fluidsynth
+import os
+
+def print_banner():
+    banner = """
+╔═══════════════════════════════════════════╗
+║             Python E-Piano                 ║
+╚═══════════════════════════════════════════╝
+
+Keys:
+  1 - 8: Piano keys (C through High C)
+  +/-  : Change instrument preset
+  Ctrl+C: Quit
+
+Current soundfont: {soundfont}
+"""
+    print(banner.format(soundfont=os.path.basename(soundfont_path)))
 
 # Initialize FluidSynth
 fs = fluidsynth.Synth()
 fs.start()
-soundfont_path = "soundfont_sm64.sf2"  # Replace with the actual path to your SoundFont
+soundfont_path = "soundfont_sm64.sf2"
+#soundfont_path = "soundfont_ultimate.sf2"
 sfid = fs.sfload(soundfont_path)
-fs.program_select(0, sfid, 0, 0)
+preset = 0
+fs.program_select(0, sfid, 0, preset)
 
 # Set up a dictionary to map keystrokes to MIDI notes
 key_note_mapping = {
@@ -23,25 +41,43 @@ key_note_mapping = {
     '8': 72,  # High C
 }
 
+# Keep track of currently pressed keys to avoid note spam
+active_notes = set()
+
 # Callback function to play a note when a key is pressed
 def on_key_press(key):
+    global preset
     try:
-        note = key_note_mapping[key.char]
-        fs.noteon(0, note, 80)  # Play the note
-        print("on {}".format(note))
-    except KeyError:
+        if hasattr(key, 'char'):
+            if key.char == '+':
+                preset = (preset + 1) % 128
+                fs.program_select(0, sfid, 0, preset)
+                print(f"\rCurrent preset: {preset}   ")
+            elif key.char == '-':
+                preset = (preset - 1) % 128
+                fs.program_select(0, sfid, 0, preset)
+                print(f"\rCurrent preset: {preset}   ")
+            elif key.char in key_note_mapping and key.char not in active_notes:
+                note = key_note_mapping[key.char]
+                fs.noteon(0, note, 80)  # Play the note
+                active_notes.add(key.char)
+    except Exception as e:
         pass
 
 # Callback function to stop playing the note when a key is released
 def on_key_release(key):
     try:
-        note = key_note_mapping[key.char]
-        fs.noteoff(0, note)  # Stop playing the note
-        print("off {}".format(note))
-    except KeyError:
+        if hasattr(key, 'char') and key.char in key_note_mapping:
+            note = key_note_mapping[key.char]
+            fs.noteoff(0, note)  # Stop playing the note
+            active_notes.discard(key.char)
+    except Exception as e:
         pass
 
-# Start monitoring keyboard events
+# Print welcome banner
+print_banner()
+
+# Start monitoring keyboard events  
 listener = keyboard.Listener(on_press=on_key_press, on_release=on_key_release)
 listener.start()
 
@@ -50,8 +86,7 @@ try:
     while True:
         time.sleep(.1)
 except KeyboardInterrupt:
-    pass
+    print("\nGoodbye!")
 finally:
-    print("done")
     listener.stop()
     fs.delete()
