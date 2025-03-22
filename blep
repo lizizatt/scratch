@@ -6,9 +6,14 @@ import random
 import sys
 import time
 
-REFERSH_RATE = 120
+PLAYER_INVULN_LEN = 1.0
+INIT_SAFE_TIME = 2.5
+REFERSH_RATE = 60
 TRAIL_LEN = 10
 EXPLOSION_FRAMES = 6
+PHASE_1_DUR_S = 5.0
+PHASE_2_DUR_S = 10.0
+
 
 def bound(a, min, max):
     if a < min:
@@ -64,132 +69,333 @@ def bounce(stdscr, state):
 def dist(a, b):
     return math.sqrt(math.pow(a[0] - b[0], 2) + math.pow(a[1] - b[1], 2))
 
-def dodge(stdscr, state, getchs):
+def draw_ring(stdscr, center_x, center_y, radius, width, height, thickness=1, color_id=4, char="*"):
+    """Draw a ring with given radius and thickness"""
+    for t in range(thickness):
+        r = radius + t
+        for angle in range(0, 360, 5):
+            ring_x = center_x + int(r * math.cos(angle * math.pi / 180))
+            ring_y = center_y + int(r * math.sin(angle * math.pi / 180))
+            if 0 <= ring_x < width and 0 <= ring_y < height:
+                stdscr.addstr(ring_y, ring_x, char, curses.color_pair(color_id))
 
+def draw_cross(stdscr, center_x, center_y, size, width, height, color_id=4, char="*"):
+    """Draw an X-shaped cross"""
+    for i in range(-size, size + 1):
+        x1, y1 = center_x + i, center_y + i
+        x2, y2 = center_x + i, center_y - i
+        if 0 <= x1 < width and 0 <= y1 < height:
+            stdscr.addstr(y1, x1, char, curses.color_pair(color_id))
+        if 0 <= x2 < width and 0 <= y2 < height:
+            stdscr.addstr(y2, x2, char, curses.color_pair(color_id))
+
+def draw_runes(stdscr, center_x, center_y, radius, width, height, color_id=4):
+    """Draw runic symbols around the circle"""
+    runes = ["⚡", "❄", "⚘", "⚜"]
+    for i, rune in enumerate(runes):
+        angle = i * 90
+        x = center_x + int(radius * math.cos(angle * math.pi / 180))
+        y = center_y + int(radius * math.sin(angle * math.pi / 180))
+        if 0 <= x < width and 0 <= y < height:
+            stdscr.addstr(y, x, rune, curses.color_pair(color_id))
+
+def draw_dotted_circle(stdscr, center_x, center_y, radius, width, height, color_id=4):
+    """Draw a dotted circle to show the sigil boundary"""
+    for angle in range(0, 360, 15):  # Larger step for dots
+        x = center_x + int(radius * math.cos(angle * math.pi / 180))
+        y = center_y + int(radius * math.sin(angle * math.pi / 180))
+        if 0 <= x < width and 0 <= y < height:
+            stdscr.addstr(y, x, "·", curses.color_pair(color_id))
+
+def draw_sigil(stdscr, center_x, center_y, still_time, width, height):
+    """Draw the layered sigil based on how long player has been still"""
+    SIGIL_APPEAR_TIME = 1.0
+    SIGIL_RADIUS = 10  # Match the movement radius
+    
+    if still_time < SIGIL_APPEAR_TIME:
+        return
+    
+    # Always draw the boundary
+    draw_dotted_circle(stdscr, center_x, center_y, SIGIL_RADIUS, width, height)
+    
+    phase = min(int((still_time - SIGIL_APPEAR_TIME) / 2), 4)
+    
+    if phase >= 0:  # First phase - inner ring
+        draw_ring(stdscr, center_x, center_y, 2, width, height, 1, 4, "◦")
+        
+    if phase >= 1:  # Second phase - outer ring
+        draw_ring(stdscr, center_x, center_y, 4, width, height, 1, 4, "○")
+        
+    if phase >= 2:  # Third phase - cross
+        draw_cross(stdscr, center_x, center_y, 3, width, height, 4, "✧")
+        
+    if phase >= 3:  # Fourth phase - runes and thicker rings
+        draw_ring(stdscr, center_x, center_y, 6, width, height, 1, 4, "⚝")
+        draw_runes(stdscr, center_x, center_y, 5, width, height, 4)
+        
+    if phase >= 4:  # Final phase - everything pulses
+        pulse = math.sin(time.time() * 4) > 0
+        if pulse:
+            draw_ring(stdscr, center_x, center_y, 8, width, height, 1, 4, "✴")
+
+def init_dodge_state(width, height):
+    return {
+        "init": True,
+        "init_time": time.time(),
+        "player_pos": [int(width / 2), int(height / 2)],
+        "explosions": [],
+        "next_exp_time": time.time() - 1,
+        "total_movement": 0,
+        "player_health": 3,
+        "player_hit_time": 0,
+        "num_explosions_survived": 0,
+        "last_pos": [int(width / 2), int(height / 2)],
+        "still_time": 0,
+        "sigil_pos": None,
+        "current_multiplier": 1.0,
+        "multiplied_score": 0
+    }
+
+def handle_player_movement(state, getchs, width, height):
     SPEED = 1
-    PLAYER_INVULN_LEN = .5
-    INIT_SAFE_TIME = 2.0
+    SIGIL_APPEAR_TIME = 1.0
+    SIGIL_RADIUS = 10
+    
+    i, j = state["player_pos"]
 
+    # Store old position before movement
+    old_i, old_j = i, j
+
+    if (119 in getchs):  # w
+        j -= SPEED
+    if (97 in getchs):   # a
+        i -= SPEED
+    if (115 in getchs):  # s
+        j += SPEED
+    if (100 in getchs):  # d
+        i += SPEED
+
+    state["total_movement"] += dist((i, j), state["player_pos"])
+    state["player_pos"] = [i, j]
+
+    # Bound position to screen
+    i = min(max(i, 0), width - 1)
+    j = min(max(j, 0), height - 1)
+
+    # Track how long player has been still or within radius
+    if i == old_i and j == old_j:
+        # Standing completely still
+        state["still_time"] += 1.0 / REFERSH_RATE
+        if state["still_time"] >= SIGIL_APPEAR_TIME and state["sigil_pos"] is None:
+            state["sigil_pos"] = [i, j]
+    else:
+        if state["sigil_pos"] is not None:
+            # Already have a sigil, check if we're still in range
+            if dist([i, j], state["sigil_pos"]) <= SIGIL_RADIUS:
+                # Within radius, keep accumulating still time
+                state["still_time"] += 1.0 / REFERSH_RATE
+            else:
+                # Outside radius, reset everything
+                state["sigil_pos"] = None
+                state["still_time"] = 0
+        else:
+            # No sigil yet, reset still time
+            state["still_time"] = 0
+    
+    state["last_pos"] = [i, j]
+    return i, j
+
+def create_explosion(game_time, i, j, width):
+    if game_time < PHASE_1_DUR_S:
+        # Phase 1: Only simple circles
+        explosion_type = 'circle'
+        exp_rad = int(random.random() * 10 + 3)
+    elif game_time < PHASE_1_DUR_S + PHASE_2_DUR_S:
+        # Phase 2: Circles and rings
+        if random.random() < 0.5:
+            explosion_type = 'circle'
+            exp_rad = int(random.random() * 5 + random.random() * 3)
+        else:
+            explosion_type = 'ring'
+            exp_rad = 8
+    else:
+        # Phase 3: All types including rotating lines
+        explosion_type = random.choice(['circle', 'ring', 'line'])
+        if explosion_type == 'circle':
+            exp_rad = int(random.random() * 10 + 3)
+        elif explosion_type == 'ring':
+            exp_rad = 8
+        else:  # line
+            exp_rad = int(random.random() * -4)
+
+    return [
+        int(random.random() * width / 4 + i - width / 4),
+        int(random.random() * height / 4 + j - height / 4),
+        exp_rad,
+        time.time() + 1.0,
+        explosion_type
+    ]
+
+def draw_explosion(stdscr, explosion, width, height, color_id):
+    exp_i, exp_j, exp_rad, ep_det_t, exp_type = explosion
+    t = time.time()
+
+    explosion_char = "✸"
+    if exp_type == 'circle':
+        for exp_ii in range(max(exp_i - exp_rad, 0), min(exp_i + exp_rad, width - 1)):
+            for exp_jj in range(max(exp_j - exp_rad, 0), min(exp_j + exp_rad, height - 1)):
+                if (dist((exp_ii, exp_jj), (exp_i, exp_j)) < exp_rad):
+                    stdscr.addstr(exp_jj, exp_ii, explosion_char, curses.color_pair(color_id))
+    
+    elif exp_type == 'line':
+        d = abs(exp_rad)
+        r = (ep_det_t - t) * math.pi * 0.25
+        for exp_ii in range(0, width - 1):
+            for exp_jj in range(0, height - 1):
+                x_rel = exp_ii - exp_i
+                y_rel = exp_jj - exp_j
+                x_rel_rot = x_rel * math.cos(r) - y_rel * math.sin(r)
+                y_rel_rot = y_rel * math.cos(r) + x_rel * math.sin(r)
+                if abs(x_rel_rot) < d or abs(y_rel_rot) < d:
+                    stdscr.addstr(exp_jj, exp_ii, "✦", curses.color_pair(color_id))
+
+    else:  # ring
+        for angle in range(0, 360, 5):
+            ring_x = exp_i + int(exp_rad * math.cos(angle * math.pi / 180))
+            ring_y = exp_j + int(exp_rad * math.sin(angle * math.pi / 180))
+            if 0 <= ring_x < width and 0 <= ring_y < height:
+                stdscr.addstr(ring_y, ring_x, "✺", curses.color_pair(color_id))
+
+def check_explosion_collision(explosion, player_pos):
+    exp_i, exp_j, exp_rad, ep_det_t, exp_type = explosion
+    i, j = player_pos
+    t = time.time()
+
+    if exp_type == 'circle':
+        return dist((i, j), (exp_i, exp_j)) < exp_rad
+    elif exp_type == 'line':
+        d = abs(exp_rad)
+        r = (ep_det_t - t) * math.pi * 0.25
+        x_rel = i - exp_i
+        y_rel = j - exp_j
+        x_rel_rot = x_rel * math.cos(r) - y_rel * math.sin(r)
+        y_rel_rot = y_rel * math.cos(r) + x_rel * math.sin(r)
+        return abs(x_rel_rot) < d or abs(y_rel_rot) < d
+    else:  # ring
+        return abs(dist((i, j), (exp_i, exp_j)) - exp_rad) < 2
+
+def draw_gui(stdscr, state, width, game_time):
+    phase_str = "Phase 1"
+    if game_time >= PHASE_1_DUR_S + PHASE_2_DUR_S:
+        phase_str = "Phase 3"
+    elif game_time >= PHASE_1_DUR_S:
+        phase_str = "Phase 2"
+    
+    # Calculate score multiplier based on sigil phase
+    multiplier = 1.0
+    if state["sigil_pos"] is not None:
+        still_time = state["still_time"]
+        if still_time >= 1.0:  # Only apply multiplier after sigil appears
+            phase = min(int((still_time - 1.0) / 2), 4)
+            multiplier = 1.0 + (phase * 0.5)  # 1.0, 1.5, 2.0, 2.5, 3.0
+            state["current_multiplier"] = multiplier
+    
+    # Update total score with multiplier
+    if "current_multiplier" in state:
+        score_str = "moved: {:.1f}, survived: {:.1f} (x{:.1f})".format(
+            state["total_movement"],
+            state["num_explosions_survived"] * state["current_multiplier"],
+            state["current_multiplier"]
+        )
+    else:
+        score_str = "moved: {:.1f}, survived: {:.1f}".format(
+            state["total_movement"],
+            state["num_explosions_survived"]
+        )
+        
+    stdscr.addstr(0, 0, f"blm simulator 2021 - {phase_str}", curses.color_pair(1))
+    health_str = "<3 " * state["player_health"]
+    stdscr.addstr(0, width - len(score_str) - len(health_str), health_str, curses.color_pair(1))
+    stdscr.addstr(0, width - len(score_str), score_str, curses.color_pair(2))
+
+def draw_player(stdscr, y, x, width, height, color_id):
+    """Draw the player as a 4x4 black mage"""
+    mage = [
+        " /\\",  # Pointy hat top
+        "/**\\", # Hat brim
+        "|••|", # Glowing eyes
+        "\\__/", # Robe bottom
+    ]
+    
+    for i, row in enumerate(mage):
+        if 0 <= y-3+i < height:  # Start 3 rows up from position
+            for j, char in enumerate(row):
+                if 0 <= x-1+j < width:  # Center horizontally (-1 offset)
+                    if char != ' ':  # Don't draw spaces
+                        stdscr.addstr(y-3+i, x-1+j, char, color_id)
+
+def dodge(stdscr, state, getchs):
     height, width = stdscr.getmaxyx()
     stdscr.clear()
 
     if not "init" in state or not state["init"]:
-        state["init"] = True
-        state["init_time"] = time.time()
-        state["player_pos"] = [int(width / 2), int(height / 2)]
-        state["explosions"] = []
-        state["next_exp_time"] = time.time() - 1
-        state["total_movement"] = 0
-        state["player_health"] = 3
-        state["player_hit_time"] = 0
-        state["num_explosions_survived"] = 0
+        state.update(init_dodge_state(width, height))
 
-    #move, using local variables so we can compute the delta to compute score
-    i, j = state["player_pos"]
-    if (119 in getchs): #w
-        j -= SPEED
+    # Handle player movement
+    i, j = handle_player_movement(state, getchs, width, height)
 
-    if (97 in getchs): #a
-        i -= SPEED
-
-    if (115 in getchs): #s
-        j += SPEED
-
-    if (100 in getchs): #d
-        i += SPEED
-    state["total_movement"] += dist((i, j), state["player_pos"])
-    state["player_pos"] = [i, j]
-
-    i = min(max(i, 0), width - 1)
-    j = min(max(j, 0), height - 1)
-
-    #explosion will go off at the indicated time.time()
-    #after that, it will be around for 1 second as a danger zone, anything in danger zone dies
-    explosions = state["explosions"]
-    next_exp_time = state["next_exp_time"]
+    # Process explosions and timing
     t = time.time()
-    #spawn explosions, only after some time has passed since start
-    if t > (state["init_time"] + INIT_SAFE_TIME) and t > next_exp_time:
-        explosions.append([int(random.random() * width / 4 + i - width / 4),
-                           int(random.random() * height / 4 + j - height / 4),
-                           int(random.random() * 10 + 3),
-                           time.time() + 1.0])
-        if random.random() < 0.5:
-            explosions[len(explosions) - 1][2] = int(random.random() * -4)
-        state["next_exp_time"] = time.time() + .5 + random.random()
+    game_time = t - state["init_time"]
 
+    # Draw sigil first (if it exists) so it's in the background
+    if state["sigil_pos"] is not None:
+        draw_sigil(stdscr, state["sigil_pos"][0], state["sigil_pos"][1], state["still_time"], width, height)
 
-    #player turns red while invuln
-    player_col = 0
+    # Spawn new explosions
+    if t > (state["init_time"] + INIT_SAFE_TIME) and t > state["next_exp_time"]:
+        state["explosions"].append(create_explosion(game_time, i, j, width))
+        state["next_exp_time"] = t + .5 + random.random()
+
+    # Handle player invulnerability
     player_invuln = state["player_hit_time"] > 0 and (t - state["player_hit_time"]) < PLAYER_INVULN_LEN
-    if player_invuln:
-        player_col = 1
+    player_col = 1 if player_invuln else 0
 
-    #process explosions
-    for explosion in explosions:
-        exp_i, exp_j, exp_rad, ep_det_t = explosion
-
-        #explosion hangs around for N frames
-        if (t > ep_det_t + 1.0 / REFERSH_RATE * EXPLOSION_FRAMES):
-            explosions.remove(explosion)
+    # Process and draw explosions on top of sigil
+    for explosion in state["explosions"][:]:
+        if (t > explosion[3] + 1.0 / REFERSH_RATE * EXPLOSION_FRAMES):
+            state["explosions"].remove(explosion)
             state["num_explosions_survived"] += 1
             continue
 
-        #draw
-        color_id = 2
-        if (t > ep_det_t): #red if fire, yellow if telegraph
-            color_id = 1
-        if exp_rad > 0:
-            for exp_ii in range(max(exp_i - exp_rad, 0), min(exp_i + exp_rad, width - 1)):
-                for exp_jj in range(max(exp_j - exp_rad, 0), min(exp_j + exp_rad, height - 1)):
-                    if (dist((exp_ii, exp_jj), (exp_i, exp_j)) < exp_rad):
-                        stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
-        else:
-            d = abs(exp_rad)
-            r = (ep_det_t - t) * math.pi * 0.5 if abs(exp_rad) <= 2 else 0
-            for exp_ii in range(0, width - 1):
-                for exp_jj in range(0, height - 1):
-                    x_rel = exp_ii - exp_i
-                    y_rel = exp_jj - exp_j
-                    x_rel_rot = x_rel * math.cos(r) - y_rel * math.sin(r)
-                    y_rel_rot = y_rel * math.cos(r) + x_rel * math.sin(r)
-                    if abs(x_rel_rot) < d or abs(y_rel_rot) < d:
-                        stdscr.addstr(exp_jj, exp_ii, "*", curses.color_pair(color_id))
+        # Draw explosion (now always on top)
+        color_id = 1 if t > explosion[3] else 2  # red if active, yellow if telegraph
+        draw_explosion(stdscr, explosion, width, height, color_id)
 
-        #compute damage, end if game death
-        if t > ep_det_t and not player_invuln and  dist((i, j), (exp_i, exp_j)) < exp_rad:
-            state["player_health"] = state["player_health"] - 1
-            state["player_hit_time"] = time.time()
-            if (state["player_health"] <= 0):
-                #game over screen -- wait for keypress
-                game_over_str = "Game Over!  moved: {}, survived: {}".format(state["total_movement"], state["num_explosions_survived"])
-                stdscr.clear()
-                stdscr.addstr(int(height / 2), int(width / 2 - len(game_over_str) / 2), game_over_str, curses.color_pair(0))
-                #block until player hits a key
-                stdscr.nodelay(0)
-                stdscr.getch()
-                stdscr.nodelay(1)
-                #force reinit
-                state["init"] = False
-                pass
+        # Check collision
+        if t > explosion[3] and not player_invuln:
+            if check_explosion_collision(explosion, (i, j)):
+                state["player_health"] -= 1
+                state["player_hit_time"] = t
+                if state["player_health"] <= 0:
+                    # Calculate final score with multiplier
+                    final_score = state["num_explosions_survived"] * state.get("current_multiplier", 1.0)
+                    game_over_str = "Game Over!  moved: {:.1f}, survived: {:.1f}".format(
+                        state["total_movement"], final_score)
+                    stdscr.clear()
+                    stdscr.addstr(int(height / 2), int(width / 2 - len(game_over_str) / 2), 
+                                game_over_str, curses.color_pair(0))
+                    stdscr.nodelay(0)
+                    stdscr.getch()
+                    stdscr.nodelay(1)
+                    state["init"] = False
+                    return
 
-
-    state["explosions"] = explosions
-
-    #draw status and gui
-    stdscr.addstr(0, 0, "blm simulator 2021", curses.color_pair(1))
-    health_str = "<3 " * state["player_health"]
-    score_str = "moved: {}, survived: {}".format(state["total_movement"], state["num_explosions_survived"])
-    stdscr.addstr(0, width - len(score_str) - len(health_str), health_str, curses.color_pair(1))
-    stdscr.addstr(0, width - len(score_str), score_str, curses.color_pair(2))
-
-    #draw player, overwriting explosion if in it
-    stdscr.addstr(j, i, "*", curses.color_pair(player_col))
-
-    pass
+    # Draw GUI and player last
+    draw_gui(stdscr, state, width, game_time)
+    draw_player(stdscr, j, i, width, height, curses.color_pair(player_col))
 
 def main(stdscr):
-
     modes = ["bounce", "dodge"]
     mode_funcs = [bounce, dodge]
     mode_states = [{}] * len(modes)
@@ -197,7 +403,7 @@ def main(stdscr):
 
     curses.curs_set(0)
     height, width = stdscr.getmaxyx()
-    stdscr.nodelay(1) # set getch() non-blocking
+    stdscr.nodelay(1)  # set getch() non-blocking
 
     curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
     curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
@@ -208,17 +414,17 @@ def main(stdscr):
 
     bounce_state = {}
     while(True):
-        #update height and width
+        # update height and width
         stdscr.refresh()
-        #todo, find a way to get multiple key presses so we can do more complex input
+        # todo, find a way to get multiple key presses so we can do more complex input
         chs = [stdscr.getch()]
-        if (32 in chs): #space
+        if (32 in chs):  # space
             mode = (mode + 1) % len(modes)
         mode_funcs[mode](stdscr, mode_states[mode], chs)
         time.sleep(1.0 / REFERSH_RATE)
 
 if __name__=='__main__':
-    #general globals
+    # general globals
     height = 0
     width = 0
     n_colors = 5
