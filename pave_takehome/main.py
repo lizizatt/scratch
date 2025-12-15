@@ -27,6 +27,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from trajectory import (
+    detect_cracks,
+    plan_trajectory_from_mask,
+    visualize_rgbd_and_trajectory,
+)
+
 
 RGB_PATTERN = re.compile(
     r"^(?P<scene_id>[0-9A-Z]+)_rgb_(?P<timestamp>[0-9\-]+)\.jpg$"
@@ -91,7 +97,7 @@ def discover_image_pairs(data_root: Path) -> List[ImagePair]:
     return sorted(pairs, key=lambda p: (p.scene_id, p.timestamp))
 
 
-def load_pair_images(pair: ImagePair) -> Tuple["np.ndarray", "np.ndarray"]:
+def load_pair_images(pair: ImagePair) -> Tuple["object", "object"]:
     """Load RGB and depth images as numpy arrays."""
     import cv2
     import numpy as np
@@ -103,123 +109,6 @@ def load_pair_images(pair: ImagePair) -> Tuple["np.ndarray", "np.ndarray"]:
     if depth_vis is None:
         raise RuntimeError(f"Failed to read depth image: {pair.depth_path}")
     return rgb, depth_vis
-
-
-def detect_cracks(rgb: "np.ndarray", depth_vis: "np.ndarray") -> "np.ndarray":
-    """Stub: detect crack pixels.
-
-    This is where you should experiment with:
-      - filtering / denoising,
-      - edge detection / ridge detection,
-      - combining RGB + depth cues,
-      - morphological ops to clean up the mask.
-
-    For now, this returns an empty mask with the same height/width.
-    """
-    import numpy as np
-
-    h, w = depth_vis.shape[:2]
-    return np.zeros((h, w), dtype=np.uint8)
-
-
-def plan_trajectory_from_mask(mask: "np.ndarray") -> List[Tuple[float, float, float]]:
-    """Stub: convert a binary crack mask into a 3D XYZ gantry trajectory.
-
-    You might:
-      - skeletonize the mask to a 1-pixel-wide curve,
-      - extract ordered polylines,
-      - convert from pixel coordinates to gantry coordinates using your
-        camera / robot assumptions.
-
-    For now, we create a simple dummy trajectory: a straight line across the
-    middle of the image at a fixed "height" in this RGBD space. When you
-    implement this for real, you should output a sequence of (x, y, z)
-    waypoints in gantry space that trace the crack(s) at the appropriate
-    application height.
-    """
-    import numpy as np
-
-    h, w = mask.shape[:2]
-    num_points = 50
-    xs = np.linspace(0, w - 1, num_points, dtype=float)
-    y = float(h // 2)
-    z = 128.0  # dummy "height" in depth units
-    return [(float(x), y, z) for x in xs]
-
-
-def rgbd_to_point_cloud(
-    rgb: "np.ndarray", depth_vis: "np.ndarray", stride: int = 4
-) -> Tuple["np.ndarray", "np.ndarray"]:
-    """Convert RGB + 8-bit depth visualization into a simple 3D point cloud.
-
-    We treat:
-      - X = image column (u)
-      - Y = image row (v)
-      - Z = depth_vis intensity (0–255)
-
-    This is not metrically accurate but is sufficient for debugging and
-    visualization of fused RGBD structure.
-    """
-    import numpy as np
-
-    h, w = depth_vis.shape[:2]
-    ys, xs = np.mgrid[0:h:stride, 0:w:stride]
-    zs = depth_vis[::stride, ::stride].astype(np.float32)
-
-    xs = xs.astype(np.float32).ravel()
-    ys = ys.astype(np.float32).ravel()
-    zs = zs.ravel()
-
-    points = np.stack([xs, ys, zs], axis=1)
-
-    colors = rgb[::stride, ::stride, :].reshape(-1, 3).astype(np.float32) / 255.0
-    return points, colors
-
-
-def visualize_rgbd_and_trajectory(
-    rgb: "np.ndarray",
-    depth_vis: "np.ndarray",
-    trajectory_xyz: List[Tuple[float, float, float]],
-    out_path: Path | None = None,
-    show: bool = False,
-) -> None:
-    """Visualize the fused RGBD point cloud and XYZ trajectory using matplotlib."""
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  (needed for 3D)
-    import numpy as np
-
-    points, colors = rgbd_to_point_cloud(rgb, depth_vis, stride=4)
-
-    fig = plt.figure(figsize=(8, 6))
-    ax = fig.add_subplot(111, projection="3d")
-
-    ax.scatter(
-        points[:, 0],
-        points[:, 1],
-        points[:, 2],
-        c=colors,
-        s=1,
-        depthshade=False,
-    )
-
-    if trajectory_xyz:
-        traj = np.array(trajectory_xyz, dtype=float)
-        ax.plot(traj[:, 0], traj[:, 1], traj[:, 2], color="red", linewidth=2)
-
-    ax.set_xlabel("X (image column)")
-    ax.set_ylabel("Y (image row)")
-    ax.set_zlabel("Z (depth intensity)")
-    ax.set_title("Fused RGBD point cloud with XYZ trajectory")
-    ax.view_init(elev=60, azim=-60)
-
-    if out_path is not None:
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=150, bbox_inches="tight")
-
-    if show:
-        plt.show()
-
-    plt.close(fig)
 
 
 def save_trajectory(
@@ -272,7 +161,9 @@ def run_pipeline(
         if do_viz:
             viz_dir = viz_dir or (output_dir / "viz")
             viz_path = viz_dir / f"{pair.scene_id}_{pair.timestamp}_viz.png"
-            visualize_rgbd_and_trajectory(rgb, depth_vis, trajectory, viz_path, show=False)
+            visualize_rgbd_and_trajectory(
+                rgb, depth_vis, trajectory, mask=mask, out_path=viz_path, show=False
+            )
 
 
 def interactive_view_pair(data_root: Path, index: int) -> None:
@@ -301,7 +192,7 @@ def interactive_view_pair(data_root: Path, index: int) -> None:
 
     # No file output here; just pop up an interactive viewer.
     visualize_rgbd_and_trajectory(
-        rgb, depth_vis, trajectory_xyz=trajectory, out_path=None, show=True
+        rgb, depth_vis, trajectory_xyz=trajectory, mask=mask, out_path=None, show=True
     )
 
 
