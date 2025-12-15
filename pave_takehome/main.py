@@ -31,6 +31,7 @@ from trajectory import (
     detect_cracks,
     plan_trajectory_from_mask,
     visualize_rgbd_and_trajectory,
+    compute_runtime,
 )
 
 
@@ -112,20 +113,91 @@ def load_pair_images(pair: ImagePair) -> Tuple["object", "object"]:
 
 
 def save_trajectory(
-    out_dir: Path, pair: ImagePair, trajectory: List[Tuple[float, float, float]]
+    out_dir: Path,
+    pair: ImagePair,
+    trajectory: List[Tuple[float, float, float]],
+    trajectory_length: float,
+    runtime_seconds: float,
+    printhead_speed: float,
 ) -> None:
     """Save a simple JSON representation of the planned XYZ gantry trajectory."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{pair.scene_id}_{pair.timestamp}_trajectory.json"
+    # Descriptive prefix, no duplicate suffix.
+    out_path = out_dir / f"metadata_{pair.scene_id}_{pair.timestamp}.json"
+
+    # Ensure trajectory is JSON-serializable (plain Python floats, not numpy types).
+    trajectory_clean = [(float(x), float(y), float(z)) for (x, y, z) in trajectory]
     payload = {
         "scene_id": pair.scene_id,
         "timestamp": pair.timestamp,
         "rgb": str(pair.rgb_path),
         "depth": str(pair.depth_path),
         # XYZ gantry positions in robot gantry frame 
-        "trajectory_xyz": trajectory,
+        "trajectory_xyz": trajectory_clean,
+        "trajectory_length_units": float(trajectory_length),
+        "printhead_speed_units_per_sec": float(printhead_speed),
+        "estimated_runtime_seconds": float(runtime_seconds),
     }
     out_path.write_text(json.dumps(payload, indent=2))
+
+
+def process_pair(
+    pair: ImagePair,
+    output_dir: Path,
+    save_json: bool,
+    do_viz: bool,
+    viz_dir: Path | None,
+    show_viz: bool,
+    verbose: bool = False,
+) -> None:
+    """Run detection, planning, and optional viz for a single image pair."""
+    if verbose:
+        print(
+            f"scene_id={pair.scene_id} ts={pair.timestamp} "
+            f"rgb={pair.rgb_path.name} depth={pair.depth_path.name}"
+        )
+
+    rgb, depth_vis = load_pair_images(pair)
+
+    mask = detect_cracks(rgb, depth_vis)
+    trajectory = plan_trajectory_from_mask(mask, rgb, depth_vis)
+    trajectory_length, runtime_seconds = compute_runtime(trajectory)
+
+    # Per-pair output directory that will contain JSON + all viz for this pair.
+    pair_dir = output_dir / f"{pair.scene_id}_{pair.timestamp}"
+    pair_dir.mkdir(parents=True, exist_ok=True)
+
+    if save_json:
+        save_trajectory(
+            pair_dir,
+            pair,
+            trajectory,
+            trajectory_length=trajectory_length,
+            runtime_seconds=runtime_seconds,
+            printhead_speed=compute_runtime.__defaults__[0]
+            if compute_runtime.__defaults__
+            else 50.0,
+        )
+
+    if do_viz:
+        if show_viz:
+            viz_path: Path | None = None
+        else:
+            # Save viz images into the same per-pair folder as the JSON.
+            viz_path = pair_dir / f"trajectory_and_mask_{pair.scene_id}_{pair.timestamp}.png"
+
+        visualize_rgbd_and_trajectory(
+            rgb,
+            depth_vis,
+            trajectory_xyz=trajectory,
+            mask=mask,
+            runtime_seconds=runtime_seconds,
+            printhead_speed=compute_runtime.__defaults__[0]
+            if compute_runtime.__defaults__
+            else 50.0,
+            out_path=viz_path,
+            show=show_viz,
+        )
 
 
 def run_pipeline(
@@ -145,25 +217,16 @@ def run_pipeline(
 
     for i, pair in enumerate(pairs, start=1):
         if verbose:
-            print(
-                f"[{i}/{len(pairs)}] "
-                f"scene_id={pair.scene_id} ts={pair.timestamp} "
-                f"rgb={pair.rgb_path.name} depth={pair.depth_path.name}"
-            )
-
-        rgb, depth_vis = load_pair_images(pair)
-
-        # TODO: insert your own preprocessing / visualization here.
-        mask = detect_cracks(rgb, depth_vis)
-        trajectory = plan_trajectory_from_mask(mask)
-        save_trajectory(output_dir, pair, trajectory)
-
-        if do_viz:
-            viz_dir = viz_dir or (output_dir / "viz")
-            viz_path = viz_dir / f"{pair.scene_id}_{pair.timestamp}_viz.png"
-            visualize_rgbd_and_trajectory(
-                rgb, depth_vis, trajectory, mask=mask, out_path=viz_path, show=False
-            )
+            print(f"[{i}/{len(pairs)}] ", end="")
+        process_pair(
+            pair=pair,
+            output_dir=output_dir,
+            save_json=True,
+            do_viz=do_viz,
+            viz_dir=viz_dir,
+            show_viz=False,
+            verbose=verbose,
+        )
 
 
 def interactive_view_pair(data_root: Path, index: int) -> None:
@@ -186,13 +249,15 @@ def interactive_view_pair(data_root: Path, index: int) -> None:
         f"rgb={pair.rgb_path.name} depth={pair.depth_path.name}"
     )
 
-    rgb, depth_vis = load_pair_images(pair)
-    mask = detect_cracks(rgb, depth_vis)
-    trajectory = plan_trajectory_from_mask(mask)
-
-    # No file output here; just pop up an interactive viewer.
-    visualize_rgbd_and_trajectory(
-        rgb, depth_vis, trajectory_xyz=trajectory, mask=mask, out_path=None, show=True
+    # No JSON or PNG output here; just pop up an interactive viewer.
+    process_pair(
+        pair=pair,
+        output_dir=Path("."),  # unused when save_json=False
+        save_json=False,
+        do_viz=True,
+        viz_dir=None,
+        show_viz=True,
+        verbose=False,
     )
 
 
