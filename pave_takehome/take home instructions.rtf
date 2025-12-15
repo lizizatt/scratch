@@ -1,0 +1,22 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2865
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fmodern\fcharset0 Courier;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue255;\red255\green255\blue255;\red0\green0\blue0;
+\red0\green0\blue109;\red1\green31\blue103;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c100000;\cssrgb\c100000\c100000\c100000;\cssrgb\c0\c0\c0;
+\cssrgb\c0\c6275\c50196;\cssrgb\c0\c18185\c48021;}
+\margl1440\margr1440\vieww11520\viewh10400\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs28 \cf2 \cb3 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 # Pave Robotics Take Home\
+\pard\pardeftab720\partightenfactor0
+\cf0 \cb1 \strokec4 \
+\pard\pardeftab720\partightenfactor0
+\cf0 \cb3 Here at Pave, our first focus is on asphalt crack sealing. To accomplish this, our robot detects cracks in the road and uses its gantry end effector to squeeze sealant over each crack, almost like a hot glue gun for asphalt. To enable this operation, we use an active stereo depth camera ({\field{\*\fldinst{HYPERLINK "https://shop.luxonis.com/products/oak-d-pro?variant=42455252369631"}}{\fldrslt OAK-D Pro}}) which returns us a 1280x800 RGB image of the road as well as its corresponding depth map rectified to the RGB camera frame.\cb1 \
+\
+\cb3 We are concerned in cleaning this data, detecting the cracks, and planning a trajectory for the robot to follow. In \cf5 \strokec5 `./data`\cf0 \strokec4 , you will find 2 folders containing readings from the sensor from real world conditions. \cf5 \strokec5 `/RGB`\cf0 \strokec4  contains the RGB camera data while \cf6 `/DEPTH`\cf0  contains the 8-bit visual depth maps generated from the stereo pair on board the OAK-D for each RGB image. Some of these images are relatively difficult to extract features from, and some have no cracks at all. We encourage you to attempt your work on the harder examples as our perception algorithms must generalize to arbitrary road conditions.\cb1 \
+\
+\cb3 Your task is to use the next 2 hours to develop some pipeline that intakes the raw data and outputs a trajectory for the robot to follow to seal the cracks present in each image. To accomplish this, assume the robot has an XYZ cartesian gantry with a dedicated actuator for each axis.\
+\
+Use this as an opportunity to showcase your ability to think critically and creatively with data. You are free to use any resources at your disposal (documentation, Google, ChatGPT, etc.). Additionally, feel free to list any assumptions you make about the rest of the system to accomplish this task within your writeup (i.e. position of the gantry relative to the camera, camera optical parameters, etc.). Our metric of success is not binary, in that we are more interested in how you approach a problem like this and how far you can get in 2 hours rather than a fully polished and functional solution.}
