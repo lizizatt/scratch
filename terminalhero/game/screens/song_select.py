@@ -67,7 +67,115 @@ def visible_slice(songs: list, selected: int, visible_rows: int) -> tuple[list, 
 # Curses renderer
 # ---------------------------------------------------------------------------
 
-_FOOTER = " ↑↓ Navigate   Enter/Space Select   Q Quit "
+# Canonical ordering for display (most→least common)
+_DIFFICULTY_ORDER = [
+    'ExpertSingle', 'HardSingle', 'MediumSingle', 'EasySingle',
+    'ExpertDouble', 'HardDouble', 'MediumDouble', 'EasyDouble',
+]
+
+# Human-readable labels for each chart-section key
+_DIFFICULTY_LABELS: dict[str, str] = {
+    'ExpertSingle': 'Expert',
+    'HardSingle':   'Hard',
+    'MediumSingle': 'Medium',
+    'EasySingle':   'Easy',
+    'ExpertDouble': 'Expert (Co-op)',
+    'HardDouble':   'Hard (Co-op)',
+    'MediumDouble': 'Medium (Co-op)',
+    'EasyDouble':   'Easy (Co-op)',
+}
+
+
+def _format_difficulty(key: str) -> str:
+    """Return a human-readable label for a chart-section difficulty key."""
+    return _DIFFICULTY_LABELS.get(key, key)
+
+
+def _sort_difficulties(keys: list[str]) -> list[str]:
+    """Sort difficulty keys in canonical order; unknown keys go at the end."""
+    known = [k for k in _DIFFICULTY_ORDER if k in keys]
+    unknown = sorted(k for k in keys if k not in _DIFFICULTY_ORDER)
+    return known + unknown
+
+
+_SONG_FOOTER = " ↑↓ Navigate   Enter/Space Select   Q Quit "
+_DIFF_FOOTER = " ↑↓ Navigate   Enter/Space Select   Esc/Q Back "
+
+
+def difficulty_select(
+    stdscr: "curses._CursesWindow",
+    song: "SongInfo",
+) -> "str | None":
+    """
+    Show a difficulty picker for *song*.
+
+    Returns the chosen difficulty key (e.g. ``'ExpertSingle'``) or ``None``
+    if the player pressed Escape/Q to go back to song select.
+    """
+    difficulties = _sort_difficulties(song.available_difficulties)
+    if not difficulties:
+        return None
+
+    # Default selection: Expert if present, else first available
+    if 'ExpertSingle' in difficulties:
+        selected = difficulties.index('ExpertSingle')
+    else:
+        selected = 0
+
+    curses.curs_set(0)
+    stdscr.keypad(True)
+
+    while True:
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+
+        # Header — song title centred
+        header = f" {song.display_name} "
+        stdscr.attron(curses.color_pair(_CP_TITLE) | curses.A_BOLD)
+        stdscr.addstr(0, max(0, (w - len(header)) // 2), header[:w])
+        stdscr.attroff(curses.color_pair(_CP_TITLE) | curses.A_BOLD)
+
+        # Sub-header
+        sub = "Select Difficulty"
+        stdscr.attron(curses.color_pair(_CP_DIM))
+        stdscr.addstr(1, max(0, (w - len(sub)) // 2), sub[:w])
+        stdscr.attroff(curses.color_pair(_CP_DIM))
+
+        # Difficulty list — centred block
+        list_top = 3
+        for i, key in enumerate(difficulties):
+            row = list_top + i
+            if row >= h - 2:
+                break
+            label = f"  {_format_difficulty(key)}  "
+            col = max(0, (w - len(label)) // 2)
+            if i == selected:
+                stdscr.attron(curses.color_pair(_CP_SELECTED) | curses.A_BOLD)
+                stdscr.addstr(row, col, label[:w])
+                stdscr.attroff(curses.color_pair(_CP_SELECTED) | curses.A_BOLD)
+            else:
+                stdscr.attron(curses.color_pair(_CP_DIM))
+                stdscr.addstr(row, col, label[:w])
+                stdscr.attroff(curses.color_pair(_CP_DIM))
+
+        # Footer
+        footer_row = h - 1
+        stdscr.attron(curses.color_pair(_CP_FOOTER))
+        stdscr.addstr(footer_row, 0, _DIFF_FOOTER[: w - 1].ljust(w - 1))
+        stdscr.attroff(curses.color_pair(_CP_FOOTER))
+
+        stdscr.refresh()
+
+        key = stdscr.getch()
+
+        if key in (curses.KEY_UP, ord('k')):
+            selected = (selected - 1) % len(difficulties)
+        elif key in (curses.KEY_DOWN, ord('j')):
+            selected = (selected + 1) % len(difficulties)
+        elif key in (ord('\n'), ord('\r'), ord(' ')):
+            return difficulties[selected]
+        elif key in (ord('q'), ord('Q'), 27):   # ESC or Q → back
+            return None
 
 
 def song_select(stdscr: "curses._CursesWindow", songs: list["SongInfo"]) -> "SongInfo | None":
@@ -124,7 +232,7 @@ def song_select(stdscr: "curses._CursesWindow", songs: list["SongInfo"]) -> "Son
         # Footer
         footer_row = h - 1
         stdscr.attron(curses.color_pair(_CP_FOOTER))
-        stdscr.addstr(footer_row, 0, _FOOTER[: w - 1].ljust(w - 1))
+        stdscr.addstr(footer_row, 0, _SONG_FOOTER[: w - 1].ljust(w - 1))
         stdscr.attroff(curses.color_pair(_CP_FOOTER))
 
         stdscr.refresh()

@@ -3,14 +3,20 @@ Tests for the pure (non-curses) logic helpers in the screen modules.
 No curses window is created.
 """
 
+import textwrap
 import pytest
-from game.screens.song_select import compute_scroll, visible_slice, _difficulty_stars, _format_duration
+from game.screens.song_select import (
+    compute_scroll, visible_slice, _difficulty_stars, _format_duration,
+    _format_difficulty, _sort_difficulties,
+)
 from game.screens.gameplay import (
     lane_col_range, note_row, SCROLL_WINDOW_S, NUM_LANES,
     FLASH_FRAMES, JUDGMENT_FRAMES,
     _HitFlash, _JudgmentDisplay,
 )
-from game.engine.scorer import HitQuality
+from game.engine.scorer import HitQuality, Scorer
+from game.chart_parser import parse_chart
+from game.engine.hit_detector import HitDetector
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +98,52 @@ class TestFormatDuration:
 
     def test_pads_seconds(self):
         assert _format_duration(61_000) == "1:01"
+
+
+# ---------------------------------------------------------------------------
+# difficulty_select helpers
+# ---------------------------------------------------------------------------
+
+class TestFormatDifficulty:
+    def test_expert_single_returns_expert(self):
+        assert _format_difficulty('ExpertSingle') == 'Expert'
+
+    def test_hard_single_returns_hard(self):
+        assert _format_difficulty('HardSingle') == 'Hard'
+
+    def test_medium_single_returns_medium(self):
+        assert _format_difficulty('MediumSingle') == 'Medium'
+
+    def test_easy_single_returns_easy(self):
+        assert _format_difficulty('EasySingle') == 'Easy'
+
+    def test_expert_double_returns_coop_label(self):
+        assert 'Co-op' in _format_difficulty('ExpertDouble')
+
+    def test_unknown_key_returned_verbatim(self):
+        assert _format_difficulty('WeirdMode') == 'WeirdMode'
+
+
+class TestSortDifficulties:
+    def test_expert_comes_before_hard(self):
+        result = _sort_difficulties(['HardSingle', 'ExpertSingle'])
+        assert result.index('ExpertSingle') < result.index('HardSingle')
+
+    def test_canonical_order_expert_hard_medium_easy(self):
+        keys = ['EasySingle', 'MediumSingle', 'HardSingle', 'ExpertSingle']
+        result = _sort_difficulties(keys)
+        assert result == ['ExpertSingle', 'HardSingle', 'MediumSingle', 'EasySingle']
+
+    def test_unknown_keys_appended_alphabetically(self):
+        result = _sort_difficulties(['ZZZ', 'ExpertSingle', 'AAA'])
+        assert result[0] == 'ExpertSingle'
+        assert set(result[1:]) == {'AAA', 'ZZZ'}
+
+    def test_empty_list_returns_empty(self):
+        assert _sort_difficulties([]) == []
+
+    def test_single_item_returned_as_list(self):
+        assert _sort_difficulties(['HardSingle']) == ['HardSingle']
 
 
 # ---------------------------------------------------------------------------
@@ -246,3 +298,106 @@ class TestJudgmentDisplay:
 
     def test_judgment_lasts_longer_than_flash(self):
         assert JUDGMENT_FRAMES > FLASH_FRAMES
+
+
+# ---------------------------------------------------------------------------
+# Restart loop invariants
+# ---------------------------------------------------------------------------
+
+_MINIMAL_CHART = textwrap.dedent("""\
+    [Song]
+    {
+      Resolution = 192
+      Offset = 0
+    }
+    [SyncTrack]
+    {
+      0 = TS 4
+      0 = B 120000
+    }
+    [Events]
+    {
+    }
+    [ExpertSingle]
+    {
+      0 = N 0 0
+      192 = N 1 0
+      384 = N 2 0
+    }
+""")
+
+
+class TestRestartLoop:
+    """
+    The restart loop in gameplay() re-runs:
+        chart_data = parse_chart(...)
+        detector   = HitDetector(chart_data.notes)
+        scorer     = Scorer()
+
+    These tests verify the invariants each of those lines relies on.
+    """
+
+    def _chart_file(self, tmp_path):
+        p = tmp_path / "notes.chart"
+        p.write_text(_MINIMAL_CHART)
+        return p
+
+    # --- Scorer reset ---
+
+    def test_new_scorer_is_fully_zeroed(self):
+        # Simulate a completed/aborted run accumulating state.
+        old = Scorer()
+        old.record_hit(HitQuality.PERFECT)
+        old.record_hit(HitQuality.GOOD)
+        old.record_hit(HitQuality.MISS)
+
+        # Restart creates a brand-new Scorer — all counters must be zero.
+        fresh = Scorer()
+        assert fresh.score == 0
+        assert fresh.streak == 0
+        assert fresh.max_streak == 0
+        assert fresh.perfect_count == 0
+        assert fresh.good_count == 0
+        assert fresh.miss_count == 0
+
+    def test_new_scorer_multiplier_is_1(self):
+        fresh = Scorer()
+        assert fresh.multiplier == 1
+
+    # --- Note list re-parse ---
+
+    def test_parse_chart_returns_fresh_notes_each_call(self, tmp_path):
+        chart_path = self._chart_file(tmp_path)
+
+        data1 = parse_chart(str(chart_path))
+        # Simulate gameplay marking notes hit/missed.
+        for note in data1.notes:
+            note.hit = True
+            note.missed = True
+
+        # Restart re-parses — must get independent, clean note objects.
+        data2 = parse_chart(str(chart_path))
+        assert all(not n.hit for n in data2.notes)
+        assert all(not n.missed for n in data2.notes)
+
+    def test_reparsed_notes_count_matches(self, tmp_path):
+        chart_path = self._chart_file(tmp_path)
+        data1 = parse_chart(str(chart_path))
+        data2 = parse_chart(str(chart_path))
+        assert len(data1.notes) == len(data2.notes)
+
+    # --- HitDetector from fresh notes ---
+
+    def test_fresh_hit_detector_reports_no_misses_at_time_zero(self, tmp_path):
+        chart_path = self._chart_file(tmp_path)
+        data = parse_chart(str(chart_path))
+        detector = HitDetector(data.notes)
+        # At t=0 nothing has passed the miss window yet.
+        missed = detector.update(0.0)
+        assert missed == []
+
+    def test_fresh_hit_detector_last_hit_note_is_none(self, tmp_path):
+        chart_path = self._chart_file(tmp_path)
+        data = parse_chart(str(chart_path))
+        detector = HitDetector(data.notes)
+        assert detector.last_hit_note is None

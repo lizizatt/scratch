@@ -56,3 +56,15 @@ class TestNoteBasics:
         b = make_note(tick=100, lane=2, sustain_ticks=0, time_s=1.0)
         b.hit = True
         assert a == b
+
+    def test_sustain_end_s_explicit_constructor_arg_preserved(self):
+        # __post_init__ only overwrites sustain_end_s when it equals 0.0;
+        # an explicitly provided non-zero value must survive unmodified.
+        n = Note(tick=0, lane=0, sustain_ticks=480, time_s=1.0, sustain_end_s=2.75)
+        assert n.sustain_end_s == 2.75
+
+    def test_sustain_end_s_zero_default_uses_time_s(self):
+        # When sustain_end_s is omitted (defaults to 0.0) __post_init__
+        # must set it to time_s regardless of the time_s value.
+        n = Note(tick=0, lane=0, sustain_ticks=0, time_s=3.5)
+        assert n.sustain_end_s == 3.5

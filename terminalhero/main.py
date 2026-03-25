@@ -14,7 +14,7 @@ from pathlib import Path
 
 from game.song_loader import load_songs, SongInfo
 from game.screens.colors import init_all_colors
-from game.screens.song_select import song_select
+from game.screens.song_select import song_select, difficulty_select
 from game.screens.gameplay import gameplay
 from game.screens.results import results_screen
 
@@ -30,11 +30,9 @@ def _run(stdscr: "curses._CursesWindow", tracks_dir: Path) -> None:
         if chosen is None:
             return
 
-        difficulty = (
-            'ExpertSingle' if 'ExpertSingle' in chosen.available_difficulties
-            else chosen.available_difficulties[0] if chosen.available_difficulties
-            else 'ExpertSingle'
-        )
+        difficulty: str | None = difficulty_select(stdscr, chosen)
+        if difficulty is None:
+            continue   # back to song select
 
         scorer = gameplay(stdscr, chosen, difficulty=difficulty)
         results_screen(stdscr, scorer, song_title=chosen.title)
