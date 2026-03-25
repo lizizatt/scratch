@@ -82,8 +82,14 @@ class AudioPlayer:
     def unpause(self) -> None:
         """Resume playback after a pause."""
         if self._playing and self._paused:
+            # Capture the resume time BEFORE calling unpause() so that any
+            # latency inside pygame (buffer refill, device reconnect, etc.)
+            # is not incorrectly charged to _paused_accum.  If it were after,
+            # _paused_accum would be too large and get_pos_s() would return a
+            # value behind the actual audio position (audio sounds ahead of notes).
+            resume_wall = time.perf_counter()
             pygame.mixer.music.unpause()
-            self._paused_accum += time.perf_counter() - self._pause_wall
+            self._paused_accum += resume_wall - self._pause_wall
             self._paused = False
 
     def stop(self) -> None:

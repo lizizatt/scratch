@@ -8,6 +8,7 @@ Renders a scrollable list of songs and returns the chosen SongInfo
 from __future__ import annotations
 
 import curses
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -98,7 +99,8 @@ def _sort_difficulties(keys: list[str]) -> list[str]:
     return known + unknown
 
 
-_SONG_FOOTER = " ↑↓ Navigate   Enter/Space Select   Q Quit "
+_SONG_FOOTER   = " ↑↓ Navigate   Enter/Space Select   Q Quit "
+_UNZIP_LABEL   = " ── Scan & unzip archives in Tracks folder ── "
 _DIFF_FOOTER = " ↑↓ Navigate   Enter/Space Select   Esc/Q Back "
 
 
@@ -178,11 +180,27 @@ def difficulty_select(
             return None
 
 
-def song_select(stdscr: "curses._CursesWindow", songs: list["SongInfo"]) -> "SongInfo | None":
+def song_select(
+    stdscr: "curses._CursesWindow",
+    songs: list["SongInfo"],
+    tracks_dir: "Path | None" = None,
+) -> "SongInfo | None":
     """
     Display the song select screen.  Returns the chosen SongInfo or None.
+
+    If *tracks_dir* is provided, a special "Unzip archives" entry is shown at
+    the bottom of the list.  Selecting it scans *tracks_dir* for .zip/.tar.gz
+    files, extracts any valid track archives, and reloads the song list.
     """
-    if not songs:
+    # Build the display list: real songs plus optional unzip action at the end.
+    # _UNZIP_SENTINEL (None) marks the special action entry.
+    _UNZIP_SENTINEL = None
+    has_unzip = tracks_dir is not None
+
+    def _make_display(song_list: list) -> list:
+        return list(song_list) + ([_UNZIP_SENTINEL] if has_unzip else [])
+
+    if not songs and not has_unzip:
         stdscr.clear()
         stdscr.addstr(0, 0, "No songs found in Tracks/. Press any key to quit.")
         stdscr.getch()
@@ -192,6 +210,8 @@ def song_select(stdscr: "curses._CursesWindow", songs: list["SongInfo"]) -> "Son
     stdscr.keypad(True)
 
     selected = 0
+    display_items = _make_display(songs)
+    status_msg: str = ""
 
     while True:
         stdscr.erase()
@@ -203,31 +223,51 @@ def song_select(stdscr: "curses._CursesWindow", songs: list["SongInfo"]) -> "Son
         stdscr.addstr(0, max(0, (w - len(header)) // 2), header[:w])
         stdscr.attroff(curses.color_pair(_CP_TITLE) | curses.A_BOLD)
 
+        # Status message row (row 1) — shown briefly after an action
+        if status_msg:
+            stdscr.attron(curses.color_pair(_CP_DIM))
+            stdscr.addstr(1, max(0, (w - len(status_msg)) // 2), status_msg[:w])
+            stdscr.attroff(curses.color_pair(_CP_DIM))
+
         # List area: rows 2 .. h-3
         list_top = 2
         list_bottom = h - 3
         visible_rows = max(1, list_bottom - list_top)
 
-        visible, sel_in_view = visible_slice(songs, selected, visible_rows)
+        visible, sel_in_view = visible_slice(display_items, selected, visible_rows)
 
-        for i, song in enumerate(visible):
+        for i, item in enumerate(visible):
             row = list_top + i
             if row >= h - 2:
                 break
             is_sel = i == sel_in_view
-            diff_str = _difficulty_stars(song.difficulty)
-            dur_str = _format_duration(song.song_length_ms)
-            line = f" {song.display_name:<{w - 20}} {diff_str} {dur_str} "
-            line = line[:w]
 
-            if is_sel:
-                stdscr.attron(curses.color_pair(_CP_SELECTED) | curses.A_BOLD)
-                stdscr.addstr(row, 0, line.ljust(w - 1))
-                stdscr.attroff(curses.color_pair(_CP_SELECTED) | curses.A_BOLD)
+            if item is _UNZIP_SENTINEL:
+                # Special action entry
+                label = _UNZIP_LABEL[:w]
+                if is_sel:
+                    stdscr.attron(curses.color_pair(_CP_SELECTED) | curses.A_BOLD)
+                    stdscr.addstr(row, 0, label.ljust(w - 1))
+                    stdscr.attroff(curses.color_pair(_CP_SELECTED) | curses.A_BOLD)
+                else:
+                    stdscr.attron(curses.color_pair(_CP_DIM))
+                    stdscr.addstr(row, 0, label[:w - 1])
+                    stdscr.attroff(curses.color_pair(_CP_DIM))
             else:
-                stdscr.attron(curses.color_pair(_CP_DIM))
-                stdscr.addstr(row, 0, line[:w - 1])
-                stdscr.attroff(curses.color_pair(_CP_DIM))
+                song = item
+                diff_str = _difficulty_stars(song.difficulty)
+                dur_str = _format_duration(song.song_length_ms)
+                line = f" {song.display_name:<{w - 20}} {diff_str} {dur_str} "
+                line = line[:w]
+
+                if is_sel:
+                    stdscr.attron(curses.color_pair(_CP_SELECTED) | curses.A_BOLD)
+                    stdscr.addstr(row, 0, line.ljust(w - 1))
+                    stdscr.attroff(curses.color_pair(_CP_SELECTED) | curses.A_BOLD)
+                else:
+                    stdscr.attron(curses.color_pair(_CP_DIM))
+                    stdscr.addstr(row, 0, line[:w - 1])
+                    stdscr.attroff(curses.color_pair(_CP_DIM))
 
         # Footer
         footer_row = h - 1
@@ -238,12 +278,24 @@ def song_select(stdscr: "curses._CursesWindow", songs: list["SongInfo"]) -> "Son
         stdscr.refresh()
 
         key = stdscr.getch()
+        status_msg = ""  # clear after each keypress
 
         if key in (curses.KEY_UP, ord('k')):
-            selected = (selected - 1) % len(songs)
+            selected = (selected - 1) % len(display_items)
         elif key in (curses.KEY_DOWN, ord('j')):
-            selected = (selected + 1) % len(songs)
+            selected = (selected + 1) % len(display_items)
         elif key in (ord('\n'), ord('\r'), ord(' ')):
-            return songs[selected]
+            chosen = display_items[selected]
+            if chosen is _UNZIP_SENTINEL:
+                # Run archive extraction then reload song list
+                from game.song_loader import _expand_archives, load_songs  # noqa: PLC0415
+                assert tracks_dir is not None
+                _expand_archives(tracks_dir)
+                songs = load_songs(tracks_dir)
+                display_items = _make_display(songs)
+                selected = min(selected, len(display_items) - 1)
+                status_msg = f" Scan complete — {len(songs)} song(s) available. "
+            else:
+                return chosen
         elif key in (ord('q'), ord('Q'), 27):   # 27 = ESC
             return None

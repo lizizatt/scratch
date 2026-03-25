@@ -23,10 +23,10 @@ DEFAULT_TRACKS = Path(__file__).parent / "Tracks"
 
 def _run(stdscr: "curses._CursesWindow", tracks_dir: Path) -> None:
     init_all_colors()
-    songs = load_songs(tracks_dir)
 
     while True:
-        chosen: SongInfo | None = song_select(stdscr, songs)
+        songs = load_songs(tracks_dir)
+        chosen: SongInfo | None = song_select(stdscr, songs, tracks_dir=tracks_dir)
         if chosen is None:
             return
 

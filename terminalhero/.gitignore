@@ -1,0 +1,4 @@
+Tracks
+tests/__pycache__/
+game/__pycache__/
+game/screens/__pycache__/

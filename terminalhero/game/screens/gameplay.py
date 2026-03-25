@@ -262,6 +262,10 @@ def gameplay(stdscr: "curses._CursesWindow", song: "SongInfo",
                     choice = pause_menu(stdscr)
                     if choice == PauseChoice.RESUME:
                         player.unpause()
+                        # Reset last_wall_time so the first post-pause dt_s
+                        # is not the entire pause duration (which would send
+                        # a huge delta to sustain_tracker and other dt consumers).
+                        last_wall_time = time.perf_counter()
                     elif choice == PauseChoice.RESTART:
                         player.stop()
                         restart_requested = True

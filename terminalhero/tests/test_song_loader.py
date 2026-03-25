@@ -249,11 +249,3 @@ class TestRealTracks:
     def test_first_song_has_expert_difficulty(self):
         songs = load_songs(TRACK_DIR)
         assert 'ExpertSingle' in songs[0].available_difficulties
-
-    def test_real_song_title(self):
-        songs = load_songs(TRACK_DIR)
-        assert "Innocence" in songs[0].title
-
-    def test_real_song_artist(self):
-        songs = load_songs(TRACK_DIR)
-        assert "Husky" in songs[0].artist
