@@ -26,6 +26,7 @@ from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
 import prepare as P
+from colregs.evaluate import evaluate_episode, rollup_episodes
 from device_util import configure_training_backend, resolve_device, torch_device_info
 from policy_infer import safe_model_predict
 
@@ -897,6 +898,7 @@ def run_eval(
     if dynamics_jitter is not None:
         plant_jitter = dynamics_jitter
     traces: List[Dict[str, Any]] = []
+    colregs_episode_scores: List[Dict[str, Any]] = []
     successes = 0
     collisions = 0
     final_ranges: List[float] = []
@@ -924,6 +926,11 @@ def run_eval(
         episode["scenario_description"] = scenario.description
         if collect_traces:
             traces.append(episode)
+            if episode.get("steps"):
+                colregs = evaluate_episode(episode)
+                episode["colregs"] = colregs
+                if colregs.get("mean_safety_S") is not None:
+                    colregs_episode_scores.append(colregs)
         if episode["success"]:
             successes += 1
         if episode["collision"]:
@@ -961,6 +968,8 @@ def run_eval(
         "eval_nominal_plant": nominal_plant.to_dict(),
         "eval_plant": nominal_plant.to_dict(),  # legacy field
     }
+    if colregs_episode_scores:
+        metrics.update(rollup_episodes(colregs_episode_scores))
     if collect_traces:
         return metrics, traces
     return metrics

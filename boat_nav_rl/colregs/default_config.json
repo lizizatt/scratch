@@ -1,0 +1,23 @@
+{
+  "R_detect_m": 900.0,
+  "R_pref_m": 200.0,
+  "R_min_m": 80.0,
+  "R_nm_m": 40.0,
+  "alpha_13_crit_deg": 45.0,
+  "alpha_14_crit_deg": 13.0,
+  "alpha_15_crit_deg": 10.0,
+  "alpha_c_deg": 80.0,
+  "beta_c_deg": 80.0,
+  "S_Rmin": 80.0,
+  "S_Rnm": 20.0,
+  "S_Rcol": 0.0,
+  "S_max": 100.0,
+  "S_max_theta": 1.0,
+  "safety_combine_mode": "multiplicative",
+  "safety_weight_range": 0.5,
+  "safety_weight_pose": 0.5,
+  "pose_reward_max_frac": 0.2,
+  "pose_effective_range_m": 50.0,
+  "R_threshold_report": 70.0,
+  "S_threshold_report": 70.0
+}
