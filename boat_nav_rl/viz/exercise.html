@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boat Nav RL — Exercise</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Exercise</h1>
+      <p class="subtitle">Three vessels · one policy · waypoint or spawn intruder</p>
+    </div>
+    <nav class="site-nav">
+      <a href="/train.html">Train</a>
+      <a href="/scenarios.html">Overview</a>
+      <a href="/exercise.html" class="active">Exercise</a>
+      <a href="/">Replay</a>
+    </nav>
+    <div class="header-actions">
+      <label>
+        Model run
+        <select id="runSelect"></select>
+      </label>
+      <button id="reloadBtn" type="button">Reload model</button>
+      <button id="resetBtn" type="button">Reset positions</button>
+    </div>
+  </header>
+
+  <main class="exercise-layout">
+    <aside id="exercisePanel">
+      <h2>Controls</h2>
+      <p class="panel-hint">
+        Choose a map mode above the chart. Waypoint: single click. Intruder: click and drag (length = speed, direction = course).
+      </p>
+      <label>
+        Intruder class
+        <select id="intruderClassSelect">
+          <option value="dinghy">Dinghy (8 m)</option>
+          <option value="workboat" selected>Workboat (15 m)</option>
+          <option value="freighter">Freighter (35 m)</option>
+        </select>
+      </label>
+      <button id="clearIntrudersBtn" type="button" class="ghost-btn">Delete intruders</button>
+      <label>
+        <input id="speedRange" type="range" min="1" max="20" step="1" value="8" />
+        <span id="speedLabel">8×</span>
+      </label>
+      <label class="checkbox-label">
+        <input id="runningToggle" type="checkbox" checked />
+        Run simulation
+      </label>
+      <dl id="vesselStats" class="vessel-stats"></dl>
+      <div class="legend">
+        <span class="swatch own"></span> Vessel A
+        <span class="swatch" style="background:#45d483"></span> Vessel B
+        <span class="swatch" style="background:#ffc857"></span> Vessel C
+        <span class="swatch goal"></span> Waypoint
+        <span class="swatch" style="background:#ff6b6b"></span> Intruder
+      </div>
+    </aside>
+
+    <section id="canvasWrap">
+      <div class="exercise-canvas-stack">
+        <div class="exercise-map-toolbar" role="group" aria-label="Map interaction mode">
+          <label class="map-mode-option">
+            <input type="radio" name="mapMode" id="modeWaypoint" value="waypoint" checked />
+            Set waypoint
+          </label>
+          <label class="map-mode-option">
+            <input type="radio" name="mapMode" id="modeIntruder" value="intruder" />
+            Spawn intruder
+          </label>
+        </div>
+        <canvas id="world" width="920" height="720"></canvas>
+      </div>
+      <div id="overlayInfo">Loading…</div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="statusLine">—</span>
+  </footer>
+
+  <script src="/api.js"></script>
+  <script src="/exercise.js"></script>
+</body>
+</html>

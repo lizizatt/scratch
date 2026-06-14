@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boat Nav RL — Training</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Training</h1>
+      <p class="subtitle">Iterate · resume · track progress over runs</p>
+    </div>
+    <nav class="site-nav">
+      <a href="/train.html" class="active">Train</a>
+      <a href="/scenarios.html">Overview</a>
+      <a href="/exercise.html">Exercise</a>
+      <a href="/">Replay</a>
+    </nav>
+  </header>
+
+  <main class="train-layout">
+    <section class="panel" id="trainPanel">
+      <h2>Start / continue training</h2>
+      <form id="trainForm" class="train-form">
+        <label>
+          Mode
+          <select id="modeSelect" name="mode">
+            <option value="navigate">Navigate</option>
+            <option value="avoid">Avoid</option>
+          </select>
+        </label>
+        <label>
+          Budget (minutes)
+          <input id="budgetMin" type="number" min="1" max="120" value="10" />
+        </label>
+        <label>
+          Parallel envs
+          <input id="nEnvs" type="number" min="1" max="32" value="16" />
+        </label>
+        <label>
+          Device
+          <select id="deviceSelect" name="device">
+            <option value="auto">Auto (GPU if available)</option>
+            <option value="cuda">GPU (CUDA)</option>
+            <option value="cpu">CPU only</option>
+          </select>
+        </label>
+        <label class="checkbox-label full">
+          <input id="dynamicsJitter" type="checkbox" />
+          Randomize ship dynamics each training episode (LTI — constant within episode)
+        </label>
+        <label>
+          Hold at goal (sec)
+          <input id="goalHoldSec" type="number" min="0" max="120" step="1" value="30" />
+        </label>
+        <p class="field-hint">
+          Episode continues after reaching the waypoint until the vessel stays in the success zone for this long.
+        </p>
+        <label class="checkbox-label full">
+          <input id="currentEnabled" type="checkbox" checked />
+          Random water current during training and eval (0–0.5 m/s, LTI per episode)
+        </label>
+        <label class="checkbox-label full">
+          <input id="montageEnabled" type="checkbox" />
+          Save eval montage PNGs after run (~2–15s post-eval; browser preview always free)
+        </label>
+        <label class="checkbox-label full">
+          <input id="robustEval" type="checkbox" />
+          Extra robust eval on finish (perturbed plants, slower post-eval pass)
+        </label>
+        <fieldset id="plantPanel" class="plant-panel full">
+          <legend>Nominal ship (used for eval; editable when jitter is off)</legend>
+          <div class="plant-grid">
+            <label>
+              Heading τ (s)
+              <input id="tauHeading" type="number" min="0.5" max="15" step="0.1" value="3.0" />
+            </label>
+            <label>
+              Speed τ (s)
+              <input id="tauSpeed" type="number" min="0.5" max="20" step="0.1" value="4.0" />
+            </label>
+            <label>
+              Max yaw rate (°/s)
+              <input id="maxYawRate" type="number" min="3" max="30" step="0.5" value="15" />
+            </label>
+          </div>
+          <p class="field-hint">
+            Jitter samples between agile (1.5s / 2.0s / 22°/s) and freighter (8s / 10s / 6°/s).
+            When jitter is off, training uses the nominal ship above; eval still samples
+            agile↔freighter plant and water current each episode (LTI within episode).
+          </p>
+          <div class="plant-presets">
+            <button type="button" id="presetNominal" class="ghost-btn">Nominal</button>
+            <button type="button" id="presetAgile" class="ghost-btn">Agile</button>
+            <button type="button" id="presetFreighter" class="ghost-btn">Freighter</button>
+          </div>
+        </fieldset>
+        <label>
+          Resume from run
+          <select id="resumeSelect">
+            <option value="">Fresh start</option>
+          </select>
+        </label>
+        <label class="full">
+          Notes
+          <input id="notesInput" type="text" placeholder="e.g. iter 3 — stronger goal reward" />
+        </label>
+        <div class="form-actions full">
+          <button id="startBtn" type="submit">Start training</button>
+          <button id="pauseBtn" type="button" disabled>Pause current run</button>
+        </div>
+      </form>
+      <div id="jobStatus" class="job-status idle">Idle</div>
+      <pre id="trainLog" class="train-log"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>Goal distance ↓ should decrease</h2>
+      <p class="panel-hint">Held-out eval set only (never seen in training). Lower is better.</p>
+      <div class="chart-split" id="goalChartSplit">
+        <div class="chart-pane chart-pane-completed">
+          <h3 class="chart-pane-title">Completed runs (full eval)</h3>
+          <canvas id="goalRangeChartCompleted" width="520" height="260"></canvas>
+        </div>
+        <div class="chart-pane chart-pane-live hidden" id="goalChartLivePane">
+          <h3 class="chart-pane-title">Current run (random eval subset)</h3>
+          <canvas id="goalRangeChartLive" width="520" height="260"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Eval score ↑ should increase</h2>
+      <p class="panel-hint">Success rate (navigate) or success × (1 − collisions) (avoid).</p>
+      <div class="chart-split" id="scoreChartSplit">
+        <div class="chart-pane chart-pane-completed">
+          <h3 class="chart-pane-title">Completed runs (full eval)</h3>
+          <canvas id="scoreChartCompleted" width="520" height="260"></canvas>
+        </div>
+        <div class="chart-pane chart-pane-live hidden" id="scoreChartLivePane">
+          <h3 class="chart-pane-title">Current run (random eval subset)</h3>
+          <canvas id="scoreChartLive" width="520" height="260"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel montage-panel">
+      <h2>Latest eval montage</h2>
+      <p class="panel-hint">
+        All scenarios at the same moment in time (scrub steps while waiting for the next run).
+        Shows up to 48 eval episodes; full grid on <a href="/scenarios.html">Overview</a>.
+      </p>
+      <div class="montage-controls">
+        <label>
+          Step
+          <input id="montageScrubber" type="range" min="0" max="1000" value="1000" />
+        </label>
+        <span id="montageStepLabel">—</span>
+        <a id="montageOverviewLink" href="/scenarios.html">Open overview</a>
+        <a id="montagePngLink" class="hidden" href="#" target="_blank" rel="noopener">Saved PNG</a>
+      </div>
+      <canvas id="montageCanvas" width="920" height="520"></canvas>
+      <p id="montageMeta" class="field-hint">Load a completed run to preview trajectories.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Run history</h2>
+      <div id="historyTableWrap">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Run</th>
+              <th>Mode</th>
+              <th>Score</th>
+              <th>Avg goal m</th>
+              <th>Session</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="statusLine">Ready</span>
+  </footer>
+
+  <script src="/api.js"></script>
+  <script src="/draw.js"></script>
+  <script src="/chart.js"></script>
+  <script src="/train.js"></script>
+</body>
+</html>

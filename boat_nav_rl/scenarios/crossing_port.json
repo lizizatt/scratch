@@ -1,0 +1,35 @@
+{
+  "name": "crossing_give_way_port",
+  "schema_version": 2,
+  "dt_s": 1.0,
+  "max_steps": 300,
+  "own_ship": {
+    "heading_deg": 0,
+    "speed_mps": 5.0,
+    "pos_x_m": 0,
+    "pos_y_m": 0
+  },
+  "goal": {
+    "has_goal": false,
+    "bearing_deg": null,
+    "speed_mps": null
+  },
+  "wind": {
+    "aws_mps": 8.0,
+    "awa_deg": 45
+  },
+  "contacts": [
+    {
+      "bearing_deg": 68.2,
+      "range_m": 538.5,
+      "cog_deg": 270,
+      "sog_mps": 4.0,
+      "speed_mps": 4.0,
+      "note": "Crossing from starboard — own ship typically give-way"
+    }
+  ],
+  "expected_colregs": {
+    "rule_applicability_min": 0.5,
+    "give_way_obligations_min_after_cpa": 0.8
+  }
+}

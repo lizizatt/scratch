@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boat Nav RL — Viz</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Boat Nav RL</h1>
+      <p class="subtitle">Eval replay · first-class visualization</p>
+    </div>
+    <nav class="site-nav">
+      <a href="/train.html">Train</a>
+      <a href="/scenarios.html">Overview</a>
+      <a href="/exercise.html">Exercise</a>
+      <a href="/" class="active">Replay</a>
+    </nav>
+    <div class="header-actions">
+      <label>
+        Run
+        <select id="runSelect"></select>
+      </label>
+      <label>
+        Episode
+        <select id="episodeSelect"></select>
+      </label>
+      <button id="refreshBtn" type="button">Refresh runs</button>
+      <label class="checkbox">
+        <input id="autoRefresh" type="checkbox" />
+        Auto-follow latest
+      </label>
+    </div>
+  </header>
+
+  <main>
+    <aside id="metricsPanel">
+      <h2>Metrics</h2>
+      <dl id="metricsList"></dl>
+      <h2>Playback</h2>
+      <div class="playback-controls">
+        <button id="playBtn" type="button">Play</button>
+        <label>
+          Speed
+          <input id="speedRange" type="range" min="0.25" max="4" step="0.25" value="1" />
+          <span id="speedLabel">1×</span>
+        </label>
+      </div>
+      <input id="scrubber" type="range" min="0" max="0" value="0" />
+      <div class="step-info">
+        <span id="stepLabel">Step 0 / 0</span>
+        <span id="rangeLabel">—</span>
+      </div>
+      <div class="legend">
+        <span class="swatch own"></span> Own ship
+        <span class="swatch contact"></span> Contact
+        <span class="swatch goal"></span> Goal
+        <span class="swatch trail"></span> Trail
+      </div>
+    </aside>
+
+    <section id="canvasWrap">
+      <canvas id="world" width="900" height="900"></canvas>
+      <div id="overlayInfo"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="statusLine">Loading…</span>
+  </footer>
+
+  <script src="/api.js"></script>
+  <script src="/draw.js"></script>
+  <script src="/replay.js"></script>
+</body>
+</html>

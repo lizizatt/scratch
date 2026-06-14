@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boat Nav RL — Scenario Overview</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Scenario Overview</h1>
+      <p class="subtitle">Full eval trajectories · one card per scenario</p>
+    </div>
+    <nav class="site-nav">
+      <a href="/train.html">Train</a>
+      <a href="/scenarios.html" class="active">Overview</a>
+      <a href="/exercise.html">Exercise</a>
+      <a href="/">Replay</a>
+    </nav>
+    <div class="header-actions">
+      <label>
+        Run
+        <select id="runSelect"></select>
+      </label>
+      <label>
+        Filter
+        <select id="filterSelect">
+          <option value="all">All scenarios</option>
+          <option value="success">Success only</option>
+          <option value="failure">Failed only</option>
+          <option value="collision">Collisions</option>
+        </select>
+      </label>
+      <label>
+        Category
+        <select id="categorySelect">
+          <option value="all">All categories</option>
+        </select>
+      </label>
+      <button id="refreshBtn" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <section id="summaryBar">
+    <div class="stat"><span id="statTotal">—</span><label>Scenarios</label></div>
+    <div class="stat"><span id="statSuccess" class="score-good">—</span><label>Success</label></div>
+    <div class="stat"><span id="statCollision" class="score-bad">—</span><label>Collisions</label></div>
+    <div class="stat"><span id="statScore">—</span><label>Score</label></div>
+    <div class="stat wide"><span id="statNotes">—</span><label>Run notes</label></div>
+  </section>
+
+  <main id="overviewMain">
+    <div id="scenarioGrid"></div>
+    <p id="emptyState" class="empty-state hidden">No scenarios match this filter.</p>
+  </main>
+
+  <footer>
+    <span id="statusLine">Loading…</span>
+  </footer>
+
+  <script src="/api.js"></script>
+  <script src="/draw.js"></script>
+  <script src="/scenarios.js"></script>
+</body>
+</html>

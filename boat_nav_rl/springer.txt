@@ -1,0 +1,2348 @@
+myjournal manuscript No.
+(will be inserted by the editor)
+Quantifying Protocol Evaluation for Autonomous Collision
+Avoidance
+Toward Establishing COLREGS Compliance Metrics
+Kyle Woerner · Michael R. Benjamin · Michael Novitzky · John J.
+Leonard
+Received: 12 November 2016 / Accepted: date
+Abstract Collision avoidance protocols such as COL-
+REGS are written primarily for human operators result-
+ing in a rule set that is open to some interpretation,
+difficult to quantify, and challenging to evaluate. Increas-
+ing use of autonomous control of vehicles emphasizes
+the need to more uniformly establish entry and exit
+criteria for collision avoidance rules, adopt a means
+to quantitatively evaluate performance, and establish
+a “road test” for autonomous marine vehicle collision
+avoidance. This paper presents a means to quantify and
+subsequently evaluate the otherwise subjective nature of
+COLREGS thus providing a path toward standardized
+evaluation and certification of protocol-constrained colli-
+sion avoidance systems based on admiralty case law and
+on-water experience. Notional algorithms are presented
+for evaluation of COLREGS collision avoidance rules
+to include overtaking, head-on, crossing, give-way, and
+stand-on rules as well as applicable entry criteria. These
+rules complement and enable an autonomous collision
+avoidance road test as a first iteration of algorithm cer-
+tification prior to vessels operating in human-present
+environments. Additional COLREGS rules are discussed
+for future development. Both real-time and post-mission
+protocol evaluation tools are introduced. While the mo-
+tivation of these techniques applies to improvement of
+autonomous marine collision avoidance, the concepts for
+K. Woerner, M. R. Benjamin, M. Novitzky, & J. J. Leonard
+Massachusetts Institute of Technology
+Department of Mechanical Engineering
+& Computer Science and Artificial Intelligence Laboratory
+77 Massachusetts Avenue 32-220
+Cambridge, Massachusetts, 02139 USA
+E-mail: k w@mit.edu, mikerb@mit.edu, novitzky@mit.edu,
+jleonard@mit.edu *This work was supported by the U.S. Office
+of Naval Research (Code 33: Robert Brizzolara; Code 311:
+Behzad Kamgar-Parsi and Don Wagner) and Battelle (Mike
+Mellott). Portions of this paper first appeared in [31].
+protocol evaluation and certification extend naturally
+to human-operated vessels. Evaluation of protocols gov-
+erning other physical domains may also benefit from
+adapting these techniques to their cases.
+Keywords COLREGS · autonomous collision
+avoidance · human-robot collaboration · marine
+navigation
+1 Introduction
+The ability to quantify and subsequently evaluate col-
+lision avoidance performance allows society to more
+uniformly assess capability and risk of the driver. In the
+case of autonomous collision avoidance, a means to vali-
+date the underlying algorithms to standards consistent
+with human expectations necessitates a first step toward
+quantification of performance. Improving algorithms
+and their evaluation techniques incrementally in real-
+world environments may then contribute to successively
+increasing collision avoidance performance standards
+throughout the world.
+The methods discussed in this paper are intended
+to be a first step toward a more robust and standard-
+ized autonomous collision avoidance evaluation process.
+These methods can further serve to standardize litera-
+ture regarding collision avoidance compliance, especially
+under protocol constraints such as COLREGS1 [26, 31].
+1 COLREGS refers to the international rules as formalized
+at the Convention on the International Rules for Preventing
+Collisions at Sea, developed by the International Maritime Or-
+ganization, and ratified as an international treaty by Congress.
+These rules were further formalized by the U.S. International
+Navigational Rules Act of 1977 [26], and are sometimes re-
+ferred to as the Collision Regulations outside the United
+States.
+2 Kyle Woerner et al.
+Fig. 1. Algorithms of this paper use autonomous surface
+vessel collision avoidance track data to evaluate each vehi-
+cle’s safety (top left and bottom right) and protocol compli-
+ance (top right and bottom left) based on the COLREGS
+rules, at-sea experience, maritime case law, and case stud-
+ies of past collisions. Evaluation algorithms may be tuned
+to localized requirements using a library of functions and
+configuration parameters. Both real-time and post-mission
+analysis tools are presented giving evaluators and drivers
+a means to objectively quantify the safety and protocol
+compliance using established metrics and standards. This
+paper provides the metrics necessary to complete a recently
+introduced “road test” for protocol-constrained collision
+avoidance for certifying autonomous marine vehicles to
+operate at sea in the vicinity of human-operated vessels.
+Here, blue marker rings indicate an encounter whose COL-
+REGS score fell below a threshold level. Other markers are
+shown when violations of configurable safety parameters
+occur including minimum acceptable range at CPA (green),
+range at which a near-miss occurs (yellow), and range at
+which a collision is assumed (red).
+Figure 1 demonstrates example safety and protocol com-
+pliance evaluation during on-water experimentation.
+Government certifying agencies such as the Inter-
+national Maritime Organization and its nation-state
+agents (e.g., U.S. Coast Guard, etc.) may rely on real-
+world performance and track data before issuing licenses
+to operate in open ocean or other environments where
+non-test vessels operate. Past performance and accident
+reconstruction may be objectively evaluated using real-
+world track data and a standardized set of expectations
+quantified by the algorithms of this paper.
+Insurance companies can use these performance scores
+when issuing policies for autonomous vessels or deter-
+mining fault in an accident. Regulatory bodies can use
+these metrics for an autonomous or remotely operated
+vehicle’s “road test” before certification as presented
+in [33]. Humans and machines alike may train with
+real-time feedback using measured performance of track
+data. Autonomous collision avoidance systems can use
+machine learning to improve behavior using aggregated
+data from both human-operated and autonomous vessels
+around the world. This may lead to specific tuning of
+collision avoidance systems or collision avoidance evalua-
+tion standards in different areas of the world depending
+on local customs or standards.
+With the methods of this paper, conversations in
+future literature can be more exact in their meaning of
+compliance in protocol-constrained collision avoidance
+research. This paper is organized as follows:
+– review of collision avoidance in the literature
+– introduction of collision avoidance evaluation algo-
+rithms and function libraries addressing overtaking,
+head-on, give-way, and stand-on rules
+– discussion of other collision avoidance rules as they
+relate to future development of evaluation algorithms
+– introduction of real-time and post-mission analysis
+tools for overtaking, head-on, give-way, and stand-on
+rules
+– discussion of recommendations to alter the Rules to
+be more inclusive of autonomous vessels
+– conclusion with remarks to support other collision
+avoidance domains such as ground and air vehicles
+A means to quantify the power driven rules is pre-
+sented to include a numeric scale of compliance (0-100%)
+for each applicable rule and its subsequent contribu-
+tion to the applicable categories of rules. Detailed nu-
+meric evaluation of scenarios may accompany an overall
+score to provide additional feedback and amplification of
+penalties assessed. Tuning of each algorithm’s parame-
+ters allows evaluators to control the scores corresponding
+to specific performance. The scores and thus mapping of
+numeric values to actionable results (e.g., pass, fail, etc.)
+are largely dependent on the evaluator’s tuning decisions.
+The assignment of scoring thresholds such as pass, fail,
+etc. are therefore reserved for the evaluation algorithm
+tuner or the appropriate certifying agency. The tuner in
+a developmental stage is likely the algorithm designer
+with input from standardized, published requirements as
+set by an evaluation authority (e.g., U.S. Coast Guard).
+The algorithm tuner in certification phases is likely the
+certification organization or its designated agent.
+COLREGS collision avoidance evaluation within this
+paper consists of two primary metrics: safety and pro-
+tocol compliance. Safety is based on a combination of
+range and pose of the vessels at closest point of ap-
+proach (CPA). CPA is defined as the point on ownship’s
+track where the distance to the contact reaches its mini-
+mum value within the context of an encounter. Protocol
+compliance is based on collision avoidance rule-specific
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 3
+requirements. Pose in this context refers to the rela-
+tive angles of two vessels with respect to the other
+and is introduced in Section 3. Pose at CPA, specific
+values of range at CPA, complexity of simultaneous
+contact geometries, and total contact picture are com-
+plicating factors that are not directly quantified in the
+written COLREGS except in limited circumstances or as
+a consideration without specific definition. Each of these
+factors are, however, important to collision avoidance
+decision making.
+Examination of past encounters and collisions can
+be used to help train algorithms to understand safe and
+unsafe characteristics of interactions. Protocol compli-
+ance and safety are related yet can provide additional
+value when observed in context of the other. For exam-
+ple, a sufficiently compliant maneuver with respect to
+the written rules might have varying degrees of safety
+depending on how a designer configures certain collision
+avoidance configuration parameters such as acceptable
+range at CPA. By examining the components of safety
+and compliance to include range, speed, pose, and simi-
+lar quantities, much insight into true performance can
+be inferred. Section 2 introduces COLREGS compli-
+ance as found in the literature. Section 3 discusses the
+safety metrics of evaluation. Section 4 discusses protocol
+compliance metrics and considerations for power-driven
+vessels under Rules 13-17. Section 5 provides narrative
+for other COLREGS rules that would benefit from de-
+velopment of similar evaluation techniques. Section 6
+discusses specific COLREGS testing and evaluation tech-
+niques including a function library and both pre- and
+post-mission analysis tools. Conclusions are presented
+in Section 7.
+2 COLREGS Compliance in the Literature
+Collision avoidance protocols are prevalent in many
+physical domains where explicit negotiation or commu-
+nication is either impractical or infeasible. In common
+practice, these protocols are often communicated simply
+as having “right of way.” In ground transit, drivers are
+taught to yield to the driver on the right when arriving
+simultaneously at an intersection with stop signs [5]. Air-
+planes use the Rules of the Air to determine right of way
+and appropriate maneuvers–including altitude deviation–
+when not under active control of an air traffic controller
+[10]. Surface vessels similarly abide by the COLREGS to
+determine right of way and appropriate maneuvers with-
+out explicit communication [26]. Special rules within
+each protocol have evolved from real-world feedback;
+one such example is the traffic separation schemes of
+COLREGS when entering or exiting a harbor [4, 25].
+While the Rules of the Air and COLREGS are largely
+similar, differences in the physical domains manifest
+as differences between the collision avoidance protocol
+requirements, such as maintaining altitude separation
+for aerial vehicles.
+Collision avoidance using COLREGS has been incor-
+porated on autonomous vessels using various approaches
+since first demonstrated with on-water experimenta-
+tion in [2]. Throughout maritime literature discussing
+COLREGS, the term “compliance” arises with varying
+context and meaning. Power-driven collision avoidance
+implementations of COLREGS (Rules 13-18) dominate
+the COLREGS-related collision avoidance literature.
+Other non-collision avoidance rules of COLREGS arise
+as being compliant within the literature when discussing
+light configurations [6].
+Testing in the literature predominately fails to define
+the term compliance in any quantifiable fashion with
+respect to COLREGS. Several authors claim compliance
+with these protocols without specifying the degree or
+scope of compliance [3, 11, 17, 18, 23, 24, 32]. In [11],
+the head-on rule was shown to appropriately eliminate
+all turns to port. It did not, however, appear to pre-
+fer courses that were “readily apparent” (COLREGS
+Rule 8) when finding a turn to starboard. Case law de-
+fines apparent course maneuvers to consist of a minimum
+turn of 35◦ while common practice often requires no less
+than 30◦ of heading change [1, 4, 27, 28]. Courts have
+found that head-on maneuvers with insufficient turns
+(i.e., not readily apparent) are in fact non-compliant
+and, when a collision occurs, partly to blame [1]. With
+velocity vector cost functions that favor maintaining
+course and speed such as [11], improper selection of
+costing weights may easily result in less than apparent
+course changes. Other authors consider breaches of COL-
+REGS that “may be in the USV’s best interest” such
+as turning to port to avoid a collision when explicitly
+prohibited by the COLREGS [17]. Many authors such
+as [32] simply claimed COLREGS compliance without
+any quantification or definition of scope.
+This trend in claiming unquantified compliance likely
+stems from a combination of three factors including:
+– the vagueness of the rules as written for human usage
+– the unspecified scope of each author’s work with
+respect to the numbered COLREGS rules
+– the tacit assumption that the COLREGS rules as
+written fully encompass all collision avoidance re-
+quirements
+2.1 Intentional Vagueness of COLREGS
+This intentional vagueness might allow the autonomous
+collision avoidance designer to assume some liberty to
+4 Kyle Woerner et al.
+interpret the vast array of complex collision avoidance
+scenarios without being overly restricted from a com-
+mon sense yet safe approach. However, case law and
+common practice greatly influence the requirements of
+COLREGS despite not being found anywhere within
+the written rules. Examples of on-water collisions and
+case law provide relevant insight into nuances of the
+COLREGS and their evolution over the years. Areas for
+increased scrutiny in autonomous collision avoidance so-
+lutions can be derived from problematic past encounters
+of human ship drivers. The intentional vagueness of the
+COLREGS including their underlying meaning as de-
+rived from the evolution of protocol-constrained collision
+avoidance in maritime environments, analysis of real-
+world examples, critiques of experienced mariners, and
+relevant rulings from Courts of Admiralty are presented
+in detail in [1, 4, 9, 25, 35] with examples presented as
+appropriate in this paper.
+2.2 Categories for COLREGS Scope
+A further complicating factor results from the discon-
+nect between experienced mariners and autonomous
+designers: few designers of marine autonomous collision
+avoidance algorithms have demonstrated significant ex-
+perience using COLREGS in open ocean navigation for
+non-academic purposes. The varying scope of what au-
+thors claim as compliant largely depends on the scope
+of interest of a particular researcher. For example, a
+perception and sensing author might claim COLREGS
+compliance if day shapes or vessel types are correctly
+identified using vision sensing algorithms. An acoustician
+might claim compliance for properly identified sound
+signals. The notion of compliance, however, should be
+amplified with the applicable scope of the COLREGS
+within each author’s work.
+Collision avoidance compliance in the most general
+sense involves maneuvering one’s vessel to properly in-
+teract with a contact for a given initial geometry with
+appropriate caveats for vessel type, maneuvering restric-
+tions, etc. To counter the disparity between claims and
+actual performance, the scope and requirements of COL-
+REGS compliance were quantified in [31] and [33] as
+part of an autonomous collision avoidance approach.
+The COLREGS rules were separated into categories to
+allow a vehicle to demonstrate compliance of appropri-
+ate COLREGS subsets. International Maritime Orga-
+nization guidance, US Coast Guard’s local issuance of
+inland-specific requirements, and other local guidelines
+can be adopted as appropriate.
+A few notable exceptions to this trend exist including
+work with a restricted visibility (Rule 19) compliance
+factor in [19] to give a preliminary estimate of fitness.
+A traffic separation scheme compliance factor in [21]
+measures fitness of a reference track with respect to
+the ship’s track. A fitness scheme was used in [20] to
+penalize maneuvers which grossly violated COLREGS
+such as maneuvering to port when turns to starboard
+were required.
+Several categories of scope were presented in [31] and
+[33] as a first pass means of grouping similar research and
+subsequent evaluation. Table 1 reproduces this group-
+ing for reference and discussion throughout this paper.
+With the development of metrics and evaluation tech-
+niques within each category, performance can be reliably
+demonstrated to a certifying body to a required degree
+of satisfaction. A means would then exist to properly
+combine work of differing categories to produce more
+fully compliant solutions prior to achieving the next
+level of operational or testing certification.
+Table 1. Categories of Scope for COLREGS Compli-
+ance Evaluation from [33]
+I General Rules (Rules 1-3)
+II General Conduct of Vessels (Rules 4-8)
+III Special Traffic Schemes (Rules 9-10)
+IV Sailing in Sight of Another Sailing Vessel
+(Rule 12)
+V Vessel Encounters in Sight of One Another
+(Rules 13-17)
+VI Responsibilities in Sight of One Another
+(Rules 11, 18)
+VII Restricted Visibility (Rule 19)
+VIII Lights and Shapes (Rules 20-31)
+IX Sound and Light Signals (Rules 32-37)
+X Inter-vehicle Communications
+XI Cumulative Performance Including Local
+Customs
+Rule categorization allows one designer to claim
+compliance within one or more categories (for example,
+maneuvering requirements of power driven vessels) while
+deferring evaluation of rules related to other areas (for
+example, sound identification and response) to other
+authors. By defining the scope of applicable rules and
+demonstrating quantifiable levels of compliance within
+each category, autonomous collision avoidance algorithm
+designers can more sufficiently articulate their contribu-
+tions to the literature. It should be noted that evaluation
+within the scope of one category may rely on compli-
+ance of another category to some degree. For example,
+because Category II includes maintaining a lookout, de-
+termining safe speed, determining risk of collision, and
+taking action to avoid a collision, it heavily influences
+evaluation of Categories III-VII. This paper primarily fo-
+cuses on Category V scenarios while discussing necessary
+aspects of future development of the other categories.
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 5
+2.3 Collision Avoidance and Risk
+Several approaches have been taken with respect to col-
+lision avoidance and risk in the literature. Each physical
+domain offers its unique challenges with modeling and
+assessing risk. In the maritime domain, collision risk
+assessments have often studied single vehicle pairs such
+as vessels in a traffic lane [13] or a vessel in a similar
+open ocean scenario [14]. A study of the reliability of
+quantitative risk analysis through a case study of ship-
+ship collision risk is presented in [7], which showed that
+probability and indicator based risk perspectives do not
+necessarily provide the same risk picture. A framework
+for measuring ship collision risk was presented in [8],
+though no evaluation of protocol compliance was for-
+mally considered. A methodology for assessing the colli-
+sion risk without consideration of protocol requirements
+in an electronic navigation environment with vessel state
+uncertainties was presented in [16]. A multi-ship anti-
+collision decision support formulation is presented using
+simulations in [34]. A domain violation problem was
+presented in [22] that considered both the degree of
+domain violation and time of domain violation aspects.
+A non-linear model for risk estimation which attempts
+to capture mariners judgment was presented in [15],
+largely based on data analysis from a questionnaire to
+experienced mariners.
+3 Evaluating Safety Using CPA Range and
+Pose
+Safety has traditionally been viewed in the collision
+avoidance literature as a measure of the number of colli-
+sions relative to the number of encounters. This, however,
+is inconsistent with how human-operated ships make de-
+cisions, especially in scenarios of complex multi-contact
+collision avoidance. By considering several quantities
+important to making collision avoidance decisions, safety
+performance can be quantified in a way that is more
+meaningful than simply declaring a collision or collision-
+free encounter. By approaching the evaluation problem
+in the same way that ships make maneuvering decisions
+[27, 28], closer ranges are considered to be higher risk
+even if not resulting in a collision.
+Within the scope of COLREGS, a collision avoidance
+encounter is defined to be from first detection of a
+contact that is assessed to have a risk of collision until
+the contact is past CPA, opening range, and no longer
+considered a risk of collision. Within the scope of this
+evaluation, vessels are assumed to commence a collision
+avoidance encounter once the other vessel is detected.
+Vessels detect each other at a nominal threshold range
+of Rdetect.
+While many factors are important to the CPA ver-
+nacular, the two most important values are the range
+between vessels at CPA (“CPA range”, rcpa) and the
+time until or at which CPA occurs (“time of CPA”,
+tcpa)2. A third value important to CPA calculations is
+the pose (“pose at CPA”, Θcpa). Pose in this context
+refers to a vector Θcpa = 〈αcpa, βcpa〉 denoting values
+of contact angle (α) and relative bearing (β). Relative
+bearing denotes the bearing of a contact relative to own-
+ship’s bow as 0◦. Contact angle3 refers to the relative
+bearing of ownship as seen from the perspective of the
+contact in question and serves as a clear means to dis-
+tinguish between the two relative bearings: one from the
+perspective of ownship, the other from the perspective
+of the contact. Consistent with on-ship conventions, rel-
+ative bearing is considered on the domain [0,360) and
+contact angle on the domain [-180,180). A graphical
+representation of relative bearing and contact angle is
+presented in Figure 2.
+3.1 Range at CPA
+Maneuvers that are otherwise compliant with required
+turn direction and speed but maneuver in a way that
+results in unnecessarily close range at CPA are penal-
+ized in the safety score. The resulting range and pose
+at closest point of approach are considered when penal-
+izing unsafe maneuvers. A safety score for evaluating
+autonomous collision avoidance considers four primary
+configurable range thresholds as shown in Table 2 and
+Figure 3. Range notation uses upper case R to denote
+a threshold or nominal value and a lower case r to
+denote a measured or actual value. Using these range
+thresholds, a collision avoidance decision is considered
+to desire ranges at CPA greater than some value Rpref
+while accepting a known value of risk for ranges as close
+as Rmin. Ranges closer than Rmin are considered unsafe
+and abnormal operating conditions. An encounter is
+considered to have a high risk of imminent collision if its
+range violates a “near miss” threshold Rnm. A physical
+collision is considered to occur for any violation of the
+Rcol threshold.
+3.2 Pose at CPA
+Using contact angle, relative bearing, range, and speed,
+a complete contact geometry can be realized. Contact
+2 Range at CPA sometimes appears in the literature as
+distance at CPA (DCPA). Both may be used interchangeably.
+Similarly, tcpa sometimes appears as TCPA.
+3 The term originated in World War II submarine operations
+under the names of “angle on the bow” and “target angle.”
+6 Kyle Woerner et al.
+a α = −90◦, β = 0◦
+b α = −90◦, β = 90◦
+Fig. 2. Contact angle α represents how ownship’s (labelled
+“O/S”) relative bearing is seen from the perspective of the
+contact. Contact angle is 0◦ if the contact is pointing its
+bow at ownship. Similarly α = 180◦ if the contact’s stern
+is facing ownship. Starboard-facing aspects assume positive
+values while port-facing aspects assume negative values. In
+both of these examples, ownship is far to the left and the
+contact is on course North. In (a) ownship is pointing the
+contact while in (b) the ships are on parallel tracks, both at
+the same location in 2-D space (x,y). Contact angle remains
+unchanged while relative bearing changes for the two cases.
+Table 2. Primary Threshold Ranges for Evaluation
+Range Description
+Rpref preferred range at CPA
+Rmin minimum acceptable range at CPA
+Rnm range considered as a “near miss” encounter
+Rcol range considered as a physical collision
+angle assumes positive increasing values clockwise from
+the starboard bow and negative values counterclockwise
+from the port bow, such that α = 0◦ represents the
+contact’s bow and α = ±180◦ represents the contact’s
+stern as shown in Figure 2. Pose at CPA is therefore not
+a single quantity, but rather a vector of two angles that
+give great insight into the collision avoidance problem.
+The pose at time of sighting or detection (Θ0) often
+defines which rule(s) of a protocol applies. The pose
+at CPA when combined with rcpa and relative speed
+gives considerable insight into the degree of risk at tcpa.
+Figure 4 shows relative bearing and contact angle for
+an arbitrary initial geometry and geometry at CPA.
+Figure 5 shows the importance of considering pose for
+two different encounters of the same range at CPA.
+Fig. 3. Concentric range rings represent configurable thresh-
+old range values that may be used in evaluation of safety of
+a collision avoidance encounter. While vessels nominally pre-
+fer CPA ranges greater than Rpref, maneuvers with Rpref >
+rcpa > Rmin (inside the green area) are considered allow-
+able if certain precautions are taken [27, 28]. Maneuvers with
+Rmin > rcpa > Rnm (inside the yellow area) should be consid-
+ered unsafe encounters and examined more closely to improve
+future performance. Any encounter violating a closer Rnm
+(inside the orange area) threshold is considered to be a near
+miss. Rcol denotes the range at which an actual collision is
+assumed to occur (inside the red area). Safety scores may be
+quantified using evaluator-defined functions that map specific
+values of rcpa using these threshold values. While the range
+rings of this figure only consider rcpa, pose may be factored
+into the safety score to create shapes other than concentric
+circles. Evaluation ranges shown here are not necessarily to
+scale.
+3.3 Safety Functions
+A tiered range approach allows for maneuverability con-
+siderations and quantification of a safety score between
+the minimum acceptable CPA range and preferred CPA
+range. This technique also produces a safety score for
+rcpa values closer than the minimum acceptable CPA
+range in a format more meaningful than standard bi-
+nary evaluation (collision or non-collision). While any
+rcpa closer than Rmin is undesirable, quantifying each
+encounter allows more thorough insight into the overall
+effectiveness of a collision avoidance algorithm, collision
+avoidance configuration parameters, performance un-
+der certain rule constraints, and similar considerations.
+User-defined safety functions map threshold ranges to
+safety scores. In a basic example, a linear function maps
+values between each of the configuration ranges with a
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 7
+a Initial Pose (Θ0)
+b Arbitrary Pose at CPA (Θcpa)
+Fig. 4. Ownship (labeled “O/S”) is traveling east and first
+sights a contact at relative bearing β with contact angle α
+in (a). Speed is represented by the length of the colored
+lines from each vessel (red for contact, blue for ownship).
+From the perspective of the contact looking at ownship, α
+and β are simply interchanged. These two angles give great
+insight into the collision avoidance picture and quickly aid in
+determining the applicable protocol constraints. Combined
+with CPA range and time (rcpa, tcpa), pose at CPA (Θcpa =
+〈αcpa, βcpa〉) gives important information as to risk of collision,
+collision avoidance protocol compliance, and overall safety of
+a maneuver. Relative bearing and contact angle at CPA are
+shown in (b). CPA (b) occurs when the range between contacts
+reaches its minimum value.
+a Bow-crossing Pose at CPA
+b Stern-crossing Pose at
+CPA
+Fig. 5. Ownship (labeled “O/S” and traveling north) encoun-
+ters two scenarios of a canonical track crossing with identical
+ranges at CPA. The bow crossing scenario of (a) demonstrates
+a much more dangerous encounter than the stern crossing of
+(b). While many techniques treat all ranges equally, this canon-
+ical example of equivalent ranges demonstrates the necessity of
+incorporating pose into calculations of risk and performance.0 Rcol Rnm Rmin Rpref
+0
+20%
+40%
+60%
+80%
+100%
+SRcol = 0%
+SRmin
+SRnm
+Smax = 100%
+Range at CPA (rcpa)
+Safety Score
+Safety Function
+Fig. 6. Safety scores map range and pose at CPA to a numeric
+value. This figure demonstrates a piecewise linear mapping
+of range at CPA (rcpa) to a range-based safety score Sr
+using the primary threshold ranges of Table 2. Additional
+penalty or reward may be assigned for pose considerations
+according to the evaluator’s preference of a safety function.
+Threshold evaluation ranges give safety scores at preferred
+range at CPA (Sr (Rpref) = SRpref
+), minimum acceptable
+range at CPA (Sr (Rmin) = SRmin
+), range at which a near-
+miss occurs (Sr (Rnm) = SRnm
+), and the nominal range at
+which a physical collision is assumed (Sr (Rcol) = SRcol
+).
+collision having a safety score of S = 0 and any range
+greater than preferred CPA range having a safety score
+of S = Smax = 100%. Safety functions can be tailored
+by the evaluator to create specific results based on regu-
+lations or experience. A piecewise linear safety function
+(Figure 6) demonstrates the adaptability of evaluating
+performance using multiple range thresholds.
+Figure 5 demonstrated that two identical ranges are
+not necessarily equally dangerous. For example, a ship
+crossing in front of another (ownship’s bow pointing
+a contact’s beam at CPA) may be considerably more
+dangerous than two vessels passing at the same range in
+a port-to-port or stern-to-beam arrangement. For this
+reason, incorporation of both pose and range at CPA
+may prove valuable to an evaluator of collision avoidance
+algorithms.
+A safety function (S) may include CPA values of
+both pose (Θcpa = 〈αcpa, βcpa〉) and range (rcpa) as
+shown in Equation (1). While most often evaluated at
+CPA, the safety function concept may be applied at any
+point in a collision avoidance encounter to achieve a real-
+time measurement of safety as shown in Equation (2).
+The safety function may take both range and pose com-
+ponents directly or as a combination of a range-based
+safety function (Sr) and a pose-based safety function
+(SΘ). If desired, an evaluator might consider only the
+8 Kyle Woerner et al.
+range-based safety function or only the pose-based safety
+function.
+S = S(rcpa, Θcpa) = S(Sr , SΘ ) (1)
+S = S(r, Θ) (2)
+Equation (3) defines an example range-based safety
+function Sr . This may take the form of a piecewise-
+defined function corresponding to each range threshold
+(Figure 6) or a single function defined across the en-
+tire domain. Safety functions might take other arbitrary
+shapes such as quadratic, logarithmic, or step-wise de-
+signs depending on the needs of the evaluator.
+Sr = Sr (SRmin , SRnm , Rcol, Rnm, Rmin, Rpref) (3)
+Pose-based safety functions (Equation (4)) are used
+to account for the risk associated with the degree which
+contacts are pointing each other. By combining a pose
+factor for contact angle using Equation (5) and relative
+bearing using Equation (6), an assessment may be made
+to reward beam or stern aspects at CPA up to a max-
+imum value of Smax
+Θ . Contact angles at CPA aft of a
+configurable cutoff value αc are given a uniform reward
+value. Similarly, relative bearings at CPA aft of a config-
+urable cutoff value βc are given a uniform reward value.
+Figure 7 demonstrates the pose-based safety scoring
+scheme of Equation (5) that favors non-bow pointing
+contact angles at CPA using αc = 80◦.
+SΘ = Smax
+Θ · Sα
+Θ · Sβ
+Θ (4)
+Sα
+Θ =
+{ 1−cos(αcpa)
+1−cos(αc) , if |αcpa| < αc
+1, if |αcpa| ≥ αc
+(5)
+Sβ
+Θ =
+{ 1−cos(βcpa)
+1−cos(βc) , if |βcpa| < βc
+1, if |βcpa| ≥ βc
+(6)
+An evaluator may find particular value in one form of
+a safety function over others for a given use case. These
+safety functions include range-only, pose-only, weighted
+summation, multiplicative, reward-only multiplicative,
+and effective range.
+The range-only method of Equation (3) improves the
+precision of standard approaches in collision avoidance:
+most literature currently measures safety performance
+as either a collision or a success. By approaching the
+evaluation problem in the same way that ships make
+maneuvering decisions [27, 28], additional risk may be−150 −100 −50 0 50 100 150
+0%
+20%
+40%
+60%
+80%
+100%
+αcpa [deg]
+Sα
+Θ [%]
+Pose-based Safety Function (αc = 80◦)
+Fig. 7. COLREGS pose-based safety functions can be used
+to give preference to passing contacts with relative bearing and
+contact angle that are least likely to increase risk of collision.
+This safety function shows Sα
+Θ that favors beam and stern
+contact angles at CPA (αcpa) using Equation (5). Here, a
+cutoff angle αc = 80◦ gives equal preference to beam and
+stern aspects. Pointing the bow (0◦) results in a pose-based
+safety score of SΘ = 0.
+assumed to be present at closer ranges even if they do
+not result in a collision. Even without incorporating
+pose, this technique provides evaluators with a means to
+examine encounters with higher precision than simply
+determining whether or not a collision occurred.
+The pose-only method of Equation (4) allows for
+testing safe poses at the time of encounter. On its own,
+this method might prove valuable to an evaluator in-
+terested only in determining how consistently a vessel
+passes in non-bow pointing aspects. Typically, the pose-
+based method appears with the range-based method in
+the form of a combined safety function.
+The weighted summation method of Equation (7)
+provides a means for an evaluator to consider both
+range and pose. This method limits the influence of the
+range and pose components using the weights sr and sΘ ,
+respectively. Evaluators may chose weights to emphasize
+the appropriate balance of range and pose as necessary.
+S = sr · Sr + sΘ · SΘ (7)
+sr + sΘ = 1
+The multiplicative safety function of Equation (8) re-
+quires high scores for both range and pose components
+to have an overall high safety score. Poor performance in
+either range or pose immediately results in a low safety
+score. An evaluator’s choice of Sr and SΘ is therefore
+particularly important. When using a safety function
+such as Equation (8) that requires both satisfactory
+performance of both range and pose, Smax
+Θ ≡ 1.
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 9
+S = Sr · SΘ (8)
+As an alternative to the penalty nature of pose in
+Equation (8), an evaluator may choose to use pose to
+reward vessels for passing astern, for example, up to
+some reasonable percentage defined by Smax
+Θ using Equa-
+tion (9). Reward-only multiplicative safety functions
+(Equation (9)) allow for the pose component to add a
+reward value to the original range-based safety score. In
+this reward case, an evaluator may choose to limit the
+pose reward to Smax
+Θ < 1 (e.g., 20% maximum reward).
+S = max
+(
+Sr · (1 + SΘ ), 100%
+)
+(9)
+The effective range method of Equation (10) directly
+adds some range value to the actual rcpa based on a
+pose-based safety score SΘ. This effective range reff
+(Equation (11)) is then used as the input of a range-
+based safety function to compute the overall safety score
+at CPA for r = reff rather than r = rcpa. The true rcpa
+value may not be compensated more than some max-
+imum possible pose-reward rΘ. This technique allows
+for pose to effectively improve the rcpa which is seen
+by the safety function as though range were actually at
+reff. In contrast, a technique such as the reward-only
+multiplicative of Equation (9) uses a proportional re-
+ward rather than the absolute maximum reward of the
+effective range method.
+S = S(reff) (10)
+reff = r + SΘ · rΘ (11)
+Algorithm 1 demonstrates assessment of safety as a
+function of both range and pose. Table 3 summarizes
+the different means of computing safety scores.
+Algorithm 1 General Approach of Safety Evaluation
+1: procedure Pseudocode for analyzeSafety()
+2: Input: range thresholds and associated penalty values
+3: Input: safety functions and shapes
+4: for each encounter do
+5: Θcpa ← pose at CPA
+6: rcpa ← range at CPA
+7: S ← S(rcpa, Θcpa)
+. combine range and pose components using Table 3
+8: end for
+9: end procedure
+Table 3. Summary of Collision Avoidance Safety Functions
+Eqn. Likely Use Case
+(3) Range-only solution desired.
+(4) Pose-only solution desired.
+(7) Preserves strong performance in either range or
+pose.
+(8) Requires high performance in both range and pose.
+(9) Rewards favorable pose without penalizing poor
+pose.
+(10) Rewards advantageous pose by increasing the “effec-
+tive” range; limits reward to an absolute quantity
+rather than relative increase of (9). Easy to visualize
+as graph of Sr (reff).
+4 Evaluating Protocol Requirements Using
+Rule-specific Algorithms and Considerations
+Standardized measures of collision avoidance algorithm
+performance and effectiveness enable consistent evalu-
+ation of COLREGS for both human-operated and au-
+tonomous vessels. Creating rule categories, assigning
+each rule to a category, and defining metrics for each
+applicable rule enables consistent evaluation and allows
+for more clear scientific conversation regarding the ad-
+vancement of autonomous collision avoidance. Incorpo-
+ration of the appropriate case law, localized nuance, and
+knowledge of the evolution of the COLREGS are vital
+to ensuring appropriate behavior in nuanced situations.
+While the Rules give general guidance, actions gener-
+ally consistent with human behavior and expectations
+must be the objective when integrating autonomous sys-
+tems into human-present environments. Appropriately
+modeling and accounting for human intuition, common
+practice, and human expectations are among the many
+factors not found on any written page of [26]. For ex-
+ample, the colloquial Law of Gross Tonnage states that
+a small craft generally stays out of the way of a large
+vessel such as an intercontinental merchant even when,
+strictly by the protocol requirements, the small vessel
+might have right of way. Adherence to custom and hu-
+man expectation must be considered and honored in
+order to integrate autonomous platforms into a human-
+dominated environment.
+Algorithm 2 demonstrates the general approach of
+evaluating COLREGS compliance including calculation
+of the safety score of Algorithm 1. Collision avoidance
+encounters commence at a threshold detection range
+r = Rdetect. Protocol compliance functions take the sym-
+bol R with a superscript denoting the applicable COL-
+REGS rule(s) (e.g., R14 denotes evaluation of head-on
+compliance). Each subsection below presents a protocol
+requirement and brief discussion of evaluation technique
+and nuance as appropriate.
+10 Kyle Woerner et al.
+Algorithm 2 General Approach of Evaluation Tech-
+nique
+1: procedure Pseudocode for EvaluateEncounter()
+2: Input: positions (x,y), courses (θ), and speeds (v) from
+track data
+3: Input: configurable threshold ranges and angles
+4: Input: configurable penalty values and functions
+5: for each encounter commencing at r = Rdetect do
+6: Calculate: initial pose (Θ0)
+7: Calculate: pose at CPA (Θcpa)
+8: Calculate: CPA range (rcpa)
+9: Calculate: changes in speed (∆v, vmin, vmax)
+10: Calculate: changes in course (∆θ)
+11: Determine R using Algorithm 3 . entry criteria
+12: R ← R(Θ0, Θcpa, rcpa, ∆v, ∆θ)
+. evaluate for each contact with respect to its rule set R
+13: S ← S(rcpa, Θcpa)
+. evaluate safety for each contact using AnalyzeSafety()
+14: end for
+15: end procedure
+This section presents methods corresponding to Cat-
+egory V of Table 1 (vessel encounters in sight of one
+another (Rules 13-17)) with the understanding that
+other categories (e.g., I, II, VI) may additionally apply.
+Each collision avoidance rule for vessels in sight of one
+another except Rule 14 (COLREGS Rules 11-13, 15-18)
+allows for entry criteria that assign one vessel to be
+stand-on (maintain course and speed4) and the other
+give-way (keep out of the way of the other) based on
+geometry, ship type or maneuverability restrictions, and
+environmental (wind) conditions for the specific case
+of two sailing vessels. Rules 13-17 are presented with
+considerations below. Rule 18 is discussed in Section 5.1.
+Open ocean vessel behavior assumes that maneuvers
+are most likely due to collision avoidance requirements
+unless otherwise specified for navigational or operational
+necessity.
+4.1 Entry Criteria
+Entry criteria for Rules 13-17 largely depend on a com-
+bination of relative geometry, relative speeds, and an
+assessed risk of collision for two power driven vessels
+assuming no special precedence of Rule 18. While rel-
+ative bearing is specified explicitly in the COLREGS
+for Rule 13, ambiguity exists for Rule 14. Contact angle
+offers significant insight into the appropriate rule and
+helps discriminate risk of collision before making more
+computationally costly calculations. Algorithm design-
+ers and evaluators evaluating entry criteria must show
+due regard for the written rules of [26], appropriate case
+law, and local custom [1, 4].
+4 Maintaining course and speed gives appropriate latitude
+to normal actions required per case law [1, 4, 35].
+Algorithm 3 COLREGS Entry Criteria: Determining
+the Appropriate Rule Set
+1: procedure Pseudocode for COLREGS Entry Crite-
+ria
+2: if rcpa > Rdetect then
+3: R ← Rcpa . no risk of collision
+. Rdetect is nominal range of detection
+. continue tracking rcpa, range-rate, and bearing-rate
+and evaluate subsequent rule entry
+4: return
+5: end if
+6: risk of collision assumed
+7: α13
+crit ← overtaking tolerance
+. default 45◦; tolerance for “coming up with” pose
+. also require closing range and risk of collision
+8: α14
+crit ← head-on tolerance . default 13◦
+. tolerance for “reciprocal or nearly reciprocal courses”
+. “When...in any doubt...assume...[head-on].”
+9: α15
+crit ← crossing aspect limit . default 10◦
+. all αcrit values are configurable by evaluator
+10: α0 ← initial contact angle (α ∈ [−180◦, 180◦))
+. α360◦
+0 maps α0 from [−180◦, 180◦) → [0◦, 360◦)
+11: β0 ← initial relative bearing (β ∈ [0◦, 360◦))
+. β180◦
+0 maps β0 from [0◦, 360◦) → [−180◦, 180◦)
+12: if (β0 > 112.5◦) && (β0 < 247.5◦) && (|α0| < α13
+crit)
+then
+13: R ← R13/17 . vessel is overtaken (stand-on)
+14: else if (α360◦
+0 > 112.5◦) && (α360◦
+0 < 247.5◦) &&
+15: (|β0|180◦
+< α13
+crit) then
+16: R ← R13/16 . vessel is overtaking (give-way)
+17: else if |β180◦
+0 | < α14
+crit && |α0| < α14
+crit then
+18: R ← R14
+. vessel is head-on; tolerance is configurable
+19: else if (β0 > 0) && (β0 < 112.5◦) && (α > −112.5◦)
+&& α < α15
+crit then
+20: R ← R15/16 . vessel is crossing give-way
+. crossing aspect limit is configurable
+21: else if (α360◦
+0 > 0◦) && (α360◦
+0 < 112.5◦) &&
+22: (β180◦
+0 − 112.5◦ && (β180◦
+0 < α15
+crit then
+23: R ← R15/17 . vessel is crossing stand-on
+. crossing aspect limit is configurable
+24: else
+25: R ← Rcpa
+. detectable but likely no risk of collision (not yet in a
+dedicated rule)
+. continue tracking rcpa, range-rate, and bearing-rate
+and evaluate subsequent rule entry
+26: end if
+27: end procedure
+A configurable critical contact angle (αcrit) shown
+in Figure 8 for Rules 13-15 helps to specify whether a
+vessel should take action per the COLREGS. The ability
+to configure αcrit gives flexibility to the evaluator. When
+self-evaluating for the purposes of autonomous collision
+avoidance algorithm development and improvement, a
+designer might tune αcrit to best mimic human ship
+driving practice. Algorithm 3 demonstrates entry cri-
+teria for Rules 13-17 assuming no overriding Rule 18
+precedence. Specific considerations of entry criteria for
+each rule are presented in the following subsections.
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 11
+a Rule 13 - Overtaking
+b Rule 14 - Head-on
+c Rule 15 - Crossing
+d Rule 15 - Crossing (edge case)
+Fig. 8. Entry criteria for Rules 13-15. All critical angles are relative to ownship’s heading. Critical angles of Rules 13 and 14
+represent half-angles of the shaded region. All critical contact angles are configurable to the evaluator as they have no prescribed
+value in the COLREGS.
+The introduction and configuration of αcrit allows
+more context for discussion and evaluation of entry
+criteria compared to the basic consideration of range
+and relative bearing alone. For example, algorithms
+might struggle to determine the appropriate context to
+assign a contact as “coming up on” within the context
+of Rule 13 [1, 4]. Using α relative to αcrit as a first pass
+filter to determine potential applicability of Rule 13 may
+give insight to appropriate values of αcrit in different
+regions of the world where local case law differs on
+“coming up on” with respect to Rule 13 entry criteria.
+Entry criteria for Rule 14 must be carefully con-
+sidered within the context of the local environmental
+conditions. Context of a ship’s course over ground as
+observed by radar and its heading as observed visibly
+must be reconciled within collision avoidance algorithms
+to avoid inappropriate rule entry. That is, a contact’s
+course as observed visually may be quite different than
+that observed by relative motion on radar. Selection of
+entry criteria using a contact’s heading for both collision
+avoidance and its subsequent evaluation must account
+for this environmental influence.
+Further research is required to determine the ap-
+propriate use of αcrit for edge case scenarios such as
+Figure 8d. Rule 15 specifies a contact off the starboard
+side as being a crossing give-way. This does not relieve
+the vessel of her duties to give-way if a risk of collision
+exists in an edge case geometry that might not be within
+the canonical examples of β ∈ [0◦, 112.5◦]. This is es-
+pecially true if strong environmental conditions might
+dominate a slow contact speed causing a risk of collision
+if no action were taken.
+Entry into many of the numbered collision avoid-
+ance rules requires adherence to give-way (Rule 16) or
+stand-on (Rule 17) requirements. Evaluation algorithms
+for give-way requirements are presented in Section 4.2
+12 Kyle Woerner et al.
+with amplification in later sections as necessary for rule-
+specific requirements (e.g., power-driven crossing vessels
+in Rule 15). Similarly, evaluation algorithms for stand-
+on vessel requirements are presented in Section 4.3 with
+appropriate amplification in later sections.
+4.2 Rule 16 – Give-way
+Give-way vessels are to take early action, to take sub-
+stantial action, and to keep well clear as shown in Al-
+gorithm 4. This yields three measurable criteria for all
+give-way vessels:
+– range at time of maneuver relative to the ranges at
+times of detection, determination of collision risk,
+and CPA (Algorithm 5)
+– determination of substantial action as measured by
+the size and direction of the maneuver (turn or speed
+change consistent with Rule 8) (Algorithms 6, 7,
+and 8)
+– range and pose at CPA
+Algorithm 4 Rule 16: Give-way Vessels
+1: procedure Pseudocode for Give-way Vessels
+2: R16 ← Rmax
+3: R16 ← AnalyzeSafety() (Rules 8,16,18)
+. “keep well clear”
+4: R16 ← penalize for delayed action
+. (Algorithm 5)
+5: R16 ← penalize for non-apparent maneuvers
+. (Algorithms 6, 7, and 8)
+. “take early and substantial action”
+6: R16 ← penalize for hindrance of stand-on vessel
+. “keep well clear”
+7: end procedure
+It should be noted that Rule 16 does not apply
+exclusively to power-driven vessels nor does it apply
+exclusively to crossing situations [1, 4]. Rather, Rule 16
+may be invoked as a result of Rules 12, 13, 15, or 18.
+Claims of “compliance” with Rule 16 have been implic-
+itly made in autonomous collision avoidance literature
+with a scope limited to power-driven crossing give-way
+situations (Rule 15) without discussion of its wider impli-
+cations. Full Rule 16 compliance claims must, however,
+specify that they include the scope of Rule 12 (sailing
+vessels), Rule 13 (overtaking), Rule 15 (power-driven
+crossing), and Rule 18 (precedence) to be complete and
+truly compliant. Detailed discussion of the applicabil-
+ity of Rule 16 to each of these give-way situations is
+presented in the appropriate subsections.
+Algorithm 5 Penalize for Delayed Action
+1: procedure Pseudocode for PenalizeDelayedAc-
+tion()
+2: rdetect ← range to contact at time of detection
+. if rdetect not explicitly known, set rdetect = Rdetect
+. assumes collision risk assessed immediately
+3: rmaneuver ← range at time of ownship’s maneuver
+4: rmaneuver ← min(rmaneuver, rdetect)
+5: Rdelay ← maximum score deduction (percent)
+6: Rdelay ← Rdelay ·
+( rdetect − rmaneuver
+rdetect
+)
+7: Rrule ← Rrule · (1 − Rdelay)
+8: end procedure
+Algorithm 6 Penalize for Non-Readily Apparent Ma-
+neuver
+1: procedure Pseudocode for PenalizeNon-
+ApparentManeuver()
+2: R∆θapp ← Non-ApparentCourseChange()
+. (Algorithm 7)
+3: R∆vapp ← Non-ApparentSpeedChange()
+. (Algorithm 8)
+4: thresh ← threshold penalty before non-apparent ma-
+neuver deducts from score
+5: . default 30%
+6: if (R∆θapp < thresh) || (R∆vapp < thresh) then
+7: return;
+8: else if (R∆vapp < thresh) then
+9: Rrule ← Rrule · (1 − R∆θapp
+)
+10: else
+11: Rrule ← Rrule · (1 − R∆vapp
+)
+12: Rrule ← Rrule · (1 − R∆θapp
+)
+13: end if
+14: end procedure
+Algorithm 7 Check for Non-Readily Apparent Course
+Change
+1: procedure Pseudocode for Non-
+ApparentCourseChange()
+2: R∆θapp ← max penalty for non-apparent course ma-
+neuver
+3: . R∆θapp ∈ [0, 1], default 50%
+4: |∆θ| ← absolute course deviation
+5: ∆θapp ← apparent course deviation threshold
+. default 30◦
+6: ∆θmd ← minimum detectable course deviation
+. default 0◦
+7: if |∆θ| > ∆θapp then
+8: return (R∆θapp ← 0)
+9: end if
+10: R∆θapp ← R∆θapp ·
+( ∆θapp − |∆θ|
+∆θapp − ∆θmd
+)
+11: end procedure
+4.3 Rule 17 – Stand-on
+Stand-on vessels are by definition the vessel not as-
+signed give-way responsibilities for an encounter requir-
+ing one vessel to keep clear (i.e., Rule 16 give-way).
+Stand-on vessels are not necessarily limited to situations
+of a crossing encounter with two power-driven vessels.
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 13
+Algorithm 8 Check for Non-Readily Apparent Speed
+Change
+1: procedure Pseudocode for Non-
+ApparentSpeedChange()
+2: R∆vapp ← max penalty for non-apparent speed ma-
+neuver
+3: . R∆vapp ∈ [0, 1], default 50%
+4: ∆vapp ← apparent speed reduction threshold
+. ∆vapp ∈ [0, 1], default 50%
+5: v0 ← initial ownship speed at time of detection
+6: vmin ← speed after slowing
+7: ∆v ←
+( v0 − vmin
+v0
+)
+8: if (∆v ≥ ∆vapp) then
+9: return (R∆vapp ← 0)
+. sufficiently apparent speed change
+10: end if
+11: R∆vapp ← R∆vapp ·
+( ∆vapp − ∆v
+∆vapp
+)
+12: end procedure
+The stand-on vessel is required by Rule 17 to maintain
+course and speed as demonstrated in Algorithm 9. A
+penalty should thus be assessed for changing course (Al-
+gorithm 10) and another penalty assessed for changing
+speed (Algorithm 11) with some reasonable tolerance
+for environmental conditions and noise. Consideration
+must be given, however, to stand-on vessels maneuvering
+when invoking their obligation to avoid collision when
+in extremis under Rule 17.a.ii. Stand-on vessels failing
+to maneuver prior to a collision have repeatedly been
+found partially (usually 25%) at fault by admiralty
+courts when not invoking this clause [1]. Environmental
+and contact picture-specific variables heavily influence
+the determination of when to maneuver as a stand-on
+vessel.
+Further, obligations of a stand-on vessel simultane-
+ously assigned responsibilities as a head-on or give-way
+vessel with another contact must take care to understand
+the obligations of case law as it applies to maintaining
+course and speed. Courts have repeatedly ruled that
+maintaining course and speed implies those navigational
+maneuvers consistent with a “steady, predictable maneu-
+ver.” This includes maneuvers for avoidance of danger
+or other navigational requirements that the stand-on
+vessel would otherwise perform (e.g., slowing to take on
+a pilot, maneuvering for another COLREGS obligation,
+etc.) [1, 35].
+Stand-on vessels that determine themselves to be in
+extremis are allowed by the COLREGS to take action
+subject to certain restrictions. Reasonable and consis-
+tent criteria are required for determination of when to
+take action under Rule 17.a.ii. Once entry criteria are
+established, evaluation of stand-on vessels deemed to
+be in extremis should focus on safely avoiding a colli-
+sion subject to the power-driven restriction of Rule 17.c.
+Algorithm 9 Rule 17: Stand-on Vessels
+1: procedure Pseudocode for Stand-on Vessels
+2: R17 ← Rmax
+3: R17 ← AnalyzeSafety() . Rules 8, 17, 18
+. “she shall take such action as will best aid to avoid
+collision”
+4: R17 ← penalizeCourseChange() . (Algorithm 10)
+5: R17 ← penalizeSpeedChange() . (Algorithm 11)
+. “shall keep her course and speed”
+6: R17 ← compensate for maneuvers required of normal
+navigation (do not penalize a stand-on vessel for maneu-
+vering for reasons other than this contact)
+. case law [1, 4, 25]
+7: if in extremis then
+8: R17 ← compensate for maneuvers required in ex-
+tremis
+. do not penalize stand-on if rcpa < configurable value
+. “take action to avoid collision by her maneuver alone”
+9: if power-driven crossing then
+10: R17 ← penalize port maneuvers for port con-
+tacts
+. “...not alter course to port for a vessel on her own port
+side”
+11: end if
+12: end if
+13: end procedure
+With the exception of Rule 17.c, evaluation of evasive
+action should use the safety score as a primary metric
+for rule compliance of the stand-on vessel.
+Algorithm 10 Penalize Course Change
+1: procedure Pseudocode for PenalizeCourseChange()
+2: if tmaneuver > tcpa then
+3: return;
+4: end if
+5: Rmax ← maximum penalty for changing course
+. default 50%
+6: |∆θ| ← maximum heading deviation
+7: ∆θapp ← apparent turn threshold . default 30◦
+8: ∆θmd ← minimum detectable heading deviation
+. default 2◦
+9: if (|∆θ| < ∆θmd) then
+10: return;
+11: else if (|∆θ| > ∆θapp) then
+12: return (Rrule ← Rrule − Rmax)
+13: end if
+14: Rrule ← Rrule − Rmax ·
+( |∆θ| − ∆θmd
+∆θapp − ∆θmd
+)
+15: end procedure
+For stand-on vessels, a change in speed is a viola-
+tion of Rule 17 within the aforementioned caveats. To
+quantify speed change, the speed at the declaration of
+entry into the stand-on obligation must be identified. A
+penalty can then be assigned for any subsequent speed
+up or slow down relative to this initial speed value. A
+speed change that is likely undetectable by the con-
+tact or insignificant to the collision avoidance scenario
+14 Kyle Woerner et al.
+Algorithm 11 Penalize Speed Change
+1: procedure Pseudocode for PenalizeSpeedChange()
+2: if tmaneuver > tcpa then
+3: return;
+4: end if
+5: Rmax ← max penalty for slowing . default 50%
+6: ∆vfast ← vmax − v0
+7: ∆vslow ← v0 − vmin
+8: ∆vmax ← max(∆vfast, ∆vslow)
+9: ∆vmd ← min detectable speed change
+. default 0.2m/s
+10: if ∆vmax < ∆vmd then
+11: return;
+12: end if
+13: Rrule ← Rrule ·
+( v0
+vmax
+)2
+. penalize speeding up
+14: Rrule ← Rrule − Rmax ·
+( ∆vslow
+v0
+)
+. penalize slowing down (not mutually exclusive)
+15: end procedure
+should be disregarded. Speeding up or slowing down
+by appreciable amounts without navigational necessity,
+however, violates Rule 17 and can result in unnecessary
+complication of the collision avoidance scenario.
+Similarly, course changes greater than some thresh-
+old noise level (say, 2◦) must be penalized for stand-on
+vessels not otherwise invoking Rule 17.a.ii. Some small
+heading change up to the generally accepted substantial
+value of 30◦ must be increasingly penalized. An exam-
+ple metric uses a linear or quadratic mapping between
+minimum detectable and substantial course changes
+(2◦ − 30◦) with a plateau of penalty outside the linear
+region. Several small turns resulting in a larger effec-
+tive turn should also be penalized accordingly. Figure 9
+demonstrates a stand-on vessel course change penalty.
+4.4 Rule 13 – Overtaking
+Collision avoidance routines for overtaking vessels (Fig-
+ure 8a) may rely on explicit entry criteria specified in
+the COLREGS with respect to initial pose: a contact
+must be more than 22.5◦ abaft the other vessel’s beam.
+Different countries have interpreted the “coming up with”
+phrase to take different meanings including a notable
+admiralty case in England involving Nowy Sacz and the
+Olympian [1]. Most courts contend, however, that the
+overtaking rule applies when the appropriate encounter
+geometry exists, the astern vessel has a higher speed
+than the overtaken vessel, the vessels are closing range,
+and an expected range at CPA would reasonably require
+prudence.
+The overtaking (higher speed) vessel is defined as
+a give-way vessel by Rule 16 [1, 4, 26]. Pose becomes
+an important aspect of measuring performance for the0 2◦ 30◦
+0%
+20%
+40%
+60%
+80%
+100% 100% Penalty →
+Course Change ∆θ [deg]
+Penalty [%]
+Nominal Stand-on Vessel Course Change Penalty
+Fig. 9. The stand-on vessel is required by Rule 17 to main-
+tain course and speed. Without a justifiable reason to alter
+course, a penalty may be assessed. This figure demonstrates a
+linear penalty for unwarranted course changes by a stand-on
+vessel. No penalty is assessed until a minimum detectable
+heading deviation is exceeded, here ∆θmd = 2◦. In this exam-
+ple function, a linearly increasing penalty is invoked until a
+maximum penalty is reached at the apparent turn threshold
+of ∆θapp = 30◦.
+overtaking vessel due to both common practice and
+specific requirements in the Rules including her “duty
+of keeping clear ... until past and clear.” Overtaking
+on near-parallel tracks (such as in a merchant transit
+lane) allows for safe pose at CPA and accounts for
+a significant and mostly trivial case in the absence of
+other collision avoidance, environmental, or navigational
+constraints. A reasonable set of entry criteria for Rule 13
+generally include a contact angle (α) within the exclusive
+sternlight region, a sufficient speed and relative bearing
+(β) for closing range, and a CPA range and CPA pose
+consistent with a risk of collision.
+When the contact situation or initial geometry re-
+quires overtaking on non-parallel tracks such as in Fig-
+ure 10, preference should be given to overtaking astern
+of the overtaken vessel when possible. Passing track
+in front of the overtaken vessel creates an encounter
+with higher risk and less evasive maneuverability for
+the overtaken vessel. Passing in front of the overtaken
+vessel within a range considered a risk of collision fur-
+ther degrades the overtaken vessel’s ability to maintain
+its course and speed. Therefore, a penalty is assessed
+for overtaking vessels who cross ahead of track of an
+overtaken vessel within a certain range.
+The vessel being overtaken is, by the definition of
+Rule 17, a stand-on vessel and must keep her course and
+speed [1, 4, 26]. This nuance is often unknowingly ne-
+glected by autonomous collision avoidance authors and
+emphasizes the need for incorporation of practical at-sea
+experience of those involved in designing and evaluating
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 15
+a Initial overtaking geome-
+try
+b Overtaking astern of con-
+tact
+Fig. 10. Ownship’s (O/S) initial encounter geometry, closing
+range, and proximity at CPA require action under an overtak-
+ing scenario of Rule 13. Dotted lines indicate the blue (O/S)
+and red (contact) speeds and demonstrate a closing range
+given the initial contact pose 〈α, β〉 in (a). By appropriately
+altering course to starboard early in the collision avoidance
+encounter (b), O/S will pass to the contact’s stern without
+causing the stand-on vessel to maneuver for a risk of collision.
+collision avoidance algorithms for autonomous vessels
+[11, 12]. Vessels deemed to be overtaken must therefore
+demonstrate their obligation to maintain course and
+speed within the context of their contact-free intentions
+[1, 35].
+Overtaking algorithms must be validated for correct
+contact angle, relative bearing, and speed considerations
+to verify mode entry criteria and algorithm robustness. A
+final necessary check in evaluation of overtaking collision
+avoidance algorithms is to ensure that modes do not
+shift from overtaking to crossing. Any mode changes
+from overtaking to crossing should be deemed a failure
+of the overtaking collision avoidance algorithm, as it
+violates an explicit clause of Rule 13.
+A general approach for evaluating overtaking vessels
+under Rules 13 and 16 is shown in Algorithm 12 as
+amplified by Algorithm 4 and includes the following
+attributes:
+– penalize for unnecessary crossing of contact’s bow
+at close ranges
+– penalize for unnecessary hindrance of overtaken ves-
+sel’s desired maneuvers
+– penalize for delayed action (range of maneuver rela-
+tive to detection range and CPA range if a maneuver
+is required) (Algorithm 5)
+– penalize for safety violations including sufficient
+range and early action (Rules 7-8)
+A general approach for evaluating overtaken vessels
+under Rules 13 and 17 is shown in Algorithm 13 as
+amplified by Algorithm 9 and includes the following
+attributes:
+Algorithm 12 Rule 13/16: Overtaking Vessels
+1: procedure Pseudocode for Overtaking Vessels
+2: R13/16 ← R16 . (Algorithm 4)
+. overtaking vessels are give-way vessels (Rules 13 & 16)
+. See [1, 4, 26]
+3: end procedure
+Algorithm 13 Rule 13/17: Overtaken Vessels
+1: procedure Pseudocode for Overtaken Vessels
+2: R13/17 ← R17 . (Algorithm 9)
+. overtaken vessels are stand-on vessels (Rules 13 & 17)
+. See [1, 4, 26]
+3: end procedure
+– penalize the overtaken vessel in accordance with
+requirements of a stand-on vessel (Rule 17)
+– penalize for safety violations resulting from neglect-
+ing to invoke Rule 17.a.ii
+– compensate for changes in course or speed required
+as a result of being in extremis
+4.5 Rule 14 – Head-on
+Head-on situations (Figure 8b) provide arguably the
+most ambiguous entry criteria of the rules for power-
+driven vessels. The definition of “reciprocal or nearly
+reciprocal courses” is vague and left to interpretation.
+The compass course is required to be used when assess-
+ing course difference due to the ship-fixed masthead
+light and sidelight definition of ship’s course in Rule 14.
+Confusion arises when environmental parameters greatly
+affect the course-over-ground; non-visual means (e.g.,
+radar, lidar, etc.) measure course-over-ground, so care
+must be taken in evaluating contact geometry for proper
+entry criteria and resolution of ambiguity. Similarly, a
+consistent entry criterion for “nearly reciprocal course”
+should be configurable and set in accordance with local
+customs, case law, or certifying agency requirements.
+Environmental conditions such as sea-state, current, or
+fluctuating wind might also warrant a change to the
+entry criteria angle (α14
+crit) tolerance or use of a filter.
+Evaluation scenarios should incorporate sufficient
+set and drift to realize an appreciable distance between
+course-over-ground and compass heading before certi-
+fication as compliant with Rule 14. Small sequential
+maneuvers should also be penalized, as a single, readily
+apparent maneuver is required (Rule 8). The size of
+a readily apparent maneuver is not explicitly defined
+in the COLREGS, though turns of 30◦ have been de-
+termined by custom to be sufficient [27]. Some texts
+suggest a minimum of 35◦ for a sufficient turn [1]. The
+intention of the rule is to ensure that turns are apparent
+by both radar and visual observation; the single large
+16 Kyle Woerner et al.
+turn clearly communicates to the other vessel that a risk
+of collision has been assumed and the vessel is taking
+appropriate early action in accordance with the COL-
+REGS. This is especially important for the majority
+of collision avoidance encounters that do not involve
+explicit communication but rather rely on observation
+of the contact’s maneuver alone.
+When evaluating maneuvers for a head-on scenario,
+both vessels must maneuver to starboard in an appre-
+ciable and timely way. Maintaining course or turning
+to port should be viewed as a failure to maneuver in
+accordance with Rule 14. Rule 14 further specifics that
+passing pose must be port-to-port. Pose should therefore
+enter into the protocol compliance metric for head-on
+encounters. Equation (12) demonstrates an arbitrary
+Rule 14 pose function (R14
+Θcpa ) accounting for both rela-
+tive bearing and contact angle at CPA.
+R14
+Θcpa = R14
+αcpa · R14
+βcpa · Rmax (12)
+Equation (13) uses specific pose functions for both
+contact angle and relative bearing to give large prefer-
+ence to near-canonical port aspects. This example pose
+function uses combinations of sinusoidal functions of
+relative bearing (β) and contact angle (α) at CPA. A
+true port-to-port passage will be a relative bearing of
+β = 270◦ and a contact angle of α = −90◦ as seen in
+Figure 11. Within an allowable tolerance, large devia-
+tions from port-to-port passage in open-ocean scenarios
+likely indicate insufficient or delayed maneuvers by one
+or both vessels. In Figure 11a, a nearly canonical head-
+on CPA geometry gives a high pose score. In Figure 11b,
+a likely late maneuver by ownship and a subsequent
+narrow contact angle at CPA results in a smaller pose
+score.
+R14
+Θcpa =
+( sin(αcpa) − 1
+2
+)2( sin(βcpa) − 1
+2
+)2
+Rmax (13)
+Algorithm 14 demonstrates an approach to evaluate
+head-on encounters including appropriate penalties for
+delayed action (Algorithm 5) and non-apparent turns
+(Algorithm 7). Alternative functions to the specific R14
+αcpa
+and R14
+βcpa of Equation (13) are available in the evalu-
+ation library discussed in Section 6. Figure 12 shows
+an example port-to-port pose function while Figure 13
+shows a more severe preference to port angles. Possible
+scores range from 0 to the maximum possible protocol
+compliance score (Rmax = 100%).
+a Near-canonical head-on geometry at CPA.
+b Head-on geometry at CPA resulting from delayed
+action of ownship (O/S).
+Fig. 11. Rule 14 requires head-on contacts to maneuver to
+starboard and pass port-to-port. The geometry of a nearly
+canonical case (a) shows the preferred CPA geometry including
+relative bearing β and contact angle α. Using Equation (13),
+a nearly maximum pose score would result. In (b), a delayed
+maneuver from ownship (“O/S”) results in a port relative
+bearing at CPA; contact angle αcpa, however, accounts for the
+less than ideal CPA geometry. Equation (12) would reduce
+the overall performance score for the situation in (b).
+Algorithm 14 Rule 14: Head-on Vessels
+1: procedure Pseudocode for Head-on Vessels
+2: Input: αcpa
+3: Input: βcpa
+4: R14 ← Rmax
+5: R14 ← assess non-starboard turn penalty
+. “each shall alter her course to starboard”
+6: R14 ← assess delayed action penalty
+. “made in ample time” (Algorithm 5)
+7: R14 ← assess non-apparent turn penalty
+. “be large enough to be readily apparent” (Algorithm 7)
+. 30◦ to 35◦ (configurable) minimum per case law
+. (default linear penalty; configurable)
+8: R14 ← assess R14
+Θcpa penalty if not port-to-port
+. “each shall pass on the port side of the other”
+. Equation (12); configurable per library of Section 6.1
+9: end procedure
+4.6 Rule 15 – Power-driven Crossing
+Rule 15 assigns give-way and stand-on responsibilities
+to each of two crossing power-driven vessels with a risk
+of collision (Figure 8c). The geometric entry criteria are
+derived from eliminating head-on and overtaking geome-
+tries while retaining a risk of collision. Relative bearing
+therefore spans {β : (β < 112.5◦) or (β > 247.5◦)} with
+an appropriate contact angle (α) such that a risk of
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 17−150 −100 −50 0 50 100 150
+0%
+20%
+40%
+60%
+80%
+100%
+Angle of Interest φ [deg]
+Protocol Score [%]
+Example Protocol Function (sin(φ)−1
+2 )2
+a Example protocol function ( sin(φ)−1
+2
+)2
+b Polar plot of ( sin(φ)−1
+2
+)2
+Fig. 12. The example protocol evaluation function
+( sin(φ)−1
+2
+)2 allows strong reinforcement of port-to-port pas-
+sage when substituting both relative bearing and contact angle
+for φ as shown in Equation (13). The plot of the Rule 14 cost
+function (a) demonstrates high reward for near-port angles.
+The polar plot representation (b) demonstrates the same re-
+ward function in a top-down view more natural to a collision
+avoidance encounter. The radius of the polar plot indicates
+the percentage of Rmax; the origin corresponds to zero while
+the outer ring corresponds to Rmax = 100%.
+collision exists without inducing head-on or overtaking
+obligations.
+Crossing give-way vessels are specifically required to
+not cross ahead of the stand-on vessel; this notion has
+been reinforced in admiralty courts [1]. Note that a risk
+of collision must exist for Rule 15 to apply. Therefore
+a risk of collision invoking crossing give-way actions re-
+quires a stern crossing. Verification that a vessel crossed
+astern of the stand-on vessel is possible using Θcpa. For
+example, a stern crossing will result in a large nega-
+tive contact angle at CPA (typically αcpa < −90◦) if
+the stand-on contact does not maneuver as shown in
+Figure 14. If aggressively regaining course after a stern−150 −100 −50 0 50 100 150
+0%
+20%
+40%
+60%
+80%
+100%
+Angle of Interest φ [deg]
+Protocol Score [%]
+Example Protocol Function (sin(φ)−1
+2 )4
+a Example protocol function
+( sin(φ)−1
+2
+)4
+b Polar plot of
+( sin(φ)−1
+2
+)4
+Fig. 13. A function such as this fourth-order sinusoidal func-
+tion allows for more severe penalties than those of Figure 12.
+crossing, the give-way vessel may reach CPA at a large
+positive value of contact angle (e.g., α > 165◦) though
+this would be an exception to the norm. If the stand-on
+vessel determines that an in extremis situation exists
+and maneuvers to starboard, the give-way vessel should
+similarly be penalized for failure to act in accordance
+with the COLREGS.
+A general approach to evaluating a crossing give-way
+power-driven vessel under Rule 15 can be seen in Algo-
+rithms 4 and 15 and includes the following attributes:
+– penalize crossing ahead (e.g., −80◦ < αcpa < 165◦
+(configurable) where αcpa is the stand-on vessel’s
+contact angle if no action is taken under Rule 17.a.ii)
+– penalize forcing an in extremis maneuver by the
+stand-on vessel in accordance with Rule 17.a.ii
+– penalize give-way requirements of Rule 16 (Section 4.2)
+– include safety penalty for early and substantial ac-
+tion clause of Rule 16
+18 Kyle Woerner et al.
+a Initial Crossing Geometry b Slowed Give-way
+c Stern-pointing Give-way d Stern-crossing Give-way
+Fig. 14. Crossing astern is required of a crossing give-way
+vessel with a risk of collision [1]. For an initial Rule 15 crossing
+scenario (a), a give-way contact might slow considerably (b)
+resulting in a contact angle at CPA near αcpa = −90◦. In
+(c), the give-way contact has maneuvered to starboard and
+maintained speed likely resulting in a contact angle at CPA
+near αcpa = −135◦. In (d), the give-way contact has turned
+and is about to cross the stern of the stand-on vessel. Because
+of the forward velocity of the stand-on vessel, CPA has likely
+already occurred near a contact angle αcpa = −165◦.
+Requirements of the stand-on vessel in a power-driven
+crossing situation are discussed in Section 4.3 and Algo-
+rithm 9.
+Algorithm 15 Rule 15: Power-driven Crossing
+1: procedure Pseudocode for Power-driven Crossing
+Vessels
+2: if crossing give-way vessel then
+3: R15/16 ← R16 . (Algorithm 4)
+. crossing give-way vessel must obey Rule 16
+4: R15/16 ← assess pass-ahead penalty
+. penalize for crossing bow of contact
+. “avoid crossing ahead of the other vessel”
+. see case law [1, 4, 25]
+5: else if crossing stand-on vessel then
+6: R15/17 ← R17 . (Algorithm 9)
+. “crossing stand-on vessel must obey Rule 17”
+7: end if
+8: end procedure
+5 Discussion of COLREGS Rules Requiring
+Further Development of Evaluation Algorithms
+While Section 4 presented algorithms for initial eval-
+uation of Rules 13-17, this section presents narratives
+of other rules within the protocol that require future
+development. Section 5.1 presents amplification of meth-
+ods for Category VI of Table 1. Section 5.2 presents
+Category I considerations, Section 5.3 presents Cate-
+gory II, Section 5.4 presents Category IV, Section 5.5
+presents Category VI, Section 5.6 presents Category X,
+and Section 5.7 presents Category IX all of Table 1.
+5.1 Responsibilities of Vessels within Sight: Rules 11, 18
+Identification of the contact’s type (e.g., power-driven,
+sailing, etc.) gives necessary knowledge for determining
+precedence under Rule 18. Certain vessels yield right-of-
+way to others by the nature of their vessel type; similarly,
+other vessels expect and are afforded right-of-way. To
+be compliant with Rule 18, autonomous vessels must
+be able to correctly classify vessel types and properly
+assign give-way hierarchy.
+Detection of another vessel being under sail is in-
+sufficient for some scenarios involving multiple sailing
+craft in the vicinity of a power-driven autonomous ves-
+sel. In order to anticipate the likely movements of a
+sailing give-way to avoid a sailing stand-on, each au-
+tonomous vessel should be able to identify which sailing
+vessel is stand-on and which is give-way to the other. By
+determining environmental conditions such as wind, a
+power-driven autonomous vessel can anticipate a likely
+maneuver of a sailing give-way vessel that might in-
+terfere with ownship’s intentions to give-way to both
+sailing vessels.
+5.2 General Rules (Rules 1-3)
+Much debate exists as to whether an autonomous vessel
+without a human physically present constitutes a “vessel”
+under international law. This paper assumes that the
+definition accorded in Rules 1-3 apply equally to any
+floating structure (or “watercraft”) as if a human were
+physically present and operating it. Rule 3 defines the
+scope of COLREGS to include any “vessel” without
+specification of control, be it human, machine, or some
+combination thereof. The only distinctions drawn by the
+COLREGS are related to propulsion (e.g., sail, power-
+driven, etc.) and maneuverability (e.g., fishing, not under
+command, etc.) constraints. This is consistent with case
+law dating back to the 19th century [9, 29, 32]. As
+recently as 2013, the U.S. Supreme Court rejected a
+permanently moored house boat meeting the definition
+of a vessel. In doing so, the court affirmed that the
+definition of a vessel is met if a reasonable observer
+would consider it designed to a practical degree for
+carrying people or things over water citing the house
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 19
+boat’s absence of a rudder or steering mechanism as
+well as a lack of capacity to generate or store electricity
+[30].
+Accordingly, COLREGS must apply to autonomous
+vessels as though they were human controlled and per-
+forming the same tasks. Rule 3 further stipulates that
+“Vessels shall be deemed to be in sight of one another
+only when one can be observed visually from the other.”
+Various work to emulate a human lookout by use of
+on-board sensors and sensor processing enables “sight,”
+including cameras, infra-red sensors, and other simi-
+lar technologies. The COLREGS deliberately address
+a visual requirement when two vessels are in “sight”
+of each other, though this does not exclude non-sight
+sensors (e.g., radar, lidar, sonar) from assisting with ini-
+tial detection, classification, or queuing of sight sensors.
+Similarly, the “restricted visibility” definition of Rule 3
+must consider the limitations of human-operated vessels
+especially as it relates to the human-visible spectrum
+of light; the inherent safety implications of entering a
+restricted visibility constraint even if an autonomous
+vessel’s sensors allow greater detection range than that
+of a human operator must be considered.
+The intention of the restricted visibility sections of
+COLREGS are two-fold:
+1. increase detectability to other contacts to maximize
+detection range
+2. reduce allowable speed while further limiting maneu-
+ver directions to account for and partially mitigate
+limited detection distances
+Autonomous designers require clarification from the
+international governing bodies as to what officially con-
+stitutes “sight” of a non-human controlled vessel.
+5.3 General Conduct of Vessels and Special Traffic
+Schemes (Rules 4-10)
+Rules 4-10 address the requirements of all vessels in-
+cluding the stationing of a look-out, use of safe speed,
+determining risk of collision, the action required to avoid
+collision, behavior in narrow channels, and behavior in
+traffic separation schemes [26]. One point of contention
+is the requirements of Rule 5 to maintain a look-out.
+Several boards have been formed in the international
+community to address the perceived discrepancy in what,
+if any, non-human means may constitute a look-out in
+accordance with the COLREGS. This paper assumes
+that any means of “sight and hearing” whether human
+or machine may constitute a look-out so long as it suf-
+ficiently functions within the spirit of the COLREGS
+and to the standards of a qualified human lookout.
+5.3.1 Rule 5 – Lookout
+Rule 5 requires a look-out to be stationed “by sight and
+hearing as well as by all available means appropriate in
+the prevailing circumstances.” Evaluation should pre-
+fer coordination between sight and hearing algorithms
+consistent with a reasonably trained human look-out.
+Metrics for Rule 5 under the assumption of machine-
+based lookout include:
+– listening with on-board auditory sensors at all times
+while underway. Above-waterline sensors must al-
+ways be functional. Sonar may supplement if in-
+stalled but must never replace a surface vessel’s
+above-waterline auditory sensor requirement
+– observing with a sufficient combination of on-board
+non-auditory (visual, radar, lidar, infrared, etc.) sen-
+sors at all times when underway
+– conditionally supplementing with additional on-board
+sensors (e.g., radar), off-board sensors (e.g., accom-
+panying aerial vehicle), and externally provided data
+(e.g., AIS) as necessary
+5.3.2 Rule 6 – Safe Speed
+Environmental factors and ship dynamics predominantly
+enter with Rule 6. Rule 6 specifically identifies 12 ar-
+eas – assuming that the autonomous vessel has radar
+– requiring evaluation when determining a safe speed.
+The state of visibility, contact density, stopping distance,
+turning ability, sea state, and draft are just some of the
+parameters identified when determining a safe speed.
+Autonomous vessels must be able to independently de-
+termine their effective time-distance capabilities, turning
+kinematics and dynamics, and effects of contact density
+when selecting a maximum allowable speed to be fully
+compliant with Rule 6.
+5.3.3 Rule 7 – Risk of Collision
+As in human-operated ship driving, autonomous marine
+vehicles enjoy widely varying interpretation of what a
+“risk of collision” means based on operating style and
+design. Several factors allow mariners to make assump-
+tions about the other vessel’s level of tolerance when
+assessing a risk of collision including vessel type, cargo,
+primary mission, maneuverability, and pose. For exam-
+ple, merchant vessels often have similar desired ranges
+at CPA based on common training, similar ship ma-
+neuverability characteristics, and maritime customs. A
+liquid Nitrogen gas tanker might have a tendency for
+larger, more conservative ranges at CPA than say a
+transiting fishing trawler who is more accustomed to
+20 Kyle Woerner et al.
+high contact density environments with greater maneu-
+verability. Pose becomes a highly relevant consideration
+for determination of collision risk. Both pose at CPA
+and initial pose must be considered in conjunction with
+speed and range when assessing risk of collision.
+Another consideration is the underlying flexibility
+of the collision avoidance algorithms. Human operators
+often use multiple CPA range thresholds to determine
+risk of collision and necessary actions. To determine risk
+of collision, one must know the conditions present in
+the decision space of the vessel as well as the vessel’s
+current capabilities. For example, certain crew members
+offer greater levels of experience, while certain machin-
+ery conditions or watch-stander configurations allow
+for greater maneuverability or performance. Requiring
+the vessel’s Captain or additional watch officers on the
+bridge for certain encounter scenarios is one example of
+a modified watch-stander configuration [28]. These fac-
+tors directly contribute to the level of conservativeness
+of the subsequent maneuver.
+A vessel master’s policy often dictates that certain
+precautionary measures must be in place before taking
+contacts closer than certain ranges [27, 28]. This might
+include certain qualified watch-standers present on the
+bridge, certain machinery configurations, or certain envi-
+ronmental conditions. Similarly, restricted visibility and
+other detectability considerations must be considered in
+the determination of risk of collision.
+Two considerations are specifically required as com-
+ponents of determination of collision risk, namely, 1) con-
+tacts with constant compass bearing with corresponding
+decreasing range, and 2) approaching large vessels, tows,
+or close range contacts. If either of these two areas are
+not explicitly considered in risk determination, an im-
+mediate failure score is warranted for Rule 7. Additional
+metrics should include the appropriate configuration of
+range thresholds, the tolerance for determining a con-
+stant bearing/decreasing range scenario, early warning
+capabilities, and analysis of “scanty information”. Such
+scanty information [26] might be considered with appro-
+priate weight based on radar return strength, fusion of
+other sensor data, and sensor filter settings.
+5.3.4 Traffic Separation Schemes (Rule 10)
+Traffic separation schemes comprise a special subset of
+vessel interactions similar to those of driving on a high-
+way with a car. The most prominent solution to driving
+in this scheme is [21]. Development of an evaluation
+algorithm for protocol compliance using only track data
+in future work would be well served to consider the
+approaches of algorithms such as this.
+5.4 Sailing in Sight of Another Sailing Vessel (Rule 12)
+Sailing vessels must be properly identified in order to
+discriminate precedence per Rule 18 and, in the case of
+ownship also being a sailing vessel, determine stand-on
+and give-way status per Rule 12. In the case of both
+vessels being under sail, proper identification of the
+windward side of both vessels is required (both wind
+direction as well as the location of the mainsail or the
+largest fore-and-aft sail). Failure to properly identify
+other sailing vessels must result in a failure of Rule 12.
+Further evaluation using the requirements of Rules 16
+and 17 applies as appropriate.
+5.5 Restricted Visibility (Rule 19)
+In addition to the discussion of Section 5.2, Rule 19 ad-
+dresses situations of reduced visibility, i.e., when vessels
+cannot see the other due to the environmental reasons
+prescribed in Rule 3. Specific checks should be made
+during algorithm testing to ensure restrictions are in
+place to limit speed consistent with Rules 6 and 19.
+The two specific cases addressed in Rule 19.d should
+be explicitly tested in conditions emulating restricted
+visibility, including:
+– ensuring a vessel does not alter course to port for
+a vessel forward of the beam, except in cases of
+overtaking
+– ensuring a vessel does not alter course toward a
+vessel abeam or abaft the beam
+Testing should also consider the cases of auditory detec-
+tion of fog signals ahead of the beam to ensure invocation
+of the bare-steerage clause of Rule 19.e.
+5.6 Lights and Shapes (Rules 20-31)
+There are two main areas of scope in the lights and
+shapes section of the COLREGS. First, designers must
+properly display the required lights and shapes on own-
+ship according to certain ship characteristics. This re-
+quires self-awareness of whether a particular section of
+the COLREGS which requires special lights and shapes
+applies. In addition, the ability to actually transmit
+the appropriate signal for the correct duration of time
+is required. Second, a vehicle must be able to prop-
+erly identify lights and shapes of other vessels including
+assignment of proper meaning. This recognition and
+application to the contact directly complements Rule 18
+requirements of precedence with respect to ownship’s
+collision avoidance role viz stand-on or give-way. Special
+lights and shapes may be necessary for autonomously
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 21
+operated vessels to display. The community would be
+well served by international governing bodies issuing
+guidance stating whether a special day shape or light
+signal is required to identify autonomously operated ve-
+hicles, and if so, making such display or signal standard
+across the world5.
+5.7 Sound and Light Signals (Rules 32-37)
+Quite similarly to the lights and shapes requirements of
+Section 5.6, vessels must be able to properly communi-
+cate using sound and light signals in accordance with
+the COLREGS. Autonomous vessels are in need of clari-
+fication of any special sound or light signals required for
+autonomous vessels. To avoid ad hoc signals intended
+to indicate an autonomous vessel encountering a human
+vessel, international governing bodies should provide
+articulated guidance. Advances in the field within the
+scope of this section would focus on multiple areas in-
+cluding:
+– receiving a contact’s light and sound signals
+– interpreting these light and sound signals then in-
+fluencing ownship’s autonomous collision avoidance
+behaviors appropriately
+– transmitting light and sound signals to a contact
+when ownship autonomously determines necessity in
+accordance with the COLREGS
+6 COLREGS Testing and Evaluation
+A COLREGS testing and evaluation software program
+was designed to be used from a third party neutral
+“shoreside” observer with assumed perfect sensing data
+of the vessels under observation in [31]. The purpose
+of the testing and evaluation program is to act as a
+neutral grader of a ship’s performance in complying
+with the COLREGS, especially in the absence of human
+intervention. Third party perfect sensing represents a
+reasonable assumption for a road test or other evaluator
+entity, as the vessel autonomy could be evaluated in a
+well-sensored testing range with verified GPS-based lo-
+cation data recorded for all vessels. A position reporting
+protocol such as AIS may prove satisfactory if reports
+can be deemed trustworthy.
+Future work could incorporate sensor fusion and im-
+perfect sensing scenarios that would enable this concept
+to be used outside the realm of certification-focused test-
+ing and evaluation. Scope of the testing and evaluation
+5 Submarines operating on the surface are currently the
+only special signal not contained as a requirement within the
+numbered international rules.
+Fig. 15. COLREGS evaluation will be capable of evaluating
+complex scenarios such as this non-canonical geometry, multi-
+rule encounter. Note that multiple collision avoidance rules
+exist simultaneously between these power-driven vessels.
+program was limited to power-driven vessel rules, specif-
+ically Rules 13-18. A library was developed to allow for
+both real-time (Section 6.3) and post-mission analysis
+(Section 6.4). Complex multi-vehicle encounters such as
+the one shown in Figure 15 are capable of real-time or
+post-mission analysis.
+The testing and evaluation program for a multi-
+contact power-driven scenario includes the ability to:
+– identify that the geometry of two vehicles requires
+action per the COLREGS
+– identify the specific rules assigned to each vessel
+– quantify the actions of each vessel with respect to
+the identified rules
+– generate a report of each vessel’s actions at the
+conclusion of the encounter
+– populate a scoring system for each vehicle and a
+cumulative performance assessment based on various
+scenarios and interactions over a specified duration
+– provide quantified data to support determination
+of a vessel’s scope of COLREGS compliance after
+performing specified encounters. Sufficient interac-
+tions in various multi-vessel, multi-rule scenarios are
+necessary as part of the “road test” described in
+Section 6.5 and presented in [33].
+Multi-contact scenarios often involve sets of rules
+that require differing action. Priority must be assigned
+as to what action should be taken given the larger scope
+of the navigation and collision avoidance pictures. Eval-
+uation algorithms must account for the requirements of
+individual rules while also considering the larger contact
+picture and more overarching rules of the protocol.
+22 Kyle Woerner et al.
+6.1 Library
+The protocol-constrained collision avoidance evaluation
+library allows a common repository for evaluation algo-
+rithms. The library enables expansion of functionality
+to multiple programs using a common set of algorithms
+while maintaining standardized configuration of collision
+avoidance parameters and adaptability to other protocol
+rule sets. This allows real-time and post-mission anal-
+ysis programs to use equivalent means of evaluation;
+however, it also allows post-mission evaluation using
+different penalty functions or configuration settings ac-
+cording to the evaluator’s preference. The library of
+algorithms allows configuration parameters to properly
+tune weights and metrics to local customs or require-
+ments of certification authorities.
+Users may use Equations (14)-(17) as an initial li-
+brary to construct relevant evaluation functions based on
+pose angles. The input angle φ may be configured to use
+the contact angle α or relative bearing β. A steering an-
+gle φ0 allows tailorable directionality for alternative use
+of the same functions. An alternative use case might rep-
+resent a passing arrangement agreed via bridge-to-bridge
+radio, such as a rare and non-conforming starboard-to-
+starboard passage. Linear and quadratic functions of
+range and speed are also available within the initial eval-
+uation library release. Incorporation of other functions
+and input parameters is reserved for future work. These
+functions are introduced to promote continued dialogue
+of alternative evaluation functions and approaches, in-
+cluding those rules whose evaluation algorithms have
+yet to be fully developed.
+sin2(φ + φ0) (14)
+step(φ) − step(φ0) (15)
+( sin(φ+φ0)−1
+2
+)2
+(16)
+( sin(φ+φ0)−1
+2
+)4
+(17)
+6.2 Configurability of Programs
+The evaluation programs are configurable for several pa-
+rameters of interest to a designer or evaluator including:
+– preferred range at CPA
+– minimum acceptable range at CPA
+– range at which a near-miss occurs
+– range at which a collision is assumed
+– threshold COLREGS rule compliance score below
+which instantaneous reports should be made
+– threshold safety score below which instantaneous
+reports should be made
+– vessel types to consider (allows knowledge of aerial,
+ground, and undersea vehicles without interference
+of collision avoidance evaluation)
+– range at which contact detection likely occurs
+– maximum time threshold allowed for comparison of
+a contact’s position report and ownship’s position
+report
+– display of visual indicators when configuration ranges
+or minimum rule compliance scores are violated
+– sounding of audible alerts when configuration ranges
+or minimum rule compliance scores are violated
+6.3 Real-time Analysis
+Using the protocol library for COLREGS presented in
+this paper, a real-time collision avoidance evaluation
+program gives instantaneous feedback to vessel designers
+and a means of real-time evaluation to any certification
+entity. This can be used to assign penalties or warnings
+to vessels violating the COLREGS, especially but not
+limited to training and design verification scenarios.
+Notifications can be sent to vessels in the vicinity of
+non-compliant actors to allow increased caution while
+operating. Reports of egregious actions can be passed
+to designers, insurance agencies, or enforcement entities
+as appropriate or required by statute.
+Within the scope of the current work, the real-time
+protocol evaluation tool was used to display important
+information at the shoreside observation center includ-
+ing:
+– COLREGS compliance scores for power-driven rules
+– safety scores after an encounter
+– rules required as determined by the observer
+– range at CPA
+– time of CPA
+– vessel names and types
+A real-time text report is posted to the mission
+console including summaries of overall performance
+(e.g., safety, protocol compliance, type of interaction)
+as shown in Figure 16. To assist a shoreside observer
+with several vehicles underway, a series of visual and au-
+dible indicators were incorporated to provide real-time
+warning of dangerous or inappropriate action. Colored
+range rings (Figure 17) appeared whenever violations
+occurred including:
+– green - rcpa less than minimum acceptable CPA
+range
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 23
+Fig. 16. Scoring of COLREGS collision avoidance rules allow
+for real-time evaluation of vehicle performance at the shoreside
+observation center. Configurable range parameters include
+nominal detection range, preferred range at CPA, minimum
+acceptable range at CPA, threshold range at which a near-
+miss occurs, and the range at which a collision is assumed.
+An aggregate tally of COLREGS violations (scores below a
+configurable threshold value) and of each configuration range
+are displayed. Vehicle types as specified by each vessel are
+used as a filter to allow consideration of only certain entities
+within the “visibility” of the shoreside observation center. This
+allows underwater and aerial vehicles to share the shoreside
+observation display without unnecessarily being considered as
+COLREGS compliance candidates.
+– yellow - rcpa less than near-miss range
+– red - rcpa less than collision range
+– blue - COLREGS score less than the threshold value
+6.4 Post-mission Analysis
+A post-mission analysis tool was constructed to provide
+detailed insight into collision avoidance performance of
+vessels. The post-mission analysis requires only vehicle
+position logs; the real-time assessment program was not
+required to be running to conduct post-mission analysis.
+A report is generated for each run of the post-mission
+analysis tool with a configurable scale of verbosity. In
+more verbose modes, detailed explanations of cause for
+score deduction allows designers and operators to un-
+derstand the rationale for evaluation scores. This can
+be used to provide feedback and tune future actions. In
+addition to the verbosity option, all configuration pa-
+rameters of Section 6.1 are available in the post-mission
+analysis tool. Evaluation data are exported to a comma-
+separated value report for ease of meta analysis in a
+user’s favorite data analysis program. This data can
+then be used for performance analysis by vehicle, by
+rule combination, or by other parameters of interest to
+the evaluator.
+a Min-desired range viola-
+tion
+b Near-miss range violation
+c Collision range violation d COLREGS violation
+Fig. 17. Violations of range below configurable threshold
+values resulted in displaying range rings including: (a) green
+for violating minimum desired range, (b) yellow for violating
+near-miss range, and (c) red for violating the collision range.
+Violations of COLREGS collision avoidance rules below a
+configurable threshold value result in display of a blue ring
+(d) around the vehicle. Sounding of an optional audible indi-
+cator was also possible for each violation. This COLREGS
+evaluation system allows real-time warning to an evaluator
+that a dangerous collision situation or egregious violation of
+the rules is occurring.
+6.5 Informing the COLREGS Certification Road Test
+In order to certify autonomous collision avoidance algo-
+rithms for on-water use outside of a testing environment,
+a road test comprised of a comprehensive scope of ex-
+amination and quantifiable metrics of performance was
+described in [33]. To be compliant with the appropriate
+protocol rule set of COLREGS, a satisfactory level of
+performance must be met across each category of evalua-
+tion. The categories of Section 2 comprise the evaluation
+areas for this test and are the principal means for the
+road test of [33] to be performed. Differing degrees of
+road tests may be possible for various levels of certifica-
+tion for operation.
+7 Conclusion
+This paper defined metrics and algorithms to quantify
+protocol compliance and safety for autonomous colli-
+sion avoidance. A library of functions was proposed
+24 Kyle Woerner et al.
+to allow configuration of the protocol evaluation tools
+in both real-time and post-mission analysis. Specific
+instantiation of protocol quantification and evaluation
+was demonstrated for the rules of the road for sea-going
+vessels, i.e., COLREGS.
+Real-time on-vehicle instantiations of the COLREGS
+evaluation program in this paper are possible to detect
+non-compliance of other vessels and adjust collision
+avoidance parameters accordingly. Future work will al-
+low a vessel to detect vessels with compliance scores less
+than a threshold value and choose to maneuver sooner
+than normal or seek a more conservative range or pose
+at CPA.
+Future work will enable third-party evaluation of
+the full rule sets rather than limitation to power-driven
+vessels. Further work is required to more fully model
+contact-free intentions when maintaining course and
+speed of a stand-on vessel in complex scenarios such
+as slowing to pick up a pilot. Further discussion and
+research is needed to fully incorporate local customs and
+laws within COLREGS (including U.S. Inland Rules),
+alternative protocols such as Rules of the Air, and special
+arrangements such as those made by bridge-to-bridge
+radio. Alternative approaches to evaluating pose may
+show cases where safety functions are more limited at
+times other than the closest point of approach.
+Before integrating human controlled and autonomous
+systems outside of laboratory environments, the com-
+mon practices, customs, and interpretations of the COL-
+REGS by manned operators must be fully understood.
+Autonomous designs that incorporate expectations and
+norms of human operators will achieve solutions that
+more naturally integrate autonomous and human-operated
+vessels. The categorization of scope and the incorpora-
+tion of the nuance, applicable case law, and customs re-
+lated to COLREGS allows appropriate and quantifiable
+assessment of autonomous collision avoidance perfor-
+mance. The International Maritime Organization, and
+other governing bodies, may choose to include these
+metrics as a means to inform both regulation and policy
+in maritime collision avoidance protocols.
+7.1 Abbreviations and Acronyms
+α - contact angle
+α0 - contact angle at detection
+αcpa - contact angle at CPA
+αc - cutoff contact angle to define reward functions
+αcrit - critical cutoff angle for entry criteria
+β - relative bearing
+β0 - relative bearing at detection
+βcpa - relative bearing at CPA
+βc - cutoff rel. bearing to define reward functions
+φ - arbitrary angle for generic functions
+φ0 - arbitrary steering angle for generic functions
+CPA - closest point of approach; point of min. range
+r - current range to contact
+rcpa - predicted or actual CPA range (distance)
+rdetect - range at which a contact is detected
+reff - effective range after adding pose component
+rmaneuver - range at which vessel maneuvers
+Rcol - range that assumes physical collision
+Rdetect - assumed range of contact detection
+Rmin - minimum acceptable CPA range
+Rnm - range considered a near-miss encounter
+Rpref - preferred CPA range
+R - COLREGS rule compliance function
+Rmax - max possible COLREGS compliance score
+RΘ - pose component of COLREGS compliance
+S - safety function for an encounter
+Sr - range component of safety function
+SΘ - pose component of safety function
+Smax
+Θ - maximum possible pose score
+tcpa - time of CPA
+tmaneuver - time of maneuver
+θ - candidate or actual course (θ ∈ [0, 360◦))
+|∆θ| - absolute change in course
+∆θapp - apparent course deviation threshold
+∆θmd - minimum detectable course deviation
+Θ - pose consisting of 〈α, β〉
+Θo - initial relative pose (determines rule set)
+Θcpa - relative pose at CPA (measure of safety)
+v - speed
+v0 - initial speed at time of detection
+∆v - change in speed during maneuver
+∆vapp - apparent speed reduction threshold
+∆vslow - slow down of vessel during maneuver
+∆vfast - speed up of vessel during maneuver
+∆vmax - greater of absolute speed up or slow down
+∆vmd - minimum detectable speed change
+180◦
+- angle converted to [−180◦, 180◦)
+360◦
+- angle converted to [0, 360◦)
+References
+1. Allen, C.: Farwell’s Rules of the Nautical Road. Blue
+and gold professional library series. Naval Institute Press
+(2005)
+2. Benjamin, M.R., Leonard, J.J., Curcio, J.A., Newman,
+P.M.: A Method for Protocol-based Collision Avoidance
+Between Autonomous Marine Surface Craft. Journal of
+Field Robotics 23(5), 333 – 346 (2006)
+3. Campbell, S., Abu-Tair, M., Naeem, W.: An automatic
+colregs-compliant obstacle avoidance system for an un-
+manned surface vehicle. Proceedings of the Institution of
+Mechanical Engineers, Part M: Journal of Engineering for
+the Maritime Environment p. 1475090213498229 (2013)
+Quantifying Protocol Evaluation for Autonomous Collision Avoidance 25
+4. Cockcroft, A.N., Lameijer, J.N.F.: Guide to the Collision
+Avoidance Rules. Butterworth-Heinemann (2012)
+5. Commonwealth of Massachusetts: Right-of-way at Inter-
+secting Ways; Turning on Red Signals, Part 1 Title XIV
+Chapter 89 Section 8 edn.
+6. Fisher, M.: Evaluation of The Vertical Sector Light Re-
+quirements for Unmanned Barges; Final Rept. Tech. rep.,
+US Coast Guard (1991)
+7. Goerlandt, F., Kujala, P., 2014. On the reliability and va-
+lidity of ship-ship collision risk analysis in light of different
+perspectives on risk Safety Science 62, 348-365.
+8. Goerlandt, F., Montewka, J., Kuzmin, V., Kujala, P., 2015.
+A risk-informed ship collision alert system: framework and
+application Safety Science. 77, 182-204.
+9. Henderson, A.: Murky Waters: The Legal Status of Un-
+manned Undersea Vehicles. Naval Law Review pp. 55–72
+(2006)
+10. International Civil Aviation Organization: Rules of the
+Air. Convention on International Civil Aviation (2005)
+11. Kuwata, Y., Wolf, M., Zarzhitsky, D., Huntsberger,
+T.: Safe Maritime Autonomous Navigation With COL-
+REGS, Using Velocity Obstacles. Oceanic Engineer-
+ing, IEEE Journal of 39(1), 110–119 (2014). DOI
+10.1109/JOE.2013.2254214
+12. Kuwata, Y., Wolf, M.T., Zarzhitsky, D., Huntsberger,
+T.L.: Safe Maritime Navigation with COLREGS Using
+Velocity Obstacles. IEEE Conference on Intelligent Robots
+and Systems pp. 4728–4734 (2011)
+13. H.-J. Lee and K. P. Rhee. Development of Collision Avoid-
+ance System by Using Expert System and Search Algo-
+rithm. International Shipbuilding Progress 48.3 (2001),
+pp. 197212.
+14. Y.-i. Lee and Y.-G. Kim. A Collision Avoidance System for
+Autonomous Ship Using Fuzzy Relational Products and
+COLREGs. Intelligent Data Engineering and Automated
+Learning. Springer, 2004, pp. 247252.
+15. Lopez-Santander, A., Lawry, J. 2017. An Ordinal Model
+of Risk Based on Mariner’s Judgement. Journal of Navi-
+gation. 70(2), 309-324.
+16. Perera, L.P., Guedes Soares, C., 2015. Collision risk detec-
+tion and quantification in ship navigation with integrated
+bridge systems. Ocean Engineering. 109, 344-354.
+17. Shah, B.C.: Trajectory Planning with Adaptive Control
+Primitives for Autonomous Surface Vehicles Operating in
+Congested Civilian Traffic. IEEE International Conference
+on Intelligent Robots and Systems (2014)
+18. ˇSvec, P., Shah, B., Bertaska, I., Alvarez, J., Sinisterra, A.,
+von Ellenrieder, K., Dhanak, M., Gupta, S.: Dynamics-
+Aware Target Following for An Autonomous Surface Vehi-
+cle Operating Under COLREGs In Civilian Traffic. In: In-
+ternational Conference on Intelligent Robots and Systems,
+pp. 3871–3878 (2013). DOI 10.1109/IROS.2013.6696910
+19. Szlapczynski, R.: Evolutionary Planning of Safe Ship
+Tracks in Restricted Visibility. Journal of Navigation 68,
+39–51 (2015). DOI 10.1017/S0373463314000587
+20. Szlapczynski, R., Szlapczynska, J.: Colregs compliance in
+evolutionary sets of cooperating ship trajectories. Elec-
+tronic journal of international group on reliability, Relia-
+bility: Theory and Applications 2(1), 127–137 (2011)
+21. Szlapczynski Rafalapczy´nski, R.: Evolutionary Sets of
+Safe Ship Trajectories Within Traffic Separation Schemes
+Journal of Navigation (2013)
+22. Szlapczynski, R., Szlapczynska, J., 2016. An analysis of
+domain-based ship collision risk parameters. Ocean Eng.
+126, 47-56.
+23. Tam, C., Bucknall, R.: Collision Risk Assessment for Ships.
+Journal of Marine Science and Technology 15(3), 257–270
+(2010)
+24. Tam, C., Bucknall, R.: Path-planning algorithm for ships
+in close-range encounters. Journal of marine science and
+technology 15(4), 395–407 (2010)
+25. Thomas, D.: The Fatal Flaw: Collision at Sea and the
+Failure of the Rules. Phaiacia, Carmarthenshire, United
+Kingdom (2001)
+26. United States Coast Guard: Navigation Rules,
+International-Inland. 1977-19. United States Department
+of Transportation (1999)
+27. United States Coast Guard: Standing Orders for The Offi-
+cers of The Deck (Freedom of Information Act). USCGC
+HEALY Instruction M1603.1C (2006)
+28. United States Navy: Standing Orders for USS Greeneville
+(Freedom of Information Act). USS Greeneville Instruc-
+tion C3120.25 (1999)
+29. U.S. Supreme Court: Stewart v. Dutra Construction Co.
+543 U.S. 481 (2005)
+30. U.S. Supreme Court: Lozman v. City of Riviera Beach,
+Fla. (2013)
+31. Woerner, K.: Multi-Contact Protocol-Constrained Colli-
+sion Avoidance for Autonomous Marine Vehicles. Ph.D.
+thesis, Massachusetts Institute of Technology (2016)
+32. Woerner, K.L.: COLREGS-Compliant Autonomous Colli-
+sion Avoidance Using Multi-Objective Optimization with
+Interval Programming. Master’s thesis, Massachusetts
+Institute of Technology, 77 Massachusetts Avenue, Cam-
+bridge, MA 02139 (2014)
+33. Woerner, K.L., Benjamin, M.R., Novitzky, M., Leonard,
+J.J.: Collision Avoidance Road Test for COLREGS-
+Constrained Autonomous Vehicles. In: OCEANS 2016
+MTS/IEEE Monterey (2016)
+34. Zhang, J., Zhang, D., Yan, X., Haugen, S., Guedes Soares,
+C., 2015. A distributed anti-collision decision support for-
+mulation in multi-ship encounter situations under COL-
+REGs. Ocean Engineering. 105, 336-348.
+35. Zhao, J.: The Legal Interpretation of Keeping Course and
+Speed. Journal of Maritime Law & Commerce 41, 85
+(2010)
