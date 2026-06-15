@@ -1,13 +1,11 @@
 /* Boat Nav RL replay viewer */
 
-const COLLISION_RADIUS_M = 20;
-const CPA_SAFE_M = 80;
-
 const canvas = document.getElementById("world");
 const ctx = canvas.getContext("2d");
 const runSelect = document.getElementById("runSelect");
 const episodeSelect = document.getElementById("episodeSelect");
 const metricsList = document.getElementById("metricsList");
+const colregsContent = document.getElementById("colregsContent");
 const playBtn = document.getElementById("playBtn");
 const scrubber = document.getElementById("scrubber");
 const stepLabel = document.getElementById("stepLabel");
@@ -28,6 +26,8 @@ let state = {
   playing: false,
   lastFrameTime: 0,
   bounds: null,
+  frameColregs: [],
+  frameColregsLoading: false,
 };
 
 function queryRunFromUrl() {
@@ -41,8 +41,8 @@ function queryEpisodeFromUrl() {
   return ep != null ? parseInt(ep, 10) : null;
 }
 
-async function fetchJson(url) {
-  return BoatNavApi.fetchJson(url);
+async function fetchJson(url, opts) {
+  return BoatNavApi.fetchJson(url, opts);
 }
 
 async function loadRuns(selectRunId) {
@@ -87,6 +87,7 @@ async function loadRun(runId) {
   populateEpisodes(epIndex);
   computeBounds();
   renderFrame();
+  loadEpisodeFrameColregs();
   statusLine.textContent = `Loaded run ${runId} · ${state.episodes.length} eval episodes`;
 }
 
@@ -113,6 +114,9 @@ function renderMetrics() {
     ["Score", score != null ? score.toFixed(3) : "—"],
     ["Success rate", fmtPct(m.success_rate)],
     ["Collision rate", fmtPct(m.collision_rate)],
+    ["Energy score", m.mean_energy_score != null ? Number(m.mean_energy_score).toFixed(3) : "—"],
+    ["COLREGS mean S", m.colregs_mean_safety != null ? `${Number(m.colregs_mean_safety).toFixed(1)}%` : "—"],
+    ["COLREGS mean R", m.colregs_mean_protocol != null ? `${Number(m.colregs_mean_protocol).toFixed(1)}%` : "—"],
     ["Eval episodes", m.eval_episodes],
     ["Train time", m.train_elapsed_sec != null ? `${m.train_elapsed_sec}s` : "—"],
     ["Notes", m.notes || "—"],
@@ -128,6 +132,61 @@ function renderMetrics() {
 function fmtPct(v) {
   if (v == null) return "—";
   return `${(v * 100).toFixed(1)}%`;
+}
+
+function renderColregsForEpisode() {
+  const ep = currentEpisode();
+  const colregs = ep.colregs;
+  if (!colregs || !colregs.encounters?.length) {
+    ColregsPanel.renderColregsPanel(colregsContent, null, {
+      emptyText: "No contacts in this episode.",
+    });
+    return;
+  }
+  const frameRow = ColregsPanel.nearestFrameScore(state.frameColregs, state.frameIndex);
+  const merged = frameRow
+    ? {
+        ...colregs,
+        mean_safety_S: frameRow.mean_safety_S ?? colregs.mean_safety_S,
+        mean_protocol_R: frameRow.mean_protocol_R ?? colregs.mean_protocol_R,
+        min_safety_S: frameRow.min_safety_S ?? colregs.min_safety_S,
+        by_rule: frameRow.by_rule || colregs.by_rule,
+        encounters: frameRow.encounters?.length ? frameRow.encounters : colregs.encounters,
+        live: frameRow.live,
+      }
+    : colregs;
+  ColregsPanel.renderColregsPanel(colregsContent, merged, {
+    title: frameRow ? `COLREGS · step ${state.frameIndex}` : "COLREGS · episode",
+    showLive: Boolean(frameRow?.live?.live_contacts?.length),
+  });
+}
+
+async function loadEpisodeFrameColregs() {
+  const ep = currentEpisode();
+  const steps = ep.steps || [];
+  state.frameColregs = [];
+  if (!steps.length || !(steps[0].contacts || []).length) {
+    renderColregsForEpisode();
+    return;
+  }
+  state.frameColregsLoading = true;
+  renderColregsForEpisode();
+  try {
+    const data = await fetchJson("/api/colregs/frames", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        steps,
+        scenario_category: ep.scenario_category || "",
+      }),
+    });
+    state.frameColregs = data.frames || [];
+  } catch (err) {
+    console.warn("COLREGS frame series failed", err);
+  } finally {
+    state.frameColregsLoading = false;
+    renderColregsForEpisode();
+  }
 }
 
 function currentEpisode() {
@@ -258,12 +317,14 @@ function renderFrame() {
   ctx.beginPath();
   ctx.arc(gx, gy, 8, 0, Math.PI * 2);
   ctx.fill();
-  drawCircle(step.goal.x, step.goal.y, 50, "#45d483", 0.08);
+  drawCircle(step.goal.x, step.goal.y, BoatNavApi.getSimConstants().goal_success_range_m || 50, "#45d483", 0.08);
 
   // Contacts
+  const ownRadiusM = BoatNavApi.getSimConstants().own_radius_m || 15;
   for (const c of step.contacts || []) {
-    drawCircle(c.x, c.y, COLLISION_RADIUS_M, "#ff6b6b", 0.12);
-    drawCircle(c.x, c.y, CPA_SAFE_M, "#ffc857", 0.05);
+    const contactRadiusM = c.radius_m || ownRadiusM;
+    drawCircle(c.x, c.y, contactRadiusM, "#ff6b6b", 0.12);
+    drawCircle(c.x, c.y, BoatNavApi.cpaSafeRadiusM(c, ownRadiusM), "#ffc857", 0.05);
     drawHeadingArrow(c.x, c.y, c.cog, 40, "#ff9f9f");
     const [cx, cy] = worldToScreen(c.x, c.y);
     ctx.fillStyle = "#ff6b6b";
@@ -273,7 +334,7 @@ function renderFrame() {
   }
 
   // Own ship
-  drawCircle(step.own.x, step.own.y, COLLISION_RADIUS_M, "#3aa6ff", 0.15);
+  drawCircle(step.own.x, step.own.y, ownRadiusM, "#3aa6ff", 0.15);
   drawHeadingArrow(step.own.x, step.own.y, step.own.heading, 50, "#3aa6ff");
   drawHeadingArrow(step.own.x, step.own.y, step.own.cmd_heading, 35, "#9fd4ff");
   const [ox, oy] = worldToScreen(step.own.x, step.own.y);
@@ -294,6 +355,7 @@ function renderFrame() {
     cmd ψ ${radToDeg(step.own.cmd_heading).toFixed(0)}° · cmd V ${step.own.cmd_speed.toFixed(1)} m/s<br/>
     ${ep.collision ? '<span class="score-bad">COLLISION</span>' : ep.success ? '<span class="score-good">SUCCESS</span>' : "in progress"}
   `;
+  renderColregsForEpisode();
 }
 
 function radToDeg(r) {
@@ -337,12 +399,14 @@ scrubber.addEventListener("input", () => {
 episodeSelect.addEventListener("change", () => {
   state.episodeIndex = parseInt(episodeSelect.value, 10);
   state.frameIndex = 0;
+  state.frameColregs = [];
   const url =
     state.episodeIndex > 0
       ? `?run=${state.runId}&episode=${state.episodeIndex}`
       : `?run=${state.runId}`;
   history.replaceState(null, "", url);
   renderFrame();
+  loadEpisodeFrameColregs();
 });
 
 runSelect.addEventListener("change", () => loadRun(runSelect.value));
@@ -368,3 +432,5 @@ setInterval(async () => {
 loadRuns(queryRunFromUrl()).catch((err) => {
   statusLine.textContent = `Error: ${err.message}. Run train.py first.`;
 });
+
+BoatNavApi.loadSimConstants().catch(() => {});

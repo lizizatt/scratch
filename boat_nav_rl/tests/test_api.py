@@ -100,6 +100,43 @@ class TestHttpApi(unittest.TestCase):
         data = get_json(self.base, "/api/plant/config")
         self.assertIn("nominal", data)
         self.assertIn("goal_hold_sec_default", data)
+        self.assertIn("default_mode", data)
+        self.assertIn("sim_constants", data)
+        self.assertIn("vessel_classes", data["sim_constants"])
+
+    def test_train_rejects_invalid_budget(self):
+        req = urllib.request.Request(
+            self.base + "/api/train",
+            data=json.dumps({"budget_sec": "not-a-number"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                self.fail(f"Expected 400, got {resp.status}")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+            body = json.loads(e.read().decode("utf-8"))
+            self.assertIn("error", body)
+
+    def test_exercise_step_rejects_invalid_steps(self):
+        runs = get_json(self.base, "/api/runs")["runs"]
+        if not runs:
+            self.skipTest("no trained runs with checkpoints")
+        post_json(self.base, "/api/exercise/init", {"run_id": runs[0]["id"]})
+        req = urllib.request.Request(
+            self.base + "/api/exercise/step",
+            data=json.dumps({"steps": "many"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                self.fail(f"Expected 400, got {resp.status}")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+            body = json.loads(e.read().decode("utf-8"))
+            self.assertIn("error", body)
 
     def test_unknown_api_returns_json_not_html(self):
         try:
@@ -162,9 +199,48 @@ class TestHttpApi(unittest.TestCase):
         self.assertAlmostEqual(c["x"], 100.0, places=1)
         self.assertAlmostEqual(c["sog_mps"], 3.5, places=1)
         self.assertEqual(c["vessel_class"], "freighter")
+        colregs = placed.get("colregs") or {}
+        self.assertIn("vessels", colregs)
+        self.assertEqual(len(colregs["vessels"]), 3)
+        self.assertIsNotNone(colregs.get("mean_safety_S"))
         _, cleared = post_json(self.base, "/api/exercise/intruders/clear", {})
         self.assertTrue(cleared.get("ok"))
         self.assertEqual(cleared.get("contacts"), [])
+
+    def test_colregs_frames_api(self):
+        import prepare as P
+
+        steps = []
+        for t in range(5):
+            steps.append(
+                P.snapshot_step(
+                    t,
+                    P.VesselState(x_m=0.0, y_m=float(t * 10), heading_rad=0.0, speed_mps=4.0),
+                    0.0,
+                    500.0,
+                    [
+                        P.ContactState(
+                            x_m=300.0,
+                            y_m=float(t * 10),
+                            cog_rad=0.0,
+                            sog_mps=0.0,
+                            speed_mps=0.0,
+                            radius_m=15.0,
+                            vessel_class="workboat",
+                        )
+                    ],
+                )
+            )
+        _, data = post_json(
+            self.base,
+            "/api/colregs/frames",
+            {"steps": steps, "scenario_category": "traffic/base_t_crossing_stbd"},
+        )
+        self.assertTrue(data.get("ok"))
+        self.assertGreaterEqual(len(data.get("frames") or []), 1)
+        frame0 = data["frames"][0]
+        self.assertIn("mean_safety_S", frame0)
+        self.assertIn("live", frame0)
 
 
 if __name__ == "__main__":

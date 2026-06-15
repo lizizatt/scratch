@@ -21,6 +21,7 @@ const speedRange = document.getElementById("speedRange");
 const speedLabel = document.getElementById("speedLabel");
 const runningToggle = document.getElementById("runningToggle");
 const vesselStats = document.getElementById("vesselStats");
+const colregsContent = document.getElementById("colregsContent");
 const overlayInfo = document.getElementById("overlayInfo");
 const statusLine = document.getElementById("statusLine");
 const modeWaypoint = document.getElementById("modeWaypoint");
@@ -31,6 +32,7 @@ let state = {
   goal: { x: 0, y: 0 },
   vessels: [],
   contacts: [],
+  colregs: null,
   trails: [[], [], []],
   running: true,
   stepping: false,
@@ -96,6 +98,7 @@ function applyPayload(data) {
   if (data.bounds) state.bounds = data.bounds;
   if (data.goal) state.goal = data.goal;
   if (data.contacts) state.contacts = data.contacts;
+  if (data.colregs) state.colregs = data.colregs;
   if (data.vessels) {
     data.vessels.forEach((v, i) => {
       const trail = state.trails[i] || (state.trails[i] = []);
@@ -108,7 +111,15 @@ function applyPayload(data) {
     state.vessels = data.vessels;
   }
   renderStats();
+  renderColregs();
   renderFrame();
+}
+
+function renderColregs() {
+  ColregsPanel.renderColregsPanel(colregsContent, state.colregs, {
+    showLive: true,
+    emptyText: "Spawn intruders to see COLREGS safety (S) and protocol (R) scores.",
+  });
 }
 
 async function loadRuns() {
@@ -129,6 +140,7 @@ async function loadRuns() {
 
 async function initExercise() {
   overlayInfo.textContent = "Loading model…";
+  await BoatNavApi.loadSimConstants().catch(() => {});
   state.trails = [[], [], []];
   state.contacts = [];
   const data = await fetchJson("/api/exercise/init", {
@@ -324,7 +336,8 @@ function renderFrame() {
       {
         x: intruderDraft.anchor.x,
         y: intruderDraft.anchor.y,
-        radius_m: { dinghy: 8, workboat: 15, freighter: 35 }[intruderClassSelect.value] || 15,
+        radius_m:
+          (BoatNavApi.getSimConstants().vessel_classes || {})[intruderClassSelect.value] || 15,
         vessel_class: intruderClassSelect.value,
         cog_deg: vel.cog_deg,
         sog_mps: vel.sog_mps,

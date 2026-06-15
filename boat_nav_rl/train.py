@@ -30,7 +30,6 @@ from vecenv_util import (
     rollout_steps_total,
     steps_per_env,
     training_perf_defaults,
-    max_n_envs,
 )
 
 import prepare as P
@@ -49,7 +48,6 @@ from eval_parallel import (
     snapshot_model_for_eval,
 )
 from curriculum import filter_seeds_by_prefix, get_phase, is_summary_better, metrics_to_summary, check_exit
-from colregs.evaluate import evaluate_episode, rollup_episodes
 from device_util import configure_training_backend, resolve_device, torch_device_info
 from mission import MissionTransition, NavigationMission
 from policy_infer import safe_model_predict
@@ -118,7 +116,6 @@ NOMINAL_PLANT = P.plant_from_dict(P.PLANT_NOMINAL)
 
 NET_ARCH: List[int] = [256, 256]
 LEARNING_RATE = 3e-4
-N_STEPS = int(os.environ.get("ROLLOUT_STEPS", "4096"))  # legacy alias; rollout sized via steps_per_env()
 BATCH_SIZE = 256
 GAMMA = 0.99
 
@@ -976,7 +973,6 @@ class CurriculumCheckpointCallback(BaseCallback):
         self.best_summary: Optional[Dict[str, Any]] = None
         self._async = AsyncEvalRunner()
         self._eval_was_capped = False
-        self._awaiting_full = False
 
     def _on_training_start(self) -> None:
         self.start_time = time.time()
@@ -996,7 +992,6 @@ class CurriculumCheckpointCallback(BaseCallback):
         self.tick += 1
         max_sc, use_cap = self._max_scenarios_for_eval(full=full)
         self._eval_was_capped = use_cap
-        self._awaiting_full = full
         sample_seed = self.num_timesteps + self.tick * 10007
         if self._async.enabled:
             snap = self.run_dir / "_curriculum_eval_snapshot"

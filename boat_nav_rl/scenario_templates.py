@@ -13,16 +13,13 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+import prepare as P
 from prepare import ScenarioSeed, contact_from_polar
 
-VESSEL_CLASSES: Dict[str, float] = {
-    "dinghy": 8.0,
-    "workboat": 15.0,
-    "freighter": 35.0,
-}
-OWN_RADIUS_M = 15.0
-DEFAULT_VESSEL_CLASS = "workboat"
-VESSEL_CLASS_CHOICES: Tuple[str, ...] = ("dinghy", "workboat", "freighter")
+VESSEL_CLASSES = P.VESSEL_CLASSES
+OWN_RADIUS_M = P.OWN_RADIUS_M
+DEFAULT_VESSEL_CLASS = P.DEFAULT_VESSEL_CLASS
+VESSEL_CLASS_CHOICES: Tuple[str, ...] = tuple(P.VESSEL_CLASSES.keys())
 
 
 @dataclass(frozen=True)
@@ -83,7 +80,7 @@ def spawn_stationary(
 def spawn_crossing(
     own_x: float,
     own_y: float,
-    side: str,
+    _side: str,
     bearing_deg: float,
     range_m: float,
     cog_deg: float,
@@ -326,22 +323,51 @@ def generate_encounter_grid(base: MissionShell, seed_counter: int) -> Tuple[List
         )
         sid += 1
 
-    # Close-quarters crossing
+    # Close-quarters crossing (tighter than main crossing grid; looser than high_conflict)
     for i, (brg, rng_m, cog) in enumerate(
-        product([50, 70, -50, -70], [250, 320, 380], [250, 270, 90])
+        product([50, 70, -50, -70], [220, 280, 340], [250, 270, 90])
     ):
         vc = _vessel_class_for_index(i + 700)
-        c = spawn_crossing(base.own_x_m, base.own_y_m, "stbd" if brg > 0 else "port", brg, rng_m, cog, 4.0, vc)
+        c = spawn_crossing(base.own_x_m, base.own_y_m, "stbd" if brg > 0 else "port", brg, rng_m, cog, 4.5, vc)
         scenarios.append(
             compose_scenario(
                 MissionShell(**{**base.__dict__, "seed": sid, "own_speed_mps": 4.5}),
                 [c],
                 "close_quarters",
-                f"Close crossing brg {brg}° rng {rng_m}m {vc}",
+                f"Close crossing brg {brg}° rng {rng_m}m cog {cog}° {vc}",
                 name_suffix=f"cl{i:03d}",
             )
         )
         sid += 1
+
+    # High-conflict encounters — tight CPA; naive goal-seeking should collide often.
+    hc_idx = 0
+    for brg in (45, 55, -45, -55):
+        for rng_m in (160, 180, 200, 220):
+            cog = 270.0 if brg > 0 else 90.0
+            for sog in (5.0, 5.5):
+                vc = _vessel_class_for_index(hc_idx + 800)
+                c = spawn_crossing(
+                    base.own_x_m,
+                    base.own_y_m,
+                    "stbd" if brg > 0 else "port",
+                    brg,
+                    rng_m,
+                    cog,
+                    sog,
+                    vc,
+                )
+                scenarios.append(
+                    compose_scenario(
+                        MissionShell(**{**base.__dict__, "seed": sid, "own_speed_mps": 5.0}),
+                        [c],
+                        "high_conflict",
+                        f"High conflict: brg {brg}° rng {rng_m}m cog {cog:.0f}° SOG {sog} m/s {vc}",
+                        name_suffix=f"hc{hc_idx:03d}",
+                    )
+                )
+                sid += 1
+                hc_idx += 1
 
     # Multi-ship (random but reproducible)
     rng = np.random.default_rng(42)

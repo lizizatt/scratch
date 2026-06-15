@@ -12,13 +12,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 import prepare as P
-from rewards import (
-    HOLD_AT_STOP_EPS_MPS,
-    aggregate_episode_breakdowns,
-    energy_score_from_speeds,
-    energy_score_from_trace,
-)
-from runs_util import score_key_for_mode
+from rewards import HOLD_AT_STOP_EPS_MPS, aggregate_episode_breakdowns
 
 EVAL_WORKERS = int(os.environ.get("EVAL_WORKERS", str(max(1, os.cpu_count() or 4))))
 EVAL_PARALLEL_MIN_SCENARIOS = int(os.environ.get("EVAL_PARALLEL_MIN_SCENARIOS", "4"))

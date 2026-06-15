@@ -27,8 +27,8 @@
         <label>
           Mode
           <select id="modeSelect" name="mode">
+            <option value="avoid" selected>Avoid</option>
             <option value="navigate">Navigate</option>
-            <option value="avoid">Avoid</option>
           </select>
         </label>
         <label>
@@ -37,8 +37,11 @@
         </label>
         <label>
           Parallel envs
-          <input id="nEnvs" type="number" min="1" max="32" value="16" />
+          <input id="nEnvs" type="number" min="1" max="64" value="32" />
         </label>
+        <p class="field-hint" id="nEnvsHint">
+          SubprocVecEnv rollouts on CPU; PPO updates use GPU when available. Default scales with CPU cores (~4×).
+        </p>
         <label>
           Device
           <select id="deviceSelect" name="device">
@@ -116,34 +119,36 @@
       <pre id="trainLog" class="train-log"></pre>
     </section>
 
-    <section class="panel">
-      <h2>Goal distance ↓ should decrease</h2>
-      <p class="panel-hint">Held-out eval set only (never seen in training). Lower is better.</p>
-      <div class="chart-split" id="goalChartSplit">
+    <section class="panel panel-primary">
+      <h2>Eval score</h2>
+      <p class="panel-hint">
+        Headline metric: success rate × energy (navigate) or success × (1 − collision) × energy (avoid).
+        Higher is better.
+      </p>
+      <div class="chart-split chart-split-live" id="scoreChartSplit">
         <div class="chart-pane chart-pane-completed">
           <h3 class="chart-pane-title">Completed runs (full eval)</h3>
-          <canvas id="goalRangeChartCompleted" width="520" height="260"></canvas>
+          <canvas id="scoreChartCompleted" width="560" height="280"></canvas>
         </div>
-        <div class="chart-pane chart-pane-live hidden" id="goalChartLivePane">
-          <h3 class="chart-pane-title">Current run (random eval subset)</h3>
-          <canvas id="goalRangeChartLive" width="520" height="260"></canvas>
+        <div class="chart-pane chart-pane-live hidden" id="scoreChartLivePane">
+          <h3 class="chart-pane-title">Current run (periodic eval)</h3>
+          <canvas id="scoreChartLive" width="560" height="280"></canvas>
         </div>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Eval score ↑ should increase</h2>
-      <p class="panel-hint">Success rate (navigate) or success × (1 − collisions) (avoid).</p>
-      <div class="chart-split" id="scoreChartSplit">
-        <div class="chart-pane chart-pane-completed">
-          <h3 class="chart-pane-title">Completed runs (full eval)</h3>
-          <canvas id="scoreChartCompleted" width="520" height="260"></canvas>
-        </div>
-        <div class="chart-pane chart-pane-live hidden" id="scoreChartLivePane">
-          <h3 class="chart-pane-title">Current run (random eval subset)</h3>
-          <canvas id="scoreChartLive" width="520" height="260"></canvas>
-        </div>
-      </div>
+      <h2>Eval diagnostics</h2>
+      <p class="panel-hint">Held-out eval — track curriculum gates and approach quality.</p>
+      <div class="metrics-grid" id="metricsGrid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Reward shaping</h2>
+      <p class="panel-hint">
+        Mean reward contribution per sim step on the eval set (positive = bonus, negative = penalty).
+      </p>
+      <div class="reward-grid" id="rewardGrid"></div>
     </section>
 
     <section class="panel montage-panel">

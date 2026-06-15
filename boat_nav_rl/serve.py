@@ -13,6 +13,12 @@ from urllib.parse import parse_qs, urlparse
 import prepare as P
 import training_job as TJ
 import exercise as EX
+from api_parse import ApiParseError, parse_int, parse_mode
+from colregs.evaluate import enrich_trace_file
+from colregs.frame_series import frame_score_series
+from device_util import torch_device_info
+from runs_util import latest_run_id, score_from_metrics
+from vecenv_util import max_n_envs, recommended_n_envs, training_perf_defaults
 
 
 ROOT = Path(__file__).resolve().parent
@@ -23,25 +29,20 @@ DEFAULT_PORT = 8765
 API_VERSION = 1
 
 
-def resolve_latest_run_id() -> Optional[str]:
-    latest_link = RUNS_DIR / "latest"
-    if latest_link.is_symlink() or latest_link.is_dir():
-        return latest_link.name if latest_link.exists() else None
-    latest_txt = RUNS_DIR / "latest.txt"
-    if latest_txt.exists():
-        return latest_txt.read_text(encoding="utf-8").strip()
-    runs = sorted(
-        [
-            p
-            for p in RUNS_DIR.iterdir()
-            if p.is_dir()
-            and p.name not in ("_training",)
-            and (p / "metrics.json").exists()
-        ],
-        key=lambda p: p.name,
-        reverse=True,
-    )
-    return runs[0].name if runs else None
+def _load_run_payload(run_id: str) -> dict:
+    run_dir = RUNS_DIR / run_id
+    metrics_path = run_dir / "metrics.json"
+    traces_path = run_dir / "eval_traces.json"
+    if not metrics_path.exists():
+        raise FileNotFoundError("run not found")
+    traces = {"episodes": []}
+    if traces_path.exists():
+        traces = enrich_trace_file(json.loads(traces_path.read_text(encoding="utf-8")))
+    return {
+        "run_id": run_id,
+        "metrics": json.loads(metrics_path.read_text(encoding="utf-8")),
+        "traces": traces,
+    }
 
 
 def list_runs(limit: int = 40) -> List[dict]:
@@ -64,7 +65,7 @@ def list_runs(limit: int = 40) -> List[dict]:
         except (json.JSONDecodeError, OSError):
             metrics = {}
         mode = metrics.get("mode", "?")
-        score = metrics.get("nav_score") if mode == "navigate" else metrics.get("avoid_score")
+        score = score_from_metrics(metrics)
         out.append(
             {
                 "id": run_dir.name,
@@ -157,20 +158,34 @@ class Handler(BaseHTTPRequestHandler):
             except json.JSONDecodeError:
                 self._send_json({"ok": False, "error": "invalid JSON"}, status=400)
                 return
-            result = TJ.start_training(
-                mode=body.get("mode", "navigate"),
-                budget_sec=int(body.get("budget_sec", 600)),
-                resume_run_id=body.get("resume_run_id") or None,
-                notes=str(body.get("notes", "")),
-                n_envs=int(body.get("n_envs", 8)),
-                device=str(body.get("device", "auto")),
-                dynamics_jitter=bool(body.get("dynamics_jitter", False)),
-                robust_eval_enabled=bool(body.get("robust_eval_enabled", False)),
-                plant=body.get("plant") or None,
-                goal_hold_sec=int(body.get("goal_hold_sec", 30)),
-                current_enabled=bool(body.get("current_enabled", True)),
-                montage_enabled=bool(body.get("montage_enabled", False)),
-            )
+            try:
+                result = TJ.start_training(
+                    mode=parse_mode(body.get("mode"), P.DEFAULT_MODE),
+                    budget_sec=parse_int(
+                        body.get("budget_sec"), 600, name="budget_sec", minimum=1
+                    ),
+                    resume_run_id=body.get("resume_run_id") or None,
+                    notes=str(body.get("notes", "")),
+                    n_envs=parse_int(
+                        body.get("n_envs"),
+                        recommended_n_envs(),
+                        name="n_envs",
+                        minimum=1,
+                        maximum=max_n_envs(),
+                    ),
+                    device=str(body.get("device", "auto")),
+                    dynamics_jitter=bool(body.get("dynamics_jitter", False)),
+                    robust_eval_enabled=bool(body.get("robust_eval_enabled", False)),
+                    plant=body.get("plant") or None,
+                    goal_hold_sec=parse_int(
+                        body.get("goal_hold_sec"), 30, name="goal_hold_sec", minimum=0
+                    ),
+                    current_enabled=bool(body.get("current_enabled", True)),
+                    montage_enabled=bool(body.get("montage_enabled", False)),
+                )
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return
             status = 200 if result.get("ok") else 409
             self._send_json(result, status=status)
             return
@@ -179,6 +194,21 @@ class Handler(BaseHTTPRequestHandler):
             result = TJ.cancel_training()
             status = 200 if result.get("ok") else 409
             self._send_json(result, status=status)
+            return
+
+        if path == "/api/colregs/frames":
+            try:
+                body = self._read_json_body()
+            except json.JSONDecodeError:
+                self._send_json({"ok": False, "error": "invalid JSON"}, status=400)
+                return
+            steps = body.get("steps") or []
+            category = str(body.get("scenario_category", ""))
+            stride = int(body.get("stride", 0))
+            if stride <= 0:
+                stride = 1 if len(steps) <= 120 else max(1, len(steps) // 100)
+            series = frame_score_series(steps, scenario_category=category, stride=stride)
+            self._send_json({"ok": True, "frames": series, "stride": stride})
             return
 
         if path == "/api/exercise/init":
@@ -254,7 +284,12 @@ class Handler(BaseHTTPRequestHandler):
             if session is None:
                 self._send_json({"ok": False, "error": "exercise not initialized"}, status=409)
                 return
-            session.step(int(body.get("steps", 1)))
+            try:
+                steps = parse_int(body.get("steps"), 1, name="steps", minimum=1, maximum=100)
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return
+            session.step(steps)
             self._send_json({"ok": True, **session.to_dict()})
             return
 
@@ -279,7 +314,8 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "ok": True,
                     "api_version": API_VERSION,
-                    "gpu": TJ.torch_device_info(),
+                    "gpu": torch_device_info(),
+                    "training": training_perf_defaults(),
                     "endpoints": [
                         "/api/health",
                         "/api/plant/config",
@@ -287,6 +323,7 @@ class Handler(BaseHTTPRequestHandler):
                         "/api/train/status",
                         "/api/train (POST)",
                         "/api/train/cancel (POST)",
+                        "/api/colregs/frames (POST)",
                         "/api/runs",
                         "/api/scenarios",
                         "/api/exercise/state",
@@ -310,7 +347,9 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/plant/config":
-            self._send_json(P.default_plant_config())
+            payload = P.default_plant_config()
+            payload["training"] = training_perf_defaults()
+            self._send_json(payload)
             return
 
         if path == "/api/history":
@@ -348,40 +387,28 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/runs":
-            self._send_json({"runs": list_runs(), "latest": resolve_latest_run_id()})
+            self._send_json({"runs": list_runs(), "latest": latest_run_id(RUNS_DIR)})
             return
 
         if path == "/api/latest":
-            run_id = resolve_latest_run_id()
+            run_id = latest_run_id(RUNS_DIR)
             if not run_id:
                 self._send_json({"error": "no runs yet"}, status=404)
                 return
-            metrics_path = RUNS_DIR / run_id / "metrics.json"
-            traces_path = RUNS_DIR / run_id / "eval_traces.json"
-            payload = {
-                "run_id": run_id,
-                "metrics": json.loads(metrics_path.read_text(encoding="utf-8")),
-                "traces": json.loads(traces_path.read_text(encoding="utf-8")),
-            }
-            self._send_json(payload)
+            try:
+                self._send_json(_load_run_payload(run_id))
+            except FileNotFoundError:
+                self._send_json({"error": "run not found"}, status=404)
             return
 
         if path.startswith("/api/runs/"):
             parts = path.strip("/").split("/")
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "runs":
                 run_id = parts[2]
-                run_dir = RUNS_DIR / run_id
-                metrics_path = run_dir / "metrics.json"
-                traces_path = run_dir / "eval_traces.json"
-                if not metrics_path.exists():
+                try:
+                    self._send_json(_load_run_payload(run_id))
+                except FileNotFoundError:
                     self._send_json({"error": "run not found"}, status=404)
-                    return
-                payload = {
-                    "run_id": run_id,
-                    "metrics": json.loads(metrics_path.read_text(encoding="utf-8")),
-                    "traces": json.loads(traces_path.read_text(encoding="utf-8")),
-                }
-                self._send_json(payload)
                 return
             if len(parts) == 4 and parts[0] == "api" and parts[1] == "runs" and parts[3] in (
                 "step_montage.png",

@@ -1,0 +1,68 @@
+---
+description: Agent-driven training iteration for boat_nav_rl reward tuning
+globs: boat_nav_rl/**
+alwaysApply: false
+---
+
+# Boat Nav RL — agent training iteration
+
+When tuning rewards or diagnosing stopping behavior, use the CLI loop (do not rely on the browser UI).
+
+## Quick iteration loop
+
+1. Edit or create `boat_nav_rl/experiments/<name>.json` with `reward_weights` overrides (or use a phase file under `experiments/phase*.json`).
+2. Run a short training pass and get JSON diagnostics:
+
+```powershell
+cd boat_nav_rl
+python scripts/agent_train.py --budget 120 --mode avoid --reward-config experiments/phase3_literal_stop.json --notes "stop tune v1"
+```
+
+3. Read the JSON output. Key stopping metrics:
+   - `mean_goal_zone_speed_mps` — should approach ~0.15 (V_min); if >>2, policy is not stopping in the hold zone
+   - `pct_goal_zone_at_min_speed` — fraction of goal-zone steps near minimum speed
+   - `mean_energy_score` — eval energy factor (higher = slower overall)
+
+4. Resume from a promising run instead of restarting:
+
+```powershell
+python scripts/agent_train.py --budget 120 --resume <run_id> --reward-config experiments/phase3_literal_stop.json
+```
+
+5. Analyze an existing run without retraining:
+
+```powershell
+python scripts/analyze_run.py <run_id> --json
+python scripts/eval_run.py <run_id> --max-scenarios 12
+```
+
+## Reward overrides (no code edit)
+
+`train.py` accepts `--reward-config path.json`. Keys match `reward_weights_dict()` in `rewards.py` (`hold_center`, `approach_slow`, `goal_progress`, `hold_overspeed`, etc.).
+
+## Background long runs
+
+For longer training, run in background and poll:
+
+```powershell
+python train.py --budget 600 --mode avoid --reward-config experiments/phase3_literal_stop.json --notes "long stop tune"
+python scripts/analyze_run.py --json
+```
+
+## Curriculum (staged phases)
+
+```powershell
+python scripts/curriculum_run.py --phase 0
+```
+
+Phase reward configs live in `experiments/phase0_nav.json` … `phase3_literal_stop.json` (see `curriculum.py`).
+
+## Tests before/after reward changes
+
+```powershell
+python run_tests.py
+```
+
+## Stopping diagnosis
+
+If `mean_goal_zone_speed_mps` stays high despite strong hold weights, check tradeoffs against `goal_progress` and `approach_slow`. Increase `hold_center`, `hold_overspeed`, `approach_slow`; reduce `goal_progress` in the experiment JSON.

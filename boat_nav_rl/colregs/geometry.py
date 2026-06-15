@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import prepare as P
+from colregs.trace_io import contact_from_step, contact_radius_from_step, own_from_step
 
 
 @dataclass(frozen=True)
@@ -56,31 +57,11 @@ def pose_from_states(own: P.VesselState, contact: P.ContactState) -> Pose:
 
 
 def _track_contact_state(step: Dict[str, Any], contact_idx: int) -> Optional[P.ContactState]:
-    contacts = step.get("contacts") or []
-    if contact_idx >= len(contacts):
-        return None
-    c = contacts[contact_idx]
-    return P.ContactState(
-        x_m=float(c["x"]),
-        y_m=float(c["y"]),
-        cog_rad=float(c["cog"]),
-        sog_mps=float(c["sog"]),
-        speed_mps=float(c["sog"]),
-        radius_m=float(c.get("radius_m", P.OWN_RADIUS_M)),
-        vessel_class=str(c.get("vessel_class", P.DEFAULT_VESSEL_CLASS)),
-    )
+    return contact_from_step(step, contact_idx)
 
 
 def _track_own_state(step: Dict[str, Any]) -> P.VesselState:
-    o = step["own"]
-    return P.VesselState(
-        x_m=float(o["x"]),
-        y_m=float(o["y"]),
-        heading_rad=float(o["heading"]),
-        speed_mps=float(o["speed"]),
-        cmd_heading_rad=float(o.get("cmd_heading", o["heading"])),
-        cmd_speed_mps=float(o.get("cmd_speed", o["speed"])),
-    )
+    return own_from_step(step)
 
 
 def pose_from_step(step: Dict[str, Any], contact_idx: int = 0) -> Optional[Pose]:
@@ -101,40 +82,37 @@ def pose_from_track_at_cpa(
         return None, float("inf"), float("inf"), 0
 
     cur = water_current or P.WaterCurrent()
-    best_r = float("inf")
+    best_cpa = float("inf")
     best_idx = 0
     best_pose: Optional[Pose] = None
+    best_tcpa = float("inf")
 
     for idx, step in enumerate(steps):
-        own = _track_own_state(step)
-        contact = _track_contact_state(step, contact_idx)
+        own = own_from_step(step)
+        contact = contact_from_step(step, contact_idx)
         if contact is None:
             continue
-        rng = math.hypot(contact.x_m - own.x_m, contact.y_m - own.y_m)
-        if rng < best_r:
-            best_r = rng
+        own_vx, own_vy = P.own_velocity(own, cur)
+        c_vx, c_vy = P.contact_velocity(contact)
+        r_cpa, tcpa = P.compute_cpa_tcpa(
+            own.x_m,
+            own.y_m,
+            own_vx,
+            own_vy,
+            contact.x_m,
+            contact.y_m,
+            c_vx,
+            c_vy,
+        )
+        if r_cpa < best_cpa:
+            best_cpa = r_cpa
             best_idx = idx
             best_pose = pose_from_states(own, contact)
+            best_tcpa = tcpa
 
     if best_pose is None:
         return None, float("inf"), float("inf"), 0
-
-    own = _track_own_state(steps[best_idx])
-    contact = _track_contact_state(steps[best_idx], contact_idx)
-    assert contact is not None
-    own_vx, own_vy = P.own_velocity(own, cur)
-    c_vx, c_vy = P.contact_velocity(contact)
-    r_cpa, tcpa = P.compute_cpa_tcpa(
-        own.x_m,
-        own.y_m,
-        own_vx,
-        own_vy,
-        contact.x_m,
-        contact.y_m,
-        c_vx,
-        c_vy,
-    )
-    return best_pose, r_cpa, tcpa, best_idx
+    return best_pose, best_cpa, best_tcpa, best_idx
 
 
 def pose_at_detection(

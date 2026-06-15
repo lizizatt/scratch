@@ -11,6 +11,7 @@ from colregs.config import ColregsConfig, load_config
 from colregs.entry import RuleAssignment, assign_rule_from_category, assign_rule_from_pose
 from colregs.geometry import Pose, pose_at_detection, pose_from_track_at_cpa
 from colregs.safety import analyze_safety
+from colregs.trace_io import contact_from_step, contact_radius_from_step, own_from_step
 
 
 @dataclass
@@ -56,33 +57,15 @@ class EncounterResult:
 
 
 def _contact_radius_from_step(step: Dict[str, Any], contact_idx: int) -> float:
-    contacts = step.get("contacts") or []
-    if contact_idx >= len(contacts):
-        return P.OWN_RADIUS_M
-    return float(contacts[contact_idx].get("radius_m", P.OWN_RADIUS_M))
+    return contact_radius_from_step(step, contact_idx)
 
 
 def _had_collision(steps: Sequence[Dict[str, Any]], contact_idx: int, own_radius_m: float) -> bool:
     for step in steps:
-        own = P.VesselState(
-            x_m=float(step["own"]["x"]),
-            y_m=float(step["own"]["y"]),
-            heading_rad=float(step["own"]["heading"]),
-            speed_mps=float(step["own"]["speed"]),
-        )
-        contacts = step.get("contacts") or []
-        if contact_idx >= len(contacts):
+        own = own_from_step(step)
+        contact = contact_from_step(step, contact_idx)
+        if contact is None:
             continue
-        c = contacts[contact_idx]
-        contact = P.ContactState(
-            x_m=float(c["x"]),
-            y_m=float(c["y"]),
-            cog_rad=float(c["cog"]),
-            sog_mps=float(c["sog"]),
-            speed_mps=float(c["sog"]),
-            radius_m=float(c.get("radius_m", P.OWN_RADIUS_M)),
-            vessel_class=str(c.get("vessel_class", P.DEFAULT_VESSEL_CLASS)),
-        )
         if P.check_collision(own, [contact], own_radius_m):
             return True
     return False
@@ -151,7 +134,7 @@ def evaluate_trace(
     cfg = cfg or load_config()
     if not steps:
         return []
-    n_contacts = len(steps[0].get("contacts") or [])
+    n_contacts = max(len(step.get("contacts") or []) for step in steps)
     return [
         enc
         for i in range(n_contacts)
@@ -170,7 +153,6 @@ def evaluate_episode(
     episode: Dict[str, Any],
     cfg: Optional[ColregsConfig] = None,
 ) -> Dict[str, Any]:
-    """Score one eval episode dict (must include 'steps' when traced)."""
     steps = episode.get("steps") or []
     category = str(episode.get("scenario_category", ""))
     encounters = evaluate_trace(steps, cfg, scenario_category=category)
@@ -218,3 +200,30 @@ def rollup_episodes(episode_scores: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         "colregs_by_rule": {k: round(sum(v) / len(v), 4) for k, v in by_rule.items()},
         "colregs_episodes_scored": len(safety),
     }
+
+
+def evaluate_steps(
+    steps: Sequence[Dict[str, Any]],
+    *,
+    scenario_category: str = "",
+    cfg: Optional[ColregsConfig] = None,
+) -> Dict[str, Any]:
+    """Score a trace prefix or full episode step list."""
+    return evaluate_episode(
+        {"steps": list(steps), "scenario_category": scenario_category},
+        cfg,
+    )
+
+
+def enrich_episode_colregs(episode: Dict[str, Any], cfg: Optional[ColregsConfig] = None) -> Dict[str, Any]:
+    """Attach colregs block if steps exist and scoring is missing."""
+    if episode.get("colregs") or not episode.get("steps"):
+        return episode
+    enriched = dict(episode)
+    enriched["colregs"] = evaluate_episode(enriched, cfg)
+    return enriched
+
+
+def enrich_trace_file(traces: Dict[str, Any], cfg: Optional[ColregsConfig] = None) -> Dict[str, Any]:
+    episodes = [enrich_episode_colregs(ep, cfg) for ep in (traces.get("episodes") or [])]
+    return {"episodes": episodes}

@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from device_util import torch_device_info
+from vecenv_util import recommended_n_envs
+import prepare as P
+from runs_util import score_from_metrics
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "runs"
@@ -76,11 +78,11 @@ def is_running() -> bool:
 
 
 def start_training(
-    mode: str = "navigate",
+    mode: str = P.DEFAULT_MODE,
     budget_sec: int = 600,
     resume_run_id: Optional[str] = None,
     notes: str = "",
-    n_envs: int = 8,
+    n_envs: int = recommended_n_envs(),
     device: str = "auto",
     dynamics_jitter: bool = False,
     robust_eval_enabled: bool = False,
@@ -221,8 +223,8 @@ def training_history(limit: int = 200) -> Dict[str, Any]:
     series = []
     for run_dir in runs:
         metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
-        mode = metrics.get("mode", "navigate")
-        score = metrics.get("nav_score") if mode == "navigate" else metrics.get("avoid_score")
+        mode = metrics.get("mode", P.DEFAULT_MODE)
+        score = score_from_metrics(metrics)
         avg_rng = metrics.get("avg_final_goal_range_m")
         if avg_rng is None:
             traces_path = run_dir / "eval_traces.json"
@@ -245,6 +247,9 @@ def training_history(limit: int = 200) -> Dict[str, Any]:
                 "success_rate": metrics.get("success_rate"),
                 "collision_rate": metrics.get("collision_rate"),
                 "avg_final_goal_range_m": avg_rng,
+                "mean_goal_zone_speed_mps": metrics.get("mean_goal_zone_speed_mps"),
+                "pct_goal_zone_at_min_speed": metrics.get("pct_goal_zone_at_min_speed"),
+                "reward_breakdown_mean": metrics.get("reward_breakdown_mean"),
                 "notes": metrics.get("notes", ""),
                 "parent_run_id": metrics.get("parent_run_id"),
                 "train_session": metrics.get("train_session", 1),

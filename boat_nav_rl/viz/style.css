@@ -273,7 +273,93 @@ canvas {
 }
 
 .score-good { color: var(--good); }
+.score-warn { color: var(--warn, #ffc857); }
 .score-bad { color: var(--bad); }
+
+.colregs-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.colregs-summary.compact {
+  margin-bottom: 0.35rem;
+}
+
+.colregs-summary dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.colregs-summary dd {
+  margin: 0;
+}
+
+.colregs-rules {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.colregs-rules .rule-id {
+  color: var(--text);
+  font-family: var(--mono, monospace);
+}
+
+.colregs-subhead {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0.65rem 0 0.35rem;
+}
+
+.colregs-encounter {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.colregs-enc-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.colregs-enc-detail {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.colregs-live-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.1rem;
+  font-size: 0.78rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.colregs-live-breakdown {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.colregs-vessel-block {
+  margin-top: 0.5rem;
+}
+
+#colregsPanel h2 {
+  margin-top: 1rem;
+}
 
 @media (max-width: 900px) {
   main { grid-template-columns: 1fr; }
@@ -433,8 +519,33 @@ canvas {
   flex-direction: column;
   gap: 1rem;
   padding: 1rem 1.25rem 2rem;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
+}
+
+.panel-primary {
+  border-color: rgba(69, 212, 131, 0.35);
+  box-shadow: 0 0 0 1px rgba(69, 212, 131, 0.08);
+}
+
+.metrics-grid,
+.reward-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.chart-pane-sm {
+  background: rgba(8, 16, 28, 0.55);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem 0.5rem;
+}
+
+.chart-pane-sm canvas {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .chart-split {
