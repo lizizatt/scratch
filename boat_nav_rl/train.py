@@ -40,6 +40,14 @@ from checkpoint_util import (
     resolve_resume_checkpoint,
     save_best_checkpoint,
 )
+from async_eval import AsyncEvalRunner
+from eval_parallel import (
+    aggregate_eval_metrics,
+    colregs_enabled_for_mode,
+    rollout_episodes,
+    run_eval_from_snapshot,
+    snapshot_model_for_eval,
+)
 from curriculum import filter_seeds_by_prefix, get_phase, is_summary_better, metrics_to_summary, check_exit
 from colregs.evaluate import evaluate_episode, rollup_episodes
 from device_util import configure_training_backend, resolve_device, torch_device_info
@@ -64,7 +72,6 @@ from rewards import (
     W_COLLISION,
     W_SMOOTH,
     apply_reward_overrides,
-    aggregate_episode_breakdowns,
     compute_step_reward,
     contact_step_metrics,
     contact_threat_and_cpa_penalty,
@@ -848,7 +855,7 @@ class TimeBudgetCallback(BaseCallback):
 
 
 class LiveMetricsCallback(BaseCallback):
-    """Periodic mini-eval on a random eval-set subset (same thread as training — no overlap)."""
+    """Periodic mini-eval on a random eval-set subset (async by default)."""
 
     def __init__(
         self,
@@ -857,53 +864,90 @@ class LiveMetricsCallback(BaseCallback):
         run_id: str,
         interval_sec: float = LIVE_EVAL_INTERVAL_SEC,
         max_scenarios: int = LIVE_EVAL_SCENARIOS,
+        run_dir: Optional[Path] = None,
     ) -> None:
         super().__init__()
         self.model_holder = model_holder
         self.mode = mode
         self.run_id = run_id
+        self.run_dir = run_dir or (RUNS_DIR / run_id)
         self.interval_sec = interval_sec
         self.max_scenarios = max_scenarios
         self.start_time = 0.0
         self.last_eval_time = 0.0
         self.eval_tick = 0
+        self._async = AsyncEvalRunner()
 
     def _on_training_start(self) -> None:
         self.start_time = time.time()
         self.last_eval_time = self.start_time
 
+    def _publish_metrics(self, metrics: Dict[str, Any], elapsed: float) -> None:
+        score = metrics[score_key_for_mode(self.mode)]
+        append_live_metric(
+            self.run_id,
+            self.mode,
+            self.num_timesteps,
+            elapsed,
+            score,
+            metrics.get("avg_final_goal_range_m") or 0.0,
+            successes=int(round(metrics.get("success_rate", 0) * metrics.get("eval_episodes", 0))),
+            eval_episodes=metrics.get("eval_episodes", 0),
+            scenario_names=metrics.get("scenario_names"),
+            eval_metrics=live_eval_extras(metrics),
+        )
+
+    def _dispatch_eval(self) -> None:
+        model = self.model_holder.get("model")
+        if model is None:
+            return
+        self.eval_tick += 1
+        sample_seed = self.num_timesteps + self.eval_tick * 10007
+        if self._async.enabled:
+            snap = self.run_dir / "_live_eval_snapshot"
+            zip_path = snapshot_model_for_eval(model, snap)
+            if not self._async.submit(
+                run_eval_from_snapshot,
+                str(zip_path),
+                self.mode,
+                self.max_scenarios,
+                sample_seed,
+                None,
+                None,
+                None,
+                False,
+                True,
+                None,
+            ):
+                zip_path.unlink(missing_ok=True)
+            return
+        metrics = run_eval(
+            model,
+            self.mode,
+            max_scenarios=self.max_scenarios,
+            sample_seed=sample_seed,
+            collect_traces=False,
+        )
+        self._publish_metrics(metrics, time.time() - self.start_time)
+
     def _on_step(self) -> bool:
         if is_cancel_requested():
             return False
+        if self._async.enabled:
+            try:
+                metrics = self._async.poll()
+                if metrics is not None:
+                    self._publish_metrics(metrics, time.time() - self.start_time)
+            except Exception as exc:
+                print(f"[live-eval] failed: {exc}")
+            if self._async.is_busy():
+                return True
         now = time.time()
         if now - self.last_eval_time < self.interval_sec:
             return True
         self.last_eval_time = now
-        self.eval_tick += 1
-        model = self.model_holder.get("model")
-        if model is None:
-            return True
         try:
-            metrics = run_eval(
-                model,
-                self.mode,
-                max_scenarios=self.max_scenarios,
-                sample_seed=self.num_timesteps + self.eval_tick * 10007,
-                collect_traces=False,
-            )
-            score = metrics[score_key_for_mode(self.mode)]
-            append_live_metric(
-                self.run_id,
-                self.mode,
-                self.num_timesteps,
-                now - self.start_time,
-                score,
-                metrics.get("avg_final_goal_range_m") or 0.0,
-                successes=int(round(metrics.get("success_rate", 0) * metrics.get("eval_episodes", 0))),
-                eval_episodes=metrics.get("eval_episodes", 0),
-                scenario_names=metrics.get("scenario_names"),
-                eval_metrics=live_eval_extras(metrics),
-            )
+            self._dispatch_eval()
         except Exception as exc:
             print(f"[live-eval] skipped: {exc}")
         return True
@@ -930,16 +974,59 @@ class CurriculumCheckpointCallback(BaseCallback):
         self.last_eval_time = 0.0
         self.tick = 0
         self.best_summary: Optional[Dict[str, Any]] = None
+        self._async = AsyncEvalRunner()
+        self._eval_was_capped = False
+        self._awaiting_full = False
 
     def _on_training_start(self) -> None:
         self.start_time = time.time()
         self.last_eval_time = self.start_time
 
-    def _run_eval_summary(self, *, full: bool) -> Dict[str, Any]:
+    def _max_scenarios_for_eval(self, *, full: bool) -> Tuple[Optional[int], bool]:
         n_seeds = len(eval_seeds_for_mode(self.mode))
         cap = CURRICULUM_EVAL_MAX_SCENARIOS
         use_cap = (not full) and cap > 0 and n_seeds > cap
         max_sc = cap if use_cap else None
+        return max_sc, use_cap
+
+    def _dispatch_eval(self, *, full: bool) -> None:
+        model = self.model_holder.get("model")
+        if model is None:
+            return
+        self.tick += 1
+        max_sc, use_cap = self._max_scenarios_for_eval(full=full)
+        self._eval_was_capped = use_cap
+        self._awaiting_full = full
+        sample_seed = self.num_timesteps + self.tick * 10007
+        if self._async.enabled:
+            snap = self.run_dir / "_curriculum_eval_snapshot"
+            zip_path = snapshot_model_for_eval(model, snap)
+            if not self._async.submit(
+                run_eval_from_snapshot,
+                str(zip_path),
+                self.mode,
+                max_sc,
+                sample_seed,
+                None,
+                None,
+                None,
+                False,
+                True,
+                None,
+            ):
+                zip_path.unlink(missing_ok=True)
+            return
+        metrics = run_eval(
+            model,
+            self.mode,
+            max_scenarios=max_sc,
+            sample_seed=sample_seed,
+            collect_traces=False,
+        )
+        self._handle_eval_metrics(metrics)
+
+    def _run_eval_summary(self, *, full: bool) -> Dict[str, Any]:
+        max_sc, use_cap = self._max_scenarios_for_eval(full=full)
         model = self.model_holder.get("model")
         metrics = run_eval(
             model,
@@ -951,6 +1038,37 @@ class CurriculumCheckpointCallback(BaseCallback):
         summary = metrics_to_summary(metrics)
         summary["eval_capped"] = use_cap
         return summary
+
+    def _handle_eval_metrics(self, metrics: Dict[str, Any]) -> None:
+        global CURRICULUM_EARLY_STOPPED
+        elapsed = time.time() - self.start_time
+        summary = metrics_to_summary(metrics)
+        summary["eval_capped"] = self._eval_was_capped
+
+        if self._eval_was_capped and is_summary_better(self.phase, summary, self.best_summary):
+            if self._async.enabled:
+                self._dispatch_eval(full=True)
+            else:
+                summary = self._run_eval_summary(full=True)
+                self._apply_summary(summary, elapsed)
+            return
+        if self._eval_was_capped:
+            return
+        self._apply_summary(summary, elapsed)
+        if CURRICULUM_EARLY_STOPPED:
+            return
+
+    def _apply_summary(self, summary: Dict[str, Any], elapsed: float) -> None:
+        global CURRICULUM_EARLY_STOPPED
+        if not is_summary_better(self.phase, summary, self.best_summary):
+            return
+        self._maybe_save(summary, elapsed)
+        passed, reasons = check_exit(self.phase, summary)
+        if passed and CURRICULUM_EARLY_STOP:
+            CURRICULUM_EARLY_STOPPED = True
+            print("[curriculum-eval] exit gate PASSED — early stop", flush=True)
+            for line in reasons:
+                print(f"  {line}", flush=True)
 
     def _maybe_save(self, summary: Dict[str, Any], elapsed: float) -> None:
         global CURRICULUM_EARLY_STOPPED
@@ -983,34 +1101,46 @@ class CurriculumCheckpointCallback(BaseCallback):
             eval_episodes=int(summary.get("eval_episodes") or 0),
             eval_metrics=live_eval_extras(summary),
         )
-        passed, reasons = check_exit(self.phase, summary)
-        if passed and CURRICULUM_EARLY_STOP:
-            CURRICULUM_EARLY_STOPPED = True
-            print("[curriculum-eval] exit gate PASSED — early stop", flush=True)
-            for line in reasons:
-                print(f"  {line}", flush=True)
 
     def _on_step(self) -> bool:
         global CURRICULUM_EARLY_STOPPED
         if is_cancel_requested():
             return False
+        if self._async.enabled:
+            try:
+                metrics = self._async.poll()
+                if metrics is not None:
+                    self._handle_eval_metrics(metrics)
+            except Exception as exc:
+                print(f"[curriculum-eval] failed: {exc}", flush=True)
+            if self._async.is_busy():
+                return not CURRICULUM_EARLY_STOPPED
         now = time.time()
         if now - self.last_eval_time < CURRICULUM_EVAL_INTERVAL_SEC:
-            return True
+            return not CURRICULUM_EARLY_STOPPED
         self.last_eval_time = now
-        self.tick += 1
-        elapsed = now - self.start_time
         try:
-            summary = self._run_eval_summary(full=False)
-            n_seeds = len(eval_seeds_for_mode(self.mode))
-            cap = CURRICULUM_EVAL_MAX_SCENARIOS
-            if summary.get("eval_capped") and is_summary_better(self.phase, summary, self.best_summary):
-                summary = self._run_eval_summary(full=True)
-            elif summary.get("eval_capped"):
-                return True
-            if not is_summary_better(self.phase, summary, self.best_summary):
-                return not CURRICULUM_EARLY_STOPPED
-            self._maybe_save(summary, elapsed)
+            if self._async.enabled:
+                self._dispatch_eval(full=False)
+            else:
+                elapsed = now - self.start_time
+                self.tick += 1
+                summary = self._run_eval_summary(full=False)
+                if summary.get("eval_capped") and is_summary_better(
+                    self.phase, summary, self.best_summary
+                ):
+                    summary = self._run_eval_summary(full=True)
+                elif summary.get("eval_capped"):
+                    return not CURRICULUM_EARLY_STOPPED
+                if not is_summary_better(self.phase, summary, self.best_summary):
+                    return not CURRICULUM_EARLY_STOPPED
+                self._maybe_save(summary, elapsed)
+                passed, reasons = check_exit(self.phase, summary)
+                if passed and CURRICULUM_EARLY_STOP:
+                    CURRICULUM_EARLY_STOPPED = True
+                    print("[curriculum-eval] exit gate PASSED — early stop", flush=True)
+                    for line in reasons:
+                        print(f"  {line}", flush=True)
         except Exception as exc:
             print(f"[curriculum-eval] skipped: {exc}", flush=True)
         if CURRICULUM_EARLY_STOPPED:
@@ -1104,6 +1234,7 @@ def run_eval(
     current_enabled: Optional[bool] = None,
     collect_traces: bool = True,
     collect_breakdown: bool = True,
+    workers: Optional[int] = None,
 ) -> Any:
     seeds = eval_seeds_for_mode(mode)
     if max_scenarios is not None and max_scenarios < len(seeds):
@@ -1116,121 +1247,35 @@ def run_eval(
         nominal_plant = eval_plant
     else:
         nominal_plant = NOMINAL_PLANT
-        plant_jitter = True  # eval always samples agile↔freighter per scenario
+        plant_jitter = True
     if dynamics_jitter is not None:
         plant_jitter = dynamics_jitter
-    traces: List[Dict[str, Any]] = []
-    colregs_episode_scores: List[Dict[str, Any]] = []
-    successes = 0
-    collisions = 0
-    cpa_violations_in_goal = 0
-    final_ranges: List[float] = []
-    energy_scores: List[float] = []
-    speed_samples: List[float] = []
-    goal_zone_speed_samples: List[float] = []
-    zone_entries = 0
 
-    env = BoatNavEnv(
+    episode_results = rollout_episodes(
+        model,
+        seeds,
         mode=mode,
-        training_randomize=False,
-        nominal_plant=nominal_plant,
-        dynamics_jitter=plant_jitter,
         goal_hold_sec=GOAL_HOLD_SEC,
         max_episode_steps=MAX_EPISODE_STEPS,
         current_enabled=cur_enabled,
-        include_reward_breakdown=collect_breakdown,
+        plant_jitter=plant_jitter,
+        nominal_plant=nominal_plant,
+        collect_trace=collect_traces,
+        collect_breakdown=collect_breakdown,
+        workers=workers,
     )
-
-    episode_results: List[Dict[str, Any]] = []
-    for scenario in seeds:
-        episode = env.rollout_episode(
-            model,
-            reset_seed=scenario.seed,
-            scenario=scenario,
-            collect_trace=collect_traces,
-        )
-        episode_results.append(episode)
-        episode["seed"] = scenario.seed
-        episode["mode"] = mode
-        episode["scenario_name"] = scenario.name
-        episode["scenario_category"] = scenario.category
-        episode["scenario_description"] = scenario.description
-        if collect_traces:
-            traces.append(episode)
-            if episode.get("steps"):
-                colregs = evaluate_episode(episode)
-                episode["colregs"] = colregs
-                if colregs.get("mean_safety_S") is not None:
-                    colregs_episode_scores.append(colregs)
-        if episode["success"]:
-            successes += 1
-        if episode["collision"]:
-            collisions += 1
-        if episode.get("cpa_unsafe_in_goal"):
-            cpa_violations_in_goal += 1
-        rng_val = episode.get("final_goal_range_m")
-        if rng_val is not None:
-            final_ranges.append(float(rng_val))
-        es = episode.get("energy_score")
-        if es is not None:
-            energy_scores.append(float(es))
-        if episode.get("entered_goal_zone"):
-            zone_entries += 1
-        ms = episode.get("mean_speed_mps")
-        if ms is not None:
-            speed_samples.append(float(ms))
-        gz_speeds = episode.get("goal_zone_speeds") or []
-        goal_zone_speed_samples.extend(float(s) for s in gz_speeds)
-
-    episodes = len(seeds)
-    success_rate = successes / episodes if episodes else 0.0
-    collision_rate = collisions / episodes if episodes else 0.0
-    mean_energy_score = float(np.mean(energy_scores)) if energy_scores else 1.0
-    nav_score = success_rate * mean_energy_score
-    avoid_score = success_rate * (1.0 - collision_rate) * mean_energy_score
-    final_ranges_arr = final_ranges
-    avg_final_goal_range_m = float(np.mean(final_ranges_arr)) if final_ranges_arr else None
-    median_final_goal_range_m = float(np.median(final_ranges_arr)) if final_ranges_arr else None
-    at_min_goal_zone = [s for s in goal_zone_speed_samples if s <= HOLD_AT_STOP_EPS_MPS]
-
-    eval_seed_list = eval_seeds_for_mode(mode)
-    metrics = {
-        "mode": mode,
-        "eval_episodes": episodes,
-        "eval_scenarios": episodes,
-        "success_rate": round(success_rate, 4),
-        "collision_rate": round(collision_rate, 4),
-        "cpa_violation_in_goal_rate": round(cpa_violations_in_goal / episodes, 4) if episodes else 0.0,
-        "mean_energy_score": round(mean_energy_score, 4),
-        "mean_speed_mps": round(float(np.mean(speed_samples)), 3) if speed_samples else None,
-        "mean_goal_zone_speed_mps": (
-            round(float(np.mean(goal_zone_speed_samples)), 3) if goal_zone_speed_samples else None
-        ),
-        "pct_goal_zone_at_min_speed": (
-            round(len(at_min_goal_zone) / len(goal_zone_speed_samples), 4)
-            if goal_zone_speed_samples
-            else None
-        ),
-        "episodes_with_goal_zone_steps": zone_entries,
-        "reward_breakdown_mean": aggregate_episode_breakdowns(episode_results),
-        "nav_score": round(nav_score, 4),
-        "avoid_score": round(avoid_score, 4),
-        "avg_final_goal_range_m": round(avg_final_goal_range_m, 2) if avg_final_goal_range_m is not None else None,
-        "median_final_goal_range_m": round(median_final_goal_range_m, 2) if median_final_goal_range_m is not None else None,
-        "goal_success_threshold_m": P.GOAL_SUCCESS_RANGE_M,
-        "eval_scenario_count": len(eval_seed_list),
-        "train_scenario_count": len(train_seeds_for_mode(mode)),
-        "scenario_names": [s.name for s in seeds],
-        "eval_dynamics_jitter": plant_jitter,
-        "eval_current_enabled": cur_enabled,
-        "eval_nominal_plant": nominal_plant.to_dict(),
-        "eval_plant": nominal_plant.to_dict(),  # legacy field
-    }
-    if colregs_episode_scores:
-        metrics.update(rollup_episodes(colregs_episode_scores))
-    if collect_traces:
-        return metrics, traces
-    return metrics
+    return aggregate_eval_metrics(
+        episode_results,
+        seeds,
+        mode,
+        eval_seed_list_count=len(eval_seeds_for_mode(mode)),
+        train_scenario_count=len(train_seeds_for_mode(mode)),
+        plant_jitter=plant_jitter,
+        current_enabled=cur_enabled,
+        nominal_plant=nominal_plant,
+        collect_traces=collect_traces,
+        colregs_enabled=colregs_enabled_for_mode(mode),
+    )
 
 
 def run_robust_eval(model: PPO, mode: str) -> Dict[str, Any]:
@@ -1430,7 +1475,7 @@ def main() -> None:
         )
         callback = CallbackList([budget_cb, curriculum_cb])
     else:
-        live_cb = LiveMetricsCallback(model_holder, MODE, run_dir.name)
+        live_cb = LiveMetricsCallback(model_holder, MODE, run_dir.name, run_dir=run_dir)
         callback = CallbackList([budget_cb, live_cb])
     model.learn(total_timesteps=int(1e9), callback=callback, progress_bar=True)
     env.close()

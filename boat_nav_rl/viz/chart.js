@@ -29,8 +29,12 @@ const BoatNavChart = (() => {
       yMin = Math.min(...vals);
       yMax = Math.max(...vals);
       const span = yMax - yMin;
-      const pad = span > 0 ? span * 0.15 : Math.max(Math.abs(yMax) * 0.1, 1);
-      yMin = Math.max(options.yFloor ?? 0, yMin - pad);
+      const pad = span > 0 ? span * 0.15 : Math.max(Math.abs(yMax), Math.abs(yMin), 1) * 0.1;
+      if (options.yFloor != null) {
+        yMin = Math.max(options.yFloor, yMin - pad);
+      } else {
+        yMin = yMin - pad;
+      }
       yMax = yMax + pad;
     } else {
       yMin = yMin ?? 0;

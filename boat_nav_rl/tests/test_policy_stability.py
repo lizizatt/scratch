@@ -95,12 +95,13 @@ class TestSafeModelPredict(unittest.TestCase):
         self.assertEqual(max_active, 1)
 
 
-class TestLiveEvalNoBackgroundThread(unittest.TestCase):
-    def test_live_metrics_callback_has_no_eval_thread(self):
+class TestLiveEvalAsync(unittest.TestCase):
+    def test_live_metrics_callback_uses_async_runner(self):
         from train import LiveMetricsCallback
 
         cb = LiveMetricsCallback({}, "navigate", "test_run")
-        self.assertFalse(hasattr(cb, "_eval_thread"))
+        self.assertIsNotNone(cb._async)
+        self.assertTrue(cb._async.enabled)
 
 
 if __name__ == "__main__":

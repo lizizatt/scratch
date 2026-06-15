@@ -87,16 +87,16 @@ const METRIC_CHARTS = [
 
 const REWARD_COMPONENTS = [
   { key: "progress", label: "Goal progress" },
-  { key: "cross_track", label: "Cross-track" },
+  { key: "cross_track", label: "Cross-track", penalty: true },
   { key: "approach_slow", label: "Approach decel" },
   { key: "goal_arrival", label: "Goal arrival" },
   { key: "hold_speed", label: "Hold speed" },
-  { key: "hold_center", label: "Hold center" },
-  { key: "hold_overspeed", label: "Hold overspeed" },
-  { key: "goal_threat_stay", label: "Threat in zone" },
-  { key: "smooth", label: "Smooth actions" },
-  { key: "cpa", label: "CPA" },
-  { key: "collision", label: "Collision" },
+  { key: "hold_center", label: "Hold center", penalty: true },
+  { key: "hold_overspeed", label: "Hold overspeed", penalty: true },
+  { key: "goal_threat_stay", label: "Threat in zone", penalty: true },
+  { key: "smooth", label: "Smooth actions", penalty: true },
+  { key: "cpa", label: "CPA", penalty: true },
+  { key: "collision", label: "Collision", penalty: true },
 ];
 
 const REWARD_COLORS = [
@@ -271,16 +271,22 @@ function liveMetricPoints(key, scale = 1) {
   }));
 }
 
-function historyBreakdownPoints(key) {
+function breakdownDisplayY(key, raw, spec) {
+  if (raw == null) return null;
+  if (spec?.penalty) return -raw;
+  return raw;
+}
+
+function historyBreakdownPoints(key, spec) {
   return history.map((r) => ({
-    y: r.reward_breakdown_mean?.[key] ?? null,
+    y: breakdownDisplayY(key, r.reward_breakdown_mean?.[key] ?? null, spec),
     label: shortRunId(r.run_id),
   }));
 }
 
-function liveBreakdownPoints(key) {
+function liveBreakdownPoints(key, spec) {
   return liveSeries.map((p) => ({
-    y: p.reward_breakdown?.[key] ?? null,
+    y: breakdownDisplayY(key, p.reward_breakdown?.[key] ?? null, spec),
     label: `${Math.round(p.t_sec)}s`,
   }));
 }
@@ -316,16 +322,24 @@ function buildRewardGrid() {
 }
 
 function drawDualSeries(completedCanvas, liveCanvas, completedPoints, livePoints, spec) {
+  const yAutoRange = spec.yMax == null;
+  const chartOpts = {
+    emptyText: spec.empty || "No completed runs yet",
+    yAutoRange,
+    yMax: spec.yMax,
+  };
+  if (spec.penalty || spec.yFloor != null) {
+    chartOpts.yFloor = spec.yFloor ?? 0;
+  }
   const seriesOpts = {
     label: spec.label,
     color: spec.color,
     yMax: spec.yMax,
-    yFloor: spec.yFloor,
   };
   BoatNavChart.drawLineChart(
     completedCanvas,
     [{ ...seriesOpts, points: completedPoints }],
-    { emptyText: spec.empty || "No completed runs yet", yAutoRange: spec.yMax == null, yFloor: spec.yFloor ?? 0 }
+    chartOpts
   );
   if (liveCanvas) {
     liveCanvas.classList.toggle("hidden", !jobRunning);
@@ -334,10 +348,8 @@ function drawDualSeries(completedCanvas, liveCanvas, completedPoints, livePoints
         liveCanvas,
         [{ ...seriesOpts, color: "#ff9f43", points: livePoints }],
         {
+          ...chartOpts,
           emptyText: "Waiting for periodic eval…",
-          yAutoRange: spec.yMax == null,
-          yFloor: spec.yFloor ?? 0,
-          yMax: spec.yMax,
         }
       );
     }
@@ -421,8 +433,8 @@ function renderCharts() {
     drawDualSeries(
       completed,
       live,
-      historyBreakdownPoints(spec.key),
-      liveBreakdownPoints(spec.key),
+      historyBreakdownPoints(spec.key, spec),
+      liveBreakdownPoints(spec.key, spec),
       { ...spec, color, empty: "No breakdown data (re-run eval)" }
     );
   });
