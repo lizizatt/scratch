@@ -60,7 +60,20 @@ class TestScenarioLibrary(unittest.TestCase):
         cats = {s.category for s in seeds}
         self.assertTrue(any(c.startswith("clear/") for c in cats))
         self.assertTrue(any(c.startswith("traffic/") for c in cats))
+        self.assertTrue(any(c == "clear/hold_then_go" for c in cats))
+        self.assertTrue(any(c == "clear/exercise_sampler" for c in cats))
+        self.assertTrue(any(c == "clear/multi_leg" for c in cats))
         self.assertTrue(all(s.mode == "navigate" for s in seeds))
+
+    def test_goal_relocate_scenarios(self):
+        seeds = SC.generate_goal_relocate_scenarios()
+        self.assertGreaterEqual(len(seeds), 40)
+        sample = seeds[0]
+        self.assertEqual(sample.category, "clear/hold_then_go")
+        self.assertEqual(sample.own_x_m, sample.goal_x_m)
+        self.assertEqual(sample.own_y_m, sample.goal_y_m)
+        self.assertIsNotNone(sample.goal_relocate_x_m)
+        self.assertIsNotNone(sample.goal_relocate_delay_sec_min)
 
     def test_write_and_load_roundtrip(self):
         path = ROOT / "runs" / "_test_eval_seeds.json"
@@ -78,6 +91,17 @@ class TestTransferFunction(unittest.TestCase):
             plant.step(state, P.DT_S)
         self.assertGreater(state.heading_rad, 0.1)
         self.assertGreater(state.speed_mps, 3.1)
+
+    def test_literal_stop_command(self):
+        heading, speed = P.action_to_command(np.array([0.0, -1.0], dtype=np.float32))
+        self.assertAlmostEqual(speed, P.V_MIN_MPS)
+        self.assertEqual(P.V_MIN_MPS, 0.0)
+        plant = P.TransferFunctionPlant()
+        state = P.VesselState(speed_mps=4.0)
+        plant.apply_command(state, heading, speed)
+        for _ in range(120):
+            plant.step(state, P.DT_S)
+        self.assertLess(state.speed_mps, 0.05)
 
 
 class TestBoatNavEnv(unittest.TestCase):
@@ -101,6 +125,47 @@ class TestBoatNavEnv(unittest.TestCase):
         obs, _ = env.reset()
         self.assertEqual(obs.shape, (P.OBS_DIM,))
 
+    def test_goal_relocates_after_delay(self):
+        from train import BoatNavEnv
+
+        scenario = SC.generate_goal_relocate_scenarios()[0]
+        env = BoatNavEnv(scenario=scenario, training_randomize=False, goal_hold_sec=60, current_enabled=False)
+        env.reset(seed=42)
+        self.assertLess(P.goal_range(env.own, env.goal_x, env.goal_y), P.GOAL_SUCCESS_RANGE_M)
+
+        relocated = False
+        for _ in range(80):
+            _, _, term, trunc, info = env.step(np.array([0.0, -1.0], dtype=np.float32))
+            if info.get("goal_relocated"):
+                relocated = True
+                break
+            if term or trunc:
+                break
+
+        self.assertTrue(relocated)
+        self.assertGreater(P.goal_range(env.own, env.goal_x, env.goal_y), P.GOAL_SUCCESS_RANGE_M / 2)
+        self.assertEqual(env.goal_hold_steps, 0)
+
+    def test_multi_leg_advances_without_terminating(self):
+        from train import BoatNavEnv
+
+        scenario = next(s for s in SC.generate_multi_leg_scenarios() if s.name.startswith("multi_leg_2x"))
+        env = BoatNavEnv(
+            scenario=scenario,
+            training_randomize=False,
+            goal_hold_sec=5,
+            current_enabled=False,
+        )
+        env.reset(seed=99)
+        env.own.x_m = env.goal_x
+        env.own.y_m = env.goal_y
+        env.own.speed_mps = P.V_MIN_MPS
+        env.goal_hold_steps = 5
+        _, _, term, _, info = env.step(np.array([0.0, -1.0], dtype=np.float32))
+        self.assertFalse(term)
+        self.assertTrue(info.get("goal_changed"))
+        self.assertGreater(P.goal_range(env.own, env.goal_x, env.goal_y), P.GOAL_SUCCESS_RANGE_M / 2)
+
     def test_goal_hold_requires_staying_in_zone(self):
         from train import BoatNavEnv
 
@@ -113,18 +178,54 @@ class TestBoatNavEnv(unittest.TestCase):
         env.reset(seed=1)
         env.own.x_m = env.goal_x
         env.own.y_m = env.goal_y
+        env.own.speed_mps = P.V_MIN_MPS
         env.prev_goal_range = 0.0
         env.goal_hold_steps = 0
 
         for _ in range(2):
-            _, _, term, _, info = env.step(env.action_space.sample())
+            env.own.speed_mps = P.V_MIN_MPS
+            _, _, term, _, info = env.step(np.array([0.0, -1.0], dtype=np.float32))
             self.assertFalse(term)
             self.assertFalse(info["success"])
             self.assertTrue(info["in_goal_zone"])
 
-        _, _, term, _, info = env.step(env.action_space.sample())
+        env.own.speed_mps = P.V_MIN_MPS
+        _, _, term, _, info = env.step(np.array([0.0, -1.0], dtype=np.float32))
         self.assertTrue(term)
         self.assertTrue(info["success"])
+
+    def test_max_episode_steps_override(self):
+        from train import BoatNavEnv
+
+        env = BoatNavEnv(
+            mode="navigate",
+            training_randomize=False,
+            goal_hold_sec=5,
+            max_episode_steps=40,
+            current_enabled=False,
+        )
+        self.assertEqual(env.max_steps, 45)
+        env.reset(seed=1)
+        for _ in range(44):
+            _, _, term, trunc, _ = env.step(env.action_space.sample())
+            self.assertFalse(term)
+            self.assertFalse(trunc)
+        _, _, term, trunc, _ = env.step(env.action_space.sample())
+        self.assertFalse(term)
+        self.assertTrue(trunc)
+
+    def test_reward_breakdown_optional(self):
+        from train import BoatNavEnv
+
+        env = BoatNavEnv(mode="navigate", training_randomize=False, include_reward_breakdown=False)
+        env.reset(seed=1)
+        _, _, _, _, info = env.step(env.action_space.sample())
+        self.assertNotIn("reward_breakdown", info)
+
+        env2 = BoatNavEnv(mode="navigate", training_randomize=False, include_reward_breakdown=True)
+        env2.reset(seed=1)
+        _, _, _, _, info2 = env2.step(env2.action_space.sample())
+        self.assertIn("reward_breakdown", info2)
 
     def test_hold_zone_favors_lower_speed(self):
         from train import BoatNavEnv, W_HOLD_STATION
@@ -152,6 +253,66 @@ class TestBoatNavEnv(unittest.TestCase):
 
         self.assertGreater(reward_slow, reward_fast)
         self.assertGreater(W_HOLD_STATION, 0.0)
+
+    def test_approach_zone_favors_slowing_down(self):
+        from train import APPROACH_SLOW_RANGE_M, BoatNavEnv
+
+        env = BoatNavEnv(
+            mode="navigate",
+            training_randomize=False,
+            goal_hold_sec=5,
+            current_enabled=False,
+        )
+        env.reset(seed=3)
+        env.own.x_m = env.goal_x
+        env.own.y_m = env.goal_y + APPROACH_SLOW_RANGE_M * 0.4
+        env.prev_goal_range = APPROACH_SLOW_RANGE_M * 0.4
+        env.goal_hold_steps = 0
+        env.own.speed_mps = P.V_MIN_MPS
+        _, reward_slow, _, _, _ = env.step(np.array([0.0, -1.0], dtype=np.float32))
+
+        env.own.x_m = env.goal_x
+        env.own.y_m = env.goal_y + APPROACH_SLOW_RANGE_M * 0.4
+        env.prev_goal_range = APPROACH_SLOW_RANGE_M * 0.4
+        env.goal_hold_steps = 0
+        env.own.speed_mps = P.V_MAX_MPS
+        _, reward_fast, _, _, _ = env.step(np.array([0.0, 1.0], dtype=np.float32))
+
+        self.assertGreater(reward_slow, reward_fast)
+
+    def test_far_from_goal_rewards_direct_heading(self):
+        from train import GOAL_DIRECT_RANGE_THRESH_M, BoatNavEnv
+
+        env = BoatNavEnv(
+            mode="navigate",
+            training_randomize=False,
+            goal_hold_sec=5,
+            current_enabled=False,
+        )
+        env.reset(seed=4)
+        env.goal_x = 0.0
+        env.goal_y = env.own.y_m + GOAL_DIRECT_RANGE_THRESH_M + 200.0
+        env.own.heading_rad = 0.0
+        env.own.speed_mps = 4.0
+        env.own.cmd_heading_rad = 0.0
+        env.own.cmd_speed_mps = 4.0
+        env.prev_goal_range = GOAL_DIRECT_RANGE_THRESH_M + 200.0
+        env.goal_hold_steps = 0
+        _, reward_aligned, _, _, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
+
+        env.own.heading_rad = math.pi
+        env.own.cmd_heading_rad = math.pi
+        env.prev_goal_range = GOAL_DIRECT_RANGE_THRESH_M + 200.0
+        env.goal_hold_steps = 0
+        _, reward_away, _, _, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
+
+        self.assertGreater(reward_aligned, reward_away)
+
+    def test_cpa_penalty_weights_quadrupled(self):
+        from train import W_CPA, W_CPA_SOFT
+
+        self.assertEqual(W_CPA, 40.0)
+        self.assertEqual(W_CPA_SOFT, 12.0)
 
     def test_threat_at_goal_rewards_leaving_waypoint(self):
         from train import BoatNavEnv, THREAT_PROGRESS_THRESH, contact_threat_and_cpa_penalty
