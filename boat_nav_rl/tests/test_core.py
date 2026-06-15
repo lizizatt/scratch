@@ -228,7 +228,8 @@ class TestBoatNavEnv(unittest.TestCase):
         self.assertIn("reward_breakdown", info2)
 
     def test_hold_zone_favors_lower_speed(self):
-        from train import BoatNavEnv, W_HOLD_STATION
+        from rewards import W_HOLD_SPEED
+        from train import BoatNavEnv
 
         env = BoatNavEnv(
             mode="navigate",
@@ -252,7 +253,37 @@ class TestBoatNavEnv(unittest.TestCase):
         _, reward_fast, _, _, _ = env.step(np.array([0.0, 1.0], dtype=np.float32))
 
         self.assertGreater(reward_slow, reward_fast)
-        self.assertGreater(W_HOLD_STATION, 0.0)
+        self.assertGreater(W_HOLD_SPEED, 0.0)
+
+    def test_cross_track_penalizes_lateral_offset(self):
+        from rewards import apply_reward_overrides
+        from train import BoatNavEnv
+
+        apply_reward_overrides({"cross_track": 1.0, "cross_track_scale_m": 100.0})
+        env = BoatNavEnv(
+            mode="navigate",
+            training_randomize=False,
+            goal_hold_sec=5,
+            current_enabled=False,
+        )
+        env.reset(seed=4)
+        env.goal_x = 0.0
+        env.goal_y = 500.0
+        env.leg_start_x = 0.0
+        env.leg_start_y = 0.0
+        env.own.x_m = 0.0
+        env.own.y_m = 100.0
+        env.prev_goal_range = 400.0
+        env.own.speed_mps = 4.0
+        _, reward_on_track, _, _, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
+
+        env.own.x_m = 100.0
+        env.own.y_m = 100.0
+        env.prev_goal_range = P.goal_range(env.own, env.goal_x, env.goal_y) + 5.0
+        _, reward_offset, _, _, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
+
+        self.assertGreater(reward_on_track, reward_offset)
+        apply_reward_overrides({"cross_track": 0.0})
 
     def test_approach_zone_favors_slowing_down(self):
         from train import APPROACH_SLOW_RANGE_M, BoatNavEnv
@@ -279,34 +310,6 @@ class TestBoatNavEnv(unittest.TestCase):
         _, reward_fast, _, _, _ = env.step(np.array([0.0, 1.0], dtype=np.float32))
 
         self.assertGreater(reward_slow, reward_fast)
-
-    def test_far_from_goal_rewards_direct_heading(self):
-        from train import GOAL_DIRECT_RANGE_THRESH_M, BoatNavEnv
-
-        env = BoatNavEnv(
-            mode="navigate",
-            training_randomize=False,
-            goal_hold_sec=5,
-            current_enabled=False,
-        )
-        env.reset(seed=4)
-        env.goal_x = 0.0
-        env.goal_y = env.own.y_m + GOAL_DIRECT_RANGE_THRESH_M + 200.0
-        env.own.heading_rad = 0.0
-        env.own.speed_mps = 4.0
-        env.own.cmd_heading_rad = 0.0
-        env.own.cmd_speed_mps = 4.0
-        env.prev_goal_range = GOAL_DIRECT_RANGE_THRESH_M + 200.0
-        env.goal_hold_steps = 0
-        _, reward_aligned, _, _, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
-
-        env.own.heading_rad = math.pi
-        env.own.cmd_heading_rad = math.pi
-        env.prev_goal_range = GOAL_DIRECT_RANGE_THRESH_M + 200.0
-        env.goal_hold_steps = 0
-        _, reward_away, _, _, _ = env.step(np.array([0.0, 0.0], dtype=np.float32))
-
-        self.assertGreater(reward_aligned, reward_away)
 
     def test_cpa_penalty_weights_quadrupled(self):
         from train import W_CPA, W_CPA_SOFT

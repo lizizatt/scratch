@@ -1,0 +1,11 @@
+{
+  "reward_weights": {
+    "goal_progress": 4.0,
+    "hold_overspeed": 5.0,
+    "hold_base": 2.0,
+    "hold_speed": 12.0,
+    "hold_stationary_speed_mps": 0.15,
+    "hold_at_stop_eps_mps": 0.1,
+    "approach_slow": 0.8
+  }
+}

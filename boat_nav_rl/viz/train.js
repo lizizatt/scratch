@@ -24,14 +24,12 @@ const pauseBtn = document.getElementById("pauseBtn");
 const jobStatus = document.getElementById("jobStatus");
 const trainLog = document.getElementById("trainLog");
 const statusLine = document.getElementById("statusLine");
-const goalChartSplit = document.getElementById("goalChartSplit");
 const scoreChartSplit = document.getElementById("scoreChartSplit");
-const goalChartLivePane = document.getElementById("goalChartLivePane");
 const scoreChartLivePane = document.getElementById("scoreChartLivePane");
-const goalRangeChartCompleted = document.getElementById("goalRangeChartCompleted");
-const goalRangeChartLive = document.getElementById("goalRangeChartLive");
 const scoreChartCompleted = document.getElementById("scoreChartCompleted");
 const scoreChartLive = document.getElementById("scoreChartLive");
+const metricsGrid = document.getElementById("metricsGrid");
+const rewardGrid = document.getElementById("rewardGrid");
 const historyTable = document.querySelector("#historyTable tbody");
 const montageCanvas = document.getElementById("montageCanvas");
 const montageScrubber = document.getElementById("montageScrubber");
@@ -51,6 +49,68 @@ let animFrameId = null;
 let plantConfig = null;
 let montageEpisodes = [];
 let montageRunId = null;
+
+const METRIC_CHARTS = [
+  {
+    key: "success_rate",
+    label: "Success rate",
+    scale: 100,
+    yMax: 100,
+    color: "#3aa6ff",
+    empty: "No eval yet",
+  },
+  {
+    key: "avg_final_goal_range_m",
+    label: "Avg goal range (m)",
+    scale: 1,
+    yFloor: 0,
+    color: "#ffc857",
+    empty: "No eval yet",
+  },
+  {
+    key: "mean_goal_zone_speed_mps",
+    label: "Goal-zone speed (m/s)",
+    scale: 1,
+    yFloor: 0,
+    color: "#ff6b6b",
+    empty: "No zone steps yet",
+  },
+  {
+    key: "pct_goal_zone_at_min_speed",
+    label: "At min speed in zone",
+    scale: 100,
+    yMax: 100,
+    color: "#45d483",
+    empty: "No zone steps yet",
+  },
+];
+
+const REWARD_COMPONENTS = [
+  { key: "progress", label: "Goal progress" },
+  { key: "cross_track", label: "Cross-track" },
+  { key: "approach_slow", label: "Approach decel" },
+  { key: "goal_arrival", label: "Goal arrival" },
+  { key: "hold_speed", label: "Hold speed" },
+  { key: "hold_center", label: "Hold center" },
+  { key: "hold_overspeed", label: "Hold overspeed" },
+  { key: "goal_threat_stay", label: "Threat in zone" },
+  { key: "smooth", label: "Smooth actions" },
+  { key: "cpa", label: "CPA" },
+  { key: "collision", label: "Collision" },
+];
+
+const REWARD_COLORS = [
+  "#45d483",
+  "#3aa6ff",
+  "#ffc857",
+  "#ff9f43",
+  "#c678dd",
+  "#56b6c2",
+  "#e06c75",
+  "#98c379",
+  "#61afef",
+  "#d19a66",
+];
 
 function readPlantFromForm() {
   return {
@@ -81,6 +141,23 @@ async function loadPlantConfig() {
   applyPlantPreset(plantConfig.nominal);
   if (plantConfig.goal_hold_sec_default != null) {
     goalHoldSec.value = plantConfig.goal_hold_sec_default;
+  }
+  if (plantConfig.default_mode) {
+    modeSelect.value = plantConfig.default_mode;
+  }
+  const tr = plantConfig.training;
+  if (tr) {
+    if (tr.recommended_n_envs != null) {
+      nEnvs.value = tr.recommended_n_envs;
+    }
+    if (tr.max_n_envs != null) {
+      nEnvs.max = tr.max_n_envs;
+    }
+    const hint = document.getElementById("nEnvsHint");
+    if (hint && tr.cpu_count != null) {
+      hint.textContent = `Rollouts on CPU (${tr.vecenv_backend || "subproc"}, ${tr.cpu_count} cores). `
+        + `Default ${tr.recommended_n_envs} envs, ${tr.rollout_steps_total || "?"} steps/update. GPU used for PPO learning.`;
+    }
   }
   syncPlantUi();
 }
@@ -180,6 +257,93 @@ async function loadMontageForRun(runId) {
   }
 }
 
+function historyMetricPoints(key, scale = 1) {
+  return history.map((r) => ({
+    y: r[key] != null ? r[key] * scale : null,
+    label: shortRunId(r.run_id),
+  }));
+}
+
+function liveMetricPoints(key, scale = 1) {
+  return liveSeries.map((p) => ({
+    y: p[key] != null ? p[key] * scale : null,
+    label: `${Math.round(p.t_sec)}s`,
+  }));
+}
+
+function historyBreakdownPoints(key) {
+  return history.map((r) => ({
+    y: r.reward_breakdown_mean?.[key] ?? null,
+    label: shortRunId(r.run_id),
+  }));
+}
+
+function liveBreakdownPoints(key) {
+  return liveSeries.map((p) => ({
+    y: p.reward_breakdown?.[key] ?? null,
+    label: `${Math.round(p.t_sec)}s`,
+  }));
+}
+
+function buildMetricGrid() {
+  if (metricsGrid.dataset.built) return;
+  METRIC_CHARTS.forEach((spec) => {
+    const pane = document.createElement("div");
+    pane.className = "chart-pane-sm";
+    pane.innerHTML = `
+      <h3 class="chart-pane-title">${spec.label}</h3>
+      <canvas class="metric-chart-completed" data-key="${spec.key}" width="400" height="170"></canvas>
+      <canvas class="metric-chart-live hidden" data-key="${spec.key}" width="400" height="130"></canvas>
+    `;
+    metricsGrid.appendChild(pane);
+  });
+  metricsGrid.dataset.built = "1";
+}
+
+function buildRewardGrid() {
+  if (rewardGrid.dataset.built) return;
+  REWARD_COMPONENTS.forEach((spec, i) => {
+    const pane = document.createElement("div");
+    pane.className = "chart-pane-sm";
+    pane.innerHTML = `
+      <h3 class="chart-pane-title">${spec.label}</h3>
+      <canvas class="reward-chart-completed" data-key="${spec.key}" width="400" height="170"></canvas>
+      <canvas class="reward-chart-live hidden" data-key="${spec.key}" width="400" height="130"></canvas>
+    `;
+    rewardGrid.appendChild(pane);
+  });
+  rewardGrid.dataset.built = "1";
+}
+
+function drawDualSeries(completedCanvas, liveCanvas, completedPoints, livePoints, spec) {
+  const seriesOpts = {
+    label: spec.label,
+    color: spec.color,
+    yMax: spec.yMax,
+    yFloor: spec.yFloor,
+  };
+  BoatNavChart.drawLineChart(
+    completedCanvas,
+    [{ ...seriesOpts, points: completedPoints }],
+    { emptyText: spec.empty || "No completed runs yet", yAutoRange: spec.yMax == null, yFloor: spec.yFloor ?? 0 }
+  );
+  if (liveCanvas) {
+    liveCanvas.classList.toggle("hidden", !jobRunning);
+    if (jobRunning) {
+      BoatNavChart.drawLineChart(
+        liveCanvas,
+        [{ ...seriesOpts, color: "#ff9f43", points: livePoints }],
+        {
+          emptyText: "Waiting for periodic eval…",
+          yAutoRange: spec.yMax == null,
+          yFloor: spec.yFloor ?? 0,
+          yMax: spec.yMax,
+        }
+      );
+    }
+  }
+}
+
 function populateResumeSelect() {
   const prev = resumeSelect.value;
   resumeSelect.innerHTML = '<option value="">Fresh start</option>';
@@ -199,27 +363,21 @@ function populateResumeSelect() {
 
 function updateChartLayout() {
   const showLive = jobRunning;
-  goalChartSplit.classList.toggle("chart-split-live", showLive);
   scoreChartSplit.classList.toggle("chart-split-live", showLive);
-  goalChartLivePane.classList.toggle("hidden", !showLive);
   scoreChartLivePane.classList.toggle("hidden", !showLive);
+  document.querySelectorAll(".metric-chart-live, .reward-chart-live").forEach((el) => {
+    el.classList.toggle("hidden", !showLive);
+  });
 }
 
 function renderCharts() {
+  buildMetricGrid();
+  buildRewardGrid();
   updateChartLayout();
 
-  const goalPoints = history.map((r) => ({
-    y: r.avg_final_goal_range_m,
-    label: shortRunId(r.run_id),
-  }));
   const scorePoints = history.map((r) => ({
     y: r.score != null ? r.score * 100 : null,
     label: shortRunId(r.run_id),
-  }));
-
-  const liveGoal = liveSeries.map((p) => ({
-    y: p.avg_final_goal_range_m,
-    label: `${Math.round(p.t_sec)}s`,
   }));
   const liveScore = liveSeries.map((p) => ({
     y: p.score != null ? p.score * 100 : null,
@@ -227,54 +385,47 @@ function renderCharts() {
   }));
 
   BoatNavChart.drawLineChart(
-    goalRangeChartCompleted,
-    [
-      {
-        label: "Avg goal (m)",
-        color: BoatNavChart.COLORS.goalRange,
-        points: goalPoints,
-      },
-    ],
-    { emptyText: "No runs yet — start training below" }
-  );
-
-  BoatNavChart.drawLineChart(
     scoreChartCompleted,
-    [
-      {
-        label: "Score (%)",
-        color: BoatNavChart.COLORS.score,
-        points: scorePoints,
-        yMax: 100,
-      },
-    ],
-    { emptyText: "No runs yet" }
+    [{ label: "Score (%)", color: BoatNavChart.COLORS.score, points: scorePoints, yMax: 100 }],
+    { emptyText: "No runs yet — start training below" }
   );
 
   if (jobRunning) {
     BoatNavChart.drawLineChart(
-      goalRangeChartLive,
-      [
-        {
-          label: "Avg goal (m)",
-          color: "#ff9f43",
-          points: liveGoal,
-        },
-      ],
-      { emptyText: "Waiting for first mini-eval (~20s)…", yAutoRange: true, yFloor: 0 }
-    );
-    BoatNavChart.drawLineChart(
       scoreChartLive,
-      [
-        {
-          label: "Score (%)",
-          color: "#ff9f43",
-          points: liveScore,
-        },
-      ],
-      { emptyText: "Waiting for first mini-eval (~20s)…", yAutoRange: true, yFloor: 0, yMax: 100 }
+      [{ label: "Score (%)", color: "#ff9f43", points: liveScore, yMax: 100 }],
+      { emptyText: "Waiting for periodic eval…", yAutoRange: true, yFloor: 0, yMax: 100 }
     );
   }
+
+  METRIC_CHARTS.forEach((spec) => {
+    const completed = metricsGrid.querySelector(
+      `.metric-chart-completed[data-key="${spec.key}"]`
+    );
+    const live = metricsGrid.querySelector(`.metric-chart-live[data-key="${spec.key}"]`);
+    drawDualSeries(
+      completed,
+      live,
+      historyMetricPoints(spec.key, spec.scale),
+      liveMetricPoints(spec.key, spec.scale),
+      spec
+    );
+  });
+
+  REWARD_COMPONENTS.forEach((spec, i) => {
+    const completed = rewardGrid.querySelector(
+      `.reward-chart-completed[data-key="${spec.key}"]`
+    );
+    const live = rewardGrid.querySelector(`.reward-chart-live[data-key="${spec.key}"]`);
+    const color = REWARD_COLORS[i % REWARD_COLORS.length];
+    drawDualSeries(
+      completed,
+      live,
+      historyBreakdownPoints(spec.key),
+      liveBreakdownPoints(spec.key),
+      { ...spec, color, empty: "No breakdown data (re-run eval)" }
+    );
+  });
 }
 
 function renderHistoryTable() {

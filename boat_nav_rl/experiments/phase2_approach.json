@@ -1,0 +1,7 @@
+{
+  "reward_weights": {
+    "hold_overspeed": 0.0,
+    "approach_slow": 1.5,
+    "goal_progress": 4.0
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "reward_weights": {
+    "hold_base": 2.0,
+    "hold_speed": 10.0,
+    "hold_overspeed": 6.0,
+    "approach_slow": 1.5,
+    "cross_track": 0.45,
+    "cross_track_scale_m": 80.0,
+    "hold_stationary_speed_mps": 0.15,
+    "hold_at_stop_eps_mps": 0.1
+  }
+}
