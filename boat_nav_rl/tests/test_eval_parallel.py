@@ -13,10 +13,26 @@ sys.path.insert(0, str(ROOT))
 import prepare as P
 from eval_parallel import (
     aggregate_eval_metrics,
+    checkpoint_stem,
+    checkpoint_zip_path,
     colregs_enabled_for_mode,
     rollout_episodes_sequential,
 )
 from async_eval import AsyncEvalRunner
+
+
+class TestCheckpointPaths(unittest.TestCase):
+    def test_stem_strips_zip_suffix(self):
+        self.assertEqual(
+            checkpoint_stem(Path("runs/_eval_snapshot.zip")),
+            Path("runs/_eval_snapshot"),
+        )
+
+    def test_zip_path_from_stem(self):
+        self.assertEqual(
+            checkpoint_zip_path(Path("runs/_eval_snapshot")),
+            Path("runs/_eval_snapshot.zip"),
+        )
 
 
 class TestColregsGating(unittest.TestCase):

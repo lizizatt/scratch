@@ -42,6 +42,7 @@ from checkpoint_util import (
 from async_eval import AsyncEvalRunner
 from eval_parallel import (
     aggregate_eval_metrics,
+    checkpoint_zip_path,
     colregs_enabled_for_mode,
     rollout_episodes,
     run_eval_from_snapshot,
@@ -902,10 +903,10 @@ class LiveMetricsCallback(BaseCallback):
         sample_seed = self.num_timesteps + self.eval_tick * 10007
         if self._async.enabled:
             snap = self.run_dir / "_live_eval_snapshot"
-            zip_path = snapshot_model_for_eval(model, snap)
+            stem = snapshot_model_for_eval(model, snap)
             if not self._async.submit(
                 run_eval_from_snapshot,
-                str(zip_path),
+                str(stem),
                 self.mode,
                 self.max_scenarios,
                 sample_seed,
@@ -916,7 +917,7 @@ class LiveMetricsCallback(BaseCallback):
                 True,
                 None,
             ):
-                zip_path.unlink(missing_ok=True)
+                checkpoint_zip_path(stem).unlink(missing_ok=True)
             return
         metrics = run_eval(
             model,
@@ -995,10 +996,10 @@ class CurriculumCheckpointCallback(BaseCallback):
         sample_seed = self.num_timesteps + self.tick * 10007
         if self._async.enabled:
             snap = self.run_dir / "_curriculum_eval_snapshot"
-            zip_path = snapshot_model_for_eval(model, snap)
+            stem = snapshot_model_for_eval(model, snap)
             if not self._async.submit(
                 run_eval_from_snapshot,
-                str(zip_path),
+                str(stem),
                 self.mode,
                 max_sc,
                 sample_seed,
@@ -1009,7 +1010,7 @@ class CurriculumCheckpointCallback(BaseCallback):
                 True,
                 None,
             ):
-                zip_path.unlink(missing_ok=True)
+                checkpoint_zip_path(stem).unlink(missing_ok=True)
             return
         metrics = run_eval(
             model,

@@ -27,12 +27,28 @@ def default_eval_workers() -> int:
     return max(1, EVAL_WORKERS)
 
 
+def checkpoint_stem(path: Path | str) -> Path:
+    """SB3 save/load stem — path without ``.zip`` suffix."""
+    p = Path(path)
+    if p.suffix.lower() == ".zip":
+        return p.with_suffix("")
+    return p
+
+
+def checkpoint_zip_path(path: Path | str) -> Path:
+    """On-disk zip written by ``model.save(stem)``."""
+    return checkpoint_stem(path).with_suffix(".zip")
+
+
 def snapshot_model_for_eval(model: PPO, path: Path) -> Path:
-    """Write a temporary checkpoint for worker processes."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    stem = str(path.with_suffix(""))
-    model.save(stem)
-    return Path(f"{stem}.zip")
+    """Write a temporary checkpoint for worker processes.
+
+    Returns the **stem** path (no ``.zip``) suitable for ``PPO.load``.
+    """
+    stem = checkpoint_stem(path)
+    stem.parent.mkdir(parents=True, exist_ok=True)
+    model.save(str(stem))
+    return stem
 
 
 def _worker_config_dict(
@@ -178,10 +194,11 @@ def rollout_episodes(
         )
 
     snap = snapshot_path or (P.RUNS_DIR / "_eval_snapshot")
-    zip_path = snapshot_model_for_eval(model, snap)
+    stem = snapshot_model_for_eval(model, snap)
+    zip_path = checkpoint_zip_path(stem)
     try:
         cfg = _worker_config_dict(
-            model_path=str(zip_path),
+            model_path=str(stem),
             mode=mode,
             goal_hold_sec=goal_hold_sec,
             max_episode_steps=max_episode_steps,
@@ -191,7 +208,7 @@ def rollout_episodes(
             collect_trace=collect_trace,
             collect_breakdown=collect_breakdown,
         )
-        return rollout_episodes_parallel(str(zip_path), scenarios, cfg, workers=n_workers)
+        return rollout_episodes_parallel(str(stem), scenarios, cfg, workers=n_workers)
     finally:
         zip_path.unlink(missing_ok=True)
 
@@ -314,7 +331,7 @@ def aggregate_eval_metrics(
 
 
 def run_eval_from_snapshot(
-    snapshot_zip: str,
+    snapshot_stem: str,
     mode: str,
     max_scenarios: Optional[int] = None,
     sample_seed: Optional[int] = None,
@@ -328,7 +345,9 @@ def run_eval_from_snapshot(
     """Load policy from snapshot path and run eval (for async background thread)."""
     from train import run_eval
 
-    model = PPO.load(snapshot_zip, device="cpu")
+    stem = checkpoint_stem(snapshot_stem)
+    zip_path = checkpoint_zip_path(stem)
+    model = PPO.load(str(stem), device="cpu")
     try:
         return run_eval(
             model,
@@ -343,4 +362,4 @@ def run_eval_from_snapshot(
             workers=workers,
         )
     finally:
-        Path(snapshot_zip).unlink(missing_ok=True)
+        zip_path.unlink(missing_ok=True)
