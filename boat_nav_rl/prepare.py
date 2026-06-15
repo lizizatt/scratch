@@ -47,10 +47,19 @@ RADIUS_SCALE_M = max(VESSEL_CLASSES.values())
 CONTACT_OBS_NOISE_M = 5.0
 CONTACT_OBS_NOISE_BEARING_RAD = 0.03
 
-V_MIN_MPS = 1.0
+V_MIN_MPS = 0.0  # literal stop allowed (all-stop command)
 V_MAX_MPS = 8.0
-CURRENT_MAX_MPS = V_MIN_MPS * 0.5  # max water current speed (m/s)
+CURRENT_MAX_MPS = 0.5  # max water current speed (m/s)
 DEFAULT_GOAL_HOLD_SEC = 30
+DEFAULT_MODE = "avoid"  # "navigate" | "avoid" | "all"
+
+# Shared world extent (Exercise sandbox + exercise_sampler scenarios).
+WORLD_BOUNDS = {
+    "min_x": -1200.0,
+    "max_x": 1200.0,
+    "min_y": -900.0,
+    "max_y": 900.0,
+}
 HEADING_MIN_RAD = -math.pi
 HEADING_MAX_RAD = math.pi
 
@@ -220,6 +229,17 @@ def default_plant_config() -> Dict[str, Any]:
             "max_yaw_rate_deg_s": [PLANT_FREIGHTER["max_yaw_rate_deg_s"], PLANT_AGILE["max_yaw_rate_deg_s"]],
         },
         "goal_hold_sec_default": DEFAULT_GOAL_HOLD_SEC,
+        "default_mode": DEFAULT_MODE,
+        "sim_constants": {
+            "vessel_classes": dict(VESSEL_CLASSES),
+            "own_radius_m": OWN_RADIUS_M,
+            "cpa_margin_m": CPA_MARGIN_M,
+            "goal_success_range_m": GOAL_SUCCESS_RANGE_M,
+            "max_episode_steps_default": MAX_STEPS,
+            "dt_s": DT_S,
+            "v_min_mps": V_MIN_MPS,
+            "v_max_mps": V_MAX_MPS,
+        },
         "current_max_mps": CURRENT_MAX_MPS,
     }
 
@@ -316,6 +336,23 @@ def bearing_range(own_x: float, own_y: float, tgt_x: float, tgt_y: float) -> Tup
     rng = math.hypot(dx, dy)
     bearing = math.atan2(dx, dy)  # 0=north, cw positive
     return bearing, rng
+
+
+def cross_track_m(
+    leg_start_x: float,
+    leg_start_y: float,
+    leg_end_x: float,
+    leg_end_y: float,
+    point_x: float,
+    point_y: float,
+) -> float:
+    """Perpendicular distance from point to the infinite line leg_start -> leg_end."""
+    dx = leg_end_x - leg_start_x
+    dy = leg_end_y - leg_start_y
+    seg_len_sq = dx * dx + dy * dy
+    if seg_len_sq < 1e-6:
+        return math.hypot(point_x - leg_start_x, point_y - leg_start_y)
+    return abs((point_x - leg_start_x) * dy - (point_y - leg_start_y) * dx) / math.sqrt(seg_len_sq)
 
 
 def action_to_command(action: np.ndarray) -> Tuple[float, float]:
@@ -422,6 +459,12 @@ class ScenarioSeed:
     contacts: List[Dict[str, float]] = field(default_factory=list)
     category: str = "uncategorized"
     description: str = ""
+    # Optional waypoint schedule (see mission.py). Legacy relocate fields still supported.
+    waypoint_events: List[Dict[str, Any]] = field(default_factory=list)
+    goal_relocate_x_m: Optional[float] = None
+    goal_relocate_y_m: Optional[float] = None
+    goal_relocate_delay_sec_min: Optional[float] = None
+    goal_relocate_delay_sec_max: Optional[float] = None
 
 
 def contact_from_polar(
@@ -475,7 +518,7 @@ def write_scenario_splits(
     train_path.write_text(json.dumps([asdict(s) for s in train_seeds], indent=2), encoding="utf-8")
     eval_path.write_text(json.dumps([asdict(s) for s in eval_seeds], indent=2), encoding="utf-8")
     manifest = {
-        "version": 3,
+        "version": 5,
         "vessel_classes": dict(VESSEL_CLASSES),
         "own_radius_m": OWN_RADIUS_M,
         "cpa_margin_m": CPA_MARGIN_M,
@@ -504,6 +547,7 @@ def _load_seed_list(raw: object) -> List[ScenarioSeed]:
     for item in raw:
         item.setdefault("category", "uncategorized")
         item.setdefault("description", "")
+        item.setdefault("waypoint_events", [])
         seeds.append(ScenarioSeed(**item))
     return seeds
 
@@ -560,6 +604,10 @@ def check_collision(
 
 def goal_range(own: VesselState, goal_x: float, goal_y: float) -> float:
     return math.hypot(goal_x - own.x_m, goal_y - own.y_m)
+
+
+def goal_range_xy(own_x: float, own_y: float, goal_x: float, goal_y: float) -> float:
+    return math.hypot(goal_x - own_x, goal_y - own_y)
 
 
 def snapshot_step(

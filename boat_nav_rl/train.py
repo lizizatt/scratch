@@ -23,12 +23,68 @@ import numpy as np
 from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+from vecenv_util import (
+    make_vec_env,
+    ppo_batch_size,
+    recommended_n_envs,
+    rollout_steps_total,
+    steps_per_env,
+    training_perf_defaults,
+    max_n_envs,
+)
 
 import prepare as P
+from checkpoint_util import (
+    copy_best_to_final,
+    load_best_metrics,
+    resolve_resume_checkpoint,
+    save_best_checkpoint,
+)
+from curriculum import filter_seeds_by_prefix, get_phase, is_summary_better, metrics_to_summary, check_exit
 from colregs.evaluate import evaluate_episode, rollup_episodes
 from device_util import configure_training_backend, resolve_device, torch_device_info
+from mission import MissionTransition, NavigationMission
 from policy_infer import safe_model_predict
+from rewards import (
+    REWARD_CLIP,
+    StepRewardInput,
+    W_CPA,
+    W_CPA_SOFT,
+    W_ESCAPE_GOAL,
+    W_GOAL_DIRECT,
+    W_GOAL_EARLY,
+    W_GOAL_HOLD,
+    W_GOAL_PROGRESS,
+    W_GOAL_REACHED,
+    W_GOAL_THREAT_STAY,
+    W_HOLD_CENTER,
+    W_HOLD_STATION,
+    W_APPROACH_SLOW,
+    APPROACH_CRUISE_TAPER,
+    APPROACH_SLOW_RANGE_M,
+    CPA_WARNING_MULT,
+    CRUISE_SPEED_FRAC,
+    GOAL_DIRECT_RANGE_THRESH_M,
+    HOLD_THREAT_DAMP,
+    THREAT_PROGRESS_THRESH,
+    W_COLLISION,
+    W_SMOOTH,
+    W_SPEED_TRACK,
+    W_TIME,
+    apply_reward_overrides,
+    aggregate_episode_breakdowns,
+    compute_step_reward,
+    contact_step_metrics,
+    contact_threat_and_cpa_penalty,
+    energy_score_from_speeds,
+    energy_score_from_trace,
+    goal_direct_alignment_reward,
+    HOLD_AT_STOP_EPS_MPS,
+    reward_weights_dict,
+    set_gated_hold_enabled,
+    gated_hold_enabled,
+)
+from runs_util import score_key_for_mode
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "runs"
@@ -40,10 +96,10 @@ LIVE_METRICS_PATH = JOB_DIR / "live_metrics.json"
 # =============================================================================
 # CONFIG — edit this section between experiments
 # =============================================================================
-MODE = "navigate"  # "navigate" (clear) | "avoid" (traffic) | "all"
+MODE = P.DEFAULT_MODE  # "navigate" (clear) | "avoid" (traffic) | "all"
 
 TRAIN_BUDGET_SEC = int(os.environ.get("TRAIN_BUDGET_SEC", "600"))
-N_ENVS = int(os.environ.get("N_ENVS", "8"))
+N_ENVS = int(os.environ.get("N_ENVS", str(recommended_n_envs())))
 DEVICE = os.environ.get("TRAIN_DEVICE", "auto")
 EVAL_EPISODES = int(os.environ.get("EVAL_EPISODES", "0"))  # 0 = full eval set at end
 LIVE_EVAL_SCENARIOS = int(os.environ.get("LIVE_EVAL_SCENARIOS", "6"))
@@ -55,6 +111,7 @@ ROBUST_EVAL_SCENARIOS = int(os.environ.get("ROBUST_EVAL_SCENARIOS", "12"))
 DYNAMICS_JITTER = os.environ.get("DYNAMICS_JITTER", "0") == "1"
 ROBUST_EVAL_ENABLED = os.environ.get("ROBUST_EVAL_ENABLED", "0") == "1"
 GOAL_HOLD_SEC = int(os.environ.get("GOAL_HOLD_SEC", str(P.DEFAULT_GOAL_HOLD_SEC)))
+MAX_EPISODE_STEPS = int(os.environ.get("MAX_STEPS", str(P.MAX_STEPS)))
 CURRENT_ENABLED = os.environ.get("CURRENT_ENABLED", "1") == "1"
 MONTAGE_ENABLED = os.environ.get("MONTAGE_ENABLED", "0") == "1"
 MONTAGE_MAX_EPISODES = int(os.environ.get("MONTAGE_MAX_EPISODES", "48"))
@@ -63,87 +120,39 @@ NOMINAL_PLANT = P.plant_from_dict(P.PLANT_NOMINAL)
 
 NET_ARCH: List[int] = [256, 256]
 LEARNING_RATE = 3e-4
-N_STEPS = 2048
+N_STEPS = int(os.environ.get("ROLLOUT_STEPS", "4096"))  # legacy alias; rollout sized via steps_per_env()
 BATCH_SIZE = 256
 GAMMA = 0.99
-
-# Reward weights
-W_GOAL_PROGRESS = 3.0
-W_GOAL_REACHED = 50.0
-W_GOAL_HOLD = 1.0
-W_GOAL_EARLY = 8.0  # bonus on first zone entry, scaled by how quickly we got there
-W_TIME = 0.04  # per-step cost until hold completes (discourages detours)
-W_SPEED_TRACK = 0.05  # en-route cruise tracking only
-W_HOLD_STATION = 1.0  # reward low speed while holding at waypoint
-W_HOLD_CENTER = 0.6  # penalize drifting off waypoint center while in zone
-W_SMOOTH = 0.02
-W_CPA = 10.0  # hard CPA penalty — must exceed per-step hold stack when unsafe
-W_CPA_SOFT = 3.0  # shaping before crossing safe CPA distance
-CPA_WARNING_MULT = 2.0  # soft penalty when cpa < safe * this and TCPA in horizon
-W_ESCAPE_GOAL = 12.0  # bonus for opening range from waypoint while threatened
-W_GOAL_THREAT_STAY = 6.0  # per-step penalty for remaining at waypoint under threat
-HOLD_THREAT_DAMP = 1.0  # at threat=1, hold rewards scale to zero
-THREAT_PROGRESS_THRESH = 0.25  # above this, retreat from waypoint is rewarded not penalized
-W_COLLISION = 100.0
-CRUISE_SPEED_FRAC = 0.65  # target fraction of V_MAX while en route
-REWARD_CLIP = 150.0
 
 # Contact sensing noise (training only — eval uses zero)
 CONTACT_OBS_NOISE_M = float(os.environ.get("CONTACT_OBS_NOISE_M", str(P.CONTACT_OBS_NOISE_M)))
 CONTACT_OBS_NOISE_BEARING_RAD = float(
     os.environ.get("CONTACT_OBS_NOISE_BEARING_RAD", str(P.CONTACT_OBS_NOISE_BEARING_RAD))
 )
-CONTACT_OBS_NOISE_EVAL = os.environ.get("CONTACT_OBS_NOISE_EVAL", "0") == "1"
 TRAIN_MAX_CONTACTS = int(os.environ.get("TRAIN_MAX_CONTACTS", "4"))
 
 NOTES = "baseline"
 
 VIZ_PORT = 8765
 
-_EVAL_SEEDS_CACHE: Dict[str, List[P.ScenarioSeed]] = {}
-_TRAIN_SEEDS_CACHE: Dict[str, List[P.ScenarioSeed]] = {}
+_EVAL_SEEDS_CACHE: Dict[tuple, List[P.ScenarioSeed]] = {}
+_TRAIN_SEEDS_CACHE: Dict[tuple, List[P.ScenarioSeed]] = {}
+CURRICULUM_PHASE: Optional[int] = None
+SCENARIO_CATEGORY_PREFIXES: List[str] = []
+CURRICULUM_EVAL_INTERVAL_SEC = 120.0
+CURRICULUM_EVAL_MAX_SCENARIOS = 0
+CURRICULUM_EARLY_STOP = False
+CURRICULUM_EARLY_STOPPED = False
 _VESSEL_CLASS_CHOICES = tuple(P.VESSEL_CLASSES.keys())
 # =============================================================================
 
 
-def contact_threat_and_cpa_penalty(
-    own: P.VesselState,
-    contacts: List[P.ContactState],
-    water_current: P.WaterCurrent,
-    own_radius_m: float,
-) -> Tuple[float, float]:
-    """Return (cpa_penalty, threat_level in [0,1]) for active encounter horizon."""
-    if not contacts:
-        return 0.0, 0.0
+def _seed_cache_key(mode: str) -> tuple:
+    return (mode, tuple(SCENARIO_CATEGORY_PREFIXES))
 
-    own_vx, own_vy = P.own_velocity(own, water_current)
-    cpa_penalty = 0.0
-    threat = 0.0
-    for c in contacts:
-        c_vx, c_vy = P.contact_velocity(c)
-        cpa_m, tcpa = P.compute_cpa_tcpa(
-            own.x_m,
-            own.y_m,
-            own_vx,
-            own_vy,
-            c.x_m,
-            c.y_m,
-            c_vx,
-            c_vy,
-        )
-        safe = P.cpa_safe_distance(c.radius_m, own_radius_m)
-        if tcpa < 0.0 or tcpa > P.CPA_HORIZON_S:
-            continue
-        if cpa_m < safe:
-            frac = (safe - cpa_m) / safe
-            cpa_penalty += W_CPA * frac
-            threat = max(threat, min(1.0, frac))
-        elif cpa_m < safe * CPA_WARNING_MULT:
-            span = safe * (CPA_WARNING_MULT - 1.0)
-            warn_frac = (safe * CPA_WARNING_MULT - cpa_m) / max(span, 1e-6)
-            cpa_penalty += W_CPA_SOFT * warn_frac
-            threat = max(threat, min(1.0, 0.5 * warn_frac))
-    return cpa_penalty, threat
+
+def apply_scenario_prefix_filter(seeds: List[P.ScenarioSeed]) -> List[P.ScenarioSeed]:
+    return filter_seeds_by_prefix(seeds, SCENARIO_CATEGORY_PREFIXES)
 
 
 def filter_seeds_for_mode(seeds: List[P.ScenarioSeed], mode: str) -> List[P.ScenarioSeed]:
@@ -152,10 +161,6 @@ def filter_seeds_for_mode(seeds: List[P.ScenarioSeed], mode: str) -> List[P.Scen
     if mode == "avoid":
         return [s for s in seeds if s.contacts]
     return [s for s in seeds if not s.contacts]
-
-
-def score_key_for_mode(mode: str) -> str:
-    return "avoid_score" if mode == "avoid" else "nav_score"
 
 
 def load_parent_metrics(resume_run_id: str) -> Dict[str, Any]:
@@ -185,6 +190,7 @@ def append_live_metric(
     successes: int = 0,
     eval_episodes: int = 0,
     scenario_names: Optional[List[str]] = None,
+    eval_metrics: Optional[Dict[str, Any]] = None,
 ) -> None:
     JOB_DIR.mkdir(parents=True, exist_ok=True)
     payload: Dict[str, Any] = {"run_id": run_id, "mode": mode, "series": []}
@@ -204,6 +210,10 @@ def append_live_metric(
     }
     if scenario_names:
         point["scenario_names"] = scenario_names
+    if eval_metrics:
+        for key, val in eval_metrics.items():
+            if val is not None:
+                point[key] = val
     series = payload.setdefault("series", [])
     series.append(point)
     if len(series) > LIVE_METRICS_MAX_POINTS:
@@ -217,6 +227,22 @@ def append_live_metric(
         live_successes=successes,
         live_eval_episodes=eval_episodes,
     )
+
+
+def live_eval_extras(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    extras: Dict[str, Any] = {}
+    for key in (
+        "success_rate",
+        "mean_speed_mps",
+        "mean_goal_zone_speed_mps",
+        "pct_goal_zone_at_min_speed",
+    ):
+        if metrics.get(key) is not None:
+            extras[key] = metrics[key]
+    bd = metrics.get("reward_breakdown_mean") or metrics.get("reward_breakdown")
+    if bd:
+        extras["reward_breakdown"] = bd
+    return extras
 
 
 def update_job_status(**fields: Any) -> None:
@@ -258,6 +284,12 @@ def parse_args() -> argparse.Namespace:
         help="Run extra perturbed-plant eval pass after training",
     )
     parser.add_argument("--run-config", type=str, default=None, help="JSON run config from UI")
+    parser.add_argument(
+        "--reward-config",
+        type=str,
+        default=None,
+        help="JSON file with reward_weights overrides (merged into run-config)",
+    )
     return parser.parse_args()
 
 
@@ -266,8 +298,10 @@ def load_run_config(path: Path) -> Dict[str, Any]:
 
 
 def apply_run_config(cfg: Dict[str, Any]) -> None:
-    global DYNAMICS_JITTER, ROBUST_EVAL_ENABLED, NOMINAL_PLANT, GOAL_HOLD_SEC, CURRENT_ENABLED
-    global MONTAGE_ENABLED, MONTAGE_MAX_EPISODES, MONTAGE_STEP_COLS
+    global DYNAMICS_JITTER, ROBUST_EVAL_ENABLED, NOMINAL_PLANT, GOAL_HOLD_SEC, MAX_EPISODE_STEPS
+    global CURRENT_ENABLED, MONTAGE_ENABLED, MONTAGE_MAX_EPISODES, MONTAGE_STEP_COLS
+    global CURRICULUM_PHASE, SCENARIO_CATEGORY_PREFIXES
+    global CURRICULUM_EVAL_INTERVAL_SEC, CURRICULUM_EVAL_MAX_SCENARIOS, CURRICULUM_EARLY_STOP
     if "dynamics_jitter" in cfg:
         DYNAMICS_JITTER = bool(cfg["dynamics_jitter"])
     elif cfg.get("phase") in ("jitter", "robust"):
@@ -280,6 +314,8 @@ def apply_run_config(cfg: Dict[str, Any]) -> None:
         NOMINAL_PLANT = P.plant_from_dict(cfg["plant"])
     if "goal_hold_sec" in cfg:
         GOAL_HOLD_SEC = max(0, int(cfg["goal_hold_sec"]))
+    if "max_steps" in cfg:
+        MAX_EPISODE_STEPS = max(1, int(cfg["max_steps"]))
     if "current_enabled" in cfg:
         CURRENT_ENABLED = bool(cfg["current_enabled"])
     if "montage_enabled" in cfg:
@@ -288,14 +324,41 @@ def apply_run_config(cfg: Dict[str, Any]) -> None:
         MONTAGE_MAX_EPISODES = max(1, int(cfg["montage_max_episodes"]))
     if "montage_step_cols" in cfg:
         MONTAGE_STEP_COLS = max(2, int(cfg["montage_step_cols"]))
+    if cfg.get("reward_weights"):
+        applied = apply_reward_overrides(cfg["reward_weights"])
+        if applied:
+            print(f"[train] reward overrides: {applied}")
+    if "curriculum_phase" in cfg:
+        CURRICULUM_PHASE = int(cfg["curriculum_phase"])
+    if "scenario_category_prefixes" in cfg:
+        SCENARIO_CATEGORY_PREFIXES = list(cfg["scenario_category_prefixes"])
+        _EVAL_SEEDS_CACHE.clear()
+        _TRAIN_SEEDS_CACHE.clear()
+        print(f"[train] scenario filter: {SCENARIO_CATEGORY_PREFIXES or 'all'}")
+    if "gated_hold" in cfg:
+        set_gated_hold_enabled(bool(cfg["gated_hold"]))
+        print(f"[train] gated_hold={cfg['gated_hold']}")
+    if "curriculum_eval_interval_sec" in cfg:
+        CURRICULUM_EVAL_INTERVAL_SEC = float(cfg["curriculum_eval_interval_sec"])
+    if "curriculum_eval_max_scenarios" in cfg:
+        CURRICULUM_EVAL_MAX_SCENARIOS = int(cfg["curriculum_eval_max_scenarios"])
+    if "curriculum_early_stop" in cfg:
+        CURRICULUM_EARLY_STOP = bool(cfg["curriculum_early_stop"])
 
 
 def apply_args(args: argparse.Namespace) -> Optional[str]:
     global MODE, TRAIN_BUDGET_SEC, N_ENVS, NOTES, DEVICE, DYNAMICS_JITTER, ROBUST_EVAL_ENABLED, NOMINAL_PLANT
-    global GOAL_HOLD_SEC, CURRENT_ENABLED, MONTAGE_ENABLED
+    global GOAL_HOLD_SEC, MAX_EPISODE_STEPS, CURRENT_ENABLED, MONTAGE_ENABLED
     resume_id = args.resume
+    run_cfg: Dict[str, Any] = {}
     if args.run_config:
-        apply_run_config(load_run_config(Path(args.run_config)))
+        run_cfg = load_run_config(Path(args.run_config))
+    if args.reward_config:
+        reward_cfg = load_run_config(Path(args.reward_config))
+        weights = reward_cfg.get("reward_weights", reward_cfg)
+        run_cfg.setdefault("reward_weights", {}).update(weights)
+    if run_cfg:
+        apply_run_config(run_cfg)
     if args.mode is not None:
         MODE = args.mode
     if args.budget is not None:
@@ -320,18 +383,20 @@ class BoatNavEnv(gym.Env):
 
     def __init__(
         self,
-        mode: str = "navigate",
+        mode: str = P.DEFAULT_MODE,
         scenario: Optional[P.ScenarioSeed] = None,
         training_randomize: bool = True,
         train_seeds: Optional[List[P.ScenarioSeed]] = None,
         nominal_plant: Optional[P.PlantParams] = None,
         dynamics_jitter: bool = False,
         goal_hold_sec: int = P.DEFAULT_GOAL_HOLD_SEC,
+        max_episode_steps: Optional[int] = None,
         current_enabled: bool = True,
         continuous: bool = False,
         contact_obs_noise_m: float = 0.0,
         contact_obs_noise_bearing_rad: float = 0.0,
         own_radius_m: float = P.OWN_RADIUS_M,
+        include_reward_breakdown: bool = False,
     ) -> None:
         super().__init__()
         self.mode = mode
@@ -347,16 +412,21 @@ class BoatNavEnv(gym.Env):
         self.contact_obs_noise_m = max(0.0, float(contact_obs_noise_m))
         self.contact_obs_noise_bearing_rad = max(0.0, float(contact_obs_noise_bearing_rad))
         self.own_radius_m = float(own_radius_m)
+        self.include_reward_breakdown = include_reward_breakdown
         self.episode_plant = self.nominal_plant
         self.water_current = P.WaterCurrent()
         self.goal_hold_steps = 0
-        self.max_steps = P.MAX_STEPS + self.goal_hold_sec
+        base_steps = max_episode_steps if max_episode_steps is not None else P.MAX_STEPS
+        self.max_steps = max(1, int(base_steps)) + self.goal_hold_sec
+        self.episode_cpa_unsafe_in_goal = False
 
         self.plant = self.nominal_plant.to_plant()
         self.own = P.VesselState()
         self.contacts: List[P.ContactState] = []
         self.goal_x = 0.0
         self.goal_y = 0.0
+        self.leg_start_x = 0.0
+        self.leg_start_y = 0.0
         self.origin_x = 0.0
         self.origin_y = 0.0
         self.step_count = 0
@@ -365,6 +435,8 @@ class BoatNavEnv(gym.Env):
         self.prev_action = np.zeros(2, dtype=np.float32)
         self.rng = np.random.default_rng(0)
         self._obs = np.zeros(P.OBS_DIM, dtype=np.float32)
+        self.mission: Optional[NavigationMission] = None
+        self._base_max_episode_steps = base_steps
 
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(P.OBS_DIM,), dtype=np.float32
@@ -462,6 +534,19 @@ class BoatNavEnv(gym.Env):
         self.contacts = P.scenario_to_contacts(scenario)
         self._apply_train_contact_count()
 
+    def _apply_mission_transition(self, transition: MissionTransition) -> None:
+        self.goal_x = transition.goal_x
+        self.goal_y = transition.goal_y
+        self.leg_start_x = transition.leg_start_x
+        self.leg_start_y = transition.leg_start_y
+        self.goal_hold_steps = transition.goal_hold_steps
+        self.initial_goal_range = transition.initial_goal_range
+        self.prev_goal_range = transition.prev_goal_range
+
+    def _recompute_max_steps(self) -> None:
+        extra = self.mission.extra_max_steps(self.goal_hold_sec) if self.mission else 0
+        self.max_steps = max(1, int(self._base_max_episode_steps)) + self.goal_hold_sec + extra
+
     def _assign_episode_plant(self) -> None:
         if self.dynamics_jitter:
             self.episode_plant = P.sample_plant_params(self.rng)
@@ -493,16 +578,24 @@ class BoatNavEnv(gym.Env):
 
         if scenario is not None:
             self._load_scenario(scenario)
-        elif self.training_randomize:
-            self._sample_training_scenario()
+            self.mission = NavigationMission.from_scenario(scenario, self.rng, dt_s=P.DT_S)
+            gx, gy = self.mission.initial_goal()
+            self.goal_x, self.goal_y = gx, gy
         else:
             self._sample_training_scenario()
+            self.mission = NavigationMission.single_goal(
+                self.goal_x, self.goal_y, self.rng, dt_s=P.DT_S
+            )
 
+        self._recompute_max_steps()
         self.step_count = 0
         self.goal_hold_steps = 0
+        self.episode_cpa_unsafe_in_goal = False
         self.initial_goal_range = P.goal_range(self.own, self.goal_x, self.goal_y)
         self.prev_goal_range = self.initial_goal_range
         self.prev_action = np.zeros(2, dtype=np.float32)
+        self.leg_start_x = self.own.x_m
+        self.leg_start_y = self.own.y_m
 
         obs = P.pack_observation(
             self.own,
@@ -533,95 +626,86 @@ class BoatNavEnv(gym.Env):
                 c.step(P.DT_S)
 
         self.step_count += 1
+        goal_changed = False
+        if self.mission is not None:
+            tr = self.mission.check_scheduled(
+                self.step_count,
+                self.own.x_m,
+                self.own.y_m,
+                curr_goal_range=P.goal_range(self.own, self.goal_x, self.goal_y),
+                initial_goal_range=self.initial_goal_range,
+                goal_range_fn=P.goal_range_xy,
+            )
+            if tr is not None:
+                self._apply_mission_transition(tr)
+                goal_changed = True
+
         curr_goal_range = P.goal_range(self.own, self.goal_x, self.goal_y)
-        min_rng = float("inf")
-        min_cpa = float("inf")
-        collision = False
-        if self.contacts:
-            min_rng = P.min_contact_range(self.own, self.contacts)
-            collision = P.check_collision(self.own, self.contacts, self.own_radius_m)
-            own_vx, own_vy = P.own_velocity(self.own, self.water_current)
-            for c in self.contacts:
-                c_vx, c_vy = P.contact_velocity(c)
-                cpa_m, tcpa = P.compute_cpa_tcpa(
-                    self.own.x_m,
-                    self.own.y_m,
-                    own_vx,
-                    own_vy,
-                    c.x_m,
-                    c.y_m,
-                    c_vx,
-                    c_vy,
-                )
-                min_cpa = min(min_cpa, cpa_m)
-        in_goal_zone = curr_goal_range < P.GOAL_SUCCESS_RANGE_M
-        cpa_penalty, threat = contact_threat_and_cpa_penalty(
+        contact_metrics = contact_step_metrics(
             self.own, self.contacts, self.water_current, self.own_radius_m
         )
+        in_goal_zone = curr_goal_range < P.GOAL_SUCCESS_RANGE_M
 
-        reward = 0.0
-        if not in_goal_zone:
-            reward -= W_TIME
-
-        progress_scale = 1.0 + min(
-            curr_goal_range / max(self.initial_goal_range, 1.0), 1.0
+        reward_out = compute_step_reward(
+            StepRewardInput(
+                own=self.own,
+                goal_x=self.goal_x,
+                goal_y=self.goal_y,
+                water_current=self.water_current,
+                curr_goal_range=curr_goal_range,
+                initial_goal_range=self.initial_goal_range,
+                prev_goal_range=self.prev_goal_range,
+                goal_hold_steps=self.goal_hold_steps,
+                step_count=self.step_count,
+                max_steps=self.max_steps,
+                action=action,
+                prev_action=self.prev_action,
+                in_goal_zone=in_goal_zone,
+                threat=contact_metrics.threat,
+                cpa_penalty=contact_metrics.cpa_penalty,
+                collision=contact_metrics.collision,
+                cpa_unsafe=contact_metrics.cpa_unsafe,
+                leg_start_x=self.leg_start_x,
+                leg_start_y=self.leg_start_y,
+            ),
+            include_breakdown=self.include_reward_breakdown,
         )
-        retreat_m = max(0.0, curr_goal_range - self.prev_goal_range)
-        approach_m = max(0.0, self.prev_goal_range - curr_goal_range)
-        if in_goal_zone and threat >= THREAT_PROGRESS_THRESH:
-            # Threat at waypoint: reward opening range, do not punish leaving to avoid
-            reward += W_GOAL_PROGRESS * retreat_m * progress_scale / 100.0
-            reward += W_ESCAPE_GOAL * threat * retreat_m / 100.0
-        else:
-            progress = approach_m - retreat_m
-            reward += W_GOAL_PROGRESS * progress * progress_scale / 100.0
-
-        if in_goal_zone:
-            hold_scale = max(0.0, 1.0 - HOLD_THREAT_DAMP * threat)
-            if self.goal_hold_steps == 0:
-                reward += W_GOAL_REACHED * hold_scale
-                if self.max_steps > 0:
-                    reward += W_GOAL_EARLY * hold_scale * max(
-                        0.0, 1.0 - self.step_count / self.max_steps
-                    )
-            self.goal_hold_steps += 1
-            reward += W_GOAL_HOLD * hold_scale
-            speed_norm = (self.own.speed_mps - P.V_MIN_MPS) / max(
-                P.V_MAX_MPS - P.V_MIN_MPS, 1e-6
-            )
-            reward += W_HOLD_STATION * hold_scale * max(0.0, 1.0 - speed_norm)
-            reward -= W_HOLD_CENTER * hold_scale * (
-                curr_goal_range / P.GOAL_SUCCESS_RANGE_M
-            )
-            if threat >= THREAT_PROGRESS_THRESH:
-                reward -= W_GOAL_THREAT_STAY * threat
-        else:
-            self.goal_hold_steps = 0
-            cruise = P.V_MAX_MPS * CRUISE_SPEED_FRAC
-            reward -= W_SPEED_TRACK * abs(self.own.speed_mps - cruise) / P.V_MAX_MPS
-
-        action_delta = float(np.linalg.norm(action - self.prev_action))
-        reward -= W_SMOOTH * action_delta
+        reward = reward_out.reward
+        self.goal_hold_steps = reward_out.goal_hold_steps
         self.prev_action[:] = action
-
-        reward -= cpa_penalty
-        if collision:
-            reward -= W_COLLISION
-
-        reward = float(np.clip(reward, -REWARD_CLIP, REWARD_CLIP))
-        if not math.isfinite(reward):
-            reward = 0.0
-
         self.prev_goal_range = curr_goal_range
 
         hold_complete = self.goal_hold_steps >= self.goal_hold_steps_required
+        if not goal_changed and self.mission is not None:
+            tr_hold = self.mission.check_hold_advance(
+                self.own.x_m,
+                self.own.y_m,
+                in_goal_zone=in_goal_zone,
+                goal_hold_steps=self.goal_hold_steps,
+                goal_hold_steps_required=self.goal_hold_steps_required,
+                goal_range_fn=P.goal_range_xy,
+            )
+            if tr_hold is not None:
+                self._apply_mission_transition(tr_hold)
+                goal_changed = True
+                hold_complete = False
+
+        if in_goal_zone and contact_metrics.cpa_unsafe:
+            self.episode_cpa_unsafe_in_goal = True
         if self.continuous:
             terminated = False
             truncated = False
         else:
-            terminated = collision or hold_complete
+            final_leg = self.mission is None or self.mission.is_on_final_leg()
+            terminated = contact_metrics.collision or (hold_complete and final_leg and not goal_changed)
             truncated = self.step_count >= self.max_steps
-        success = hold_complete and not collision
+        success = (
+            hold_complete
+            and not contact_metrics.collision
+            and not contact_metrics.cpa_unsafe
+            and (self.mission is None or self.mission.is_on_final_leg())
+            and not goal_changed
+        )
 
         obs = P.pack_observation(
             self.own,
@@ -635,16 +719,22 @@ class BoatNavEnv(gym.Env):
             out=self._obs,
             **self._obs_noise_kwargs(),
         )
-        info = {
+        info: Dict[str, Any] = {
             "goal_range_m": curr_goal_range,
-            "min_range_m": min_rng,
-            "min_cpa_m": min_cpa if self.contacts else None,
-            "collision": collision,
+            "min_range_m": contact_metrics.min_range_m,
+            "min_cpa_m": contact_metrics.min_cpa_m,
+            "collision": contact_metrics.collision,
             "success": success,
+            "cpa_unsafe": contact_metrics.cpa_unsafe,
             "goal_hold_steps": self.goal_hold_steps,
             "goal_hold_required": self.goal_hold_steps_required,
             "in_goal_zone": in_goal_zone,
         }
+        if goal_changed:
+            info["goal_changed"] = True
+            info["goal_relocated"] = True
+        if self.include_reward_breakdown:
+            info["reward_breakdown"] = reward_out.breakdown
         return obs, reward, terminated, truncated, info
 
     def rollout_episode(
@@ -668,6 +758,7 @@ class BoatNavEnv(gym.Env):
         obs, _ = self.reset(seed=seed, options=reset_options)
 
         steps: List[Dict[str, Any]] = []
+        speeds: List[float] = [float(self.own.speed_mps)]
         if collect_trace:
             steps.append(
                 P.snapshot_step(0, self.own, self.goal_x, self.goal_y, self.contacts)
@@ -676,11 +767,27 @@ class BoatNavEnv(gym.Env):
         collision = False
         success = False
         final_goal_range_m = P.goal_range(self.own, self.goal_x, self.goal_y)
+        min_goal_range_m = final_goal_range_m
+        entered_goal_zone = final_goal_range_m < P.GOAL_SUCCESS_RANGE_M
+        goal_zone_speeds: List[float] = []
+        breakdown_sums: Dict[str, float] = {}
+        breakdown_steps = 0
 
         for _t in range(1, max_steps + 1):
             action, _ = safe_model_predict(model, obs, deterministic=True)
             obs, _, terminated, truncated, info = self.step(action)
+            if self.include_reward_breakdown and info.get("reward_breakdown"):
+                for key, val in info["reward_breakdown"].items():
+                    breakdown_sums[key] = breakdown_sums.get(key, 0.0) + float(val)
+                breakdown_steps += 1
             final_goal_range_m = info["goal_range_m"]
+            min_goal_range_m = min(min_goal_range_m, final_goal_range_m)
+            if final_goal_range_m < P.GOAL_SUCCESS_RANGE_M:
+                entered_goal_zone = True
+            speed_mps = float(self.own.speed_mps)
+            speeds.append(speed_mps)
+            if final_goal_range_m < P.GOAL_SUCCESS_RANGE_M:
+                goal_zone_speeds.append(speed_mps)
             if collect_trace:
                 steps.append(
                     P.snapshot_step(
@@ -696,30 +803,40 @@ class BoatNavEnv(gym.Env):
         result: Dict[str, Any] = {
             "collision": collision,
             "success": success,
+            "cpa_unsafe_in_goal": self.episode_cpa_unsafe_in_goal,
             "final_goal_range_m": final_goal_range_m,
+            "min_goal_range_m": min_goal_range_m,
+            "entered_goal_zone": entered_goal_zone,
             "scenario_name": scenario_ref.name if scenario_ref else "random",
             "scenario_category": scenario_ref.category if scenario_ref else "random",
             "scenario_description": scenario_ref.description if scenario_ref else "",
             "scenario_seed": scenario_ref.seed if scenario_ref else None,
             "plant": self.episode_plant.to_dict(),
             "current": self.water_current.to_dict(),
+            "energy_score": energy_score_from_speeds(speeds),
+            "mean_speed_mps": round(sum(speeds) / len(speeds), 3) if speeds else None,
+            "mean_goal_zone_speed_mps": (
+                round(sum(goal_zone_speeds) / len(goal_zone_speeds), 3) if goal_zone_speeds else None
+            ),
+            "pct_goal_zone_at_min_speed": (
+                round(
+                    sum(1 for s in goal_zone_speeds if s <= HOLD_AT_STOP_EPS_MPS) / len(goal_zone_speeds),
+                    4,
+                )
+                if goal_zone_speeds
+                else None
+            ),
+            "goal_zone_steps": len(goal_zone_speeds),
+            "goal_zone_speeds": goal_zone_speeds,
         }
+        if breakdown_steps:
+            result["mean_reward_breakdown"] = {
+                k: round(v / breakdown_steps, 4) for k, v in breakdown_sums.items()
+            }
         if collect_trace:
             result["steps"] = steps
+            result["energy_score"] = energy_score_from_trace(steps)
         return result
-
-    def rollout_trace(
-        self,
-        model: PPO,
-        max_steps: Optional[int] = None,
-        reset_seed: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        return self.rollout_episode(
-            model,
-            max_steps=max_steps,
-            reset_seed=reset_seed,
-            collect_trace=True,
-        )
 
 
 class TimeBudgetCallback(BaseCallback):
@@ -794,19 +911,133 @@ class LiveMetricsCallback(BaseCallback):
                 successes=int(round(metrics.get("success_rate", 0) * metrics.get("eval_episodes", 0))),
                 eval_episodes=metrics.get("eval_episodes", 0),
                 scenario_names=metrics.get("scenario_names"),
+                eval_metrics=live_eval_extras(metrics),
             )
         except Exception as exc:
             print(f"[live-eval] skipped: {exc}")
         return True
 
 
+class CurriculumCheckpointCallback(BaseCallback):
+    """Periodic eval, save best_model, optional early stop when phase gate passes."""
+
+    def __init__(
+        self,
+        model_holder: Dict[str, Any],
+        run_dir: Path,
+        mode: str,
+        phase_id: int,
+        run_id: str,
+    ) -> None:
+        super().__init__()
+        self.model_holder = model_holder
+        self.run_dir = run_dir
+        self.mode = mode
+        self.phase = get_phase(phase_id)
+        self.run_id = run_id
+        self.start_time = 0.0
+        self.last_eval_time = 0.0
+        self.tick = 0
+        self.best_summary: Optional[Dict[str, Any]] = None
+
+    def _on_training_start(self) -> None:
+        self.start_time = time.time()
+        self.last_eval_time = self.start_time
+
+    def _run_eval_summary(self, *, full: bool) -> Dict[str, Any]:
+        n_seeds = len(eval_seeds_for_mode(self.mode))
+        cap = CURRICULUM_EVAL_MAX_SCENARIOS
+        use_cap = (not full) and cap > 0 and n_seeds > cap
+        max_sc = cap if use_cap else None
+        model = self.model_holder.get("model")
+        metrics = run_eval(
+            model,
+            self.mode,
+            max_scenarios=max_sc,
+            sample_seed=self.num_timesteps + self.tick * 10007,
+            collect_traces=False,
+        )
+        summary = metrics_to_summary(metrics)
+        summary["eval_capped"] = use_cap
+        return summary
+
+    def _maybe_save(self, summary: Dict[str, Any], elapsed: float) -> None:
+        global CURRICULUM_EARLY_STOPPED
+        model = self.model_holder.get("model")
+        if model is None:
+            return
+        save_best_checkpoint(
+            self.run_dir,
+            model,
+            summary,
+            timesteps=self.num_timesteps,
+            elapsed_sec=elapsed,
+        )
+        self.best_summary = dict(summary)
+        sr = summary.get("success_rate")
+        print(
+            f"[curriculum-eval] new best success_rate={sr} "
+            f"zone_entry={summary.get('zone_entry_rate')} timesteps={self.num_timesteps}",
+            flush=True,
+        )
+        score = summary.get("score") or 0.0
+        append_live_metric(
+            self.run_id,
+            self.mode,
+            self.num_timesteps,
+            elapsed,
+            float(score),
+            summary.get("avg_final_goal_range_m") or 0.0,
+            successes=int(round(float(sr or 0) * int(summary.get("eval_episodes") or 0))),
+            eval_episodes=int(summary.get("eval_episodes") or 0),
+            eval_metrics=live_eval_extras(summary),
+        )
+        passed, reasons = check_exit(self.phase, summary)
+        if passed and CURRICULUM_EARLY_STOP:
+            CURRICULUM_EARLY_STOPPED = True
+            print("[curriculum-eval] exit gate PASSED — early stop", flush=True)
+            for line in reasons:
+                print(f"  {line}", flush=True)
+
+    def _on_step(self) -> bool:
+        global CURRICULUM_EARLY_STOPPED
+        if is_cancel_requested():
+            return False
+        now = time.time()
+        if now - self.last_eval_time < CURRICULUM_EVAL_INTERVAL_SEC:
+            return True
+        self.last_eval_time = now
+        self.tick += 1
+        elapsed = now - self.start_time
+        try:
+            summary = self._run_eval_summary(full=False)
+            n_seeds = len(eval_seeds_for_mode(self.mode))
+            cap = CURRICULUM_EVAL_MAX_SCENARIOS
+            if summary.get("eval_capped") and is_summary_better(self.phase, summary, self.best_summary):
+                summary = self._run_eval_summary(full=True)
+            elif summary.get("eval_capped"):
+                return True
+            if not is_summary_better(self.phase, summary, self.best_summary):
+                return not CURRICULUM_EARLY_STOPPED
+            self._maybe_save(summary, elapsed)
+        except Exception as exc:
+            print(f"[curriculum-eval] skipped: {exc}", flush=True)
+        if CURRICULUM_EARLY_STOPPED:
+            return False
+        return True
+
+
 def train_seeds_for_mode(mode: str) -> List[P.ScenarioSeed]:
-    if mode in _TRAIN_SEEDS_CACHE:
-        return _TRAIN_SEEDS_CACHE[mode]
+    key = _seed_cache_key(mode)
+    if key in _TRAIN_SEEDS_CACHE:
+        return _TRAIN_SEEDS_CACHE[key]
     seeds = filter_seeds_for_mode(P.load_train_seeds(), mode)
+    seeds = apply_scenario_prefix_filter(seeds)
     if not seeds:
-        raise RuntimeError(f"No train seeds for mode={mode}. Run prepare.py first.")
-    _TRAIN_SEEDS_CACHE[mode] = seeds
+        raise RuntimeError(
+            f"No train seeds for mode={mode} filter={SCENARIO_CATEGORY_PREFIXES}. Run prepare.py first."
+        )
+    _TRAIN_SEEDS_CACHE[key] = seeds
     return seeds
 
 
@@ -817,6 +1048,7 @@ def make_env(
     nominal_plant: Optional[P.PlantParams] = None,
     dynamics_jitter: bool = False,
     goal_hold_sec: int = P.DEFAULT_GOAL_HOLD_SEC,
+    max_episode_steps: Optional[int] = None,
     current_enabled: bool = True,
     contact_obs_noise_m: float = 0.0,
     contact_obs_noise_bearing_rad: float = 0.0,
@@ -832,6 +1064,7 @@ def make_env(
             nominal_plant=plant,
             dynamics_jitter=dynamics_jitter,
             goal_hold_sec=goal_hold_sec,
+            max_episode_steps=max_episode_steps,
             current_enabled=current_enabled,
             contact_obs_noise_m=contact_obs_noise_m,
             contact_obs_noise_bearing_rad=contact_obs_noise_bearing_rad,
@@ -857,20 +1090,17 @@ def create_run_dir() -> Path:
 
 
 def eval_seeds_for_mode(mode: str) -> List[P.ScenarioSeed]:
-    if mode in _EVAL_SEEDS_CACHE:
-        return _EVAL_SEEDS_CACHE[mode]
+    key = _seed_cache_key(mode)
+    if key in _EVAL_SEEDS_CACHE:
+        return _EVAL_SEEDS_CACHE[key]
     seeds = filter_seeds_for_mode(P.load_eval_seeds(), mode)
+    seeds = apply_scenario_prefix_filter(seeds)
     if not seeds:
-        raise RuntimeError(f"No eval seeds for mode={mode}. Run prepare.py first.")
-    _EVAL_SEEDS_CACHE[mode] = seeds
+        raise RuntimeError(
+            f"No eval seeds for mode={mode} filter={SCENARIO_CATEGORY_PREFIXES}. Run prepare.py first."
+        )
+    _EVAL_SEEDS_CACHE[key] = seeds
     return seeds
-
-
-def make_vec_env(factories: List[Any], n_envs: int):
-    if n_envs <= 1:
-        return DummyVecEnv(factories)
-    start_method = "spawn" if sys.platform == "win32" else "fork"
-    return SubprocVecEnv(factories, start_method=start_method)
 
 
 def run_eval(
@@ -882,6 +1112,7 @@ def run_eval(
     dynamics_jitter: Optional[bool] = None,
     current_enabled: Optional[bool] = None,
     collect_traces: bool = True,
+    collect_breakdown: bool = True,
 ) -> Any:
     seeds = eval_seeds_for_mode(mode)
     if max_scenarios is not None and max_scenarios < len(seeds):
@@ -901,7 +1132,12 @@ def run_eval(
     colregs_episode_scores: List[Dict[str, Any]] = []
     successes = 0
     collisions = 0
+    cpa_violations_in_goal = 0
     final_ranges: List[float] = []
+    energy_scores: List[float] = []
+    speed_samples: List[float] = []
+    goal_zone_speed_samples: List[float] = []
+    zone_entries = 0
 
     env = BoatNavEnv(
         mode=mode,
@@ -909,9 +1145,12 @@ def run_eval(
         nominal_plant=nominal_plant,
         dynamics_jitter=plant_jitter,
         goal_hold_sec=GOAL_HOLD_SEC,
+        max_episode_steps=MAX_EPISODE_STEPS,
         current_enabled=cur_enabled,
+        include_reward_breakdown=collect_breakdown,
     )
 
+    episode_results: List[Dict[str, Any]] = []
     for scenario in seeds:
         episode = env.rollout_episode(
             model,
@@ -919,6 +1158,7 @@ def run_eval(
             scenario=scenario,
             collect_trace=collect_traces,
         )
+        episode_results.append(episode)
         episode["seed"] = scenario.seed
         episode["mode"] = mode
         episode["scenario_name"] = scenario.name
@@ -935,18 +1175,32 @@ def run_eval(
             successes += 1
         if episode["collision"]:
             collisions += 1
+        if episode.get("cpa_unsafe_in_goal"):
+            cpa_violations_in_goal += 1
         rng_val = episode.get("final_goal_range_m")
         if rng_val is not None:
             final_ranges.append(float(rng_val))
+        es = episode.get("energy_score")
+        if es is not None:
+            energy_scores.append(float(es))
+        if episode.get("entered_goal_zone"):
+            zone_entries += 1
+        ms = episode.get("mean_speed_mps")
+        if ms is not None:
+            speed_samples.append(float(ms))
+        gz_speeds = episode.get("goal_zone_speeds") or []
+        goal_zone_speed_samples.extend(float(s) for s in gz_speeds)
 
     episodes = len(seeds)
     success_rate = successes / episodes if episodes else 0.0
     collision_rate = collisions / episodes if episodes else 0.0
-    nav_score = success_rate
-    avoid_score = success_rate * (1.0 - collision_rate)
+    mean_energy_score = float(np.mean(energy_scores)) if energy_scores else 1.0
+    nav_score = success_rate * mean_energy_score
+    avoid_score = success_rate * (1.0 - collision_rate) * mean_energy_score
     final_ranges_arr = final_ranges
     avg_final_goal_range_m = float(np.mean(final_ranges_arr)) if final_ranges_arr else None
     median_final_goal_range_m = float(np.median(final_ranges_arr)) if final_ranges_arr else None
+    at_min_goal_zone = [s for s in goal_zone_speed_samples if s <= HOLD_AT_STOP_EPS_MPS]
 
     eval_seed_list = eval_seeds_for_mode(mode)
     metrics = {
@@ -955,6 +1209,19 @@ def run_eval(
         "eval_scenarios": episodes,
         "success_rate": round(success_rate, 4),
         "collision_rate": round(collision_rate, 4),
+        "cpa_violation_in_goal_rate": round(cpa_violations_in_goal / episodes, 4) if episodes else 0.0,
+        "mean_energy_score": round(mean_energy_score, 4),
+        "mean_speed_mps": round(float(np.mean(speed_samples)), 3) if speed_samples else None,
+        "mean_goal_zone_speed_mps": (
+            round(float(np.mean(goal_zone_speed_samples)), 3) if goal_zone_speed_samples else None
+        ),
+        "pct_goal_zone_at_min_speed": (
+            round(len(at_min_goal_zone) / len(goal_zone_speed_samples), 4)
+            if goal_zone_speed_samples
+            else None
+        ),
+        "episodes_with_goal_zone_steps": zone_entries,
+        "reward_breakdown_mean": aggregate_episode_breakdowns(episode_results),
         "nav_score": round(nav_score, 4),
         "avoid_score": round(avoid_score, 4),
         "avg_final_goal_range_m": round(avg_final_goal_range_m, 2) if avg_final_goal_range_m is not None else None,
@@ -1030,29 +1297,22 @@ def write_run_outputs(
             "net_arch": NET_ARCH,
             "learning_rate": LEARNING_RATE,
             "n_envs": N_ENVS,
+            "rollout_steps_total": train_metrics.get("rollout_steps_total"),
+            "steps_per_env": train_metrics.get("steps_per_env"),
+            "vecenv_backend": train_metrics.get("vecenv_backend"),
             "device": train_metrics.get("device"),
             "dynamics_jitter": train_metrics.get("dynamics_jitter"),
             "robust_eval_enabled": train_metrics.get("robust_eval_enabled"),
             "nominal_plant": train_metrics.get("nominal_plant"),
             "goal_hold_sec": train_metrics.get("goal_hold_sec"),
+            "max_steps": train_metrics.get("max_steps"),
             "current_enabled": train_metrics.get("current_enabled"),
             "montage_enabled": MONTAGE_ENABLED,
             "train_max_contacts": TRAIN_MAX_CONTACTS,
-            "reward_weights": {
-                "goal_progress": W_GOAL_PROGRESS,
-                "goal_reached": W_GOAL_REACHED,
-                "goal_early": W_GOAL_EARLY,
-                "time_en_route": W_TIME,
-                "hold_station": W_HOLD_STATION,
-                "hold_center": W_HOLD_CENTER,
-                "cpa": W_CPA,
-                "cpa_soft": W_CPA_SOFT,
-                "cpa_warning_mult": CPA_WARNING_MULT,
-                "escape_goal": W_ESCAPE_GOAL,
-                "goal_threat_stay": W_GOAL_THREAT_STAY,
-                "hold_threat_damp": HOLD_THREAT_DAMP,
-                "collision": W_COLLISION,
-            },
+            "reward_weights": reward_weights_dict(),
+            "curriculum_phase": CURRICULUM_PHASE,
+            "gated_hold": gated_hold_enabled(),
+            "scenario_category_prefixes": list(SCENARIO_CATEGORY_PREFIXES),
         },
         "viz_url": f"http://localhost:{VIZ_PORT}/scenarios.html?run={run_dir.name}",
     }
@@ -1098,14 +1358,17 @@ def main() -> None:
 
     device = resolve_device(DEVICE)
     configure_training_backend(device)
-    batch_size = max(BATCH_SIZE, 512) if device == "cuda" else BATCH_SIZE
+    rollout_total = rollout_steps_total(N_ENVS)
+    n_steps = steps_per_env(N_ENVS)
+    batch_size = ppo_batch_size(device, rollout_total, base=BATCH_SIZE)
+    vec_backend = training_perf_defaults()["vecenv_backend"]
     gpu_info = torch_device_info()
 
     print(f"[train] mode={MODE} budget={TRAIN_BUDGET_SEC}s n_envs={N_ENVS} run={run_dir.name}")
     print(
-        f"[train] vec={'subproc' if N_ENVS > 1 else 'dummy'} "
+        f"[train] vec={vec_backend} rollout={rollout_total} ({n_steps} steps/env) "
         f"dynamics_jitter={DYNAMICS_JITTER} robust_eval={ROBUST_EVAL_ENABLED} "
-        f"hold={GOAL_HOLD_SEC}s current={CURRENT_ENABLED} live_eval={LIVE_EVAL_SCENARIOS}@{LIVE_EVAL_INTERVAL_SEC}s"
+        f"hold={GOAL_HOLD_SEC}s max_steps={MAX_EPISODE_STEPS} current={CURRENT_ENABLED} live_eval={LIVE_EVAL_SCENARIOS}@{LIVE_EVAL_INTERVAL_SEC}s"
     )
     print(f"[train] device={device} batch_size={batch_size}", end="")
     if device == "cuda" and gpu_info.get("cuda_device"):
@@ -1135,6 +1398,7 @@ def main() -> None:
             nominal_plant=NOMINAL_PLANT,
             dynamics_jitter=DYNAMICS_JITTER,
             goal_hold_sec=GOAL_HOLD_SEC,
+            max_episode_steps=MAX_EPISODE_STEPS,
             current_enabled=CURRENT_ENABLED,
             contact_obs_noise_m=CONTACT_OBS_NOISE_M,
             contact_obs_noise_bearing_rad=CONTACT_OBS_NOISE_BEARING_RAD,
@@ -1145,7 +1409,8 @@ def main() -> None:
 
     model_holder: Dict[str, Any] = {}
     if resume_run_id:
-        checkpoint = RUNS_DIR / resume_run_id / "model"
+        parent_dir = RUNS_DIR / resume_run_id
+        checkpoint = resolve_resume_checkpoint(parent_dir, prefer_best=True)
         model = PPO.load(str(checkpoint), env=env, device=device)
         print(f"[train] loaded checkpoint {checkpoint}")
     else:
@@ -1153,7 +1418,7 @@ def main() -> None:
             "MlpPolicy",
             env,
             learning_rate=LEARNING_RATE,
-            n_steps=N_STEPS // max(N_ENVS, 1),
+            n_steps=n_steps,
             batch_size=batch_size,
             gamma=GAMMA,
             max_grad_norm=0.5,
@@ -1164,15 +1429,38 @@ def main() -> None:
     model_holder["model"] = model
 
     budget_cb = TimeBudgetCallback(TRAIN_BUDGET_SEC)
-    live_cb = LiveMetricsCallback(model_holder, MODE, run_dir.name)
-    callback = CallbackList([budget_cb, live_cb])
+    if CURRICULUM_PHASE is not None:
+        curriculum_cb = CurriculumCheckpointCallback(
+            model_holder,
+            run_dir,
+            MODE,
+            CURRICULUM_PHASE,
+            run_dir.name,
+        )
+        callback = CallbackList([budget_cb, curriculum_cb])
+    else:
+        live_cb = LiveMetricsCallback(model_holder, MODE, run_dir.name)
+        callback = CallbackList([budget_cb, live_cb])
     model.learn(total_timesteps=int(1e9), callback=callback, progress_bar=True)
     env.close()
 
     elapsed = time.time() - train_start
+    early_stopped = CURRICULUM_EARLY_STOPPED
     cancelled = is_cancel_requested() or budget_cb.cancelled
-    if cancelled:
+    if early_stopped:
+        print("[train] early stopped — curriculum exit gate passed")
+    elif cancelled:
         print("[train] paused/cancelled by user")
+
+    best_meta = load_best_metrics(run_dir)
+    if best_meta:
+        ckpt = resolve_resume_checkpoint(run_dir, prefer_best=True)
+        if ckpt.with_suffix(".zip").exists() or ckpt.exists():
+            model = PPO.load(str(ckpt), device=device)
+            model_holder["model"] = model
+            sr = best_meta.get("summary", {}).get("success_rate")
+            print(f"[train] final eval using best checkpoint (success_rate={sr})")
+        copy_best_to_final(run_dir)
 
     eval_limit = EVAL_EPISODES if EVAL_EPISODES > 0 else None
     eval_metrics, traces = run_eval(model, MODE, max_scenarios=eval_limit, collect_traces=True)
@@ -1191,12 +1479,18 @@ def main() -> None:
             "train_budget_sec": TRAIN_BUDGET_SEC,
             "train_elapsed_sec": round(elapsed, 1),
             "cancelled": cancelled,
+            "curriculum_early_stopped": early_stopped,
+            "best_checkpoint": best_meta,
             "device": device,
             "batch_size": batch_size,
+            "rollout_steps_total": rollout_total,
+            "steps_per_env": n_steps,
+            "vecenv_backend": vec_backend,
             "dynamics_jitter": DYNAMICS_JITTER,
             "robust_eval_enabled": ROBUST_EVAL_ENABLED,
             "nominal_plant": NOMINAL_PLANT.to_dict(),
             "goal_hold_sec": GOAL_HOLD_SEC,
+            "max_steps": MAX_EPISODE_STEPS,
             "current_enabled": CURRENT_ENABLED,
             "montage_enabled": MONTAGE_ENABLED,
         },
@@ -1205,7 +1499,7 @@ def main() -> None:
         parent_metrics=parent_metrics,
     )
 
-    score_key = "nav_score" if MODE == "navigate" else "avoid_score"
+    score_key = score_key_for_mode(MODE)
     score = eval_metrics[score_key]
     avg_rng = eval_metrics.get("avg_final_goal_range_m")
     clear_cancel_flag()

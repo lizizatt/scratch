@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,13 +13,16 @@ import numpy as np
 from stable_baselines3 import PPO
 
 import prepare as P
+from colregs.live import live_status_for_step
+from colregs.evaluate import evaluate_steps
 from device_util import resolve_device
+from mission import NavigationMission
 from policy_infer import safe_model_predict
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "runs"
 
-WORLD_BOUNDS = {"min_x": -1200.0, "max_x": 1200.0, "min_y": -900.0, "max_y": 900.0}
+WORLD_BOUNDS = dict(P.WORLD_BOUNDS)
 
 # Three start positions (m) — same model, different spawn points
 DEFAULT_STARTS: List[Tuple[float, float]] = [
@@ -28,6 +32,11 @@ DEFAULT_STARTS: List[Tuple[float, float]] = [
 ]
 
 DEFAULT_GOAL = (400.0, 0.0)
+
+# Full protocol eval is expensive; live pose scoring runs every frame.
+COLREGS_FULL_EVAL_INTERVAL = max(
+    1, int(os.environ.get("EXERCISE_COLREGS_FULL_EVAL_INTERVAL", "8"))
+)
 
 _model_cache: Dict[str, PPO] = {}
 _model_lock = threading.Lock()
@@ -76,12 +85,18 @@ class ExerciseSession:
             cur = bool(cfg["current_enabled"])
 
         self.run_id = run_id
-        self.mode = str(metrics.get("mode", "navigate"))
+        self.mode = str(metrics.get("mode", P.DEFAULT_MODE))
         self.model = load_policy(run_id)
         self.goal_x, self.goal_y = DEFAULT_GOAL
         self.bounds = dict(WORLD_BOUNDS)
+        self.mission = NavigationMission.single_goal(
+            self.goal_x, self.goal_y, np.random.default_rng(42), dt_s=P.DT_S
+        )
         self.contacts: List[P.ContactState] = []
+        self.traces: List[List[Dict[str, Any]]] = [[], [], []]
         self.vessels: List[BoatNavEnv] = []
+        self._colregs_frame = 0
+        self._colregs_rollup_cache: List[Optional[Dict[str, Any]]] = [None, None, None]
 
         for i, (sx, sy) in enumerate(DEFAULT_STARTS):
             env = BoatNavEnv(
@@ -121,6 +136,93 @@ class ExerciseSession:
             )
             self.vessels.append(env)
         self._sync_contacts_to_envs()
+        self._record_trace_snapshot()
+
+    def _invalidate_colregs_cache(self) -> None:
+        self._colregs_rollup_cache = [None, None, None]
+
+    def _record_trace_snapshot(self) -> None:
+        for i, env in enumerate(self.vessels):
+            self.traces[i].append(
+                P.snapshot_step(
+                    env.step_count,
+                    env.own,
+                    self.goal_x,
+                    self.goal_y,
+                    self.contacts,
+                )
+            )
+            if len(self.traces[i]) > 800:
+                self.traces[i] = self.traces[i][-800:]
+
+    def _colregs_payload(self) -> Dict[str, Any]:
+        if not self.contacts:
+            return {
+                "vessels": [],
+                "mean_safety_S": None,
+                "mean_protocol_R": None,
+                "live": {"live_contacts": [], "mean_live_safety_S": None},
+            }
+
+        self._colregs_frame += 1
+        run_full = (
+            self._colregs_frame % COLREGS_FULL_EVAL_INTERVAL == 0
+            or any(cache is None for cache in self._colregs_rollup_cache)
+        )
+
+        vessel_scores: List[Dict[str, Any]] = []
+        safety_vals: List[float] = []
+        protocol_vals: List[float] = []
+        live_payload: Optional[Dict[str, Any]] = None
+
+        for i, trace in enumerate(self.traces):
+            if not trace:
+                continue
+            live = live_status_for_step(trace[-1])
+            if run_full or self._colregs_rollup_cache[i] is None:
+                rollup = evaluate_steps(trace, scenario_category="exercise/live")
+                self._colregs_rollup_cache[i] = rollup
+            else:
+                rollup = self._colregs_rollup_cache[i]
+            if i == 0:
+                live_payload = live
+            label = chr(ord("A") + i)
+            vessel_scores.append(
+                {
+                    "vessel": label,
+                    "mean_safety_S": rollup.get("mean_safety_S")
+                    if rollup.get("mean_safety_S") is not None
+                    else live.get("mean_live_safety_S"),
+                    "mean_protocol_R": rollup.get("mean_protocol_R")
+                    if rollup.get("mean_protocol_R") is not None
+                    else live.get("mean_live_protocol_R"),
+                    "min_safety_S": rollup.get("min_safety_S")
+                    if rollup.get("min_safety_S") is not None
+                    else live.get("mean_live_safety_S"),
+                    "by_rule": rollup.get("by_rule") or {},
+                    "encounters": rollup.get("encounters") or [],
+                    "live": live,
+                }
+            )
+            mean_s = rollup.get("mean_safety_S")
+            if mean_s is None:
+                mean_s = live.get("mean_live_safety_S")
+            if mean_s is not None:
+                safety_vals.append(float(mean_s))
+            mean_r = rollup.get("mean_protocol_R")
+            if mean_r is None:
+                mean_r = live.get("mean_live_protocol_R")
+            if mean_r is not None:
+                protocol_vals.append(float(mean_r))
+
+        return {
+            "vessels": vessel_scores,
+            "mean_safety_S": round(sum(safety_vals) / len(safety_vals), 1) if safety_vals else None,
+            "mean_protocol_R": round(sum(protocol_vals) / len(protocol_vals), 1)
+            if protocol_vals
+            else None,
+            "live": live_payload or {"live_contacts": [], "mean_live_safety_S": None},
+        }
 
     def _clip_xy(self, x_m: float, y_m: float) -> Tuple[float, float]:
         return (
@@ -166,22 +268,47 @@ class ExerciseSession:
         )
         self.contacts.append(contact)
         self._sync_contacts_to_envs()
+        self._invalidate_colregs_cache()
+        self._record_trace_snapshot()
         return contact
 
     def clear_intruders(self) -> None:
         self.contacts.clear()
         self._sync_contacts_to_envs()
+        self._invalidate_colregs_cache()
+        self._record_trace_snapshot()
 
     def set_goal(self, x_m: float, y_m: float) -> None:
         x_m, y_m = self._clip_xy(x_m, y_m)
-        self.goal_x = x_m
-        self.goal_y = y_m
+        if not self.vessels:
+            self.goal_x, self.goal_y = x_m, y_m
+            return
+        ref = self.vessels[0]
+        tr = self.mission.set_goal(
+            ref.own.x_m,
+            ref.own.y_m,
+            x_m,
+            y_m,
+            self.goal_x,
+            self.goal_y,
+            P.goal_range_xy,
+        )
+        if tr is None:
+            return
+        self.goal_x = tr.goal_x
+        self.goal_y = tr.goal_y
         for env in self.vessels:
+            gr = P.goal_range(env.own, x_m, y_m)
             env.goal_x = x_m
             env.goal_y = y_m
+            env.leg_start_x = env.own.x_m
+            env.leg_start_y = env.own.y_m
             env.goal_hold_steps = 0
-            env.prev_goal_range = P.goal_range(env.own, x_m, y_m)
+            env.initial_goal_range = gr
+            env.prev_goal_range = gr
         self._sync_contacts_to_envs()
+        self._invalidate_colregs_cache()
+        self._record_trace_snapshot()
 
     def step(self, n_steps: int = 1) -> None:
         n_steps = max(1, min(int(n_steps), 20))
@@ -193,6 +320,7 @@ class ExerciseSession:
                 action, _ = safe_model_predict(self.model, env._last_obs, deterministic=True)
                 obs, _, _, _, _ = env.step(action, advance_contacts=False)
                 env._last_obs = obs
+            self._record_trace_snapshot()
 
     def reset_vessels(self) -> None:
         for i, env in enumerate(self.vessels):
@@ -211,7 +339,10 @@ class ExerciseSession:
             env.prev_goal_range = env.initial_goal_range
             env.goal_hold_steps = 0
             env.step_count = 0
+        self.traces = [[], [], []]
+        self._invalidate_colregs_cache()
         self._sync_contacts_to_envs()
+        self._record_trace_snapshot()
 
     def _contact_payload(self) -> List[Dict[str, Any]]:
         out: List[Dict[str, Any]] = []
@@ -257,6 +388,7 @@ class ExerciseSession:
             "goal_success_range_m": P.GOAL_SUCCESS_RANGE_M,
             "contacts": self._contact_payload(),
             "vessels": vessel_payload,
+            "colregs": self._colregs_payload(),
         }
 
 
