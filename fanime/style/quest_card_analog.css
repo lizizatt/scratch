@@ -1,0 +1,245 @@
+/**
+ * Fanime — analog quest business card (print reference).
+ * US standard: 3.5" × 2". Print at 100% scale, no margins/fit-to-page.
+ */
+
+@page {
+  size: 3.5in 2in;
+  margin: 0;
+}
+
+@media print {
+  body {
+    margin: 0;
+    background: #fff !important;
+  }
+  .sheet {
+    gap: 0;
+    padding: 0;
+    background: #fff !important;
+  }
+  .card {
+    break-after: page;
+    box-shadow: none !important;
+    outline: 0.5pt dashed #ccc;
+  }
+  .card:last-child {
+    break-after: auto;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Open Sans", Arial, sans-serif;
+  background: #2a2a2e;
+  color: #1a1a1a;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 16px 48px;
+}
+
+.print-hint {
+  max-width: 3.5in;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #ccc;
+  text-align: center;
+}
+
+.print-hint code {
+  font-size: 11px;
+  color: #ffd100;
+}
+
+/* Physical card */
+.card {
+  width: 3.5in;
+  height: 2in;
+  padding: 0.14in 0.16in 0.12in;
+  background: #0c0c0e;
+  color: #e8e8e8;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #2a5010, #1eff00, #c9a227, #1eff00, #2a5010);
+}
+
+.card--back::before {
+  background: linear-gradient(90deg, #3d2914, #c9a227, #ffd100, #c9a227, #3d2914);
+}
+
+.card-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.08in;
+  margin-bottom: 0.06in;
+  flex-shrink: 0;
+}
+
+.badge {
+  width: 0.28in;
+  height: 0.28in;
+  border: 1.5pt solid #c9a227;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.16in;
+  color: #ffd100;
+  background: #1a1510;
+  flex-shrink: 0;
+}
+
+.tier-label {
+  font-size: 0.11in;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.tier-label--uncommon {
+  color: #1eff00;
+}
+
+.tier-label--rare {
+  color: #4da3ff;
+}
+
+.tier-label--epic {
+  color: #c77dff;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 0.105in;
+  font-weight: 600;
+  color: #aaa;
+  flex: 1;
+  text-align: right;
+}
+
+.rule {
+  height: 0;
+  border: none;
+  border-top: 0.5pt solid #3a3228;
+  margin: 0 0 0.05in;
+}
+
+.quest-pick {
+  margin: 0;
+  font-size: 0.072in;
+  font-weight: 700;
+  color: #ffd100;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.quest-list {
+  margin: 0.04in 0 0;
+  padding: 0 0 0 0.14in;
+  font-size: 0.068in;
+  line-height: 1.28;
+  color: #d0d0d0;
+  flex: 1;
+}
+
+.quest-list li {
+  margin-bottom: 0.02in;
+}
+
+.quest-list li::marker {
+  color: #1eff00;
+  font-weight: 700;
+}
+
+/* Back: turn-in */
+.turnin-title {
+  margin: 0 0 0.05in;
+  font-size: 0.085in;
+  font-weight: 800;
+  color: #ffd100;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.turnin-steps {
+  margin: 0;
+  padding: 0 0 0 0.12in;
+  font-size: 0.068in;
+  line-height: 1.32;
+  color: #d8d8d8;
+  flex: 1;
+}
+
+.turnin-steps li {
+  margin-bottom: 0.03in;
+}
+
+.turnin-steps strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.proof-line {
+  margin: 0.04in 0 0;
+  padding-top: 0.04in;
+  border-top: 0.5pt solid #3a3228;
+  font-size: 0.062in;
+  line-height: 1.25;
+  color: #999;
+}
+
+.reward-line {
+  margin: 0.03in 0 0;
+  font-size: 0.065in;
+  font-weight: 700;
+  color: #1eff00;
+}
+
+.card-footer {
+  margin-top: auto;
+  font-size: 0.055in;
+  color: #666;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* Preview: show front + back side by side on screen */
+@media screen and (min-width: 500px) {
+  .sheet {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+}

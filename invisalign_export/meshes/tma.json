@@ -1,0 +1,369 @@
+{
+	"TMA" : 
+	{
+		"10" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 10,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"11" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 11,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"12" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 12,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"13" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 13,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"14" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 14,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"15" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 15,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"18" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 18,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"19" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 19,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"2" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 2,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"20" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 20,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"21" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 21,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"22" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 22,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"23" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 23,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"24" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 24,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"25" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 25,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"26" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 26,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"27" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 27,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"28" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 28,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"29" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 29,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"3" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 3,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"30" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 30,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"31" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 31,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"4" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 4,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"5" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 5,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"6" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 6,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"7" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 7,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"8" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 8,
+			"unit" : "",
+			"upperLimit" : 0
+		},
+		"9" : 
+		{
+			"amount" : 0,
+			"difficulty" : 0,
+			"difficultyID" : "None",
+			"infinity" : 0,
+			"lowerLimit" : 0,
+			"missingAttachments" : [],
+			"name" : "",
+			"tooth" : 9,
+			"unit" : "",
+			"upperLimit" : 0
+		}
+	}
+}

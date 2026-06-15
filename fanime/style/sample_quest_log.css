@@ -1,0 +1,335 @@
+/**
+ * Fanime — sample quest log shell (original).
+ * Inspired by common dark MMO database patterns; not copied from third-party CSS.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap");
+
+:root {
+  --bg-page: #050508;
+  --bg-panel: #121214;
+  --bg-panel-head: #1a1510;
+  --border-panel: #3a3228;
+  --border-accent: #c9a227;
+  --text-body: #c4c4c4;
+  --text-dim: #8a8a8a;
+  --link-gold: #ffd100;
+  --q-uncommon: #1eff00;
+  --q-rare: #0070dd;
+  --q-epic: #a335ee;
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html {
+  background-color: var(--bg-page);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--bg-page);
+  background-image: radial-gradient(
+    ellipse 120% 80% at 50% -20%,
+    #1a1418 0%,
+    transparent 55%
+  );
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--text-body);
+  font-family: "Open Sans", Arial, Helvetica, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+a {
+  color: var(--link-gold);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+.page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+}
+
+@media (min-width: 480px) {
+  .page {
+    padding: 24px 20px 48px;
+  }
+}
+
+/* --- Top bar (echo of global nav strip without copying assets) --- */
+.top-strip {
+  height: 4px;
+  background: linear-gradient(90deg, #3d2914, var(--border-accent), #3d2914);
+  margin-bottom: 20px;
+}
+
+/* --- Tier / quest title block --- */
+.tier-header .quest-title {
+  margin-bottom: 0;
+}
+
+.quest-title {
+  font-size: clamp(1.35rem, 4.5vw, 1.75rem);
+  font-weight: 700;
+  color: var(--link-gold);
+  margin: 0 0 12px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  line-height: 1.25;
+}
+
+.quest-title .tier-uncommon {
+  color: var(--q-uncommon);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.quest-tagline {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  margin-bottom: 18px;
+  max-width: 62ch;
+}
+
+/* --- Panels --- */
+.panel {
+  background: linear-gradient(165deg, #18181c 0%, var(--bg-panel) 40%);
+  border: 1px solid var(--border-panel);
+  border-radius: 2px;
+  box-shadow: var(--shadow-inset), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.panel-head {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e8dcc8;
+  background: var(--bg-panel-head);
+  border-bottom: 1px solid var(--border-panel);
+}
+
+.panel-body {
+  padding: 14px 14px 16px;
+}
+
+/* Quest log: expandable list */
+.panel-body--flush {
+  padding: 0 !important;
+}
+
+.quest-log {
+  padding: 0;
+}
+
+.quest-entry {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.quest-entry:last-child {
+  border-bottom: 0;
+}
+
+.quest-summary {
+  list-style: none;
+  cursor: pointer;
+  min-height: 48px;
+  padding: 14px 48px 14px 14px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  -webkit-tap-highlight-color: rgba(255, 209, 0, 0.12);
+}
+
+.quest-summary::-webkit-details-marker {
+  display: none;
+}
+
+.quest-summary::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -6px;
+  border-right: 2px solid var(--border-accent);
+  border-bottom: 2px solid var(--border-accent);
+  transform: rotate(45deg);
+  opacity: 0.85;
+  transition: transform 0.15s ease, margin-top 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quest-summary::after {
+    transition: none;
+  }
+}
+
+.quest-entry[open] > .quest-summary::after {
+  transform: rotate(225deg);
+  margin-top: 2px;
+}
+
+.quest-summary:hover {
+  background: rgba(255, 209, 0, 0.05);
+}
+
+.quest-summary:focus {
+  outline: none;
+}
+.quest-summary:focus-visible {
+  outline: 2px solid var(--link-gold);
+  outline-offset: -2px;
+}
+
+.quest-summary-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding-right: 4px;
+}
+
+.quest-name {
+  font-weight: 700;
+  color: #eee;
+  font-size: 1rem;
+  line-height: 1.3;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.quest-teaser {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.35;
+}
+
+.quest-expanded {
+  padding: 4px 14px 18px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+@media (min-width: 480px) {
+  .quest-expanded {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
+
+.quest-entry[open] > .quest-summary {
+  background: rgba(255, 209, 0, 0.06);
+}
+
+.section-title--compact {
+  font-size: 0.9rem;
+  margin: 16px 0 8px;
+  padding-bottom: 3px;
+}
+.section-title--compact:first-child {
+  margin-top: 8px;
+}
+
+.tier-uncommon {
+  color: var(--q-uncommon);
+  font-weight: 600;
+}
+.tier-rare {
+  color: var(--q-rare);
+  font-weight: 600;
+}
+.tier-epic {
+  color: var(--q-epic);
+  font-weight: 600;
+}
+
+/* --- Section headings (Description / Objectives style) --- */
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #eee;
+  margin: 28px 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.25);
+}
+.section-title:first-of-type {
+  margin-top: 0;
+}
+
+.proof-section {
+  margin-top: 3rem;
+  padding-top: 0.5rem;
+}
+
+@media (min-width: 480px) {
+  .proof-section {
+    margin-top: 3.5rem;
+  }
+}
+
+.section-title--proof {
+  margin-top: 0;
+}
+
+.quest-body p {
+  margin: 0 0 12px;
+}
+
+.objectives {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.objectives li {
+  margin-bottom: 8px;
+}
+
+/* --- Icon rail placeholder (quest ! vibe) --- */
+.exclaim-badge {
+  float: left;
+  width: 48px;
+  height: 48px;
+  margin: 0 14px 12px 0;
+  border-radius: 4px;
+  border: 2px solid var(--border-accent);
+  background: linear-gradient(145deg, #2a2418, #141210);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--link-gold);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.clearfix::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+footer.note {
+  margin-top: 32px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* Slightly larger touch targets on very small phones */
+@media (max-width: 380px) {
+  .quest-summary {
+    padding-left: 12px;
+    padding-right: 46px;
+  }
+}

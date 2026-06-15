@@ -1,0 +1,7 @@
+{
+  "time_scale": 0.9126840017214162,
+  "time_offset": 5.779818481481151,
+  "default_acceleration": 12354.197057403535,
+  "max_acceleration": 20000.0,
+  "accel_distance_threshold": 5.0
+}

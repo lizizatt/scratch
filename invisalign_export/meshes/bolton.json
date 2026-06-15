@@ -1,0 +1,183 @@
+{
+	"anteriorExcessEstimation" : -0.001148199,
+	"lowerJawPerimeter3x3" : 0.03606893,
+	"lowerJawPerimeter6x6" : 0.08752322,
+	"maxillaryExcess3x3" : -1.148199,
+	"maxillaryExcess6x6" : -1.515955,
+	"primary" : [],
+	"regular" : 
+	[
+		{
+			"id" : 3,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "3",
+			"width" : 0.01050998
+		},
+		{
+			"id" : 4,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "4",
+			"width" : 0.006727519
+		},
+		{
+			"id" : 5,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "5",
+			"width" : 0.007288602
+		},
+		{
+			"id" : 6,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "6",
+			"width" : 0.007873283
+		},
+		{
+			"id" : 7,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "7",
+			"width" : 0.00637833
+		},
+		{
+			"id" : 8,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "8",
+			"width" : 0.00803992
+		},
+		{
+			"id" : 9,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "9",
+			"width" : 0.008335108
+		},
+		{
+			"id" : 10,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "10",
+			"width" : 0.006721701
+		},
+		{
+			"id" : 11,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "11",
+			"width" : 0.007885775
+		},
+		{
+			"id" : 12,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "12",
+			"width" : 0.007249366
+		},
+		{
+			"id" : 13,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "13",
+			"width" : 0.006603927
+		},
+		{
+			"id" : 14,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "14",
+			"width" : 0.01058941
+		},
+		{
+			"id" : 19,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "19",
+			"width" : 0.01102323
+		},
+		{
+			"id" : 20,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "20",
+			"width" : 0.007525853
+		},
+		{
+			"id" : 21,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "21",
+			"width" : 0.007472695
+		},
+		{
+			"id" : 22,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "22",
+			"width" : 0.006931198
+		},
+		{
+			"id" : 23,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "23",
+			"width" : 0.005881927
+		},
+		{
+			"id" : 24,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "24",
+			"width" : 0.005328955
+		},
+		{
+			"id" : 25,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "25",
+			"width" : 0.005115322
+		},
+		{
+			"id" : 26,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "26",
+			"width" : 0.005922063
+		},
+		{
+			"id" : 27,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "27",
+			"width" : 0.006889469
+		},
+		{
+			"id" : 28,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "28",
+			"width" : 0.007202018
+		},
+		{
+			"id" : 29,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "29",
+			"width" : 0.007373424
+		},
+		{
+			"id" : 30,
+			"isEstimated" : false,
+			"isMissing" : false,
+			"name" : "30",
+			"width" : 0.01085707
+		}
+	],
+	"supernumerary" : [],
+	"totalExcessEstimation" : -0.001515955,
+	"upperJawPerimeter3x3" : 0.04523411,
+	"upperJawPerimeter6x6" : 0.09420292
+}

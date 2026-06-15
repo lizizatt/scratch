@@ -1,0 +1,310 @@
+{
+	"10" : 
+	{
+		"dentalTypeID" : 10,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "11",
+		"parent" : "Tooth_10",
+		"prev" : "9",
+		"toothId" : 10
+	},
+	"11" : 
+	{
+		"dentalTypeID" : 11,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "12",
+		"parent" : "Tooth_11",
+		"prev" : "10",
+		"toothId" : 11
+	},
+	"12" : 
+	{
+		"dentalTypeID" : 12,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "13",
+		"parent" : "Tooth_12",
+		"prev" : "11",
+		"toothId" : 12
+	},
+	"13" : 
+	{
+		"dentalTypeID" : 13,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "14",
+		"parent" : "Tooth_13",
+		"prev" : "12",
+		"toothId" : 13
+	},
+	"14" : 
+	{
+		"dentalTypeID" : 14,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "15",
+		"parent" : "Tooth_14",
+		"prev" : "13",
+		"toothId" : 14
+	},
+	"15" : 
+	{
+		"dentalTypeID" : 15,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "",
+		"parent" : "Tooth_15",
+		"prev" : "14",
+		"toothId" : 15
+	},
+	"18" : 
+	{
+		"dentalTypeID" : 18,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "19",
+		"parent" : "Tooth_18",
+		"prev" : "",
+		"toothId" : 18
+	},
+	"19" : 
+	{
+		"dentalTypeID" : 19,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "20",
+		"parent" : "Tooth_19",
+		"prev" : "18",
+		"toothId" : 19
+	},
+	"2" : 
+	{
+		"dentalTypeID" : 2,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "3",
+		"parent" : "Tooth_02",
+		"prev" : "",
+		"toothId" : 2
+	},
+	"20" : 
+	{
+		"dentalTypeID" : 20,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "21",
+		"parent" : "Tooth_20",
+		"prev" : "19",
+		"toothId" : 20
+	},
+	"21" : 
+	{
+		"dentalTypeID" : 21,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "22",
+		"parent" : "Tooth_21",
+		"prev" : "20",
+		"toothId" : 21
+	},
+	"22" : 
+	{
+		"dentalTypeID" : 22,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "23",
+		"parent" : "Tooth_22",
+		"prev" : "21",
+		"toothId" : 22
+	},
+	"23" : 
+	{
+		"dentalTypeID" : 23,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "24",
+		"parent" : "Tooth_23",
+		"prev" : "22",
+		"toothId" : 23
+	},
+	"24" : 
+	{
+		"dentalTypeID" : 24,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "25",
+		"parent" : "Tooth_24",
+		"prev" : "23",
+		"toothId" : 24
+	},
+	"25" : 
+	{
+		"dentalTypeID" : 25,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "26",
+		"parent" : "Tooth_25",
+		"prev" : "24",
+		"toothId" : 25
+	},
+	"26" : 
+	{
+		"dentalTypeID" : 26,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "27",
+		"parent" : "Tooth_26",
+		"prev" : "25",
+		"toothId" : 26
+	},
+	"27" : 
+	{
+		"dentalTypeID" : 27,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "28",
+		"parent" : "Tooth_27",
+		"prev" : "26",
+		"toothId" : 27
+	},
+	"28" : 
+	{
+		"dentalTypeID" : 28,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "29",
+		"parent" : "Tooth_28",
+		"prev" : "27",
+		"toothId" : 28
+	},
+	"29" : 
+	{
+		"dentalTypeID" : 29,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "30",
+		"parent" : "Tooth_29",
+		"prev" : "28",
+		"toothId" : 29
+	},
+	"3" : 
+	{
+		"dentalTypeID" : 3,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "4",
+		"parent" : "Tooth_03",
+		"prev" : "2",
+		"toothId" : 3
+	},
+	"30" : 
+	{
+		"dentalTypeID" : 30,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "31",
+		"parent" : "Tooth_30",
+		"prev" : "29",
+		"toothId" : 30
+	},
+	"31" : 
+	{
+		"dentalTypeID" : 31,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "",
+		"parent" : "Tooth_31",
+		"prev" : "30",
+		"toothId" : 31
+	},
+	"4" : 
+	{
+		"dentalTypeID" : 4,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "5",
+		"parent" : "Tooth_04",
+		"prev" : "3",
+		"toothId" : 4
+	},
+	"5" : 
+	{
+		"dentalTypeID" : 5,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "6",
+		"parent" : "Tooth_05",
+		"prev" : "4",
+		"toothId" : 5
+	},
+	"6" : 
+	{
+		"dentalTypeID" : 6,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "7",
+		"parent" : "Tooth_06",
+		"prev" : "5",
+		"toothId" : 6
+	},
+	"7" : 
+	{
+		"dentalTypeID" : 7,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "8",
+		"parent" : "Tooth_07",
+		"prev" : "6",
+		"toothId" : 7
+	},
+	"8" : 
+	{
+		"dentalTypeID" : 8,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "9",
+		"parent" : "Tooth_08",
+		"prev" : "7",
+		"toothId" : 8
+	},
+	"9" : 
+	{
+		"dentalTypeID" : 9,
+		"isPontic" : false,
+		"isSupernumerary" : false,
+		"movable" : true,
+		"next" : "10",
+		"parent" : "Tooth_09",
+		"prev" : "8",
+		"toothId" : 9
+	}
+}
