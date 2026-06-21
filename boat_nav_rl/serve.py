@@ -18,6 +18,7 @@ from colregs.evaluate import enrich_trace_file
 from colregs.frame_series import frame_score_series
 from device_util import torch_device_info
 from runs_util import latest_run_id, score_from_metrics
+from rewards import gated_hold_enabled, reward_weights_dict
 from vecenv_util import max_n_envs, recommended_n_envs, training_perf_defaults
 
 
@@ -182,6 +183,8 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                     current_enabled=bool(body.get("current_enabled", True)),
                     montage_enabled=bool(body.get("montage_enabled", False)),
+                    reward_weights=body.get("reward_weights") or None,
+                    gated_hold=body.get("gated_hold"),
                 )
             except ApiParseError as exc:
                 self._send_json({"ok": False, "error": str(exc)}, status=400)
@@ -349,6 +352,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/plant/config":
             payload = P.default_plant_config()
             payload["training"] = training_perf_defaults()
+            payload["reward_weights"] = reward_weights_dict()
+            payload["gated_hold_default"] = gated_hold_enabled()
             self._send_json(payload)
             return
 

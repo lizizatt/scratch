@@ -766,6 +766,8 @@ class BoatNavEnv(gym.Env):
         min_goal_range_m = final_goal_range_m
         entered_goal_zone = final_goal_range_m < P.GOAL_SUCCESS_RANGE_M
         goal_zone_speeds: List[float] = []
+        max_goal_hold_steps = 0
+        goal_hold_required = self.goal_hold_steps_required
         breakdown_sums: Dict[str, float] = {}
         breakdown_steps = 0
 
@@ -792,6 +794,9 @@ class BoatNavEnv(gym.Env):
                 )
             collision = collision or info["collision"]
             success = info["success"]
+            max_goal_hold_steps = max(max_goal_hold_steps, int(info.get("goal_hold_steps") or 0))
+            if info.get("goal_hold_required") is not None:
+                goal_hold_required = int(info["goal_hold_required"])
             if terminated or truncated:
                 break
 
@@ -824,6 +829,8 @@ class BoatNavEnv(gym.Env):
             ),
             "goal_zone_steps": len(goal_zone_speeds),
             "goal_zone_speeds": goal_zone_speeds,
+            "goal_hold_steps": max_goal_hold_steps,
+            "goal_hold_required": goal_hold_required,
         }
         if breakdown_steps:
             result["mean_reward_breakdown"] = {
@@ -949,6 +956,21 @@ class LiveMetricsCallback(BaseCallback):
         except Exception as exc:
             print(f"[live-eval] skipped: {exc}")
         return True
+
+    def drain_background_eval(self, timeout: float = 900.0) -> None:
+        if not self._async.enabled or not self._async.is_busy():
+            try:
+                self._async.poll()
+            except Exception as exc:
+                print(f"[live-eval] background eval failed: {exc}")
+            return
+        print("[live-eval] waiting for background eval to finish…")
+        try:
+            metrics = self._async.drain(timeout=timeout)
+            if metrics is not None:
+                self._publish_metrics(metrics, time.time() - self.start_time)
+        except Exception as exc:
+            print(f"[live-eval] background eval failed: {exc}")
 
 
 class CurriculumCheckpointCallback(BaseCallback):
@@ -1142,6 +1164,23 @@ class CurriculumCheckpointCallback(BaseCallback):
         if CURRICULUM_EARLY_STOPPED:
             return False
         return True
+
+    def drain_background_eval(self, timeout: float = 900.0) -> None:
+        if not self._async.enabled or not self._async.is_busy():
+            try:
+                metrics = self._async.poll()
+                if metrics is not None:
+                    self._handle_eval_metrics(metrics)
+            except Exception as exc:
+                print(f"[curriculum-eval] background eval failed: {exc}", flush=True)
+            return
+        print("[curriculum-eval] waiting for background eval to finish…", flush=True)
+        try:
+            metrics = self._async.drain(timeout=timeout)
+            if metrics is not None:
+                self._handle_eval_metrics(metrics)
+        except Exception as exc:
+            print(f"[curriculum-eval] background eval failed: {exc}", flush=True)
 
 
 def train_seeds_for_mode(mode: str) -> List[P.ScenarioSeed]:
@@ -1461,20 +1500,24 @@ def main() -> None:
     model_holder["model"] = model
 
     budget_cb = TimeBudgetCallback(TRAIN_BUDGET_SEC)
+    async_eval_cb: Optional[BaseCallback] = None
     if CURRICULUM_PHASE is not None:
-        curriculum_cb = CurriculumCheckpointCallback(
+        async_eval_cb = CurriculumCheckpointCallback(
             model_holder,
             run_dir,
             MODE,
             CURRICULUM_PHASE,
             run_dir.name,
         )
-        callback = CallbackList([budget_cb, curriculum_cb])
+        callback = CallbackList([budget_cb, async_eval_cb])
     else:
-        live_cb = LiveMetricsCallback(model_holder, MODE, run_dir.name, run_dir=run_dir)
-        callback = CallbackList([budget_cb, live_cb])
+        async_eval_cb = LiveMetricsCallback(model_holder, MODE, run_dir.name, run_dir=run_dir)
+        callback = CallbackList([budget_cb, async_eval_cb])
     model.learn(total_timesteps=int(1e9), callback=callback, progress_bar=True)
     env.close()
+
+    if async_eval_cb is not None and hasattr(async_eval_cb, "drain_background_eval"):
+        async_eval_cb.drain_background_eval()
 
     elapsed = time.time() - train_start
     early_stopped = CURRICULUM_EARLY_STOPPED
@@ -1495,13 +1538,19 @@ def main() -> None:
         copy_best_to_final(run_dir)
 
     eval_limit = EVAL_EPISODES if EVAL_EPISODES > 0 else None
-    eval_metrics, traces = run_eval(model, MODE, max_scenarios=eval_limit, collect_traces=True)
-    if ROBUST_EVAL_ENABLED:
-        eval_metrics.update(run_robust_eval(model, MODE))
-        print(
-            f"[train] robust_eval score={eval_metrics.get('robust_eval_score')} "
-            f"worst={eval_metrics.get('robust_eval_worst')}"
-        )
+    eval_metrics: Dict[str, Any] = {}
+    traces: List[Dict[str, Any]] = []
+    try:
+        eval_result = run_eval(model, MODE, max_scenarios=eval_limit, collect_traces=True)
+        eval_metrics, traces = eval_result
+        if ROBUST_EVAL_ENABLED:
+            eval_metrics.update(run_robust_eval(model, MODE))
+            print(
+                f"[train] robust_eval score={eval_metrics.get('robust_eval_score')} "
+                f"worst={eval_metrics.get('robust_eval_worst')}"
+            )
+    except Exception as exc:
+        print(f"[train] final eval failed ({exc}); saving checkpoint without full eval")
 
     write_run_outputs(
         run_dir,
@@ -1532,7 +1581,7 @@ def main() -> None:
     )
 
     score_key = score_key_for_mode(MODE)
-    score = eval_metrics[score_key]
+    score = eval_metrics.get(score_key)
     avg_rng = eval_metrics.get("avg_final_goal_range_m")
     clear_cancel_flag()
     update_job_status(
@@ -1542,10 +1591,16 @@ def main() -> None:
         score=score,
         avg_final_goal_range_m=avg_rng,
     )
-    print(
-        f"[experiment] {score_key}={score:.3f}  avg_goal_range={avg_rng}m  "
-        f"elapsed={elapsed:.0f}s  run=runs/{run_dir.name}"
-    )
+    if score is not None:
+        print(
+            f"[experiment] {score_key}={score:.3f}  avg_goal_range={avg_rng}m  "
+            f"elapsed={elapsed:.0f}s  run=runs/{run_dir.name}"
+        )
+    else:
+        print(
+            f"[experiment] checkpoint saved (eval skipped)  "
+            f"elapsed={elapsed:.0f}s  run=runs/{run_dir.name}"
+        )
     print(f"[viz] Train:     http://localhost:{VIZ_PORT}/train.html")
     print(f"[viz] Overview:  http://localhost:{VIZ_PORT}/scenarios.html?run={run_dir.name}")
     print(f"[viz] Replay:    http://localhost:{VIZ_PORT}/?run={run_dir.name}")

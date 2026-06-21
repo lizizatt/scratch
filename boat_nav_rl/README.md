@@ -86,8 +86,8 @@ flowchart TB
 
 | Mode | Contacts | COLREGS eval | Primary metric |
 |------|----------|--------------|----------------|
-| `navigate` | None (masked) | **Skipped** | `nav_score` = success_rate × mean_energy_score |
-| `avoid` | 1–8 traffic contacts | On when traces collected | `avoid_score` = success × (1 − collision) × energy |
+| `navigate` | None (masked) | **Skipped** | `nav_score` = mean per-episode mission score; see `nav_score_strict` for legacy binary gate |
+| `avoid` | 1–8 traffic contacts | On when traces collected | `avoid_score` = mean per-episode mission score (approach × hold × safety × energy); see `avoid_score_strict` for legacy binary gate |
 | `all` | Mixed train split | Per-scenario mode | Whichever applies |
 
 **Success** = reach goal within `GOAL_SUCCESS_RANGE_M` (50 m) and complete the hold timer at minimum speed. **Navigate** mode teaches open-water waypoint following; **avoid** adds CPA penalties, collision terminals, and threat-in-zone terms.

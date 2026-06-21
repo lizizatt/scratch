@@ -90,6 +90,8 @@ def start_training(
     goal_hold_sec: int = 30,
     current_enabled: bool = True,
     montage_enabled: bool = False,
+    reward_weights: Optional[Dict[str, Any]] = None,
+    gated_hold: Optional[bool] = None,
 ) -> Dict[str, Any]:
     global _process
 
@@ -118,6 +120,10 @@ def start_training(
             "current_enabled": bool(current_enabled),
             "montage_enabled": bool(montage_enabled),
         }
+        if reward_weights:
+            run_cfg["reward_weights"] = reward_weights
+        if gated_hold is not None:
+            run_cfg["gated_hold"] = bool(gated_hold)
         JOB_DIR.mkdir(parents=True, exist_ok=True)
         RUN_CONFIG_PATH.write_text(json.dumps(run_cfg, indent=2), encoding="utf-8")
 
@@ -155,6 +161,8 @@ def start_training(
                 "goal_hold_sec": run_cfg["goal_hold_sec"],
                 "current_enabled": run_cfg["current_enabled"],
                 "montage_enabled": run_cfg["montage_enabled"],
+                "reward_weights": run_cfg.get("reward_weights"),
+                "gated_hold": run_cfg.get("gated_hold"),
             }
         )
 
@@ -250,6 +258,8 @@ def training_history(limit: int = 200) -> Dict[str, Any]:
                 "mean_goal_zone_speed_mps": metrics.get("mean_goal_zone_speed_mps"),
                 "pct_goal_zone_at_min_speed": metrics.get("pct_goal_zone_at_min_speed"),
                 "reward_breakdown_mean": metrics.get("reward_breakdown_mean"),
+                "reward_weights": (metrics.get("config") or {}).get("reward_weights"),
+                "gated_hold": (metrics.get("config") or {}).get("gated_hold"),
                 "notes": metrics.get("notes", ""),
                 "parent_run_id": metrics.get("parent_run_id"),
                 "train_session": metrics.get("train_session", 1),

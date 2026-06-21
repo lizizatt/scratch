@@ -46,6 +46,23 @@ class AsyncEvalRunner:
         except Exception:
             raise
 
+    def drain(self, timeout: float = 600.0) -> Optional[Any]:
+        """Block until the in-flight job finishes (or timeout). Returns its result."""
+        import time
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if not self.is_busy():
+                return self.poll()
+            try:
+                result = self.poll()
+                if result is not None:
+                    return result
+            except Exception:
+                raise
+            time.sleep(0.05)
+        return None
+
     def shutdown(self, *, wait: bool = False) -> None:
         try:
             self._pool.shutdown(wait=wait, cancel_futures=True)

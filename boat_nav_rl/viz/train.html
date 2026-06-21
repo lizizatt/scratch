@@ -100,6 +100,21 @@
             <button type="button" id="presetFreighter" class="ghost-btn">Freighter</button>
           </div>
         </fieldset>
+        <fieldset id="rewardPanel" class="reward-panel full">
+          <legend>Reward shaping weights</legend>
+          <p class="field-hint">
+            Tune per-step bonuses and penalties. Encounter motion is shaped mainly by CPA, collision,
+            and threat-in-zone weights. Set a weight to 0 to disable that term.
+          </p>
+          <label class="checkbox-label full">
+            <input id="gatedHold" type="checkbox" checked />
+            Gated hold — only reward stationary hold when SOG ≤ stationary threshold
+          </label>
+          <div id="rewardWeightsGrid" class="reward-weights-grid"></div>
+          <div class="reward-presets">
+            <button type="button" id="presetRewardDefaults" class="ghost-btn">Reset to defaults</button>
+          </div>
+        </fieldset>
         <label>
           Resume from run
           <select id="resumeSelect">
@@ -122,8 +137,8 @@
     <section class="panel panel-primary">
       <h2>Eval score</h2>
       <p class="panel-hint">
-        Headline metric: success rate × energy (navigate) or success × (1 − collision) × energy (avoid).
-        Higher is better.
+        Headline metric: mean partial mission score (approach × hold × safety × energy).
+        Binary success rate is still tracked separately for curriculum gates.
       </p>
       <div class="chart-split chart-split-live" id="scoreChartSplit">
         <div class="chart-pane chart-pane-completed">

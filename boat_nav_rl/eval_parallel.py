@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import os
+import uuid
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
@@ -16,6 +18,70 @@ from rewards import HOLD_AT_STOP_EPS_MPS, aggregate_episode_breakdowns
 
 EVAL_WORKERS = int(os.environ.get("EVAL_WORKERS", str(max(1, os.cpu_count() or 4))))
 EVAL_PARALLEL_MIN_SCENARIOS = int(os.environ.get("EVAL_PARALLEL_MIN_SCENARIOS", "4"))
+
+# Partial-credit headline score — penalties reduce by ~order of magnitude, not binary zero.
+COLLISION_SCORE_FACTOR = 0.15
+CPA_UNSAFE_GOAL_FACTOR = 0.4
+HOLD_PROGRESS_FLOOR = 0.25
+HOLD_PROGRESS_WEIGHT = 0.75
+DEFAULT_GOAL_HOLD_REQUIRED = 30
+
+
+def _closest_goal_range_m(episode: Dict[str, Any]) -> float:
+    candidates = [
+        episode.get("min_goal_range_m"),
+        episode.get("final_goal_range_m"),
+    ]
+    vals = [float(v) for v in candidates if v is not None]
+    return min(vals) if vals else float("inf")
+
+
+def approach_factor(episode: Dict[str, Any]) -> float:
+    """1.0 at the goal; linear falloff to 0 at GOAL_SUCCESS_RANGE_M."""
+    closest = _closest_goal_range_m(episode)
+    if not math.isfinite(closest):
+        return 0.0
+    thresh = max(P.GOAL_SUCCESS_RANGE_M, 1e-6)
+    return max(0.0, min(1.0, 1.0 - closest / thresh))
+
+
+def hold_progress_factor(episode: Dict[str, Any]) -> float:
+    """Partial credit for stationary hold progress inside the goal zone."""
+    if episode.get("success"):
+        return 1.0
+    required = int(episode.get("goal_hold_required") or DEFAULT_GOAL_HOLD_REQUIRED)
+    if required <= 0:
+        return 1.0 if episode.get("entered_goal_zone") else 0.0
+    steps = int(episode.get("goal_hold_steps") or 0)
+    frac = min(1.0, steps / required)
+    if episode.get("entered_goal_zone"):
+        return HOLD_PROGRESS_FLOOR + HOLD_PROGRESS_WEIGHT * frac
+    return HOLD_PROGRESS_WEIGHT * frac
+
+
+def safety_factor(episode: Dict[str, Any], mode: str) -> float:
+    """Soft penalties for collision and CPA-unsafe time in the goal zone."""
+    factor = 1.0
+    if episode.get("collision"):
+        factor *= COLLISION_SCORE_FACTOR
+    if colregs_enabled_for_mode(mode) and episode.get("cpa_unsafe_in_goal"):
+        factor *= CPA_UNSAFE_GOAL_FACTOR
+    return factor
+
+
+def episode_mission_score(episode: Dict[str, Any], mode: str) -> float:
+    """Per-episode score in [0, 1]: approach × hold × safety × energy."""
+    core = approach_factor(episode) * hold_progress_factor(episode)
+    safety = safety_factor(episode, mode)
+    energy = float(episode.get("energy_score") or 1.0)
+    return max(0.0, min(1.0, core * safety * energy))
+
+
+def strict_episode_score(episode: Dict[str, Any], mode: str) -> float:
+    """Legacy binary success gate × safety × energy (one episode)."""
+    if not episode.get("success"):
+        return 0.0
+    return max(0.0, min(1.0, safety_factor(episode, mode) * float(episode.get("energy_score") or 1.0)))
 
 
 def colregs_enabled_for_mode(mode: str) -> bool:
@@ -49,6 +115,13 @@ def snapshot_model_for_eval(model: PPO, path: Path) -> Path:
     stem.parent.mkdir(parents=True, exist_ok=True)
     model.save(str(stem))
     return stem
+
+
+def alloc_eval_snapshot_stem(base_dir: Optional[Path] = None) -> Path:
+    """Unique on-disk stem so concurrent eval jobs do not share one zip."""
+    root = base_dir or (P.RUNS_DIR / "_eval_snapshots")
+    root.mkdir(parents=True, exist_ok=True)
+    return root / uuid.uuid4().hex
 
 
 def _worker_config_dict(
@@ -193,7 +266,7 @@ def rollout_episodes(
             collect_breakdown=collect_breakdown,
         )
 
-    snap = snapshot_path or (P.RUNS_DIR / "_eval_snapshot")
+    snap = snapshot_path or alloc_eval_snapshot_stem()
     stem = snapshot_model_for_eval(model, snap)
     zip_path = checkpoint_zip_path(stem)
     try:
@@ -282,8 +355,12 @@ def aggregate_eval_metrics(
     success_rate = successes / episodes if episodes else 0.0
     collision_rate = collisions / episodes if episodes else 0.0
     mean_energy_score = float(np.mean(energy_scores)) if energy_scores else 1.0
-    nav_score = success_rate * mean_energy_score
-    avoid_score = success_rate * (1.0 - collision_rate) * mean_energy_score
+    mission_scores = [episode_mission_score(ep, mode) for ep in episode_results]
+    mean_mission_score = float(np.mean(mission_scores)) if mission_scores else 0.0
+    strict_nav = success_rate * mean_energy_score
+    strict_avoid = success_rate * (1.0 - collision_rate) * mean_energy_score
+    nav_score = mean_mission_score if mode == "navigate" else strict_nav
+    avoid_score = mean_mission_score if mode == "avoid" else strict_avoid
     avg_final_goal_range_m = float(np.mean(final_ranges)) if final_ranges else None
     median_final_goal_range_m = float(np.median(final_ranges)) if final_ranges else None
     at_min_goal_zone = [s for s in goal_zone_speed_samples if s <= HOLD_AT_STOP_EPS_MPS]
@@ -307,8 +384,11 @@ def aggregate_eval_metrics(
         ),
         "episodes_with_goal_zone_steps": zone_entries,
         "reward_breakdown_mean": aggregate_episode_breakdowns(episode_results),
+        "mean_mission_score": round(mean_mission_score, 4),
         "nav_score": round(nav_score, 4),
         "avoid_score": round(avoid_score, 4),
+        "nav_score_strict": round(strict_nav, 4),
+        "avoid_score_strict": round(strict_avoid, 4),
         "avg_final_goal_range_m": round(avg_final_goal_range_m, 2) if avg_final_goal_range_m is not None else None,
         "median_final_goal_range_m": (
             round(median_final_goal_range_m, 2) if median_final_goal_range_m is not None else None

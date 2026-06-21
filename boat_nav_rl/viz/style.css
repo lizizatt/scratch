@@ -621,6 +621,63 @@ canvas {
   font: inherit;
 }
 
+.reward-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0;
+}
+
+.reward-panel legend {
+  padding: 0 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.reward-weights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.65rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.reward-weight-group {
+  grid-column: 1 / -1;
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.reward-weight-group:first-of-type {
+  margin-top: 0;
+}
+
+.reward-weights-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+}
+
+.reward-weights-grid input[type="number"] {
+  width: 100%;
+  background: #1a2740;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+}
+
+.reward-presets {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
 .field-hint {
   margin: 0.25rem 0 0;
   font-size: 0.8rem;

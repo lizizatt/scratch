@@ -103,6 +103,10 @@ class TestHttpApi(unittest.TestCase):
         self.assertIn("default_mode", data)
         self.assertIn("sim_constants", data)
         self.assertIn("vessel_classes", data["sim_constants"])
+        self.assertIn("reward_weights", data)
+        self.assertIn("goal_progress", data["reward_weights"])
+        self.assertIn("cpa", data["reward_weights"])
+        self.assertIn("gated_hold_default", data)
 
     def test_train_rejects_invalid_budget(self):
         req = urllib.request.Request(

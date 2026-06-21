@@ -17,6 +17,10 @@ const maxYawRate = document.getElementById("maxYawRate");
 const presetNominal = document.getElementById("presetNominal");
 const presetAgile = document.getElementById("presetAgile");
 const presetFreighter = document.getElementById("presetFreighter");
+const rewardPanel = document.getElementById("rewardPanel");
+const rewardWeightsGrid = document.getElementById("rewardWeightsGrid");
+const gatedHold = document.getElementById("gatedHold");
+const presetRewardDefaults = document.getElementById("presetRewardDefaults");
 const resumeSelect = document.getElementById("resumeSelect");
 const notesInput = document.getElementById("notesInput");
 const startBtn = document.getElementById("startBtn");
@@ -47,6 +51,7 @@ let pollInFlight = false;
 let animFrameId = null;
 
 let plantConfig = null;
+let defaultRewardWeights = null;
 let montageEpisodes = [];
 let montageRunId = null;
 
@@ -112,12 +117,111 @@ const REWARD_COLORS = [
   "#d19a66",
 ];
 
+/** Config keys grouped for the train form (defaults mirror rewards.py). */
+const REWARD_WEIGHT_GROUPS = [
+  {
+    title: "Encounter",
+    fields: [
+      { key: "cpa", label: "CPA hard", step: 1, min: 0, default: 40 },
+      { key: "cpa_soft", label: "CPA soft", step: 1, min: 0, default: 12 },
+      { key: "cpa_warning_mult", label: "CPA warn ×", step: 0.1, min: 1, default: 2 },
+      { key: "goal_threat_stay", label: "Threat in zone", step: 0.5, min: 0, default: 6 },
+      { key: "collision", label: "Collision", step: 5, min: 0, default: 100 },
+    ],
+  },
+  {
+    title: "Navigation",
+    fields: [
+      { key: "goal_progress", label: "Goal progress", step: 0.5, min: 0, default: 3 },
+      { key: "cross_track", label: "Cross-track", step: 0.05, min: 0, default: 0 },
+      { key: "cross_track_scale_m", label: "Cross-track scale (m)", step: 1, min: 0, default: 100 },
+      { key: "approach_slow", label: "Approach decel", step: 0.05, min: 0, default: 0.35 },
+      { key: "approach_slow_range_m", label: "Approach range (m)", step: 1, min: 0, default: 200 },
+    ],
+  },
+  {
+    title: "Goal hold",
+    fields: [
+      { key: "goal_arrival", label: "Goal arrival", step: 5, min: 0, default: 50 },
+      { key: "goal_arrival_early", label: "Early arrival", step: 1, min: 0, default: 8 },
+      { key: "hold_base", label: "Hold base", step: 0.5, min: 0, default: 2 },
+      { key: "hold_speed", label: "Hold speed", step: 0.5, min: 0, default: 3 },
+      { key: "hold_center", label: "Hold center", step: 0.1, min: 0, default: 0.6 },
+      { key: "hold_overspeed", label: "Hold overspeed", step: 0.5, min: 0, default: 3 },
+      { key: "hold_stationary_speed_mps", label: "Stationary (m/s)", step: 0.01, min: 0, default: 0.15 },
+    ],
+  },
+];
+
+function rewardWeightDefaults() {
+  const weights = {};
+  REWARD_WEIGHT_GROUPS.forEach((group) => {
+    group.fields.forEach((field) => {
+      weights[field.key] = field.default;
+    });
+  });
+  return weights;
+}
+
 function readPlantFromForm() {
   return {
     tau_heading_s: parseFloat(tauHeading.value),
     tau_speed_s: parseFloat(tauSpeed.value),
     max_yaw_rate_deg_s: parseFloat(maxYawRate.value),
   };
+}
+
+function buildRewardWeightInputs() {
+  if (!rewardWeightsGrid || rewardWeightsGrid.dataset.built) return;
+  REWARD_WEIGHT_GROUPS.forEach((group) => {
+    const heading = document.createElement("div");
+    heading.className = "reward-weight-group";
+    heading.textContent = group.title;
+    rewardWeightsGrid.appendChild(heading);
+    group.fields.forEach((field) => {
+      const label = document.createElement("label");
+      label.htmlFor = `reward_${field.key}`;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.id = `reward_${field.key}`;
+      input.name = `reward_${field.key}`;
+      input.dataset.rewardKey = field.key;
+      input.step = String(field.step ?? 0.1);
+      input.min = String(field.min ?? 0);
+      input.value = String(field.default ?? 0);
+      label.appendChild(document.createTextNode(field.label));
+      label.appendChild(input);
+      rewardWeightsGrid.appendChild(label);
+    });
+  });
+  rewardWeightsGrid.dataset.built = "1";
+}
+
+function applyRewardWeights(weights, gatedHoldValue) {
+  buildRewardWeightInputs();
+  const source = weights || defaultRewardWeights || rewardWeightDefaults();
+  Object.entries(source).forEach(([key, value]) => {
+    const input = rewardWeightsGrid.querySelector(`[data-reward-key="${key}"]`);
+    if (input && value != null) {
+      input.value = value;
+    }
+  });
+  if (gatedHoldValue != null) {
+    gatedHold.checked = Boolean(gatedHoldValue);
+  }
+}
+
+function readRewardWeightsFromForm() {
+  buildRewardWeightInputs();
+  const weights = {};
+  rewardWeightsGrid.querySelectorAll("[data-reward-key]").forEach((input) => {
+    const key = input.dataset.rewardKey;
+    const value = parseFloat(input.value);
+    if (key && Number.isFinite(value)) {
+      weights[key] = value;
+    }
+  });
+  return weights;
 }
 
 function applyPlantPreset(preset) {
@@ -139,6 +243,8 @@ function updatePlantPanelState() {
 async function loadPlantConfig() {
   plantConfig = await fetchJson("/api/plant/config");
   applyPlantPreset(plantConfig.nominal);
+  defaultRewardWeights = plantConfig.reward_weights || rewardWeightDefaults();
+  applyRewardWeights(defaultRewardWeights, plantConfig.gated_hold_default ?? true);
   if (plantConfig.goal_hold_sec_default != null) {
     goalHoldSec.value = plantConfig.goal_hold_sec_default;
   }
@@ -174,6 +280,8 @@ function getTrainingPayload(resumeRunId) {
     current_enabled: currentEnabled.checked,
     montage_enabled: montageEnabled.checked,
     plant: readPlantFromForm(),
+    reward_weights: readRewardWeightsFromForm(),
+    gated_hold: gatedHold.checked,
     resume_run_id: resumeRunId || null,
     notes: notesInput.value.trim(),
   };
@@ -364,12 +472,39 @@ function populateResumeSelect() {
     opt.value = r.run_id;
     const score = r.score != null ? r.score.toFixed(3) : "?";
     opt.textContent = `${r.run_id} · ${r.mode} · ${score}`;
+    if (r.reward_weights) {
+      opt.dataset.rewardWeights = JSON.stringify(r.reward_weights);
+      if (r.gated_hold != null) {
+        opt.dataset.gatedHold = r.gated_hold ? "1" : "0";
+      }
+    }
     resumeSelect.appendChild(opt);
   });
   if (prev && [...resumeSelect.options].some((o) => o.value === prev)) {
     resumeSelect.value = prev;
   } else if (history.length) {
     resumeSelect.value = history[history.length - 1].run_id;
+  }
+  syncRewardWeightsFromResume();
+}
+
+function syncRewardWeightsFromResume() {
+  const opt = resumeSelect.selectedOptions[0];
+  if (!opt || !opt.value) {
+    applyRewardWeights(defaultRewardWeights, plantConfig?.gated_hold_default);
+    return;
+  }
+  if (opt.dataset.rewardWeights) {
+    try {
+      const weights = JSON.parse(opt.dataset.rewardWeights);
+      const gated =
+        opt.dataset.gatedHold != null
+          ? opt.dataset.gatedHold === "1"
+          : plantConfig?.gated_hold_default;
+      applyRewardWeights(weights, gated);
+    } catch (err) {
+      /* keep current form values */
+    }
   }
 }
 
@@ -604,7 +739,16 @@ dynamicsJitter.addEventListener("change", updatePlantPanelState);
 presetNominal.addEventListener("click", () => applyPlantPreset(plantConfig?.nominal));
 presetAgile.addEventListener("click", () => applyPlantPreset(plantConfig?.agile));
 presetFreighter.addEventListener("click", () => applyPlantPreset(plantConfig?.freighter));
+presetRewardDefaults.addEventListener("click", () => {
+  applyRewardWeights(
+    defaultRewardWeights || rewardWeightDefaults(),
+    plantConfig?.gated_hold_default ?? true
+  );
+});
+resumeSelect.addEventListener("change", syncRewardWeightsFromResume);
 montageScrubber.addEventListener("input", renderMontageCanvas);
+
+buildRewardWeightInputs();
 
 loadPlantConfig()
   .then(() => loadHistory())
