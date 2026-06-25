@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 import prepare as P
 import training_job as TJ
 import exercise as EX
-from api_parse import ApiParseError, parse_int, parse_mode
+from exercise import EXERCISE_MAX_STEP_BATCH
 from colregs.evaluate import enrich_trace_file
 from colregs.frame_series import frame_score_series
 from device_util import torch_device_info
@@ -288,7 +288,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": "exercise not initialized"}, status=409)
                 return
             try:
-                steps = parse_int(body.get("steps"), 1, name="steps", minimum=1, maximum=100)
+                steps = parse_int(
+                    body.get("steps"), 1, name="steps", minimum=1, maximum=EXERCISE_MAX_STEP_BATCH
+                )
             except ApiParseError as exc:
                 self._send_json({"ok": False, "error": str(exc)}, status=400)
                 return

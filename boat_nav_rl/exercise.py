@@ -37,6 +37,7 @@ DEFAULT_GOAL = (400.0, 0.0)
 COLREGS_FULL_EVAL_INTERVAL = max(
     1, int(os.environ.get("EXERCISE_COLREGS_FULL_EVAL_INTERVAL", "8"))
 )
+EXERCISE_MAX_STEP_BATCH = 20
 
 _model_cache: Dict[str, PPO] = {}
 _model_lock = threading.Lock()
@@ -311,7 +312,7 @@ class ExerciseSession:
         self._record_trace_snapshot()
 
     def step(self, n_steps: int = 1) -> None:
-        n_steps = max(1, min(int(n_steps), 20))
+        n_steps = max(1, min(int(n_steps), EXERCISE_MAX_STEP_BATCH))
         for _ in range(n_steps):
             for c in self.contacts:
                 c.step(P.DT_S)
