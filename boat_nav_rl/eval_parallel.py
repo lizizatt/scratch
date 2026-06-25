@@ -157,14 +157,29 @@ def _worker_config_dict(
     }
 
 
+_WORKER_MODEL: Optional[PPO] = None
+_WORKER_MODEL_PATH: Optional[str] = None
+
+
+def _init_eval_worker(model_path: str) -> None:
+    global _WORKER_MODEL, _WORKER_MODEL_PATH
+    _WORKER_MODEL_PATH = model_path
+    _WORKER_MODEL = PPO.load(model_path, device="cpu")
+
+
 def _eval_scenario_worker(payload: Tuple[Dict[str, Any], Dict[str, Any]]) -> Dict[str, Any]:
-    """Process-pool entry: rollout one scenario (loads policy per worker process)."""
+    """Process-pool entry: rollout one scenario (reuses model loaded in worker init)."""
+    global _WORKER_MODEL, _WORKER_MODEL_PATH
     scenario_dict, cfg = payload
     from env import BoatNavEnv
 
     scenario = P.ScenarioSeed(**scenario_dict)
     plant = P.plant_from_dict(cfg["nominal_plant"])
-    model = PPO.load(cfg["model_path"], device="cpu")
+    model_path = cfg["model_path"]
+    if _WORKER_MODEL is None or _WORKER_MODEL_PATH != model_path:
+        _WORKER_MODEL_PATH = model_path
+        _WORKER_MODEL = PPO.load(model_path, device="cpu")
+    model = _WORKER_MODEL
     env = BoatNavEnv(
         mode=cfg["mode"],
         training_randomize=False,
@@ -240,7 +255,11 @@ def rollout_episodes_parallel(
 ) -> List[Dict[str, Any]]:
     payloads = [(asdict(s), cfg) for s in scenarios]
     chunksize = max(1, len(payloads) // (workers * 4))
-    with ProcessPoolExecutor(max_workers=workers) as pool:
+    with ProcessPoolExecutor(
+        max_workers=workers,
+        initializer=_init_eval_worker,
+        initargs=(model_path,),
+    ) as pool:
         return list(pool.map(_eval_scenario_worker, payloads, chunksize=chunksize))
 
 
