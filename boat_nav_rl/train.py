@@ -412,7 +412,7 @@ def run_eval(
         nominal_plant = eval_plant
     else:
         nominal_plant = NOMINAL_PLANT
-        plant_jitter = True
+        plant_jitter = False
     if dynamics_jitter is not None:
         plant_jitter = dynamics_jitter
 
