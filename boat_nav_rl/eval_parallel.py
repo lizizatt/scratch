@@ -152,7 +152,7 @@ def _worker_config_dict(
 def _eval_scenario_worker(payload: Tuple[Dict[str, Any], Dict[str, Any]]) -> Dict[str, Any]:
     """Process-pool entry: rollout one scenario (loads policy per worker process)."""
     scenario_dict, cfg = payload
-    from train import BoatNavEnv
+    from env import BoatNavEnv
 
     scenario = P.ScenarioSeed(**scenario_dict)
     plant = P.plant_from_dict(cfg["nominal_plant"])
@@ -194,7 +194,7 @@ def rollout_episodes_sequential(
     collect_trace: bool,
     collect_breakdown: bool,
 ) -> List[Dict[str, Any]]:
-    from train import BoatNavEnv
+    from env import BoatNavEnv
 
     env = BoatNavEnv(
         mode=mode,

@@ -72,7 +72,7 @@ class ExerciseSession:
         goal_hold_sec: Optional[int] = None,
         current_enabled: Optional[bool] = None,
     ) -> None:
-        from train import BoatNavEnv
+        from env import BoatNavEnv
 
         metrics = _load_run_metrics(run_id)
         cfg = metrics.get("config") or {}
