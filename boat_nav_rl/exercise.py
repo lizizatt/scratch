@@ -82,8 +82,13 @@ class ExerciseSession:
             cfg.get("goal_hold_sec", P.DEFAULT_GOAL_HOLD_SEC)
         )
         cur = True if current_enabled is None else bool(current_enabled)
+        dyn_jitter = False
         if "current_enabled" in cfg and current_enabled is None:
             cur = bool(cfg["current_enabled"])
+        if "dynamics_jitter" in cfg:
+            dyn_jitter = bool(cfg["dynamics_jitter"])
+        elif metrics.get("config", {}).get("dynamics_jitter") is not None:
+            dyn_jitter = bool(metrics["config"]["dynamics_jitter"])
 
         self.run_id = run_id
         self.mode = str(metrics.get("mode", P.DEFAULT_MODE))
@@ -104,7 +109,7 @@ class ExerciseSession:
                 mode=self.mode,
                 training_randomize=False,
                 nominal_plant=plant,
-                dynamics_jitter=True,
+                dynamics_jitter=dyn_jitter,
                 goal_hold_sec=hold,
                 current_enabled=cur,
                 continuous=True,
