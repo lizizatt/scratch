@@ -12,7 +12,7 @@ Pure Python today (Stable-Baselines3 PPO). A C++/ONNX deployment path is scoped 
 cd boat_nav_rl
 pip install -r requirements.txt
 python prepare.py          # generate scenario seeds (739 train / 395 eval)
-python run_tests.py        # 153 tests — should all pass
+python run_tests.py        # 167 tests — should all pass
 python train.py            # train until TRAIN_BUDGET_SEC (default 10 min), then eval
 python serve.py            # viz + API at http://127.0.0.1:8765
 ```
@@ -102,7 +102,10 @@ Set mode in `train.py` `CONFIG` or via CLI `--mode`. Curriculum phases override 
 boat_nav_rl/
 ├── README.md                 ← this file
 ├── prepare.py                ← fixed obs/plant/seeds (do not edit during reward experiments)
-├── train.py                  ← Gym env, PPO training, eval entry point
+├── train.py                  ← Gym training CLI, eval orchestration
+├── env.py                    ← BoatNavEnv (Gymnasium environment)
+├── callbacks.py              ← PPO training callbacks (live eval, curriculum)
+├── train_job_state.py        ← Live metrics + cancel flag paths
 ├── serve.py                  ← HTTP server for viz + training API
 ├── exercise.py               ← interactive sandbox backend
 ├── training_job.py           ← subprocess training launcher for browser UI
@@ -156,7 +159,7 @@ boat_nav_rl/
 │   ├── chart.js, draw.js, api.js, colregs_panel.js, style.css
 │   └── …
 │
-├── tests/                    ← pytest suite (153 tests)
+├── tests/                    ← pytest suite (167 tests)
 ├── runs/                     ← gitignored experiment outputs
 ├── interface/                ← C ABI header for future C++ integration
 ├── render_montage.py         ← optional eval trace image grid
@@ -185,7 +188,7 @@ boat_nav_rl/
 
 Defines what the policy sees and how the plant responds:
 
-- **77-dim observation**: own state (6), wind (3, often zeroed), up to 8 contacts × 7 fields, contact mask, goal bearing/speed, `has_goal`
+- **77-dim observation**: own state (6), water current (3), up to 8 contacts × 7 fields, contact mask, goal bearing/range, `has_goal`
 - **Transfer-function plant**: heading/speed lag, yaw-rate limits; agile ↔ freighter envelope for domain randomization
 - **Scenario seeds**: written to `runs/train_seeds.json` and `runs/eval_seeds.json` via `python prepare.py`
 - **World bounds** shared with Exercise (`WORLD_BOUNDS`)
@@ -386,7 +389,7 @@ python run_tests.py
 python -m pytest tests/ -v
 ```
 
-**153 tests** covering: observation layout, plant dynamics, rewards, mission controller, COLREGS geometry/eval, API JSON responses, vecenv sizing, curriculum gates, parallel/async eval, checkpoint resolution, scenario collision audits.
+**167 tests** covering: observation layout, plant dynamics, rewards, mission controller, COLREGS geometry/eval, API JSON responses, vecenv sizing, curriculum gates, parallel/async eval, checkpoint resolution, scenario collision audits.
 
 See [`TESTING.md`](TESTING.md) for manual smoke steps.
 
