@@ -78,8 +78,16 @@ RANGE_SCALE_M = 2000.0
 SPEED_SCALE_MPS = V_MAX_MPS
 YAW_RATE_SCALE_RPS = MAX_YAW_RATE_RPS
 
-# Flat observation layout: own(6) + wind(3) + contacts(7*8) + mask(8) + goal(3) + has_goal(1)
-OBS_DIM = 6 + 3 + (N_MAX_CONTACTS * 7) + N_MAX_CONTACTS + 3 + 1  # 77
+# Flat observation layout — must match interface/boat_nav_rl_interface.h (BNRL_SCHEMA_VERSION).
+OBS_SCHEMA_VERSION = 3
+OBS_OWN_DIM = 6
+OBS_CURRENT_DIM = 3
+OBS_CONTACT_DIM = 7
+OBS_GOAL_DIM = 3
+OBS_MASK_OFFSET = OBS_OWN_DIM + OBS_CURRENT_DIM + N_MAX_CONTACTS * OBS_CONTACT_DIM
+OBS_GOAL_OFFSET = OBS_MASK_OFFSET + N_MAX_CONTACTS
+OBS_HAS_GOAL_OFFSET = OBS_GOAL_OFFSET + OBS_GOAL_DIM
+OBS_DIM = OBS_HAS_GOAL_OFFSET + 1  # 77
 
 
 def wrap_angle(rad: float) -> float:
