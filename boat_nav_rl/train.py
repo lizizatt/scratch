@@ -458,7 +458,7 @@ def run_robust_eval(model: PPO, mode: str) -> Dict[str, Any]:
             sample_seed=8000 + i,
             eval_plant=plant,
             collect_traces=False,
-        )
+        ).metrics
         scores.append(float(metrics[score_key]))
         plant_records.append(plant.to_dict())
     arr = np.array(scores, dtype=np.float64)
@@ -672,7 +672,7 @@ def main() -> None:
     traces: List[Dict[str, Any]] = []
     try:
         eval_result = run_eval(model, MODE, max_scenarios=eval_limit, collect_traces=True)
-        eval_metrics, traces = eval_result
+        eval_metrics, traces = eval_result.metrics, eval_result.traces
         if ROBUST_EVAL_ENABLED:
             eval_metrics.update(run_robust_eval(model, MODE))
             print(

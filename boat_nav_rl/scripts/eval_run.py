@@ -42,7 +42,8 @@ def main() -> None:
     model = PPO.load(str(ckpt), device=device)
 
     limit = args.max_scenarios if args.max_scenarios > 0 else None
-    eval_metrics, traces = run_eval(model, mode, max_scenarios=limit, collect_traces=True)
+    eval_result = run_eval(model, mode, max_scenarios=limit, collect_traces=True)
+    eval_metrics, traces = eval_result.metrics, eval_result.traces
 
     if args.write:
         (run_dir / "eval_traces.json").write_text(

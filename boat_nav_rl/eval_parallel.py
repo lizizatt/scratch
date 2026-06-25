@@ -6,7 +6,7 @@ import math
 import os
 import uuid
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -25,6 +25,14 @@ CPA_UNSAFE_GOAL_FACTOR = 0.4
 HOLD_PROGRESS_FLOOR = 0.25
 HOLD_PROGRESS_WEIGHT = 0.75
 DEFAULT_GOAL_HOLD_REQUIRED = 30
+
+
+@dataclass
+class EvalResult:
+    """Consistent return type from run_eval / aggregate_eval_metrics."""
+
+    metrics: Dict[str, Any]
+    traces: List[Dict[str, Any]]
 
 
 def _closest_goal_range_m(episode: Dict[str, Any]) -> float:
@@ -298,7 +306,7 @@ def aggregate_eval_metrics(
     nominal_plant: P.PlantParams,
     collect_traces: bool,
     colregs_enabled: Optional[bool] = None,
-) -> Union[Dict[str, Any], Tuple[Dict[str, Any], List[Dict[str, Any]]]]:
+) -> EvalResult:
     if colregs_enabled is None:
         colregs_enabled = colregs_enabled_for_mode(mode)
 
@@ -405,9 +413,7 @@ def aggregate_eval_metrics(
     }
     if colregs_episode_scores and rollup_episodes is not None:
         metrics.update(rollup_episodes(colregs_episode_scores))
-    if collect_traces:
-        return metrics, traces
-    return metrics
+    return EvalResult(metrics=metrics, traces=traces if collect_traces else [])
 
 
 def run_eval_from_snapshot(

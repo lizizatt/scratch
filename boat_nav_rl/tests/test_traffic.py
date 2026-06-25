@@ -150,8 +150,10 @@ class TestRunEvalReturn(unittest.TestCase):
 
         from train import run_robust_eval
 
+        from eval_parallel import EvalResult
+
         fake_metrics = {"avoid_score": 0.42, "nav_score": 0.5}
-        with mock.patch("train.run_eval", return_value=fake_metrics):
+        with mock.patch("train.run_eval", return_value=EvalResult(fake_metrics, [])):
             result = run_robust_eval(mock.Mock(), "avoid")
         self.assertAlmostEqual(result["robust_eval_score"], 0.42, places=4)
         self.assertEqual(result["robust_eval_samples"], 5)

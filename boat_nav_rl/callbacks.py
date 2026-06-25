@@ -11,7 +11,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from async_eval import AsyncEvalRunner
 from checkpoint_util import save_best_checkpoint
 from curriculum import check_exit, get_phase, is_summary_better, metrics_to_summary
-from eval_parallel import checkpoint_zip_path, run_eval_from_snapshot, snapshot_model_for_eval
+from eval_parallel import EvalResult, checkpoint_zip_path, run_eval_from_snapshot, snapshot_model_for_eval
 from runs_util import score_key_for_mode
 from train_job_state import (
     RUNS_DIR,
@@ -33,6 +33,12 @@ def _run_eval(*args: Any, **kwargs: Any) -> Any:
 
 def _eval_seeds_for_mode(mode: str) -> Any:
     return _train().eval_seeds_for_mode(mode)
+
+
+def _eval_metrics(result: Any) -> Dict[str, Any]:
+    if isinstance(result, EvalResult):
+        return result.metrics
+    return result
 
 
 class TimeBudgetCallback(BaseCallback):
@@ -130,7 +136,7 @@ class LiveMetricsCallback(BaseCallback):
             max_scenarios=self.max_scenarios,
             sample_seed=sample_seed,
             collect_traces=False,
-        )
+        ).metrics
         self._publish_metrics(metrics, time.time() - self.start_time)
 
     def _on_step(self) -> bool:
@@ -138,9 +144,9 @@ class LiveMetricsCallback(BaseCallback):
             return False
         if self._async.enabled:
             try:
-                metrics = self._async.poll()
-                if metrics is not None:
-                    self._publish_metrics(metrics, time.time() - self.start_time)
+                result = self._async.poll()
+                if result is not None:
+                    self._publish_metrics(_eval_metrics(result), time.time() - self.start_time)
             except Exception as exc:
                 print(f"[live-eval] failed: {exc}")
             if self._async.is_busy():
@@ -166,7 +172,7 @@ class LiveMetricsCallback(BaseCallback):
         try:
             metrics = self._async.drain(timeout=timeout)
             if metrics is not None:
-                self._publish_metrics(metrics, time.time() - self.start_time)
+                self._publish_metrics(_eval_metrics(metrics), time.time() - self.start_time)
         except Exception as exc:
             print(f"[live-eval] background eval failed: {exc}")
 
@@ -238,7 +244,7 @@ class CurriculumCheckpointCallback(BaseCallback):
             max_scenarios=max_sc,
             sample_seed=sample_seed,
             collect_traces=False,
-        )
+        ).metrics
         self._handle_eval_metrics(metrics)
 
     def _run_eval_summary(self, *, full: bool) -> Dict[str, Any]:
@@ -250,7 +256,7 @@ class CurriculumCheckpointCallback(BaseCallback):
             max_scenarios=max_sc,
             sample_seed=self.num_timesteps + self.tick * 10007,
             collect_traces=False,
-        )
+        ).metrics
         summary = metrics_to_summary(metrics)
         summary["eval_capped"] = use_cap
         return summary
@@ -323,9 +329,9 @@ class CurriculumCheckpointCallback(BaseCallback):
             return False
         if self._async.enabled:
             try:
-                metrics = self._async.poll()
-                if metrics is not None:
-                    self._handle_eval_metrics(metrics)
+                result = self._async.poll()
+                if result is not None:
+                    self._handle_eval_metrics(_eval_metrics(result))
             except Exception as exc:
                 print(f"[curriculum-eval] failed: {exc}", flush=True)
             if self._async.is_busy():
@@ -365,17 +371,17 @@ class CurriculumCheckpointCallback(BaseCallback):
     def drain_background_eval(self, timeout: float = 900.0) -> None:
         if not self._async.enabled or not self._async.is_busy():
             try:
-                metrics = self._async.poll()
-                if metrics is not None:
-                    self._handle_eval_metrics(metrics)
+                result = self._async.poll()
+                if result is not None:
+                    self._handle_eval_metrics(_eval_metrics(result))
             except Exception as exc:
                 print(f"[curriculum-eval] background eval failed: {exc}", flush=True)
             return
         print("[curriculum-eval] waiting for background eval to finish…", flush=True)
         try:
-            metrics = self._async.drain(timeout=timeout)
-            if metrics is not None:
-                self._handle_eval_metrics(metrics)
+            result = self._async.drain(timeout=timeout)
+            if result is not None:
+                self._handle_eval_metrics(_eval_metrics(result))
         except Exception as exc:
             print(f"[curriculum-eval] background eval failed: {exc}", flush=True)
 

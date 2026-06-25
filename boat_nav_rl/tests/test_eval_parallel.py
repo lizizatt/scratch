@@ -143,7 +143,7 @@ class TestAggregateEvalMetrics(unittest.TestCase):
             }
         ]
         with mock.patch("colregs.evaluate.evaluate_episode") as mock_eval:
-            metrics, traces = aggregate_eval_metrics(
+            result = aggregate_eval_metrics(
                 episodes,
                 seeds,
                 "navigate",
@@ -155,6 +155,7 @@ class TestAggregateEvalMetrics(unittest.TestCase):
                 collect_traces=True,
             )
             mock_eval.assert_not_called()
+        metrics, traces = result.metrics, result.traces
         self.assertEqual(metrics["eval_episodes"], 1)
         self.assertEqual(len(traces), 1)
         self.assertNotIn("colregs_mean_safety", metrics)
@@ -243,7 +244,7 @@ class TestAggregateEvalMetrics(unittest.TestCase):
             current_enabled=False,
             nominal_plant=P.plant_from_dict(P.PLANT_NOMINAL),
             collect_traces=False,
-        )
+        ).metrics
         self.assertEqual(metrics["success_rate"], 0.0)
         self.assertGreater(metrics["avoid_score"], 0.0)
         self.assertEqual(metrics["avoid_score"], metrics["mean_mission_score"])
