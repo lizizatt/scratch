@@ -1,0 +1,2 @@
+# Shell scripts used by Cursor hooks must stay LF for Git Bash on Windows.
+.cursor/hooks/*.sh text eol=lf

@@ -1,0 +1,9 @@
+{
+  "name": "superpowers",
+  "source": "https://github.com/obra/Superpowers",
+  "path": "vendor/superpowers",
+  "version": "6.0.3",
+  "commit": "896224c",
+  "install": "git submodule update --init vendor/superpowers",
+  "update": "git submodule update --remote vendor/superpowers"
+}
