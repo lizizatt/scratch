@@ -7,6 +7,13 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+
+def _atomic_write_json(path: Path, payload: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(str(tmp), str(path))
+
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "runs"
 JOB_DIR = RUNS_DIR / "_training"
@@ -50,7 +57,7 @@ def update_job_status(**fields: Any) -> None:
         except (json.JSONDecodeError, OSError):
             pass
     current.update(fields)
-    STATUS_PATH.write_text(json.dumps(current, indent=2), encoding="utf-8")
+    _atomic_write_json(STATUS_PATH, current)
 
 
 def append_live_metric(
@@ -92,7 +99,7 @@ def append_live_metric(
     series.append(point)
     if len(series) > LIVE_METRICS_MAX_POINTS:
         payload["series"] = series[-LIVE_METRICS_MAX_POINTS:]
-    LIVE_METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _atomic_write_json(LIVE_METRICS_PATH, payload)
     update_job_status(
         live_score=round(score, 4),
         live_avg_goal_range_m=round(avg_final_goal_range_m, 2),

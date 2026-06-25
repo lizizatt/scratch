@@ -66,7 +66,7 @@ async function loadRun(runId) {
   const data = await fetchJson(`/api/runs/${runId}`);
   state.runId = runId;
   state.metrics = data.metrics;
-  state.episodes = data.traces.episodes || [];
+  state.episodes = data.traces?.episodes || [];
   history.replaceState(null, "", `?run=${runId}`);
   populateCategories();
   renderSummary();
@@ -98,6 +98,7 @@ function renderSummary() {
   statCollision.textContent = `${collisions} (${total ? ((100 * collisions) / total).toFixed(0) : 0}%)`;
   statScore.textContent = score != null ? score.toFixed(3) : "—";
   statNotes.textContent = m.notes || "—";
+  statNotes.title = m.notes || "";
 }
 
 function filteredEpisodes() {
@@ -128,15 +129,18 @@ function renderGrid() {
   for (const { ep, idx } of items) {
     const card = document.createElement("article");
     card.className = "scenario-card";
+    const name = BoatNavApi.escapeHtml(ep.scenario_name || `episode ${idx + 1}`);
+    const category = BoatNavApi.escapeHtml(ep.scenario_category || "—");
+    const desc = BoatNavApi.escapeHtml(ep.scenario_description || "");
     card.innerHTML = `
       <canvas width="320" height="220"></canvas>
       <div class="card-body">
-        <div class="card-title">${ep.scenario_name || `episode ${idx + 1}`}</div>
+        <div class="card-title">${name}</div>
         <div class="card-meta">
-          <span class="tag">${ep.scenario_category || "—"}</span>
+          <span class="tag">${category}</span>
           ${outcomeBadge(ep)}
         </div>
-        <p class="card-desc">${ep.scenario_description || ""}</p>
+        <p class="card-desc">${desc}</p>
         <div class="card-stats">
           goal ${Math.round(ep.final_goal_range_m || 0)} m
         </div>

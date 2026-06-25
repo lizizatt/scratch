@@ -2,10 +2,43 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import prepare as P
+
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+class InvalidRunIdError(ValueError):
+    """Run id failed format or path-safety checks."""
+
+
+def validate_run_id(run_id: str) -> str:
+    """Reject traversal and unsafe run directory names."""
+    if not run_id or not isinstance(run_id, str):
+        raise InvalidRunIdError("run id required")
+    run_id = run_id.strip()
+    if not run_id or run_id in (".", ".."):
+        raise InvalidRunIdError("invalid run id")
+    if "/" in run_id or "\\" in run_id or ".." in run_id:
+        raise InvalidRunIdError("invalid run id")
+    if not _RUN_ID_RE.match(run_id):
+        raise InvalidRunIdError("invalid run id")
+    return run_id
+
+
+def safe_run_dir(run_id: str, runs_dir: Optional[Path] = None) -> Path:
+    """Resolve run_id to a directory guaranteed under runs_dir."""
+    root = (runs_dir or Path(__file__).resolve().parent / "runs").resolve()
+    safe_id = validate_run_id(run_id)
+    run_dir = (root / safe_id).resolve()
+    try:
+        run_dir.relative_to(root)
+    except ValueError as exc:
+        raise InvalidRunIdError("invalid run id") from exc
+    return run_dir
 
 
 def score_key_for_mode(mode: str) -> str:

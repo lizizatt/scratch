@@ -30,6 +30,8 @@ let state = {
   frameColregsLoading: false,
 };
 
+let colregsLoadSeq = 0;
+
 function queryRunFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get("run");
@@ -52,7 +54,7 @@ async function loadRuns(selectRunId) {
     const opt = document.createElement("option");
     opt.value = run.id;
     const score = run.score != null ? run.score.toFixed(3) : "?";
-    opt.textContent = `${run.id} · ${run.mode} · ${score} · ${run.notes || ""}`;
+    opt.textContent = `${run.id} · ${run.mode} · ${score} · ${(run.notes || "").slice(0, 40)}`;
     runSelect.appendChild(opt);
   }
   const target = selectRunId || queryRunFromUrl() || data.latest;
@@ -69,7 +71,7 @@ async function loadRun(runId) {
   const data = await fetchJson(`/api/runs/${runId}`);
   state.runId = runId;
   state.metrics = data.metrics;
-  state.episodes = data.traces.episodes || [];
+  state.episodes = data.traces?.episodes || [];
   state.episodeIndex = 0;
   state.frameIndex = 0;
   state.playing = false;
@@ -81,7 +83,7 @@ async function loadRun(runId) {
   state.episodeIndex = epIndex;
   state.frameIndex = 0;
 
-  const url = epIndex > 0 ? `?run=${runId}&episode=${epIndex}` : `?run=${runId}`;
+  const url = `?run=${runId}&episode=${epIndex}`;
   history.replaceState(null, "", url);
   renderMetrics();
   populateEpisodes(epIndex);
@@ -119,7 +121,7 @@ function renderMetrics() {
     ["COLREGS mean R", m.colregs_mean_protocol != null ? `${Number(m.colregs_mean_protocol).toFixed(1)}%` : "—"],
     ["Eval episodes", m.eval_episodes],
     ["Train time", m.train_elapsed_sec != null ? `${m.train_elapsed_sec}s` : "—"],
-    ["Notes", m.notes || "—"],
+    ["Notes", BoatNavApi.escapeHtml(m.notes || "—")],
   ];
   metricsList.innerHTML = rows
     .map(
@@ -164,6 +166,7 @@ function renderColregsForEpisode() {
 async function loadEpisodeFrameColregs() {
   const ep = currentEpisode();
   const steps = ep.steps || [];
+  const seq = ++colregsLoadSeq;
   state.frameColregs = [];
   if (!steps.length || !(steps[0].contacts || []).length) {
     renderColregsForEpisode();
@@ -180,10 +183,13 @@ async function loadEpisodeFrameColregs() {
         scenario_category: ep.scenario_category || "",
       }),
     });
+    if (seq !== colregsLoadSeq) return;
     state.frameColregs = data.frames || [];
   } catch (err) {
+    if (seq !== colregsLoadSeq) return;
     console.warn("COLREGS frame series failed", err);
   } finally {
+    if (seq !== colregsLoadSeq) return;
     state.frameColregsLoading = false;
     renderColregsForEpisode();
   }
@@ -350,7 +356,7 @@ function renderFrame() {
   rangeLabel.textContent = `goal ${Math.round(step.goal_range_m)} m · nearest ${minR}`;
 
   overlayInfo.innerHTML = `
-    <strong>${ep.scenario_name || "episode"}</strong><br/>
+    <strong>${BoatNavApi.escapeHtml(ep.scenario_name || "episode")}</strong><br/>
     SOG ${step.own.speed.toFixed(1)} m/s · ψ ${radToDeg(step.own.heading).toFixed(0)}°<br/>
     cmd ψ ${radToDeg(step.own.cmd_heading).toFixed(0)}° · cmd V ${step.own.cmd_speed.toFixed(1)} m/s<br/>
     ${ep.collision ? '<span class="score-bad">COLLISION</span>' : ep.success ? '<span class="score-good">SUCCESS</span>' : "in progress"}
@@ -392,18 +398,19 @@ playBtn.addEventListener("click", () => {
 });
 
 scrubber.addEventListener("input", () => {
+  state.playing = false;
+  playBtn.textContent = "Play";
   state.frameIndex = parseInt(scrubber.value, 10);
   renderFrame();
 });
 
 episodeSelect.addEventListener("change", () => {
+  state.playing = false;
+  playBtn.textContent = "Play";
   state.episodeIndex = parseInt(episodeSelect.value, 10);
   state.frameIndex = 0;
   state.frameColregs = [];
-  const url =
-    state.episodeIndex > 0
-      ? `?run=${state.runId}&episode=${state.episodeIndex}`
-      : `?run=${state.runId}`;
+  const url = `?run=${state.runId}&episode=${state.episodeIndex}`;
   history.replaceState(null, "", url);
   renderFrame();
   loadEpisodeFrameColregs();

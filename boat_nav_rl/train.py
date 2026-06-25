@@ -26,42 +26,15 @@ from vecenv_util import (
 import prepare as P
 from checkpoint_util import copy_best_to_final, load_best_metrics, resolve_resume_checkpoint
 from device_util import configure_training_backend, resolve_device, torch_device_info
-from callbacks import CurriculumCheckpointCallback, LiveMetricsCallback, TimeBudgetCallback
+from callbacks import CurriculumCheckpointCallback, LiveMetricsCallback, PeriodicSnapshotCallback, TimeBudgetCallback
 from env import BoatNavEnv, DEFAULT_TRAIN_MAX_CONTACTS
 from env_factory import make_env
 from eval_runner import run_eval, run_robust_eval
 from run_outputs import create_run_dir, load_parent_metrics, write_run_outputs
 from runs_util import score_key_for_mode
 from scenario_seeds import eval_seeds_for_mode, filter_seeds_for_mode, train_seeds_for_mode
-from train_config import (
-    BATCH_SIZE,
-    CONTACT_OBS_NOISE_BEARING_RAD,
-    CONTACT_OBS_NOISE_M,
-    CURRENT_ENABLED,
-    CURRICULUM_EARLY_STOPPED,
-    CURRICULUM_PHASE,
-    DEVICE,
-    DYNAMICS_JITTER,
-    EVAL_EPISODES,
-    GAMMA,
-    GOAL_HOLD_SEC,
-    LEARNING_RATE,
-    LIVE_EVAL_INTERVAL_SEC,
-    LIVE_EVAL_SCENARIOS,
-    MAX_EPISODE_STEPS,
-    MODE,
-    MONTAGE_ENABLED,
-    NET_ARCH,
-    NOMINAL_PLANT,
-    N_ENVS,
-    NOTES,
-    ROBUST_EVAL_ENABLED,
-    TRAIN_BUDGET_SEC,
-    TRAIN_MAX_CONTACTS,
-    VIZ_PORT,
-    apply_args,
-    parse_args,
-)
+import train_config as C
+from train_config import apply_args, parse_args
 from train_job_state import LIVE_METRICS_PATH, RUNS_DIR, clear_cancel_flag, is_cancel_requested, update_job_status
 
 # Re-exported for tests and scripts that import from train
@@ -84,6 +57,36 @@ from rewards import (  # noqa: E402, F401
     contact_threat_and_cpa_penalty,
 )
 
+# Re-exported for tests and scripts that import from train
+from train_config import (  # noqa: E402, F401
+    BATCH_SIZE,
+    CONTACT_OBS_NOISE_BEARING_RAD,
+    CONTACT_OBS_NOISE_M,
+    CURRENT_ENABLED,
+    CURRICULUM_EARLY_STOPPED,
+    CURRICULUM_PHASE,
+    DEVICE,
+    DYNAMICS_JITTER,
+    EVAL_EPISODES,
+    GAMMA,
+    GOAL_HOLD_SEC,
+    LEARNING_RATE,
+    LIVE_EVAL_INTERVAL_SEC,
+    LIVE_EVAL_SCENARIOS,
+    MAX_EPISODE_STEPS,
+    MODE,
+    MONTAGE_ENABLED,
+    NET_ARCH,
+    NOMINAL_PLANT,
+    N_ENVS,
+    NOTES,
+    ROBUST_EVAL_ENABLED,
+    SNAPSHOT_INTERVAL_SEC,
+    TRAIN_BUDGET_SEC,
+    TRAIN_MAX_CONTACTS,
+    VIZ_PORT,
+)
+
 
 def main() -> None:
     args = parse_args()
@@ -98,21 +101,23 @@ def main() -> None:
     run_dir = create_run_dir()
     train_start = time.time()
 
-    device = resolve_device(DEVICE)
+    device = resolve_device(C.DEVICE)
     configure_training_backend(device)
-    rollout_total = rollout_steps_total(N_ENVS)
-    n_steps = steps_per_env(N_ENVS)
-    batch_size = ppo_batch_size(device, rollout_total, base=BATCH_SIZE)
+    rollout_total = rollout_steps_total(C.N_ENVS)
+    n_steps = steps_per_env(C.N_ENVS)
+    batch_size = ppo_batch_size(device, rollout_total, base=C.BATCH_SIZE)
     vec_backend = training_perf_defaults()["vecenv_backend"]
     gpu_info = torch_device_info()
 
-    print(f"[train] mode={MODE} budget={TRAIN_BUDGET_SEC}s n_envs={N_ENVS} run={run_dir.name}")
+    print(f"[train] mode={C.MODE} budget={C.TRAIN_BUDGET_SEC}s n_envs={C.N_ENVS} run={run_dir.name}")
     print(
         f"[train] vec={vec_backend} rollout={rollout_total} ({n_steps} steps/env) "
-        f"dynamics_jitter={DYNAMICS_JITTER} robust_eval={ROBUST_EVAL_ENABLED} "
-        f"hold={GOAL_HOLD_SEC}s max_steps={MAX_EPISODE_STEPS} current={CURRENT_ENABLED} "
-        f"live_eval={LIVE_EVAL_SCENARIOS}@{LIVE_EVAL_INTERVAL_SEC}s"
+        f"dynamics_jitter={C.DYNAMICS_JITTER} robust_eval={C.ROBUST_EVAL_ENABLED} "
+        f"hold={C.GOAL_HOLD_SEC}s max_steps={C.MAX_EPISODE_STEPS} current={C.CURRENT_ENABLED} "
+        f"live_eval={C.LIVE_EVAL_SCENARIOS}@{C.LIVE_EVAL_INTERVAL_SEC}s"
     )
+    if C.SNAPSHOT_INTERVAL_SEC > 0:
+        print(f"[train] snapshot_interval={C.SNAPSHOT_INTERVAL_SEC}s ({C.SNAPSHOT_INTERVAL_SEC / 60:.0f} min)")
     print(f"[train] device={device} batch_size={batch_size}", end="")
     if device == "cuda" and gpu_info.get("cuda_device"):
         print(f" ({gpu_info['cuda_device']})", end="")
@@ -122,33 +127,33 @@ def main() -> None:
 
     update_job_status(
         run_id=run_dir.name,
-        mode=MODE,
+        mode=C.MODE,
         resume_run_id=resume_run_id,
-        dynamics_jitter=DYNAMICS_JITTER,
-        robust_eval_enabled=ROBUST_EVAL_ENABLED,
-        nominal_plant=NOMINAL_PLANT.to_dict(),
-        goal_hold_sec=GOAL_HOLD_SEC,
-        current_enabled=CURRENT_ENABLED,
-        montage_enabled=MONTAGE_ENABLED,
+        dynamics_jitter=C.DYNAMICS_JITTER,
+        robust_eval_enabled=C.ROBUST_EVAL_ENABLED,
+        nominal_plant=C.NOMINAL_PLANT.to_dict(),
+        goal_hold_sec=C.GOAL_HOLD_SEC,
+        current_enabled=C.CURRENT_ENABLED,
+        montage_enabled=C.MONTAGE_ENABLED,
     )
 
-    train_seeds = train_seeds_for_mode(MODE)
+    train_seeds = train_seeds_for_mode(C.MODE)
     factories = [
         make_env(
-            MODE,
+            C.MODE,
             i,
             train_seeds=train_seeds,
-            nominal_plant=NOMINAL_PLANT,
-            dynamics_jitter=DYNAMICS_JITTER,
-            goal_hold_sec=GOAL_HOLD_SEC,
-            max_episode_steps=MAX_EPISODE_STEPS,
-            current_enabled=CURRENT_ENABLED,
-            contact_obs_noise_m=CONTACT_OBS_NOISE_M,
-            contact_obs_noise_bearing_rad=CONTACT_OBS_NOISE_BEARING_RAD,
+            nominal_plant=C.NOMINAL_PLANT,
+            dynamics_jitter=C.DYNAMICS_JITTER,
+            goal_hold_sec=C.GOAL_HOLD_SEC,
+            max_episode_steps=C.MAX_EPISODE_STEPS,
+            current_enabled=C.CURRENT_ENABLED,
+            contact_obs_noise_m=C.CONTACT_OBS_NOISE_M,
+            contact_obs_noise_bearing_rad=C.CONTACT_OBS_NOISE_BEARING_RAD,
         )
-        for i in range(N_ENVS)
+        for i in range(C.N_ENVS)
     ]
-    env = make_vec_env(factories, N_ENVS)
+    env = make_vec_env(factories, C.N_ENVS)
 
     model_holder: Dict[str, Any] = {}
     if resume_run_id:
@@ -160,31 +165,35 @@ def main() -> None:
         model = PPO(
             "MlpPolicy",
             env,
-            learning_rate=LEARNING_RATE,
+            learning_rate=C.LEARNING_RATE,
             n_steps=n_steps,
             batch_size=batch_size,
-            gamma=GAMMA,
+            gamma=C.GAMMA,
             max_grad_norm=0.5,
             device=device,
-            policy_kwargs={"net_arch": dict(pi=NET_ARCH, vf=NET_ARCH)},
+            policy_kwargs={"net_arch": dict(pi=C.NET_ARCH, vf=C.NET_ARCH)},
             verbose=1,
         )
     model_holder["model"] = model
 
-    budget_cb = TimeBudgetCallback(TRAIN_BUDGET_SEC)
+    budget_cb = TimeBudgetCallback(C.TRAIN_BUDGET_SEC)
     async_eval_cb: Optional[BaseCallback] = None
-    if CURRICULUM_PHASE is not None:
+    if C.CURRICULUM_PHASE is not None:
         async_eval_cb = CurriculumCheckpointCallback(
             model_holder,
             run_dir,
-            MODE,
-            CURRICULUM_PHASE,
+            C.MODE,
+            C.CURRICULUM_PHASE,
             run_dir.name,
         )
-        callback = CallbackList([budget_cb, async_eval_cb])
     else:
-        async_eval_cb = LiveMetricsCallback(model_holder, MODE, run_dir.name, run_dir=run_dir)
-        callback = CallbackList([budget_cb, async_eval_cb])
+        async_eval_cb = LiveMetricsCallback(model_holder, C.MODE, run_dir.name, run_dir=run_dir)
+    callbacks: List[BaseCallback] = [budget_cb, async_eval_cb]
+    if C.SNAPSHOT_INTERVAL_SEC > 0:
+        callbacks.append(
+            PeriodicSnapshotCallback(model_holder, run_dir, float(C.SNAPSHOT_INTERVAL_SEC))
+        )
+    callback = CallbackList(callbacks)
     model.learn(total_timesteps=int(1e9), callback=callback, progress_bar=True)
     env.close()
 
@@ -192,7 +201,7 @@ def main() -> None:
         async_eval_cb.drain_background_eval()
 
     elapsed = time.time() - train_start
-    early_stopped = CURRICULUM_EARLY_STOPPED
+    early_stopped = C.CURRICULUM_EARLY_STOPPED
     cancelled = is_cancel_requested() or budget_cb.cancelled
     if early_stopped:
         print("[train] early stopped — curriculum exit gate passed")
@@ -209,14 +218,14 @@ def main() -> None:
             print(f"[train] final eval using best checkpoint (success_rate={sr})")
         copy_best_to_final(run_dir)
 
-    eval_limit = EVAL_EPISODES if EVAL_EPISODES > 0 else None
+    eval_limit = C.EVAL_EPISODES if C.EVAL_EPISODES > 0 else None
     eval_metrics: Dict[str, Any] = {}
     traces: List[Dict[str, Any]] = []
     try:
-        eval_result = run_eval(model, MODE, max_scenarios=eval_limit, collect_traces=True)
+        eval_result = run_eval(model, C.MODE, max_scenarios=eval_limit, collect_traces=True)
         eval_metrics, traces = eval_result.metrics, eval_result.traces
-        if ROBUST_EVAL_ENABLED:
-            eval_metrics.update(run_robust_eval(model, MODE))
+        if C.ROBUST_EVAL_ENABLED:
+            eval_metrics.update(run_robust_eval(model, C.MODE))
             print(
                 f"[train] robust_eval score={eval_metrics.get('robust_eval_score')} "
                 f"worst={eval_metrics.get('robust_eval_worst')}"
@@ -224,14 +233,12 @@ def main() -> None:
     except Exception as exc:
         print(f"[train] final eval failed ({exc}); saving checkpoint without full eval")
 
-    import train_config as C
-
     write_run_outputs(
         run_dir,
         eval_metrics,
         traces,
         {
-            "train_budget_sec": TRAIN_BUDGET_SEC,
+            "train_budget_sec": C.TRAIN_BUDGET_SEC,
             "train_elapsed_sec": round(elapsed, 1),
             "cancelled": cancelled,
             "curriculum_early_stopped": early_stopped,
@@ -241,20 +248,21 @@ def main() -> None:
             "rollout_steps_total": rollout_total,
             "steps_per_env": n_steps,
             "vecenv_backend": vec_backend,
-            "dynamics_jitter": DYNAMICS_JITTER,
-            "robust_eval_enabled": ROBUST_EVAL_ENABLED,
-            "nominal_plant": NOMINAL_PLANT.to_dict(),
-            "goal_hold_sec": GOAL_HOLD_SEC,
-            "max_steps": MAX_EPISODE_STEPS,
-            "current_enabled": CURRENT_ENABLED,
+            "dynamics_jitter": C.DYNAMICS_JITTER,
+            "robust_eval_enabled": C.ROBUST_EVAL_ENABLED,
+            "nominal_plant": C.NOMINAL_PLANT.to_dict(),
+            "goal_hold_sec": C.GOAL_HOLD_SEC,
+            "max_steps": C.MAX_EPISODE_STEPS,
+            "current_enabled": C.CURRENT_ENABLED,
             "montage_enabled": C.MONTAGE_ENABLED,
+            "snapshot_interval_sec": C.SNAPSHOT_INTERVAL_SEC,
         },
         model,
         resume_run_id=resume_run_id,
         parent_metrics=parent_metrics,
     )
 
-    score_key = score_key_for_mode(MODE)
+    score_key = score_key_for_mode(C.MODE)
     score = eval_metrics.get(score_key)
     avg_rng = eval_metrics.get("avg_final_goal_range_m")
     clear_cancel_flag()
@@ -275,7 +283,7 @@ def main() -> None:
             f"[experiment] checkpoint saved (eval skipped)  "
             f"elapsed={elapsed:.0f}s  run=runs/{run_dir.name}"
         )
-    print(f"[viz] Train:     http://localhost:{VIZ_PORT}/train.html")
+    print(f"[viz] Train:     http://localhost:{C.VIZ_PORT}/train.html")
     print(f"[viz] Overview:  http://localhost:{VIZ_PORT}/scenarios.html?run={run_dir.name}")
     print(f"[viz] Replay:    http://localhost:{VIZ_PORT}/?run={run_dir.name}")
 

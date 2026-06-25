@@ -125,6 +125,76 @@ PHASES: Tuple[PhaseSpec, ...] = (
 )
 
 
+def _merged_preset_reward_weights(reward_config_file: str) -> Dict[str, Any]:
+    """Baseline reward weights with experiment JSON overrides applied."""
+    from rewards import RewardConfig
+
+    weights = RewardConfig().to_weights_dict()
+    cfg_path = EXPERIMENTS_DIR / reward_config_file
+    if cfg_path.exists():
+        loaded = json.loads(cfg_path.read_text(encoding="utf-8"))
+        weights.update(loaded.get("reward_weights", {}))
+    return weights
+
+
+def _phase_preset_dict(phase: PhaseSpec, *, preset_id: str, label: str, description: str) -> Dict[str, Any]:
+    return {
+        "id": preset_id,
+        "label": label,
+        "description": description,
+        "mode": phase.mode,
+        "budget_sec": phase.budget_sec,
+        "goal_hold_sec": P.DEFAULT_GOAL_HOLD_SEC,
+        "gated_hold": phase.gated_hold,
+        "current_enabled": False,
+        "dynamics_jitter": False,
+        "robust_eval_enabled": False,
+        "montage_enabled": False,
+        "reward_weights": _merged_preset_reward_weights(phase.reward_config),
+        "scenario_category_prefixes": list(phase.scenario_prefixes) or None,
+        "curriculum_phase": phase.phase_id,
+        "notes": phase.notes_suffix,
+    }
+
+
+def list_ui_training_presets() -> List[Dict[str, Any]]:
+    """Presets for the train UI — quick start plus curriculum phases 0–1."""
+    p0 = get_phase(0)
+    p1 = get_phase(1)
+    return [
+        {
+            "id": "quick_start",
+            "label": "Quick start (recommended)",
+            "description": "Navigate in clear water — 30 min, 15 s hold, phase-0 reward shaping.",
+            "mode": "navigate",
+            "budget_sec": 1800,
+            "goal_hold_sec": P.DEFAULT_GOAL_HOLD_SEC_UI,
+            "gated_hold": True,
+            "current_enabled": False,
+            "dynamics_jitter": False,
+            "robust_eval_enabled": False,
+            "montage_enabled": False,
+            "reward_weights": _merged_preset_reward_weights(p0.reward_config),
+            "scenario_category_prefixes": None,
+            "curriculum_phase": None,
+            "snapshot_interval_min": 30,
+            "notes": "quick start navigate",
+        },
+        _phase_preset_dict(
+            p0,
+            preset_id="phase0",
+            label="Curriculum phase 0 — Navigate",
+            description="Full phase 0: 40 min, 30 s gated hold, all navigate scenarios.",
+        ),
+        _phase_preset_dict(
+            p1,
+            preset_id="phase1",
+            label="Curriculum phase 1 — Avoid reach",
+            description="Reach the goal zone in traffic — 20 min, gated hold off, subset of avoid scenarios.",
+        ),
+    ]
+
+
 def get_phase(phase_id: int) -> PhaseSpec:
     for p in PHASES:
         if p.phase_id == phase_id:

@@ -3,6 +3,7 @@
 const trainForm = document.getElementById("trainForm");
 const modeSelect = document.getElementById("modeSelect");
 const budgetMin = document.getElementById("budgetMin");
+const snapshotIntervalMin = document.getElementById("snapshotIntervalMin");
 const nEnvs = document.getElementById("nEnvs");
 const deviceSelect = document.getElementById("deviceSelect");
 const dynamicsJitter = document.getElementById("dynamicsJitter");
@@ -41,6 +42,8 @@ const montageStepLabel = document.getElementById("montageStepLabel");
 const montageMeta = document.getElementById("montageMeta");
 const montageOverviewLink = document.getElementById("montageOverviewLink");
 const montagePngLink = document.getElementById("montagePngLink");
+const presetButtons = document.getElementById("presetButtons");
+const presetDescription = document.getElementById("presetDescription");
 
 let history = [];
 let lastCompletedRun = null;
@@ -54,6 +57,11 @@ let plantConfig = null;
 let defaultRewardWeights = null;
 let montageEpisodes = [];
 let montageRunId = null;
+let montageLoadSeq = 0;
+let trainingPresets = [];
+let activePresetId = "quick_start";
+let activeScenarioPrefixes = null;
+let activeCurriculumPhase = null;
 
 const METRIC_CHARTS = [
   {
@@ -117,50 +125,76 @@ const REWARD_COLORS = [
   "#d19a66",
 ];
 
-/** Config keys grouped for the train form (defaults mirror rewards.py). */
-const REWARD_WEIGHT_GROUPS = [
-  {
-    title: "Encounter",
-    fields: [
-      { key: "cpa", label: "CPA hard", step: 1, min: 0, default: 40 },
-      { key: "cpa_soft", label: "CPA soft", step: 1, min: 0, default: 12 },
-      { key: "cpa_warning_mult", label: "CPA warn ×", step: 0.1, min: 1, default: 2 },
-      { key: "goal_threat_stay", label: "Threat in zone", step: 0.5, min: 0, default: 6 },
-      { key: "collision", label: "Collision", step: 5, min: 0, default: 100 },
-    ],
-  },
-  {
-    title: "Navigation",
-    fields: [
-      { key: "goal_progress", label: "Goal progress", step: 0.5, min: 0, default: 3 },
-      { key: "cross_track", label: "Cross-track", step: 0.05, min: 0, default: 0 },
-      { key: "cross_track_scale_m", label: "Cross-track scale (m)", step: 1, min: 0, default: 100 },
-      { key: "approach_slow", label: "Approach decel", step: 0.05, min: 0, default: 0.35 },
-      { key: "approach_slow_range_m", label: "Approach range (m)", step: 1, min: 0, default: 200 },
-    ],
-  },
-  {
-    title: "Goal hold",
-    fields: [
-      { key: "goal_arrival", label: "Goal arrival", step: 5, min: 0, default: 50 },
-      { key: "goal_arrival_early", label: "Early arrival", step: 1, min: 0, default: 8 },
-      { key: "hold_base", label: "Hold base", step: 0.5, min: 0, default: 2 },
-      { key: "hold_speed", label: "Hold speed", step: 0.5, min: 0, default: 3 },
-      { key: "hold_center", label: "Hold center", step: 0.1, min: 0, default: 0.6 },
-      { key: "hold_overspeed", label: "Hold overspeed", step: 0.5, min: 0, default: 3 },
-      { key: "hold_stationary_speed_mps", label: "Stationary (m/s)", step: 0.01, min: 0, default: 0.15 },
-    ],
-  },
-];
+/** Config keys grouped for the train form (defaults in train_form.js). */
+const REWARD_WEIGHT_GROUPS = BoatNavTrainForm.REWARD_WEIGHT_GROUPS;
+
+let lastChartRender = 0;
+
+function clearPresetCurriculumFields() {
+  const cleared = BoatNavTrainForm.clearCurriculumState();
+  activePresetId = cleared.activePresetId;
+  activeScenarioPrefixes = cleared.activeScenarioPrefixes;
+  activeCurriculumPhase = cleared.activeCurriculumPhase;
+  renderPresetButtons();
+}
+
+function markFormEdited() {
+  clearPresetCurriculumFields();
+}
+
+function liveMetricsFingerprint(series) {
+  return BoatNavUtil.liveMetricsFingerprint(series);
+}
 
 function rewardWeightDefaults() {
-  const weights = {};
-  REWARD_WEIGHT_GROUPS.forEach((group) => {
-    group.fields.forEach((field) => {
-      weights[field.key] = field.default;
-    });
+  return BoatNavTrainForm.rewardWeightDefaults();
+}
+
+function applyTrainingPreset(preset) {
+  if (!preset) return;
+  const curriculum = BoatNavTrainForm.curriculumFromPreset(preset);
+  activePresetId = curriculum.activePresetId;
+  activeScenarioPrefixes = curriculum.activeScenarioPrefixes;
+  activeCurriculumPhase = curriculum.activeCurriculumPhase;
+  modeSelect.value = preset.mode;
+  budgetMin.value = Math.round(preset.budget_sec / 60);
+  goalHoldSec.value = preset.goal_hold_sec;
+  gatedHold.checked = Boolean(preset.gated_hold);
+  currentEnabled.checked = Boolean(preset.current_enabled);
+  dynamicsJitter.checked = Boolean(preset.dynamics_jitter);
+  robustEval.checked = Boolean(preset.robust_eval_enabled);
+  montageEnabled.checked = Boolean(preset.montage_enabled);
+  if (preset.snapshot_interval_min != null) {
+    snapshotIntervalMin.value = String(preset.snapshot_interval_min);
+  }
+  applyRewardWeights(preset.reward_weights, preset.gated_hold);
+  if (preset.notes) notesInput.value = preset.notes;
+  if (presetDescription) {
+    presetDescription.textContent = preset.description || preset.label;
+  }
+  renderPresetButtons();
+  syncPlantUi();
+}
+
+function renderPresetButtons() {
+  if (!presetButtons) return;
+  presetButtons.innerHTML = "";
+  trainingPresets.forEach((preset) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `ghost-btn${preset.id === activePresetId ? " active" : ""}`;
+    btn.textContent = preset.label;
+    btn.addEventListener("click", () => applyTrainingPreset(preset));
+    presetButtons.appendChild(btn);
   });
-  return weights;
+}
+
+async function loadTrainingPresets() {
+  const data = await fetchJson("/api/curriculum/presets");
+  trainingPresets = data.presets || [];
+  renderPresetButtons();
+  const quick = trainingPresets.find((p) => p.id === "quick_start") || trainingPresets[0];
+  if (quick) applyTrainingPreset(quick);
 }
 
 function readPlantFromForm() {
@@ -244,13 +278,6 @@ async function loadPlantConfig() {
   plantConfig = await fetchJson("/api/plant/config");
   applyPlantPreset(plantConfig.nominal);
   defaultRewardWeights = plantConfig.reward_weights || rewardWeightDefaults();
-  applyRewardWeights(defaultRewardWeights, plantConfig.gated_hold_default ?? true);
-  if (plantConfig.goal_hold_sec_default != null) {
-    goalHoldSec.value = plantConfig.goal_hold_sec_default;
-  }
-  if (plantConfig.default_mode) {
-    modeSelect.value = plantConfig.default_mode;
-  }
   const tr = plantConfig.training;
   if (tr) {
     if (tr.recommended_n_envs != null) {
@@ -269,22 +296,29 @@ async function loadPlantConfig() {
 }
 
 function getTrainingPayload(resumeRunId) {
-  return {
-    mode: modeSelect.value,
-    budget_sec: Math.round(parseFloat(budgetMin.value) * 60),
-    n_envs: parseInt(nEnvs.value, 10),
-    device: deviceSelect.value,
-    dynamics_jitter: dynamicsJitter.checked,
-    robust_eval_enabled: robustEval.checked,
-    goal_hold_sec: parseInt(goalHoldSec.value, 10) || 0,
-    current_enabled: currentEnabled.checked,
-    montage_enabled: montageEnabled.checked,
-    plant: readPlantFromForm(),
-    reward_weights: readRewardWeightsFromForm(),
-    gated_hold: gatedHold.checked,
-    resume_run_id: resumeRunId || null,
-    notes: notesInput.value.trim(),
-  };
+  return BoatNavTrainForm.buildTrainingPayload(
+    {
+      mode: modeSelect.value,
+      budgetMin: budgetMin.value,
+      snapshotIntervalMin: snapshotIntervalMin.value,
+      nEnvs: nEnvs.value,
+      device: deviceSelect.value,
+      dynamicsJitter: dynamicsJitter.checked,
+      robustEval: robustEval.checked,
+      goalHoldSec: goalHoldSec.value,
+      currentEnabled: currentEnabled.checked,
+      montageEnabled: montageEnabled.checked,
+      plant: readPlantFromForm(),
+      rewardWeights: readRewardWeightsFromForm(),
+      gatedHold: gatedHold.checked,
+      notes: notesInput.value,
+    },
+    {
+      activeScenarioPrefixes: activeScenarioPrefixes,
+      activeCurriculumPhase: activeCurriculumPhase,
+    },
+    resumeRunId
+  );
 }
 
 async function fetchJson(url, opts) {
@@ -292,8 +326,7 @@ async function fetchJson(url, opts) {
 }
 
 function shortRunId(id) {
-  if (!id) return "—";
-  return id.length > 15 ? id.slice(9) : id;
+  return BoatNavUtil.shortRunId(id);
 }
 
 async function loadHistory() {
@@ -335,8 +368,10 @@ async function loadMontageForRun(runId) {
     renderMontageCanvas();
     return;
   }
+  const seq = ++montageLoadSeq;
   try {
     const data = await fetchJson(`/api/runs/${runId}`);
+    if (seq !== montageLoadSeq) return;
     montageEpisodes = data.traces?.episodes || [];
     montageRunId = runId;
     montageOverviewLink.href = `/scenarios.html?run=${runId}`;
@@ -359,9 +394,11 @@ async function loadMontageForRun(runId) {
 
     const score = data.metrics?.nav_score ?? data.metrics?.avoid_score;
     montageMeta.textContent = `Run ${shortRunId(runId)} · ${montageEpisodes.length} eval episodes · score ${score != null ? score.toFixed(3) : "?"}`;
+    montageScrubber.disabled = false;
     renderMontageCanvas();
   } catch (err) {
     montageMeta.textContent = `Montage unavailable: ${err.message}`;
+    montageScrubber.disabled = true;
   }
 }
 
@@ -380,9 +417,7 @@ function liveMetricPoints(key, scale = 1) {
 }
 
 function breakdownDisplayY(key, raw, spec) {
-  if (raw == null) return null;
-  if (spec?.penalty) return -raw;
-  return raw;
+  return BoatNavUtil.breakdownDisplayY(raw, spec);
 }
 
 function historyBreakdownPoints(key, spec) {
@@ -480,11 +515,7 @@ function populateResumeSelect() {
     }
     resumeSelect.appendChild(opt);
   });
-  if (prev && [...resumeSelect.options].some((o) => o.value === prev)) {
-    resumeSelect.value = prev;
-  } else if (history.length) {
-    resumeSelect.value = history[history.length - 1].run_id;
-  }
+  resumeSelect.value = BoatNavTrainForm.resolveResumeSelection(history, prev);
   syncRewardWeightsFromResume();
 }
 
@@ -579,6 +610,7 @@ function renderHistoryTable() {
   historyTable.innerHTML = "";
   history.forEach((r, i) => {
     const tr = document.createElement("tr");
+    const notes = BoatNavApi.escapeHtml(r.notes || "");
     tr.innerHTML = `
       <td>${i + 1}</td>
       <td><a href="/scenarios.html?run=${r.run_id}">${r.run_id}</a></td>
@@ -586,10 +618,11 @@ function renderHistoryTable() {
       <td>${r.score != null ? (r.score * 100).toFixed(1) + "%" : "—"}</td>
       <td>${r.avg_final_goal_range_m != null ? Math.round(r.avg_final_goal_range_m) : "—"}</td>
       <td>${r.train_session || 1}</td>
-      <td>${r.notes || ""}</td>
+      <td>${notes}</td>
     `;
     tr.addEventListener("click", () => {
       resumeSelect.value = r.run_id;
+      syncRewardWeightsFromResume();
     });
     tr.addEventListener("mouseenter", () => loadMontageForRun(r.run_id));
     historyTable.appendChild(tr);
@@ -620,7 +653,10 @@ function startLiveLoop() {
       lastPoll = ts;
       pollJobStatus();
     }
-    renderCharts();
+    if (ts - lastChartRender > 700) {
+      lastChartRender = ts;
+      renderCharts();
+    }
     animFrameId = requestAnimationFrame(frame);
   };
   animFrameId = requestAnimationFrame(frame);
@@ -670,7 +706,7 @@ async function pollJobStatus() {
     trainLog.scrollTop = trainLog.scrollHeight;
 
     const lm = st.live_metrics && st.live_metrics.series ? st.live_metrics.series : [];
-    const hash = JSON.stringify(lm);
+    const hash = liveMetricsFingerprint(lm);
     if (hash !== lastLiveHash) {
       lastLiveHash = hash;
       liveSeries = lm;
@@ -695,19 +731,27 @@ async function pollJobStatus() {
 async function startTraining(resumeRunId) {
   liveSeries = [];
   lastLiveHash = "";
+  lastChartRender = 0;
   const body = getTrainingPayload(resumeRunId);
   if (body.resume_run_id === "") body.resume_run_id = null;
 
-  await fetchJson("/api/train", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  startBtn.disabled = true;
+  try {
+    await fetchJson("/api/train", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
-  jobStatus.className = "job-status running";
-  jobStatus.textContent = "Starting…";
-  setJobRunning(true);
-  pollJobStatus();
+    jobStatus.className = "job-status running";
+    jobStatus.textContent = "Starting…";
+    setJobRunning(true);
+    pollJobStatus();
+  } finally {
+    if (!jobRunning) {
+      startBtn.disabled = false;
+    }
+  }
 }
 
 async function pauseTraining() {
@@ -748,9 +792,33 @@ presetRewardDefaults.addEventListener("click", () => {
 resumeSelect.addEventListener("change", syncRewardWeightsFromResume);
 montageScrubber.addEventListener("input", renderMontageCanvas);
 
+[
+  modeSelect,
+  budgetMin,
+  snapshotIntervalMin,
+  nEnvs,
+  deviceSelect,
+  dynamicsJitter,
+  goalHoldSec,
+  currentEnabled,
+  montageEnabled,
+  robustEval,
+  gatedHold,
+  notesInput,
+  tauHeading,
+  tauSpeed,
+  maxYawRate,
+].forEach((el) => {
+  if (!el) return;
+  el.addEventListener("input", markFormEdited);
+  el.addEventListener("change", markFormEdited);
+});
+rewardWeightsGrid?.addEventListener("input", markFormEdited);
+
 buildRewardWeightInputs();
 
 loadPlantConfig()
+  .then(() => loadTrainingPresets())
   .then(() => loadHistory())
   .then(async () => {
     try {

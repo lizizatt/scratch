@@ -73,6 +73,7 @@ def write_run_outputs(
             "max_steps": train_metrics.get("max_steps"),
             "current_enabled": train_metrics.get("current_enabled"),
             "montage_enabled": C.MONTAGE_ENABLED,
+            "snapshot_interval_sec": train_metrics.get("snapshot_interval_sec"),
             "train_max_contacts": C.TRAIN_MAX_CONTACTS,
             "reward_weights": reward_weights_dict(),
             "curriculum_phase": C.CURRICULUM_PHASE,

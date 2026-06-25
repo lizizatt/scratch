@@ -38,7 +38,13 @@ const BoatNavApi = (() => {
   }
 
   async function checkHealth() {
-    return fetchJson("/api/health");
+    const data = await fetchJson("/api/health");
+    if (data.api_version != null && data.api_version !== API_VERSION) {
+      console.warn(
+        `API version mismatch: page expects ${API_VERSION}, server reports ${data.api_version}`
+      );
+    }
+    return data;
   }
 
   async function loadSimConstants() {
@@ -57,6 +63,10 @@ const BoatNavApi = (() => {
     return simConstants;
   }
 
+  function escapeHtml(text) {
+    return BoatNavUtil.escapeHtml(text);
+  }
+
   function cpaSafeRadiusM(contact, ownRadiusM = simConstants.own_radius_m) {
     const classes = simConstants.vessel_classes || DEFAULT_SIM_CONSTANTS.vessel_classes;
     const contactR = contact?.radius_m ?? classes.workboat ?? 15;
@@ -69,6 +79,7 @@ const BoatNavApi = (() => {
     loadSimConstants,
     getSimConstants,
     cpaSafeRadiusM,
+    escapeHtml,
     API_VERSION,
   };
 })();

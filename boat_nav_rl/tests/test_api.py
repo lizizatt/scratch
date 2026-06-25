@@ -100,13 +100,30 @@ class TestHttpApi(unittest.TestCase):
         data = get_json(self.base, "/api/plant/config")
         self.assertIn("nominal", data)
         self.assertIn("goal_hold_sec_default", data)
+        self.assertIn("goal_hold_sec_ui_default", data)
         self.assertIn("default_mode", data)
+        self.assertEqual(data["default_mode"], "navigate")
         self.assertIn("sim_constants", data)
         self.assertIn("vessel_classes", data["sim_constants"])
         self.assertIn("reward_weights", data)
         self.assertIn("goal_progress", data["reward_weights"])
         self.assertIn("cpa", data["reward_weights"])
         self.assertIn("gated_hold_default", data)
+
+    def test_curriculum_presets_is_json(self):
+        data = get_json(self.base, "/api/curriculum/presets")
+        self.assertIn("presets", data)
+        self.assertGreaterEqual(len(data["presets"]), 3)
+        quick = next(p for p in data["presets"] if p["id"] == "quick_start")
+        self.assertEqual(quick["mode"], "navigate")
+        self.assertEqual(quick["budget_sec"], 1800)
+        self.assertFalse(quick["current_enabled"])
+        self.assertEqual(quick.get("snapshot_interval_min"), 30)
+        self.assertIn("reward_weights", quick)
+        phase1 = next(p for p in data["presets"] if p["id"] == "phase1")
+        self.assertEqual(phase1["mode"], "avoid")
+        self.assertFalse(phase1["gated_hold"])
+        self.assertIsInstance(phase1["scenario_category_prefixes"], list)
 
     def test_train_rejects_invalid_budget(self):
         req = urllib.request.Request(
@@ -160,8 +177,31 @@ class TestHttpApi(unittest.TestCase):
         self.assertIn("Boat Nav RL", html)
         self.assertIn("api.js", html)
 
+    def test_index_html_served(self):
+        req = urllib.request.Request(self.base + "/")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn("replay.js", html)
+
+    def test_scenarios_html_served(self):
+        req = urllib.request.Request(self.base + "/scenarios.html")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            html = resp.read().decode("utf-8")
+        self.assertIn("scenarios.js", html)
+
     def test_viz_static_assets_exist(self):
-        for name in ("api.js", "chart.js", "draw.js", "train.js", "scenarios.js", "replay.js", "exercise.js"):
+        for name in (
+            "util.js",
+            "api.js",
+            "api_queue.js",
+            "train_form.js",
+            "chart.js",
+            "draw.js",
+            "train.js",
+            "scenarios.js",
+            "replay.js",
+            "exercise.js",
+        ):
             path = VIZ_DIR / name
             self.assertTrue(path.exists(), f"missing viz/{name}")
 
@@ -183,6 +223,46 @@ class TestHttpApi(unittest.TestCase):
             self.assertEqual(e.code, 409)
         else:
             self.fail("Expected 409")
+
+    def test_api_runs_by_id_rejects_traversal(self):
+        try:
+            get_json(self.base, "/api/runs/..", expect_ok=False)
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+            body = json.loads(e.read().decode("utf-8"))
+            self.assertIn("error", body)
+        else:
+            self.fail("Expected 400")
+
+    def test_train_rejects_invalid_device(self):
+        req = urllib.request.Request(
+            self.base + "/api/train",
+            data=json.dumps({"device": "tpu"}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                self.fail(f"Expected 400, got {resp.status}")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+
+    def test_exercise_goal_rejects_invalid_float(self):
+        runs = get_json(self.base, "/api/runs")["runs"]
+        if not runs:
+            self.skipTest("no trained runs with checkpoints")
+        post_json(self.base, "/api/exercise/init", {"run_id": runs[0]["id"]})
+        req = urllib.request.Request(
+            self.base + "/api/exercise/goal",
+            data=json.dumps({"x_m": "north", "y_m": 0}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                self.fail(f"Expected 400, got {resp.status}")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
 
     def test_exercise_add_intruder(self):
         runs = get_json(self.base, "/api/runs")["runs"]

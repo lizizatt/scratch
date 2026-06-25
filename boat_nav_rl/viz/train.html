@@ -24,97 +24,115 @@
     <section class="panel" id="trainPanel">
       <h2>Start / continue training</h2>
       <form id="trainForm" class="train-form">
+        <div class="preset-bar full">
+          <span class="preset-label">Preset</span>
+          <div id="presetButtons" class="preset-buttons"></div>
+        </div>
+        <p class="field-hint full" id="presetDescription">
+          Pick a preset or adjust mode and budget, then Start.
+        </p>
         <label>
           Mode
           <select id="modeSelect" name="mode">
-            <option value="avoid" selected>Avoid</option>
-            <option value="navigate">Navigate</option>
+            <option value="navigate" selected>Navigate</option>
+            <option value="avoid">Avoid</option>
           </select>
         </label>
         <label>
           Budget (minutes)
-          <input id="budgetMin" type="number" min="1" max="120" value="10" />
+          <input id="budgetMin" type="number" min="1" max="600" value="30" />
         </label>
         <label>
-          Parallel envs
-          <input id="nEnvs" type="number" min="1" max="64" value="32" />
+          Save snapshot every (minutes)
+          <input id="snapshotIntervalMin" type="number" min="0" max="600" step="1" value="0" />
         </label>
-        <p class="field-hint" id="nEnvsHint">
-          SubprocVecEnv rollouts on CPU; PPO updates use GPU when available. Default scales with CPU cores (~4×).
+        <p class="field-hint full">
+          Snapshot interval: 0 = off. Otherwise writes numbered checkpoints to
+          <code>runs/&lt;id&gt;/snapshots/</code> during training (resume still uses the final checkpoint).
         </p>
         <label>
-          Device
-          <select id="deviceSelect" name="device">
-            <option value="auto">Auto (GPU if available)</option>
-            <option value="cuda">GPU (CUDA)</option>
-            <option value="cpu">CPU only</option>
-          </select>
-        </label>
-        <label class="checkbox-label full">
-          <input id="dynamicsJitter" type="checkbox" />
-          Randomize ship dynamics each training episode (LTI — constant within episode)
-        </label>
-        <label>
           Hold at goal (sec)
-          <input id="goalHoldSec" type="number" min="0" max="120" step="1" value="30" />
+          <input id="goalHoldSec" type="number" min="0" max="120" step="1" value="15" />
         </label>
-        <p class="field-hint">
+        <p class="field-hint full">
           Episode continues after reaching the waypoint until the vessel stays in the success zone for this long.
         </p>
         <label class="checkbox-label full">
-          <input id="currentEnabled" type="checkbox" checked />
+          <input id="currentEnabled" type="checkbox" />
           Random water current during training and eval (0–0.5 m/s, LTI per episode)
         </label>
-        <label class="checkbox-label full">
-          <input id="montageEnabled" type="checkbox" />
-          Save eval montage PNGs after run (~2–15s post-eval; browser preview always free)
-        </label>
-        <label class="checkbox-label full">
-          <input id="robustEval" type="checkbox" />
-          Extra robust eval on finish (perturbed plants, slower post-eval pass)
-        </label>
-        <fieldset id="plantPanel" class="plant-panel full">
-          <legend>Nominal ship (used for eval; editable when jitter is off)</legend>
-          <div class="plant-grid">
+        <details class="advanced-panel full" id="advancedPanel">
+          <summary>Advanced options</summary>
+          <div class="advanced-inner">
             <label>
-              Heading τ (s)
-              <input id="tauHeading" type="number" min="0.5" max="15" step="0.1" value="3.0" />
+              Parallel envs
+              <input id="nEnvs" type="number" min="1" max="64" value="32" />
             </label>
             <label>
-              Speed τ (s)
-              <input id="tauSpeed" type="number" min="0.5" max="20" step="0.1" value="4.0" />
+              Device
+              <select id="deviceSelect" name="device">
+                <option value="auto">Auto (GPU if available)</option>
+                <option value="cuda">GPU (CUDA)</option>
+                <option value="cpu">CPU only</option>
+              </select>
             </label>
-            <label>
-              Max yaw rate (°/s)
-              <input id="maxYawRate" type="number" min="3" max="30" step="0.5" value="15" />
+            <p class="field-hint full" id="nEnvsHint">
+              SubprocVecEnv rollouts on CPU; PPO updates use GPU when available.
+            </p>
+            <label class="checkbox-label full">
+              <input id="dynamicsJitter" type="checkbox" />
+              Randomize ship dynamics each training episode (LTI — constant within episode)
             </label>
+            <label class="checkbox-label full">
+              <input id="montageEnabled" type="checkbox" />
+              Save eval montage PNGs after run (~2–15s post-eval; browser preview always free)
+            </label>
+            <label class="checkbox-label full">
+              <input id="robustEval" type="checkbox" />
+              Extra robust eval on finish (perturbed plants, slower post-eval pass)
+            </label>
+            <fieldset id="plantPanel" class="plant-panel full">
+              <legend>Nominal ship (training + eval when jitter is off)</legend>
+              <div class="plant-grid">
+                <label>
+                  Heading τ (s)
+                  <input id="tauHeading" type="number" min="0.5" max="15" step="0.1" value="3.0" />
+                </label>
+                <label>
+                  Speed τ (s)
+                  <input id="tauSpeed" type="number" min="0.5" max="20" step="0.1" value="4.0" />
+                </label>
+                <label>
+                  Max yaw rate (°/s)
+                  <input id="maxYawRate" type="number" min="3" max="30" step="0.5" value="15" />
+                </label>
+              </div>
+              <p class="field-hint">
+                Jitter samples between agile (1.5s / 2.0s / 22°/s) and freighter (8s / 10s / 6°/s).
+                When jitter is off, training and eval use the nominal ship above.
+              </p>
+              <div class="plant-presets">
+                <button type="button" id="presetNominal" class="ghost-btn">Nominal</button>
+                <button type="button" id="presetAgile" class="ghost-btn">Agile</button>
+                <button type="button" id="presetFreighter" class="ghost-btn">Freighter</button>
+              </div>
+            </fieldset>
+            <fieldset id="rewardPanel" class="reward-panel full">
+              <legend>Reward shaping weights</legend>
+              <p class="field-hint">
+                Tune per-step bonuses and penalties. Set a weight to 0 to disable that term.
+              </p>
+              <label class="checkbox-label full">
+                <input id="gatedHold" type="checkbox" checked />
+                Gated hold — only reward stationary hold when SOG ≤ stationary threshold
+              </label>
+              <div id="rewardWeightsGrid" class="reward-weights-grid"></div>
+              <div class="reward-presets">
+                <button type="button" id="presetRewardDefaults" class="ghost-btn">Reset to defaults</button>
+              </div>
+            </fieldset>
           </div>
-          <p class="field-hint">
-            Jitter samples between agile (1.5s / 2.0s / 22°/s) and freighter (8s / 10s / 6°/s).
-            When jitter is off, training uses the nominal ship above; eval still samples
-            agile↔freighter plant and water current each episode (LTI within episode).
-          </p>
-          <div class="plant-presets">
-            <button type="button" id="presetNominal" class="ghost-btn">Nominal</button>
-            <button type="button" id="presetAgile" class="ghost-btn">Agile</button>
-            <button type="button" id="presetFreighter" class="ghost-btn">Freighter</button>
-          </div>
-        </fieldset>
-        <fieldset id="rewardPanel" class="reward-panel full">
-          <legend>Reward shaping weights</legend>
-          <p class="field-hint">
-            Tune per-step bonuses and penalties. Encounter motion is shaped mainly by CPA, collision,
-            and threat-in-zone weights. Set a weight to 0 to disable that term.
-          </p>
-          <label class="checkbox-label full">
-            <input id="gatedHold" type="checkbox" checked />
-            Gated hold — only reward stationary hold when SOG ≤ stationary threshold
-          </label>
-          <div id="rewardWeightsGrid" class="reward-weights-grid"></div>
-          <div class="reward-presets">
-            <button type="button" id="presetRewardDefaults" class="ghost-btn">Reset to defaults</button>
-          </div>
-        </fieldset>
+        </details>
         <label>
           Resume from run
           <select id="resumeSelect">
@@ -175,7 +193,7 @@
       <div class="montage-controls">
         <label>
           Step
-          <input id="montageScrubber" type="range" min="0" max="1000" value="1000" />
+          <input id="montageScrubber" type="range" min="0" max="1000" value="1000" disabled />
         </label>
         <span id="montageStepLabel">—</span>
         <a id="montageOverviewLink" href="/scenarios.html">Open overview</a>
@@ -210,9 +228,11 @@
     <span id="statusLine">Ready</span>
   </footer>
 
+  <script src="/util.js"></script>
   <script src="/api.js"></script>
   <script src="/draw.js"></script>
   <script src="/chart.js"></script>
+  <script src="/train_form.js"></script>
   <script src="/train.js"></script>
 </body>
 </html>

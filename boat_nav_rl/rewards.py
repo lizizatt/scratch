@@ -300,6 +300,29 @@ def apply_reward_overrides(overrides: Dict[str, Any]) -> Dict[str, Any]:
     return applied
 
 
+def reward_config_from_overrides(
+    overrides: Optional[Dict[str, Any]] = None,
+    *,
+    gated_hold: Optional[bool] = None,
+) -> RewardConfig:
+    """Build a RewardConfig without mutating module globals."""
+    cfg = get_reward_config()
+    if overrides:
+        for key, raw in overrides.items():
+            if key in _DEPRECATED_CONFIG_KEYS:
+                if key in _LEGACY_CONFIG_ALIASES:
+                    key = _LEGACY_CONFIG_ALIASES[key]
+                else:
+                    continue
+            field = _REWARD_FIELD_MAP.get(key)
+            if field is None:
+                continue
+            setattr(cfg, field, float(raw))
+    if gated_hold is not None:
+        cfg.gated_hold = bool(gated_hold)
+    return cfg
+
+
 def aggregate_episode_breakdowns(episodes: Sequence[Dict[str, Any]]) -> Dict[str, float]:
     """Mean per-step reward component across eval episodes."""
     buckets: Dict[str, List[float]] = {}

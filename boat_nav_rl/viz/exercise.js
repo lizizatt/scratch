@@ -34,7 +34,6 @@ let state = {
   contacts: [],
   colregs: null,
   trails: [[], [], []],
-  running: true,
   stepping: false,
   lastFrame: 0,
   accum: 0,
@@ -42,6 +41,7 @@ let state = {
 
 let intruderDraft = null;
 let suppressNextClick = false;
+const { enqueue: enqueueExerciseApi } = BoatNavApiQueue.createApiQueue();
 
 function isIntruderMode() {
   return modeIntruder.checked;
@@ -139,69 +139,81 @@ async function loadRuns() {
 }
 
 async function initExercise() {
-  overlayInfo.textContent = "Loading model…";
-  await BoatNavApi.loadSimConstants().catch(() => {});
-  state.trails = [[], [], []];
-  state.contacts = [];
-  const data = await fetchJson("/api/exercise/init", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ run_id: runSelect.value }),
+  return enqueueExerciseApi(async () => {
+    overlayInfo.textContent = "Loading model…";
+    await BoatNavApi.loadSimConstants().catch(() => {});
+    state.trails = [[], [], []];
+    state.contacts = [];
+    const data = await fetchJson("/api/exercise/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: runSelect.value }),
+    });
+    applyPayload(data);
+    syncMapModeUi();
+    statusLine.textContent = `Model ${data.run_id} · ${data.mode}`;
   });
-  applyPayload(data);
-  syncMapModeUi();
-  statusLine.textContent = `Model ${data.run_id} · ${data.mode}`;
 }
 
 async function setGoal(x, y) {
-  const data = await fetchJson("/api/exercise/goal", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ x_m: x, y_m: y }),
+  return enqueueExerciseApi(async () => {
+    const data = await fetchJson("/api/exercise/goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ x_m: x, y_m: y }),
+    });
+    applyPayload(data);
   });
-  applyPayload(data);
 }
 
 async function addIntruder(x, y, cog_deg, sog_mps) {
-  const data = await fetchJson("/api/exercise/intruder", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      x_m: x,
-      y_m: y,
-      cog_deg,
-      sog_mps,
-      vessel_class: intruderClassSelect.value,
-    }),
+  return enqueueExerciseApi(async () => {
+    const data = await fetchJson("/api/exercise/intruder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        x_m: x,
+        y_m: y,
+        cog_deg,
+        sog_mps,
+        vessel_class: intruderClassSelect.value,
+      }),
+    });
+    applyPayload(data);
   });
-  applyPayload(data);
 }
 
 async function clearIntruders() {
-  const data = await fetchJson("/api/exercise/intruders/clear", { method: "POST" });
-  applyPayload(data);
-  syncMapModeUi();
+  return enqueueExerciseApi(async () => {
+    const data = await fetchJson("/api/exercise/intruders/clear", { method: "POST" });
+    applyPayload(data);
+    syncMapModeUi();
+  });
 }
 
 async function stepSim(steps) {
   if (state.stepping) return;
-  state.stepping = true;
-  try {
-    const data = await fetchJson("/api/exercise/step", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ steps }),
-    });
-    applyPayload(data);
-  } finally {
-    state.stepping = false;
-  }
+  return enqueueExerciseApi(async () => {
+    state.stepping = true;
+    try {
+      const data = await fetchJson("/api/exercise/step", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ steps }),
+      });
+      applyPayload(data);
+    } finally {
+      state.stepping = false;
+    }
+  });
 }
 
 async function resetVessels() {
-  const data = await fetchJson("/api/exercise/reset", { method: "POST" });
-  state.trails = [[], [], []];
-  applyPayload(data);
+  return enqueueExerciseApi(async () => {
+    const data = await fetchJson("/api/exercise/reset", { method: "POST" });
+    state.trails = [[], [], []];
+    applyPayload(data);
+  });
 }
 
 function renderStats() {
@@ -357,7 +369,7 @@ function tick(ts) {
   if (intruderDraft) {
     renderFrame();
   }
-  if (!state.running || !state.lastFrame) {
+  if (!state.lastFrame) {
     state.lastFrame = ts;
     return;
   }

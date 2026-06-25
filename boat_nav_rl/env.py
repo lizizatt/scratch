@@ -235,6 +235,13 @@ class BoatNavEnv(gym.Env):
             self.mission = NavigationMission.from_scenario(scenario, self.rng, dt_s=P.DT_S)
             gx, gy = self.mission.initial_goal()
             self.goal_x, self.goal_y = gx, gy
+        elif not self.training_randomize:
+            # Exercise / eval harness set pose and goal after reset.
+            self.own = P.VesselState()
+            self.contacts = []
+            self.mission = NavigationMission.single_goal(
+                self.goal_x, self.goal_y, self.rng, dt_s=P.DT_S
+            )
         else:
             self._sample_training_scenario()
             self.mission = NavigationMission.single_goal(

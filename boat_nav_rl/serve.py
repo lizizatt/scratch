@@ -13,12 +13,13 @@ from urllib.parse import parse_qs, urlparse
 import prepare as P
 import training_job as TJ
 import exercise as EX
-from api_parse import ApiParseError, parse_int, parse_mode
-from exercise import EXERCISE_MAX_STEP_BATCH
+from api_parse import ApiParseError, parse_device, parse_float, parse_int, parse_mode, parse_optional_int, parse_run_id
+from exercise import EXERCISE_MAX_STEP_BATCH, ExerciseNotInitializedError, GoalRejectedError
 from colregs.evaluate import enrich_trace_file
 from colregs.frame_series import frame_score_series
 from device_util import torch_device_info
-from runs_util import latest_run_id, score_from_metrics
+from runs_util import InvalidRunIdError, latest_run_id, safe_run_dir, score_from_metrics, validate_run_id
+from curriculum import list_ui_training_presets
 from rewards import gated_hold_enabled, reward_weights_dict
 from vecenv_util import max_n_envs, recommended_n_envs, training_perf_defaults
 
@@ -29,10 +30,12 @@ VIZ_DIR = ROOT / "viz"
 EVAL_SEEDS_PATH = RUNS_DIR / "eval_seeds.json"
 DEFAULT_PORT = 8765
 API_VERSION = 1
+MAX_JSON_BODY_BYTES = int(os.environ.get("BOAT_NAV_MAX_JSON_BODY", str(1024 * 1024)))
+MAX_COLREGS_STEPS = int(os.environ.get("BOAT_NAV_MAX_COLREGS_STEPS", "2000"))
 
 
 def _load_run_payload(run_id: str) -> dict:
-    run_dir = RUNS_DIR / run_id
+    run_dir = safe_run_dir(run_id, RUNS_DIR)
     metrics_path = run_dir / "metrics.json"
     traces_path = run_dir / "eval_traces.json"
     if not metrics_path.exists():
@@ -132,6 +135,8 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         if length <= 0:
             return {}
+        if length > MAX_JSON_BODY_BYTES:
+            raise ApiParseError(f"request body too large (max {MAX_JSON_BODY_BYTES} bytes)")
         raw = self.rfile.read(length)
         return json.loads(raw.decode("utf-8"))
 
@@ -157,16 +162,23 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/train":
             try:
                 body = self._read_json_body()
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return
             except json.JSONDecodeError:
                 self._send_json({"ok": False, "error": "invalid JSON"}, status=400)
                 return
             try:
+                resume_raw = body.get("resume_run_id")
+                resume_run_id = None
+                if resume_raw:
+                    resume_run_id = parse_run_id(resume_raw, required=True)
                 result = TJ.start_training(
                     mode=parse_mode(body.get("mode"), P.DEFAULT_MODE),
                     budget_sec=parse_int(
-                        body.get("budget_sec"), 600, name="budget_sec", minimum=1
+                        body.get("budget_sec"), 600, name="budget_sec", minimum=1, maximum=36000
                     ),
-                    resume_run_id=body.get("resume_run_id") or None,
+                    resume_run_id=resume_run_id,
                     notes=str(body.get("notes", "")),
                     n_envs=parse_int(
                         body.get("n_envs"),
@@ -175,17 +187,24 @@ class Handler(BaseHTTPRequestHandler):
                         minimum=1,
                         maximum=max_n_envs(),
                     ),
-                    device=str(body.get("device", "auto")),
+                    device=parse_device(body.get("device"), "auto"),
                     dynamics_jitter=bool(body.get("dynamics_jitter", False)),
                     robust_eval_enabled=bool(body.get("robust_eval_enabled", False)),
                     plant=body.get("plant") or None,
                     goal_hold_sec=parse_int(
                         body.get("goal_hold_sec"), 30, name="goal_hold_sec", minimum=0
                     ),
-                    current_enabled=bool(body.get("current_enabled", True)),
+                    current_enabled=bool(body.get("current_enabled", False)),
                     montage_enabled=bool(body.get("montage_enabled", False)),
                     reward_weights=body.get("reward_weights") or None,
                     gated_hold=body.get("gated_hold"),
+                    scenario_category_prefixes=body.get("scenario_category_prefixes") or None,
+                    curriculum_phase=parse_optional_int(
+                        body.get("curriculum_phase"), name="curriculum_phase", minimum=0, maximum=3
+                    ),
+                    snapshot_interval_min=parse_int(
+                        body.get("snapshot_interval_min"), 0, name="snapshot_interval_min", minimum=0, maximum=600
+                    ),
                 )
             except ApiParseError as exc:
                 self._send_json({"ok": False, "error": str(exc)}, status=400)
@@ -203,10 +222,19 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/colregs/frames":
             try:
                 body = self._read_json_body()
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return
             except json.JSONDecodeError:
                 self._send_json({"ok": False, "error": "invalid JSON"}, status=400)
                 return
             steps = body.get("steps") or []
+            if len(steps) > MAX_COLREGS_STEPS:
+                self._send_json(
+                    {"ok": False, "error": f"steps exceeds max {MAX_COLREGS_STEPS}"},
+                    status=400,
+                )
+                return
             category = str(body.get("scenario_category", ""))
             stride = int(body.get("stride", 0))
             if stride <= 0:
@@ -218,17 +246,22 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/exercise/init":
             try:
                 body = self._read_json_body()
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return
             except json.JSONDecodeError:
                 self._send_json({"ok": False, "error": "invalid JSON"}, status=400)
                 return
             try:
                 run_id = EX.resolve_exercise_run_id(body.get("run_id"))
-                session = EX.init_session(
+                payload = EX.init_session(
                     run_id,
                     goal_hold_sec=body.get("goal_hold_sec"),
                     current_enabled=body.get("current_enabled"),
                 )
-                self._send_json({"ok": True, **session.to_dict()})
+                self._send_json({"ok": True, **payload})
+            except (InvalidRunIdError, ApiParseError) as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
             except FileNotFoundError as exc:
                 self._send_json({"ok": False, "error": str(exc)}, status=404)
             except Exception as exc:
@@ -238,74 +271,85 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/exercise/goal":
             try:
                 body = self._read_json_body()
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return
             except json.JSONDecodeError:
                 self._send_json({"ok": False, "error": "invalid JSON"}, status=400)
                 return
-            session = EX.get_session()
-            if session is None:
-                self._send_json({"ok": False, "error": "exercise not initialized"}, status=409)
-                return
-            session.set_goal(float(body.get("x_m", 0)), float(body.get("y_m", 0)))
-            self._send_json({"ok": True, **session.to_dict()})
+            try:
+                x_m = parse_float(body.get("x_m"), 0, name="x_m")
+                y_m = parse_float(body.get("y_m"), 0, name="y_m")
+                payload = EX.set_goal_locked(x_m, y_m)
+                self._send_json({"ok": True, **payload})
+            except ExerciseNotInitializedError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=409)
+            except GoalRejectedError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
             return
 
         if path == "/api/exercise/intruder":
             try:
                 body = self._read_json_body()
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return
             except json.JSONDecodeError:
                 self._send_json({"ok": False, "error": "invalid JSON"}, status=400)
                 return
-            session = EX.get_session()
-            if session is None:
-                self._send_json({"ok": False, "error": "exercise not initialized"}, status=409)
-                return
-            session.add_intruder(
-                float(body.get("x_m", 0)),
-                float(body.get("y_m", 0)),
-                float(body.get("cog_deg", 0)),
-                float(body.get("sog_mps", 0)),
-                str(body.get("vessel_class", P.DEFAULT_VESSEL_CLASS)),
-            )
-            self._send_json({"ok": True, **session.to_dict()})
+            try:
+                x_m = parse_float(body.get("x_m"), 0, name="x_m")
+                y_m = parse_float(body.get("y_m"), 0, name="y_m")
+                cog_deg = parse_float(body.get("cog_deg"), 0, name="cog_deg")
+                sog_mps = parse_float(body.get("sog_mps"), 0, name="sog_mps", minimum=0)
+                vessel_class = str(body.get("vessel_class", P.DEFAULT_VESSEL_CLASS))
+                payload = EX.mutate_session(
+                    lambda s: s.add_intruder(x_m, y_m, cog_deg, sog_mps, vessel_class)
+                )
+                self._send_json({"ok": True, **payload})
+            except ExerciseNotInitializedError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=409)
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
             return
 
         if path == "/api/exercise/intruders/clear":
-            session = EX.get_session()
-            if session is None:
-                self._send_json({"ok": False, "error": "exercise not initialized"}, status=409)
-                return
-            session.clear_intruders()
-            self._send_json({"ok": True, **session.to_dict()})
+            try:
+                payload = EX.mutate_session(lambda s: s.clear_intruders())
+                self._send_json({"ok": True, **payload})
+            except ExerciseNotInitializedError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=409)
             return
 
         if path == "/api/exercise/step":
             try:
                 body = self._read_json_body()
+            except ApiParseError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=400)
+                return
             except json.JSONDecodeError:
                 self._send_json({"ok": False, "error": "invalid JSON"}, status=400)
-                return
-            session = EX.get_session()
-            if session is None:
-                self._send_json({"ok": False, "error": "exercise not initialized"}, status=409)
                 return
             try:
                 steps = parse_int(
                     body.get("steps"), 1, name="steps", minimum=1, maximum=EXERCISE_MAX_STEP_BATCH
                 )
+                payload = EX.mutate_session(lambda s: s.step(steps))
+                self._send_json({"ok": True, **payload})
+            except ExerciseNotInitializedError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=409)
             except ApiParseError as exc:
                 self._send_json({"ok": False, "error": str(exc)}, status=400)
-                return
-            session.step(steps)
-            self._send_json({"ok": True, **session.to_dict()})
             return
 
         if path == "/api/exercise/reset":
-            session = EX.get_session()
-            if session is None:
-                self._send_json({"ok": False, "error": "exercise not initialized"}, status=409)
-                return
-            session.reset_vessels()
-            self._send_json({"ok": True, **session.to_dict()})
+            try:
+                payload = EX.mutate_session(lambda s: s.reset_vessels())
+                self._send_json({"ok": True, **payload})
+            except ExerciseNotInitializedError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=409)
             return
 
         self.send_error(404, "Not found")
@@ -325,6 +369,7 @@ class Handler(BaseHTTPRequestHandler):
                     "endpoints": [
                         "/api/health",
                         "/api/plant/config",
+                        "/api/curriculum/presets",
                         "/api/history",
                         "/api/train/status",
                         "/api/train (POST)",
@@ -345,11 +390,11 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/exercise/state":
-            session = EX.get_session()
-            if session is None:
-                self._send_json({"ok": False, "error": "exercise not initialized"}, status=409)
-                return
-            self._send_json({"ok": True, **session.to_dict()})
+            try:
+                payload = EX.session_dict()
+                self._send_json({"ok": True, **payload})
+            except ExerciseNotInitializedError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, status=409)
             return
 
         if path == "/api/plant/config":
@@ -358,6 +403,10 @@ class Handler(BaseHTTPRequestHandler):
             payload["reward_weights"] = reward_weights_dict()
             payload["gated_hold_default"] = gated_hold_enabled()
             self._send_json(payload)
+            return
+
+        if path == "/api/curriculum/presets":
+            self._send_json({"presets": list_ui_training_presets()})
             return
 
         if path == "/api/history":
@@ -414,7 +463,10 @@ class Handler(BaseHTTPRequestHandler):
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "runs":
                 run_id = parts[2]
                 try:
+                    validate_run_id(run_id)
                     self._send_json(_load_run_payload(run_id))
+                except InvalidRunIdError:
+                    self._send_json({"error": "invalid run id"}, status=400)
                 except FileNotFoundError:
                     self._send_json({"error": "run not found"}, status=404)
                 return
@@ -423,8 +475,13 @@ class Handler(BaseHTTPRequestHandler):
                 "trajectory_montage.png",
             ):
                 run_id = parts[2]
+                try:
+                    run_dir = safe_run_dir(run_id, RUNS_DIR)
+                except InvalidRunIdError:
+                    self._send_json({"error": "invalid run id"}, status=400)
+                    return
                 fname = "eval_step_montage.png" if parts[3] == "step_montage.png" else "eval_trajectory_montage.png"
-                self._send_file(RUNS_DIR / run_id / fname)
+                self._send_file(run_dir / fname)
                 return
 
         # Static viz files

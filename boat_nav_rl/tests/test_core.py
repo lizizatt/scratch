@@ -377,6 +377,16 @@ class TestBoatNavEnv(unittest.TestCase):
         self.assertAlmostEqual(obs[6], expected, places=4)
         self.assertLessEqual(env.water_current.speed_mps, P.CURRENT_MAX_MPS)
 
+    def test_reset_without_training_randomize_no_random_contacts(self):
+        from train import BoatNavEnv
+
+        env = BoatNavEnv(mode="avoid", training_randomize=False)
+        env.goal_x = 100.0
+        env.goal_y = 200.0
+        env.reset(seed=99)
+        self.assertEqual(env.contacts, [])
+        self.assertEqual(env.own.x_m, 0.0)
+
     def test_eval_samples_current_without_training_randomize(self):
         from train import BoatNavEnv
 

@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 from stable_baselines3.common.callbacks import BaseCallback
 
 from async_eval import AsyncEvalRunner
-from checkpoint_util import save_best_checkpoint
+from checkpoint_util import save_best_checkpoint, save_periodic_snapshot
 from curriculum import check_exit, get_phase, is_summary_better, metrics_to_summary
 from eval_parallel import EvalResult, checkpoint_zip_path, run_eval_from_snapshot, snapshot_model_for_eval
 from eval_runner import run_eval
@@ -52,6 +52,58 @@ class TimeBudgetCallback(BaseCallback):
             self.cancelled = True
             return False
         return (time.time() - self.start_time) < self.budget_sec
+
+
+class PeriodicSnapshotCallback(BaseCallback):
+    """Save PPO checkpoints on a fixed wall-clock interval (for long runs)."""
+
+    def __init__(
+        self,
+        model_holder: Dict[str, Any],
+        run_dir: Path,
+        interval_sec: float,
+    ) -> None:
+        super().__init__()
+        self.model_holder = model_holder
+        self.run_dir = run_dir
+        self.interval_sec = max(60.0, float(interval_sec))
+        self.start_time = 0.0
+        self.next_snapshot_time = 0.0
+        self.snapshot_index = 0
+
+    def _on_training_start(self) -> None:
+        self.start_time = time.time()
+        self.next_snapshot_time = self.start_time + self.interval_sec
+
+    def _save_snapshot(self, now: float) -> None:
+        model = self.model_holder.get("model")
+        if model is None:
+            return
+        elapsed = now - self.start_time
+        self.snapshot_index += 1
+        path = save_periodic_snapshot(
+            self.run_dir,
+            model,
+            elapsed_sec=elapsed,
+            timesteps=self.num_timesteps,
+            index=self.snapshot_index,
+        )
+        print(
+            f"[snapshot] saved {path.name} "
+            f"@ {elapsed / 60.0:.1f} min ({self.num_timesteps} steps)",
+            flush=True,
+        )
+
+    def _on_step(self) -> bool:
+        now = time.time()
+        if now < self.next_snapshot_time:
+            return True
+        try:
+            self._save_snapshot(now)
+        except Exception as exc:
+            print(f"[snapshot] skipped: {exc}", flush=True)
+        self.next_snapshot_time += self.interval_sec
+        return True
 
 
 class LiveMetricsCallback(BaseCallback):

@@ -17,6 +17,13 @@ All tests must pass. This covers:
 - Gym env reset/step
 - **All `/api/*` endpoints return JSON** (not HTML)
 - Viz static assets present
+- **Node unit tests** for extracted viz logic (`viz/util.js`, `train_form.js`, `api_queue.js`) when `node` is on PATH
+
+### JavaScript unit tests only
+
+```powershell
+node --test tests/js/*.test.mjs
+```
 
 ## Full manual smoke (5–10 minutes)
 

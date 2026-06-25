@@ -4,16 +4,17 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from vecenv_util import recommended_n_envs
 import prepare as P
-from runs_util import score_from_metrics
+from runs_util import safe_run_dir, score_from_metrics, validate_run_id
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "runs"
@@ -24,14 +25,64 @@ LOG_PATH = JOB_DIR / "current.log"
 CANCEL_FLAG_PATH = JOB_DIR / "cancel.flag"
 LIVE_METRICS_PATH = JOB_DIR / "live_metrics.json"
 RUN_CONFIG_PATH = JOB_DIR / "run_config.json"
+PID_PATH = JOB_DIR / "train.pid"
 
 _lock = threading.Lock()
 _process: Optional[subprocess.Popen] = None
 
 
+def _atomic_write_json(path: Path, payload: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(str(tmp), str(path))
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _read_pid_file() -> Optional[int]:
+    if not PID_PATH.exists():
+        return None
+    try:
+        return int(PID_PATH.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _clear_pid_file() -> None:
+    if PID_PATH.exists():
+        PID_PATH.unlink()
+
+
+def _reconcile_stale_job() -> None:
+    """Mark orphaned in-progress status after server restart."""
+    pid = _read_pid_file()
+    if pid is not None and _pid_alive(pid):
+        return
+    _clear_pid_file()
+    if not STATUS_PATH.exists():
+        return
+    try:
+        data = json.loads(STATUS_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    if data.get("state") in ("running", "cancelling"):
+        data["running"] = False
+        data["state"] = "interrupted"
+        data["error"] = "Server restarted while training was in progress"
+        _atomic_write_json(STATUS_PATH, data)
+
+
 def _write_status(payload: Dict[str, Any]) -> None:
-    JOB_DIR.mkdir(parents=True, exist_ok=True)
-    STATUS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _atomic_write_json(STATUS_PATH, payload)
 
 
 def read_live_metrics() -> Dict[str, Any]:
@@ -44,14 +95,19 @@ def read_live_metrics() -> Dict[str, Any]:
 
 
 def read_status() -> Dict[str, Any]:
-    if not STATUS_PATH.exists():
-        return {"running": False, "state": "idle"}
-    try:
-        data = json.loads(STATUS_PATH.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {"running": False, "state": "idle"}
+    _reconcile_stale_job()
     with _lock:
+        if not STATUS_PATH.exists():
+            data: Dict[str, Any] = {"running": False, "state": "idle"}
+        else:
+            try:
+                data = json.loads(STATUS_PATH.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                data = {"running": False, "state": "idle"}
+        pid = _read_pid_file()
         if _process is not None and _process.poll() is None:
+            data["running"] = True
+        elif pid is not None and _pid_alive(pid):
             data["running"] = True
         elif data.get("state") == "running":
             data["running"] = False
@@ -59,8 +115,8 @@ def read_status() -> Dict[str, Any]:
                 if data.get("state") != "cancelled":
                     data["state"] = "failed"
                     data["exit_code"] = _process.returncode
-    data["live_metrics"] = read_live_metrics()
-    return data
+        data["live_metrics"] = read_live_metrics()
+        return data
 
 
 def read_log_tail(max_bytes: int = 12000) -> str:
@@ -73,8 +129,12 @@ def read_log_tail(max_bytes: int = 12000) -> str:
 
 
 def is_running() -> bool:
+    _reconcile_stale_job()
     with _lock:
-        return _process is not None and _process.poll() is None
+        if _process is not None and _process.poll() is None:
+            return True
+        pid = _read_pid_file()
+        return pid is not None and _pid_alive(pid)
 
 
 def start_training(
@@ -88,19 +148,27 @@ def start_training(
     robust_eval_enabled: bool = False,
     plant: Optional[Dict[str, Any]] = None,
     goal_hold_sec: int = 30,
-    current_enabled: bool = True,
+    current_enabled: bool = False,
     montage_enabled: bool = False,
     reward_weights: Optional[Dict[str, Any]] = None,
     gated_hold: Optional[bool] = None,
+    scenario_category_prefixes: Optional[List[str]] = None,
+    curriculum_phase: Optional[int] = None,
+    snapshot_interval_min: int = 0,
 ) -> Dict[str, Any]:
     global _process
 
+    _reconcile_stale_job()
     with _lock:
         if _process is not None and _process.poll() is None:
             return {"ok": False, "error": "Training already running"}
+        pid = _read_pid_file()
+        if pid is not None and _pid_alive(pid):
+            return {"ok": False, "error": f"Training already running (pid {pid})"}
 
         if resume_run_id:
-            ckpt = RUNS_DIR / resume_run_id / "model.zip"
+            resume_run_id = validate_run_id(resume_run_id)
+            ckpt = safe_run_dir(resume_run_id) / "model.zip"
             if not ckpt.exists():
                 return {"ok": False, "error": f"No checkpoint for run {resume_run_id}"}
 
@@ -119,16 +187,25 @@ def start_training(
             "goal_hold_sec": max(0, int(goal_hold_sec)),
             "current_enabled": bool(current_enabled),
             "montage_enabled": bool(montage_enabled),
+            "budget_sec": max(1, int(budget_sec)),
         }
         if reward_weights:
             run_cfg["reward_weights"] = reward_weights
         if gated_hold is not None:
             run_cfg["gated_hold"] = bool(gated_hold)
+        if scenario_category_prefixes:
+            run_cfg["scenario_category_prefixes"] = list(scenario_category_prefixes)
+        if curriculum_phase is not None:
+            run_cfg["curriculum_phase"] = int(curriculum_phase)
+        snap_min = max(0, int(snapshot_interval_min))
+        if snap_min > 0:
+            run_cfg["snapshot_interval_min"] = snap_min
         JOB_DIR.mkdir(parents=True, exist_ok=True)
         RUN_CONFIG_PATH.write_text(json.dumps(run_cfg, indent=2), encoding="utf-8")
 
         cmd = [
             sys.executable,
+            "-u",
             str(TRAIN_SCRIPT),
             "--mode",
             mode,
@@ -163,21 +240,27 @@ def start_training(
                 "montage_enabled": run_cfg["montage_enabled"],
                 "reward_weights": run_cfg.get("reward_weights"),
                 "gated_hold": run_cfg.get("gated_hold"),
+                "snapshot_interval_min": run_cfg.get("snapshot_interval_min", 0),
             }
         )
 
         log_fp = open(LOG_PATH, "a", encoding="utf-8")
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
         _process = subprocess.Popen(
             cmd,
             cwd=str(ROOT),
             stdout=log_fp,
             stderr=subprocess.STDOUT,
+            env=env,
         )
+        PID_PATH.write_text(str(_process.pid), encoding="utf-8")
 
         def _wait() -> None:
             global _process
             exit_code = _process.wait()
             log_fp.close()
+            _clear_pid_file()
             status = read_status()
             status["running"] = False
             if status.get("state") != "cancelled":
@@ -230,7 +313,11 @@ def training_history(limit: int = 200) -> Dict[str, Any]:
 
     series = []
     for run_dir in runs:
-        metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+        metrics_path = run_dir / "metrics.json"
+        try:
+            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
         mode = metrics.get("mode", P.DEFAULT_MODE)
         score = score_from_metrics(metrics)
         avg_rng = metrics.get("avg_final_goal_range_m")

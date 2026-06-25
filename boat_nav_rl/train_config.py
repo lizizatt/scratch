@@ -30,7 +30,7 @@ DYNAMICS_JITTER = os.environ.get("DYNAMICS_JITTER", "0") == "1"
 ROBUST_EVAL_ENABLED = os.environ.get("ROBUST_EVAL_ENABLED", "0") == "1"
 GOAL_HOLD_SEC = int(os.environ.get("GOAL_HOLD_SEC", str(P.DEFAULT_GOAL_HOLD_SEC)))
 MAX_EPISODE_STEPS = int(os.environ.get("MAX_STEPS", str(P.MAX_STEPS)))
-CURRENT_ENABLED = os.environ.get("CURRENT_ENABLED", "1") == "1"
+CURRENT_ENABLED = os.environ.get("CURRENT_ENABLED", "0") == "1"
 MONTAGE_ENABLED = os.environ.get("MONTAGE_ENABLED", "0") == "1"
 MONTAGE_MAX_EPISODES = int(os.environ.get("MONTAGE_MAX_EPISODES", "48"))
 MONTAGE_STEP_COLS = int(os.environ.get("MONTAGE_STEP_COLS", "12"))
@@ -41,10 +41,9 @@ LEARNING_RATE = 3e-4
 BATCH_SIZE = 256
 GAMMA = 0.99
 
-CONTACT_OBS_NOISE_M = float(os.environ.get("CONTACT_OBS_NOISE_M", str(P.CONTACT_OBS_NOISE_M)))
-CONTACT_OBS_NOISE_BEARING_RAD = float(
-    os.environ.get("CONTACT_OBS_NOISE_BEARING_RAD", str(P.CONTACT_OBS_NOISE_BEARING_RAD))
-)
+# Default 0 so training matches eval; set CONTACT_OBS_NOISE_M=5 for robustness experiments.
+CONTACT_OBS_NOISE_M = float(os.environ.get("CONTACT_OBS_NOISE_M", "0"))
+CONTACT_OBS_NOISE_BEARING_RAD = float(os.environ.get("CONTACT_OBS_NOISE_BEARING_RAD", "0"))
 TRAIN_MAX_CONTACTS = int(os.environ.get("TRAIN_MAX_CONTACTS", "4"))
 
 NOTES = "baseline"
@@ -56,6 +55,7 @@ CURRICULUM_EVAL_INTERVAL_SEC = 120.0
 CURRICULUM_EVAL_MAX_SCENARIOS = 0
 CURRICULUM_EARLY_STOP = False
 CURRICULUM_EARLY_STOPPED = False
+SNAPSHOT_INTERVAL_SEC = int(os.environ.get("SNAPSHOT_INTERVAL_SEC", "0"))  # 0 = off
 # =============================================================================
 
 
@@ -106,6 +106,7 @@ def apply_run_config(cfg: Dict[str, Any]) -> None:
     global CURRENT_ENABLED, MONTAGE_ENABLED, MONTAGE_MAX_EPISODES, MONTAGE_STEP_COLS
     global CURRICULUM_PHASE, SCENARIO_CATEGORY_PREFIXES
     global CURRICULUM_EVAL_INTERVAL_SEC, CURRICULUM_EVAL_MAX_SCENARIOS, CURRICULUM_EARLY_STOP
+    global SNAPSHOT_INTERVAL_SEC, TRAIN_BUDGET_SEC
     if "dynamics_jitter" in cfg:
         DYNAMICS_JITTER = bool(cfg["dynamics_jitter"])
     elif cfg.get("phase") in ("jitter", "robust"):
@@ -149,6 +150,12 @@ def apply_run_config(cfg: Dict[str, Any]) -> None:
         CURRICULUM_EVAL_MAX_SCENARIOS = int(cfg["curriculum_eval_max_scenarios"])
     if "curriculum_early_stop" in cfg:
         CURRICULUM_EARLY_STOP = bool(cfg["curriculum_early_stop"])
+    if "snapshot_interval_sec" in cfg:
+        SNAPSHOT_INTERVAL_SEC = max(0, int(cfg["snapshot_interval_sec"]))
+    elif "snapshot_interval_min" in cfg:
+        SNAPSHOT_INTERVAL_SEC = max(0, int(cfg["snapshot_interval_min"])) * 60
+    if "budget_sec" in cfg:
+        TRAIN_BUDGET_SEC = max(1, int(cfg["budget_sec"]))
 
 
 def apply_args(args: argparse.Namespace) -> Optional[str]:

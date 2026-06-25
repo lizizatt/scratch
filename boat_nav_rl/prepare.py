@@ -51,7 +51,8 @@ V_MIN_MPS = 0.0  # literal stop allowed (all-stop command)
 V_MAX_MPS = 8.0
 CURRENT_MAX_MPS = 0.5  # max water current speed (m/s)
 DEFAULT_GOAL_HOLD_SEC = 30
-DEFAULT_MODE = "avoid"  # "navigate" | "avoid" | "all"
+DEFAULT_GOAL_HOLD_SEC_UI = 15  # friendlier first-run default in train UI
+DEFAULT_MODE = "navigate"  # "navigate" | "avoid" | "all"
 
 # Shared world extent (Exercise sandbox + exercise_sampler scenarios).
 WORLD_BOUNDS = {
@@ -237,6 +238,7 @@ def default_plant_config() -> Dict[str, Any]:
             "max_yaw_rate_deg_s": [PLANT_FREIGHTER["max_yaw_rate_deg_s"], PLANT_AGILE["max_yaw_rate_deg_s"]],
         },
         "goal_hold_sec_default": DEFAULT_GOAL_HOLD_SEC,
+        "goal_hold_sec_ui_default": DEFAULT_GOAL_HOLD_SEC_UI,
         "default_mode": DEFAULT_MODE,
         "sim_constants": {
             "vessel_classes": dict(VESSEL_CLASSES),

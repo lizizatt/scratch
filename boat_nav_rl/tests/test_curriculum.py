@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import prepare as P
-from curriculum import check_exit, filter_seeds_by_prefix, get_phase, is_summary_better, metrics_to_summary
+from curriculum import check_exit, filter_seeds_by_prefix, get_phase, is_summary_better, list_ui_training_presets, metrics_to_summary
 from rewards import set_gated_hold_enabled, is_hold_stationary
 
 
@@ -51,6 +51,20 @@ class TestCurriculumExit(unittest.TestCase):
         failing = {"success_rate": 0.5, "mean_speed_mps": 5.0, "eval_episodes": 10}
         passing = {"success_rate": 0.8, "mean_speed_mps": 5.0, "eval_episodes": 10}
         self.assertTrue(is_summary_better(phase, passing, failing))
+
+
+class TestUiTrainingPresets(unittest.TestCase):
+    def test_list_ui_training_presets(self):
+        presets = list_ui_training_presets()
+        self.assertGreaterEqual(len(presets), 3)
+        quick = next(p for p in presets if p["id"] == "quick_start")
+        self.assertEqual(quick["mode"], "navigate")
+        self.assertEqual(quick["goal_hold_sec"], P.DEFAULT_GOAL_HOLD_SEC_UI)
+        self.assertEqual(quick.get("snapshot_interval_min"), 30)
+        phase1 = next(p for p in presets if p["id"] == "phase1")
+        self.assertEqual(phase1["mode"], "avoid")
+        self.assertFalse(phase1["gated_hold"])
+        self.assertIsInstance(phase1["scenario_category_prefixes"], list)
 
 
 if __name__ == "__main__":

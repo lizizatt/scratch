@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 BEST_MODEL_DIRNAME = "best_model"
 BEST_METRICS_NAME = "best_metrics.json"
 FINAL_MODEL_DIRNAME = "model"
+SNAPSHOTS_DIRNAME = "snapshots"
 
 
 def best_model_path(run_dir: Path) -> Path:
@@ -78,3 +79,32 @@ def copy_best_to_final(run_dir: Path) -> bool:
         sidecar = run_dir / "metrics_best.json"
         sidecar.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return True
+
+
+def snapshots_dir(run_dir: Path) -> Path:
+    return run_dir / SNAPSHOTS_DIRNAME
+
+
+def save_periodic_snapshot(
+    run_dir: Path,
+    model: Any,
+    *,
+    elapsed_sec: float,
+    timesteps: int,
+    index: int,
+) -> Path:
+    """Write a numbered PPO checkpoint under runs/<id>/snapshots/."""
+    snap_dir = snapshots_dir(run_dir)
+    snap_dir.mkdir(parents=True, exist_ok=True)
+    mins = max(0, int(round(elapsed_sec / 60.0)))
+    stem = snap_dir / f"snapshot_{index:03d}_{mins:04d}m"
+    model.save(str(stem))
+    zip_path = stem.with_suffix(".zip")
+    meta = {
+        "elapsed_sec": round(elapsed_sec, 1),
+        "elapsed_min": mins,
+        "timesteps": timesteps,
+        "index": index,
+    }
+    stem.with_suffix(".meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return zip_path

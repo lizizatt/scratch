@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from runs_util import score_from_metrics, score_key_for_mode
+from runs_util import InvalidRunIdError, score_from_metrics, score_key_for_mode, validate_run_id
 
 
 class TestRunsUtil(unittest.TestCase):
@@ -18,6 +18,10 @@ class TestRunsUtil(unittest.TestCase):
     def test_score_from_metrics(self):
         self.assertEqual(score_from_metrics({"mode": "avoid", "avoid_score": 0.7}), 0.7)
         self.assertEqual(score_from_metrics({"mode": "navigate", "nav_score": 0.9}), 0.9)
+
+    def test_validate_run_id_rejects_dots(self):
+        with self.assertRaises(InvalidRunIdError):
+            validate_run_id("..")
 
 
 if __name__ == "__main__":

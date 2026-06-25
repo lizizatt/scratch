@@ -18,9 +18,14 @@ from colregs.evaluate import evaluate_steps
 from device_util import resolve_device
 from mission import NavigationMission
 from policy_infer import safe_model_predict
+from rewards import reward_config_from_overrides
+
+from runs_util import safe_run_dir, validate_run_id
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "runs"
+
+_MODEL_CACHE_MAX = 3
 
 WORLD_BOUNDS = dict(P.WORLD_BOUNDS)
 
@@ -45,24 +50,80 @@ _session_lock = threading.Lock()
 _session: Optional["ExerciseSession"] = None
 
 
+class ExerciseNotInitializedError(Exception):
+    """No active exercise session."""
+
+
+class GoalRejectedError(Exception):
+    """Waypoint could not be applied (mission planner rejected)."""
+
+
 def _load_run_metrics(run_id: str) -> Dict[str, Any]:
-    path = RUNS_DIR / run_id / "metrics.json"
+    safe_id = validate_run_id(run_id)
+    path = safe_run_dir(safe_id, RUNS_DIR) / "metrics.json"
     if not path.exists():
-        raise FileNotFoundError(f"Run not found: {run_id}")
+        raise FileNotFoundError(f"Run not found: {safe_id}")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_policy(run_id: str) -> PPO:
+    safe_id = validate_run_id(run_id)
     with _model_lock:
-        if run_id in _model_cache:
-            return _model_cache[run_id]
-        ckpt = RUNS_DIR / run_id / "model"
+        if safe_id in _model_cache:
+            return _model_cache[safe_id]
+        ckpt = safe_run_dir(safe_id, RUNS_DIR) / "model"
         if not (ckpt.with_suffix(".zip").exists() or ckpt.exists()):
-            raise FileNotFoundError(f"No model checkpoint for run {run_id}")
+            raise FileNotFoundError(f"No model checkpoint for run {safe_id}")
+        while len(_model_cache) >= _MODEL_CACHE_MAX:
+            _model_cache.pop(next(iter(_model_cache)))
         device = resolve_device("cpu")
         model = PPO.load(str(ckpt), device=device)
-        _model_cache[run_id] = model
+        _model_cache[safe_id] = model
         return model
+
+
+def _apply_exercise_spawn(
+    env: "BoatNavEnv",
+    *,
+    sx: float,
+    sy: float,
+    goal_x: float,
+    goal_y: float,
+    mission: NavigationMission,
+    seed: int,
+    contacts: List[P.ContactState],
+) -> None:
+    """Reset env without random scenario, then apply exercise pose and shared mission."""
+    env.reset(seed=seed)
+    env.mission = mission
+    env.own.x_m = sx
+    env.own.y_m = sy
+    env.own.speed_mps = 3.5
+    env.own.cmd_heading_rad = env.own.heading_rad
+    env.own.cmd_speed_mps = 3.5
+    env.origin_x = sx
+    env.origin_y = sy
+    env.goal_x = goal_x
+    env.goal_y = goal_y
+    env.contacts = contacts
+    env.initial_goal_range = P.goal_range(env.own, goal_x, goal_y)
+    env.prev_goal_range = env.initial_goal_range
+    env.leg_start_x = sx
+    env.leg_start_y = sy
+    env.goal_hold_steps = 0
+    env.step_count = 0
+    P.pack_observation(
+        env.own,
+        env.goal_x,
+        env.goal_y,
+        has_goal=True,
+        contacts=contacts,
+        origin_x=env.origin_x,
+        origin_y=env.origin_y,
+        current=env.water_current,
+        out=env._obs,
+    )
+    env._last_obs = env._obs
 
 
 class ExerciseSession:
@@ -90,6 +151,10 @@ class ExerciseSession:
         elif metrics.get("config", {}).get("dynamics_jitter") is not None:
             dyn_jitter = bool(metrics["config"]["dynamics_jitter"])
 
+        reward_weights = cfg.get("reward_weights") or {}
+        gated_hold = cfg.get("gated_hold")
+        reward_config = reward_config_from_overrides(reward_weights, gated_hold=gated_hold)
+
         self.run_id = run_id
         self.mode = str(metrics.get("mode", P.DEFAULT_MODE))
         self.model = load_policy(run_id)
@@ -113,32 +178,17 @@ class ExerciseSession:
                 goal_hold_sec=hold,
                 current_enabled=cur,
                 continuous=True,
+                reward_config=reward_config,
             )
-            env.reset(seed=7000 + i)
-            env.own.x_m = sx
-            env.own.y_m = sy
-            env.own.speed_mps = 3.5
-            env.own.cmd_heading_rad = env.own.heading_rad
-            env.own.cmd_speed_mps = 3.5
-            env.origin_x = sx
-            env.origin_y = sy
-            env.goal_x = self.goal_x
-            env.goal_y = self.goal_y
-            env.initial_goal_range = P.goal_range(env.own, self.goal_x, self.goal_y)
-            env.prev_goal_range = env.initial_goal_range
-            env.goal_hold_steps = 0
-            env.step_count = 0
-            env._last_obs = env._obs
-            P.pack_observation(
-                env.own,
-                env.goal_x,
-                env.goal_y,
-                has_goal=True,
-                contacts=[],
-                origin_x=env.origin_x,
-                origin_y=env.origin_y,
-                current=env.water_current,
-                out=env._obs,
+            _apply_exercise_spawn(
+                env,
+                sx=sx,
+                sy=sy,
+                goal_x=self.goal_x,
+                goal_y=self.goal_y,
+                mission=self.mission,
+                seed=7000 + i,
+                contacts=self.contacts,
             )
             self.vessels.append(env)
         self._sync_contacts_to_envs()
@@ -284,11 +334,11 @@ class ExerciseSession:
         self._invalidate_colregs_cache()
         self._record_trace_snapshot()
 
-    def set_goal(self, x_m: float, y_m: float) -> None:
+    def set_goal(self, x_m: float, y_m: float) -> bool:
         x_m, y_m = self._clip_xy(x_m, y_m)
         if not self.vessels:
             self.goal_x, self.goal_y = x_m, y_m
-            return
+            return True
         ref = self.vessels[0]
         tr = self.mission.set_goal(
             ref.own.x_m,
@@ -300,7 +350,7 @@ class ExerciseSession:
             P.goal_range_xy,
         )
         if tr is None:
-            return
+            return False
         self.goal_x = tr.goal_x
         self.goal_y = tr.goal_y
         for env in self.vessels:
@@ -312,9 +362,11 @@ class ExerciseSession:
             env.goal_hold_steps = 0
             env.initial_goal_range = gr
             env.prev_goal_range = gr
+            env.mission = self.mission
         self._sync_contacts_to_envs()
         self._invalidate_colregs_cache()
         self._record_trace_snapshot()
+        return True
 
     def step(self, n_steps: int = 1) -> None:
         n_steps = max(1, min(int(n_steps), EXERCISE_MAX_STEP_BATCH))
@@ -331,20 +383,16 @@ class ExerciseSession:
     def reset_vessels(self) -> None:
         for i, env in enumerate(self.vessels):
             sx, sy = DEFAULT_STARTS[i]
-            env.reset(seed=8000 + i)
-            env.own.x_m = sx
-            env.own.y_m = sy
-            env.own.speed_mps = 3.5
-            env.own.cmd_heading_rad = env.own.heading_rad
-            env.own.cmd_speed_mps = 3.5
-            env.origin_x = sx
-            env.origin_y = sy
-            env.goal_x = self.goal_x
-            env.goal_y = self.goal_y
-            env.initial_goal_range = P.goal_range(env.own, self.goal_x, self.goal_y)
-            env.prev_goal_range = env.initial_goal_range
-            env.goal_hold_steps = 0
-            env.step_count = 0
+            _apply_exercise_spawn(
+                env,
+                sx=sx,
+                sy=sy,
+                goal_x=self.goal_x,
+                goal_y=self.goal_y,
+                mission=self.mission,
+                seed=8000 + i,
+                contacts=self.contacts,
+            )
         self.traces = [[], [], []]
         self._invalidate_colregs_cache()
         self._sync_contacts_to_envs()
@@ -403,27 +451,52 @@ def get_session() -> Optional[ExerciseSession]:
         return _session
 
 
+def session_dict() -> Dict[str, Any]:
+    with _session_lock:
+        if _session is None:
+            raise ExerciseNotInitializedError("exercise not initialized")
+        return _session.to_dict()
+
+
 def init_session(
     run_id: str,
     *,
     goal_hold_sec: Optional[int] = None,
     current_enabled: Optional[bool] = None,
-) -> ExerciseSession:
+) -> Dict[str, Any]:
     global _session
+    safe_id = validate_run_id(run_id)
     session = ExerciseSession(
-        run_id,
+        safe_id,
         goal_hold_sec=goal_hold_sec,
         current_enabled=current_enabled,
     )
     with _session_lock:
         _session = session
-    return session
+        return _session.to_dict()
+
+
+def mutate_session(mutator) -> Dict[str, Any]:
+    with _session_lock:
+        if _session is None:
+            raise ExerciseNotInitializedError("exercise not initialized")
+        mutator(_session)
+        return _session.to_dict()
+
+
+def set_goal_locked(x_m: float, y_m: float) -> Dict[str, Any]:
+    def _mutator(session: ExerciseSession) -> None:
+        if not session.set_goal(x_m, y_m):
+            raise GoalRejectedError("goal rejected")
+
+    return mutate_session(_mutator)
 
 
 def resolve_exercise_run_id(run_id: Optional[str]) -> str:
     if run_id:
-        _load_run_metrics(run_id)
-        return run_id
+        safe_id = validate_run_id(str(run_id))
+        _load_run_metrics(safe_id)
+        return safe_id
     runs = sorted(
         [
             p
