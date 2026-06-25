@@ -16,7 +16,7 @@ from run_analysis import summarize_run
 from stable_baselines3 import PPO
 
 import prepare as P
-from train import run_eval
+from eval_runner import run_eval
 
 
 def main() -> None:

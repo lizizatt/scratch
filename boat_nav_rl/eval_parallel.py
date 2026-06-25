@@ -448,7 +448,7 @@ def run_eval_from_snapshot(
     workers: Optional[int] = None,
 ) -> Any:
     """Load policy from snapshot path and run eval (for async background thread)."""
-    from train import run_eval
+    from eval_runner import run_eval
 
     stem = checkpoint_stem(snapshot_stem)
     zip_path = checkpoint_zip_path(stem)

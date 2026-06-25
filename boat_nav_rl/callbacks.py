@@ -12,27 +12,23 @@ from async_eval import AsyncEvalRunner
 from checkpoint_util import save_best_checkpoint
 from curriculum import check_exit, get_phase, is_summary_better, metrics_to_summary
 from eval_parallel import EvalResult, checkpoint_zip_path, run_eval_from_snapshot, snapshot_model_for_eval
+from eval_runner import run_eval
 from runs_util import score_key_for_mode
+from scenario_seeds import eval_seeds_for_mode
+from train_config import (
+    CURRICULUM_EARLY_STOP,
+    CURRICULUM_EVAL_INTERVAL_SEC,
+    CURRICULUM_EVAL_MAX_SCENARIOS,
+    LIVE_EVAL_INTERVAL_SEC,
+    LIVE_EVAL_SCENARIOS,
+)
+import train_config as C
 from train_job_state import (
     RUNS_DIR,
     append_live_metric,
     is_cancel_requested,
     live_eval_extras,
 )
-
-
-def _train():
-    import train as train_mod
-
-    return train_mod
-
-
-def _run_eval(*args: Any, **kwargs: Any) -> Any:
-    return _train().run_eval(*args, **kwargs)
-
-
-def _eval_seeds_for_mode(mode: str) -> Any:
-    return _train().eval_seeds_for_mode(mode)
 
 
 def _eval_metrics(result: Any) -> Dict[str, Any]:
@@ -71,17 +67,12 @@ class LiveMetricsCallback(BaseCallback):
         run_dir: Optional[Path] = None,
     ) -> None:
         super().__init__()
-        train_mod = _train()
         self.model_holder = model_holder
         self.mode = mode
         self.run_id = run_id
         self.run_dir = run_dir or (RUNS_DIR / run_id)
-        self.interval_sec = (
-            train_mod.LIVE_EVAL_INTERVAL_SEC if interval_sec is None else interval_sec
-        )
-        self.max_scenarios = (
-            train_mod.LIVE_EVAL_SCENARIOS if max_scenarios is None else max_scenarios
-        )
+        self.interval_sec = LIVE_EVAL_INTERVAL_SEC if interval_sec is None else interval_sec
+        self.max_scenarios = LIVE_EVAL_SCENARIOS if max_scenarios is None else max_scenarios
         self.start_time = 0.0
         self.last_eval_time = 0.0
         self.eval_tick = 0
@@ -130,7 +121,7 @@ class LiveMetricsCallback(BaseCallback):
             ):
                 checkpoint_zip_path(stem).unlink(missing_ok=True)
             return
-        metrics = _run_eval(
+        metrics = run_eval(
             model,
             self.mode,
             max_scenarios=self.max_scenarios,
@@ -170,9 +161,9 @@ class LiveMetricsCallback(BaseCallback):
             return
         print("[live-eval] waiting for background eval to finish…")
         try:
-            metrics = self._async.drain(timeout=timeout)
-            if metrics is not None:
-                self._publish_metrics(_eval_metrics(metrics), time.time() - self.start_time)
+            result = self._async.drain(timeout=timeout)
+            if result is not None:
+                self._publish_metrics(_eval_metrics(result), time.time() - self.start_time)
         except Exception as exc:
             print(f"[live-eval] background eval failed: {exc}")
 
@@ -206,8 +197,8 @@ class CurriculumCheckpointCallback(BaseCallback):
         self.last_eval_time = self.start_time
 
     def _max_scenarios_for_eval(self, *, full: bool) -> Tuple[Optional[int], bool]:
-        n_seeds = len(_eval_seeds_for_mode(self.mode))
-        cap = _train().CURRICULUM_EVAL_MAX_SCENARIOS
+        n_seeds = len(eval_seeds_for_mode(self.mode))
+        cap = CURRICULUM_EVAL_MAX_SCENARIOS
         use_cap = (not full) and cap > 0 and n_seeds > cap
         max_sc = cap if use_cap else None
         return max_sc, use_cap
@@ -238,7 +229,7 @@ class CurriculumCheckpointCallback(BaseCallback):
             ):
                 checkpoint_zip_path(stem).unlink(missing_ok=True)
             return
-        metrics = _run_eval(
+        metrics = run_eval(
             model,
             self.mode,
             max_scenarios=max_sc,
@@ -250,7 +241,7 @@ class CurriculumCheckpointCallback(BaseCallback):
     def _run_eval_summary(self, *, full: bool) -> Dict[str, Any]:
         max_sc, use_cap = self._max_scenarios_for_eval(full=full)
         model = self.model_holder.get("model")
-        metrics = _run_eval(
+        metrics = run_eval(
             model,
             self.mode,
             max_scenarios=max_sc,
@@ -262,7 +253,6 @@ class CurriculumCheckpointCallback(BaseCallback):
         return summary
 
     def _handle_eval_metrics(self, metrics: Dict[str, Any]) -> None:
-        train_mod = _train()
         elapsed = time.time() - self.start_time
         summary = metrics_to_summary(metrics)
         summary["eval_capped"] = self._eval_was_capped
@@ -277,17 +267,16 @@ class CurriculumCheckpointCallback(BaseCallback):
         if self._eval_was_capped:
             return
         self._apply_summary(summary, elapsed)
-        if train_mod.CURRICULUM_EARLY_STOPPED:
+        if C.CURRICULUM_EARLY_STOPPED:
             return
 
     def _apply_summary(self, summary: Dict[str, Any], elapsed: float) -> None:
-        train_mod = _train()
         if not is_summary_better(self.phase, summary, self.best_summary):
             return
         self._maybe_save(summary, elapsed)
         passed, reasons = check_exit(self.phase, summary)
-        if passed and train_mod.CURRICULUM_EARLY_STOP:
-            train_mod.CURRICULUM_EARLY_STOPPED = True
+        if passed and CURRICULUM_EARLY_STOP:
+            C.CURRICULUM_EARLY_STOPPED = True
             print("[curriculum-eval] exit gate PASSED — early stop", flush=True)
             for line in reasons:
                 print(f"  {line}", flush=True)
@@ -324,7 +313,6 @@ class CurriculumCheckpointCallback(BaseCallback):
         )
 
     def _on_step(self) -> bool:
-        train_mod = _train()
         if is_cancel_requested():
             return False
         if self._async.enabled:
@@ -335,10 +323,10 @@ class CurriculumCheckpointCallback(BaseCallback):
             except Exception as exc:
                 print(f"[curriculum-eval] failed: {exc}", flush=True)
             if self._async.is_busy():
-                return not train_mod.CURRICULUM_EARLY_STOPPED
+                return not C.CURRICULUM_EARLY_STOPPED
         now = time.time()
-        if now - self.last_eval_time < train_mod.CURRICULUM_EVAL_INTERVAL_SEC:
-            return not train_mod.CURRICULUM_EARLY_STOPPED
+        if now - self.last_eval_time < CURRICULUM_EVAL_INTERVAL_SEC:
+            return not C.CURRICULUM_EARLY_STOPPED
         self.last_eval_time = now
         try:
             if self._async.enabled:
@@ -352,28 +340,26 @@ class CurriculumCheckpointCallback(BaseCallback):
                 ):
                     summary = self._run_eval_summary(full=True)
                 elif summary.get("eval_capped"):
-                    return not train_mod.CURRICULUM_EARLY_STOPPED
+                    return not C.CURRICULUM_EARLY_STOPPED
                 if not is_summary_better(self.phase, summary, self.best_summary):
-                    return not train_mod.CURRICULUM_EARLY_STOPPED
+                    return not C.CURRICULUM_EARLY_STOPPED
                 self._maybe_save(summary, elapsed)
                 passed, reasons = check_exit(self.phase, summary)
-                if passed and train_mod.CURRICULUM_EARLY_STOP:
-                    train_mod.CURRICULUM_EARLY_STOPPED = True
+                if passed and CURRICULUM_EARLY_STOP:
+                    C.CURRICULUM_EARLY_STOPPED = True
                     print("[curriculum-eval] exit gate PASSED — early stop", flush=True)
                     for line in reasons:
                         print(f"  {line}", flush=True)
         except Exception as exc:
             print(f"[curriculum-eval] skipped: {exc}", flush=True)
-        if train_mod.CURRICULUM_EARLY_STOPPED:
+        if C.CURRICULUM_EARLY_STOPPED:
             return False
         return True
 
     def drain_background_eval(self, timeout: float = 900.0) -> None:
         if not self._async.enabled or not self._async.is_busy():
             try:
-                result = self._async.poll()
-                if result is not None:
-                    self._handle_eval_metrics(_eval_metrics(result))
+                self._async.poll()
             except Exception as exc:
                 print(f"[curriculum-eval] background eval failed: {exc}", flush=True)
             return
@@ -384,4 +370,3 @@ class CurriculumCheckpointCallback(BaseCallback):
                 self._handle_eval_metrics(_eval_metrics(result))
         except Exception as exc:
             print(f"[curriculum-eval] background eval failed: {exc}", flush=True)
-

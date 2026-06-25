@@ -36,7 +36,7 @@ GPU: `pip install -r requirements-gpu.txt` (CUDA PyTorch).
 flowchart TB
   subgraph train_loop [Training loop]
     SEEDS[prepare.py scenarios]
-    ENV[BoatNavEnv in train.py]
+    ENV[BoatNavEnv in env.py]
     PPO[PPO policy]
     PLANT[Transfer-function plant]
     RWD[rewards.py shaping]
@@ -70,7 +70,9 @@ flowchart TB
 | Layer | Module | Role |
 |-------|--------|------|
 | Fixed sim contract | `prepare.py` | Obs layout (77 floats), plant dynamics, scenario seeds, world bounds |
-| Environment + training | `train.py` | `BoatNavEnv`, PPO, callbacks, `run_eval()` |
+| Environment | `env.py`, `env_factory.py` | `BoatNavEnv`, `make_env()` |
+| Training CLI | `train.py`, `train_config.py` | PPO loop, CONFIG, CLI |
+| Eval | `eval_runner.py` | `run_eval()`, robust eval |
 | Mission / waypoints | `mission.py` | Multi-leg goals, hold timers, Exercise-aligned triggers |
 | Reward shaping | `rewards.py` | 11-component breakdown (progress, hold, CPA, collision, …) |
 | Scenarios | `scenarios.py`, `scenario_templates.py` | Navigate shells, traffic encounters, exercise samplers |
@@ -92,7 +94,7 @@ flowchart TB
 
 **Success** = reach goal within `GOAL_SUCCESS_RANGE_M` (50 m) and complete the hold timer at minimum speed. **Navigate** mode teaches open-water waypoint following; **avoid** adds CPA penalties, collision terminals, and threat-in-zone terms.
 
-Set mode in `train.py` `CONFIG` or via CLI `--mode`. Curriculum phases override mode and scenario subsets automatically.
+Set mode in `train_config.py` `CONFIG` or via CLI `--mode`. Curriculum phases override mode and scenario subsets automatically.
 
 ---
 
@@ -102,10 +104,15 @@ Set mode in `train.py` `CONFIG` or via CLI `--mode`. Curriculum phases override 
 boat_nav_rl/
 ├── README.md                 ← this file
 ├── prepare.py                ← fixed obs/plant/seeds (do not edit during reward experiments)
-├── train.py                  ← Gym training CLI, eval orchestration
+├── train.py                  ← thin CLI entry point
+├── train_config.py           ← CONFIG globals, CLI / run-config parsing
 ├── env.py                    ← BoatNavEnv (Gymnasium environment)
-├── callbacks.py              ← PPO training callbacks (live eval, curriculum)
-├── train_job_state.py        ← Live metrics + cancel flag paths
+├── env_factory.py            ← make_env() for vectorized training
+├── scenario_seeds.py         ← train/eval seed loading and filters
+├── eval_runner.py            ← run_eval(), run_robust_eval()
+├── run_outputs.py            ← metrics, traces, checkpoint persistence
+├── callbacks.py              ← PPO callbacks (live eval, curriculum)
+├── train_job_state.py        ← live metrics + cancel flag paths
 ├── serve.py                  ← HTTP server for viz + training API
 ├── exercise.py               ← interactive sandbox backend
 ├── training_job.py           ← subprocess training launcher for browser UI
@@ -193,17 +200,24 @@ Defines what the policy sees and how the plant responds:
 - **Scenario seeds**: written to `runs/train_seeds.json` and `runs/eval_seeds.json` via `python prepare.py`
 - **World bounds** shared with Exercise (`WORLD_BOUNDS`)
 
-Do not edit during reward-tuning experiments — change `train.py` or `experiments/*.json` instead.
+Do not edit during reward-tuning experiments — change `train_config.py` or `experiments/*.json` instead.
 
-### `train.py` — environment and training
+### `train_config.py` — experiment CONFIG
 
-- **`BoatNavEnv`**: Gymnasium env wrapping plant, contacts, currents, mission controller, reward breakdown
+Edit the CONFIG section at the top of `train_config.py` between runs (mode, budget, PPO knobs, curriculum flags). `train.py` is the CLI entry point only.
+
+### `env.py` — Gymnasium environment
+
+- **`BoatNavEnv`**: plant, contacts, currents, mission controller, reward breakdown
 - **`NavigationMission`** integration: multi-leg waypoints, delayed reassignments, hold-at-goal
-- **PPO** with vectorized envs (`vecenv_util.py`), time-budget callback, live metrics, curriculum checkpoint callback
-- **`run_eval()`**: rolls out fixed eval seeds, returns metrics (+ traces when requested)
+
+### `train.py` — training CLI
+
+- **PPO** with vectorized envs (`env_factory.make_env`, `vecenv_util.py`), callbacks in `callbacks.py`
+- **`run_eval()`** in `eval_runner.py`: rolls out fixed eval seeds, returns `EvalResult`
 - **CLI flags**: `--mode`, `--budget`, `--resume`, `--reward-config`, `--curriculum-phase`, device, plant overrides
 
-Key `CONFIG` section at top of file (also overridable via env vars and `run_config.json`).
+Key `CONFIG` in `train_config.py` (also overridable via env vars and `run_config.json`).
 
 ### `rewards.py` — 11 reward components
 
@@ -322,7 +336,7 @@ All routes return JSON. Training pages poll these endpoints.
 
 ## Configuration
 
-### `train.py` CONFIG (top of file)
+### `train_config.py` CONFIG
 
 | Setting | Default | Notes |
 |---------|---------|-------|
@@ -340,7 +354,7 @@ All routes return JSON. Training pages poll these endpoints.
 |----------|---------|
 | `TRAIN_BUDGET_SEC`, `N_ENVS`, `TRAIN_DEVICE` | Training overrides |
 | `EVAL_WORKERS`, `EVAL_ASYNC`, `EVAL_PARALLEL_MIN_SCENARIOS` | Eval performance |
-| `CURRICULUM_PHASE` | Activate curriculum phase in `train.py` |
+| `CURRICULUM_PHASE` | Activate curriculum phase in `train_config.py` |
 | `SCENARIO_CATEGORY_PREFIX` | Filter training scenarios (comma-separated) |
 | `ROLLOUT_STEPS` | Total steps per PPO rollout (via `vecenv_util`) |
 
@@ -405,7 +419,7 @@ See [`TESTING.md`](TESTING.md) for manual smoke steps.
 
 ### Autoresearch-style single experiment
 
-1. Edit rewards or PPO knobs in `train.py` CONFIG.
+1. Edit rewards or PPO knobs in `train_config.py` CONFIG.
 2. `python train.py`
 3. Compare `runs/latest/metrics.json` `nav_score` or `avoid_score`.
 4. Keep or revert.
