@@ -15,11 +15,13 @@ from mission import MissionTransition, NavigationMission
 from policy_infer import safe_model_predict
 from rewards import (
     HOLD_AT_STOP_EPS_MPS,
+    RewardConfig,
     StepRewardInput,
     compute_step_reward,
     contact_step_metrics,
     energy_score_from_speeds,
     energy_score_from_trace,
+    get_reward_config,
 )
 
 DEFAULT_TRAIN_MAX_CONTACTS = 4
@@ -46,6 +48,7 @@ class BoatNavEnv(gym.Env):
         own_radius_m: float = P.OWN_RADIUS_M,
         include_reward_breakdown: bool = False,
         train_max_contacts: int = DEFAULT_TRAIN_MAX_CONTACTS,
+        reward_config: Optional[RewardConfig] = None,
     ) -> None:
         super().__init__()
         self.mode = mode
@@ -63,6 +66,7 @@ class BoatNavEnv(gym.Env):
         self.own_radius_m = float(own_radius_m)
         self.include_reward_breakdown = include_reward_breakdown
         self.train_max_contacts = max(1, int(train_max_contacts))
+        self.reward_config = reward_config or get_reward_config()
         self.episode_plant = self.nominal_plant
         self.water_current = P.WaterCurrent()
         self.goal_hold_steps = 0
@@ -292,7 +296,8 @@ class BoatNavEnv(gym.Env):
 
         curr_goal_range = P.goal_range(self.own, self.goal_x, self.goal_y)
         contact_metrics = contact_step_metrics(
-            self.own, self.contacts, self.water_current, self.own_radius_m
+            self.own, self.contacts, self.water_current, self.own_radius_m,
+            reward_config=self.reward_config,
         )
         in_goal_zone = curr_goal_range < P.GOAL_SUCCESS_RANGE_M
 
@@ -319,6 +324,7 @@ class BoatNavEnv(gym.Env):
                 leg_start_y=self.leg_start_y,
             ),
             include_breakdown=self.include_reward_breakdown,
+            reward_config=self.reward_config,
         )
         reward = reward_out.reward
         self.goal_hold_steps = reward_out.goal_hold_steps
