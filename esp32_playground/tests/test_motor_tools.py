@@ -9,8 +9,32 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
+import motor_app  # noqa: E402
 import motor_app_wifi  # noqa: E402
 from pg_protocol import WIFI_CMD_PORT, encode_command  # noqa: E402
+
+
+class TestMotorAppSerial(unittest.TestCase):
+    def test_send_writes_encoded_line(self):
+        ser = mock.Mock()
+        ser.in_waiting = 0
+        with mock.patch.object(motor_app, "drain"), mock.patch.object(
+            motor_app.time, "sleep"
+        ), mock.patch("builtins.print"):
+            motor_app.send(ser, "STOP", wait=0)
+        ser.write.assert_called_once_with(encode_command("STOP"))
+        ser.flush.assert_called_once()
+
+    def test_send_test_on_writes_hold_and_release(self):
+        ser = mock.Mock()
+        ser.in_waiting = 0
+        with mock.patch.object(motor_app, "drain"), mock.patch(
+            "builtins.input", return_value=""
+        ), mock.patch("builtins.print"):
+            motor_app.send_test_on(ser)
+        writes = [c.args[0] for c in ser.write.call_args_list]
+        self.assertEqual(writes[0], encode_command("TEST,ON"))
+        self.assertEqual(writes[1], encode_command(""))
 
 
 class TestMotorAppWifi(unittest.TestCase):

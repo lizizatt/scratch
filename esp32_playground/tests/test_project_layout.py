@@ -49,6 +49,8 @@ class TestProjectLayout(unittest.TestCase):
         self.assertTrue((ROOT / "tools" / "motor_app.py").is_file())
         self.assertTrue((ROOT / "tools" / "motor_app_wifi.py").is_file())
         self.assertTrue((ROOT / "tools" / "pg_protocol.py").is_file())
+        self.assertTrue((ROOT / "tools" / "pg_attitude.py").is_file())
+        self.assertTrue((ROOT / "tools" / "tune_attitude.py").is_file())
 
     def test_docs_present(self):
         for doc in ("WIRING.md", "MOTORS_WIRING.md", "WIFI.md", "memory.md"):

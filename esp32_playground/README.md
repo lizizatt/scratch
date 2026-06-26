@@ -59,7 +59,12 @@ cd c:\Users\liz\scratch\esp32_playground
 python run_tests.py
 ```
 
-30 unit tests — protocol, pin map, WiFi constants, repo layout. See [AGENTS.md](AGENTS.md#tests).
+30+ unit tests — protocol, pin map, WiFi constants, attitude filter, compile smoke. See [AGENTS.md](AGENTS.md#tests).
+
+```powershell
+python run_tests.py              # fast tests only if no arduino-cli
+python tools/tune_attitude.py --pitch-deg 20   # offline filter exploration
+```
 
 ## Board
 

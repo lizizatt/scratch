@@ -3,12 +3,9 @@
 #include <Arduino.h>
 #include <math.h>
 
-namespace {
+#include "attitude_config.h"
 
-constexpr float kRadToDeg = 57.2957795f;
-constexpr float kDegToRad = 0.0174532925f;
-constexpr float kAlpha = 0.98f;
-constexpr int kCalTarget = 80;
+namespace {
 
 float clampf(float v, float lo, float hi) {
   if (v < lo) return lo;
@@ -35,10 +32,10 @@ void AttitudeFilter::update(const ImuSample& s, float dt_s) {
     gy_bias_ += s.gy_dps;
     gz_bias_ += s.gz_dps;
     ++cal_samples_;
-    if (cal_samples_ >= kCalTarget) {
-      gx_bias_ /= kCalTarget;
-      gy_bias_ /= kCalTarget;
-      gz_bias_ /= kCalTarget;
+    if (cal_samples_ >= kAttitudeCalTarget) {
+      gx_bias_ /= kAttitudeCalTarget;
+      gy_bias_ /= kAttitudeCalTarget;
+      gz_bias_ /= kAttitudeCalTarget;
       have_gyro_bias_ = true;
       Serial.printf("Gyro bias: %.2f %.2f %.2f dps\n", gx_bias_, gy_bias_, gz_bias_);
     }
@@ -49,13 +46,16 @@ void AttitudeFilter::update(const ImuSample& s, float dt_s) {
   const float gy = s.gy_dps - gy_bias_;
   const float gz = s.gz_dps - gz_bias_;
 
-  const float accel_pitch = atan2f(s.ay_g, sqrtf(s.ax_g * s.ax_g + s.az_g * s.az_g)) * kRadToDeg;
+  const float accel_pitch =
+      atan2f(s.ay_g, sqrtf(s.ax_g * s.ax_g + s.az_g * s.az_g)) * kRadToDeg;
   const float accel_roll = atan2f(-s.ax_g, s.az_g) * kRadToDeg;
 
-  att_.pitch_deg = kAlpha * (att_.pitch_deg + gx * dt_s) + (1.0f - kAlpha) * accel_pitch;
-  att_.roll_deg = kAlpha * (att_.roll_deg + gy * dt_s) + (1.0f - kAlpha) * accel_roll;
+  att_.pitch_deg =
+      kAttitudeAlpha * (att_.pitch_deg + gx * dt_s) + (1.0f - kAttitudeAlpha) * accel_pitch;
+  att_.roll_deg =
+      kAttitudeAlpha * (att_.roll_deg + gy * dt_s) + (1.0f - kAttitudeAlpha) * accel_roll;
   att_.yaw_deg += gz * dt_s;
 
-  att_.pitch_deg = clampf(att_.pitch_deg, -89.0f, 89.0f);
-  att_.roll_deg = clampf(att_.roll_deg, -89.0f, 89.0f);
+  att_.pitch_deg = clampf(att_.pitch_deg, -kAttitudeClampDeg, kAttitudeClampDeg);
+  att_.roll_deg = clampf(att_.roll_deg, -kAttitudeClampDeg, kAttitudeClampDeg);
 }

@@ -98,12 +98,16 @@ python run_tests.py
 | `tests/test_board_pins.py` | `board_pins.h` vs `pin_finder.h` ribbon map |
 | `tests/test_wifi_constants.py` | `pg_link.cpp` / `docs/WIFI.md` / tools stay in sync |
 | `tests/test_motor_commands.py` | Firmware handler strings in `motor_drv8833.cpp` |
-| `tests/test_motor_tools.py` | `motor_app_wifi.py` UDP encoding (mocked) |
+| `tests/test_attitude.py` | Complementary filter + C++/Python config sync |
+| `tests/test_compile_smoke.py` | `build.ps1 -Action compile` (skipped if no arduino-cli) |
+| `tests/test_motor_tools.py` | `motor_app.py` / `motor_app_wifi.py` (mocked) |
 | `tests/test_project_layout.py` | Libraries, projects, docs exist |
 
-Shared protocol constants live in `tools/pg_protocol.py` — update there when changing WiFi ports or hold commands.
+Shared modules: `tools/pg_protocol.py` (commands/WiFi), `tools/pg_attitude.py` (filter reference for tuning — keep in sync with `libraries/pg_attitude/src/attitude_config.h`).
 
-Firmware compile is manual: `.\build.ps1 -Action compile`. No on-device HIL yet.
+Offline tuning: `python tools/tune_attitude.py --pitch-deg 15 --steps 300`
+
+Firmware compile smoke runs automatically when arduino-cli is installed; otherwise skipped.
 
 ## New project checklist
 
