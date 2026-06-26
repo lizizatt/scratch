@@ -7,6 +7,8 @@ import time
 
 import serial
 
+from pg_protocol import BENCH_SCRIPT_STEPS, encode_command, is_hold_test_command
+
 
 def drain(ser: serial.Serial, seconds: float = 0.5) -> None:
     deadline = time.time() + seconds
@@ -22,7 +24,7 @@ def drain(ser: serial.Serial, seconds: float = 0.5) -> None:
 
 def send(ser: serial.Serial, cmd: str, wait: float = 0.15) -> None:
     print(f">> {cmd}")
-    ser.write((cmd + "\n").encode())
+    ser.write(encode_command(cmd))
     ser.flush()
     time.sleep(wait)
     drain(ser, 2.0)
@@ -31,14 +33,14 @@ def send(ser: serial.Serial, cmd: str, wait: float = 0.15) -> None:
 def send_test_on(ser: serial.Serial) -> None:
     """TEST,ON blocks on the board until any serial key; we send one after Enter."""
     print(">> TEST,ON  (hold until you press Enter)")
-    ser.write(b"TEST,ON\n")
+    ser.write(encode_command("TEST,ON"))
     ser.flush()
     drain(ser, 1.0)
     try:
         input("Motors ON — press Enter to stop… ")
     except KeyboardInterrupt:
         print()
-    ser.write(b"\n")
+    ser.write(encode_command(""))
     ser.flush()
     drain(ser, 1.0)
 
@@ -60,23 +62,7 @@ def main() -> int:
     send(ser, "STOP", wait=0.3)
 
     if args.script:
-        steps = [
-            "PING",
-            "STATUS",
-            ("test_on",),
-            "ARM",
-            "A,70",
-            ("sleep", 2.0),
-            "STOP",
-            "ARM",
-            "B,70",
-            ("sleep", 2.0),
-            "STOP",
-            "ARM",
-            "RAMP,M,30,70,80",
-            ("sleep", 0.5),
-            "STOP",
-        ]
+        steps = BENCH_SCRIPT_STEPS
         for step in steps:
             if isinstance(step, tuple) and step[0] == "sleep":
                 time.sleep(step[1])
@@ -89,9 +75,7 @@ def main() -> int:
         ser.close()
         return 0
 
-    if args.command and args.command.upper() in (
-        "TEST,ON", "TEST,FULL", "TEST,A", "TEST,B", "DIAG,ON"
-    ):
+    if args.command and is_hold_test_command(args.command):
         send_test_on(ser)
         ser.close()
         return 0

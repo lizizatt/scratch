@@ -7,9 +7,14 @@ import socket
 import sys
 import time
 
-DEFAULT_HOST = "192.168.4.1"
-CMD_PORT = 4242
-TLM_PORT = 4243
+from pg_protocol import (
+    HOLD_TEST_COMMANDS,
+    WIFI_CMD_PORT,
+    WIFI_DEFAULT_IP,
+    WIFI_TLM_PORT,
+    encode_command,
+    is_hold_test_command,
+)
 
 
 def drain(sock: socket.socket, seconds: float = 0.5) -> None:
@@ -30,26 +35,26 @@ def drain(sock: socket.socket, seconds: float = 0.5) -> None:
 
 def send_cmd(sock: socket.socket, host: str, cmd: str, wait: float = 0.15) -> None:
     print(f">> {cmd}")
-    sock.sendto((cmd + "\n").encode(), (host, CMD_PORT))
+    sock.sendto(encode_command(cmd), (host, WIFI_CMD_PORT))
     time.sleep(wait)
     drain(sock, 2.0)
 
 
 def send_test_hold(sock: socket.socket, host: str, cmd: str) -> None:
     print(f">> {cmd}  (hold until Enter)")
-    sock.sendto((cmd + "\n").encode(), (host, CMD_PORT))
+    sock.sendto(encode_command(cmd), (host, WIFI_CMD_PORT))
     drain(sock, 1.0)
     try:
         input("Motors ON — press Enter to stop… ")
     except KeyboardInterrupt:
         print()
-    sock.sendto(b"\n", (host, CMD_PORT))
+    sock.sendto(encode_command(""), (host, WIFI_CMD_PORT))
     drain(sock, 1.0)
 
 
 def main() -> int:
     p = argparse.ArgumentParser(description="WiFi motor test for ESP32 playground")
-    p.add_argument("--host", default=DEFAULT_HOST, help="board SoftAP IP (default 192.168.4.1)")
+    p.add_argument("--host", default=WIFI_DEFAULT_IP, help="board SoftAP IP (default 192.168.4.1)")
     p.add_argument(
         "command",
         nargs="?",
@@ -61,14 +66,14 @@ def main() -> int:
     args = p.parse_args()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("", TLM_PORT))
+    sock.bind(("", WIFI_TLM_PORT))
     sock.setblocking(False)
 
     host = args.host
-    print(f"Target {host}:{CMD_PORT}  (join WiFi AP ESP32-Playground first)")
+    print(f"Target {host}:{WIFI_CMD_PORT}  (join WiFi AP ESP32-Playground first)")
 
     if args.listen:
-        print("Listening for telemetry on UDP", TLM_PORT)
+        print("Listening for telemetry on UDP", WIFI_TLM_PORT)
         try:
             while True:
                 drain(sock, 1.0)
@@ -77,8 +82,7 @@ def main() -> int:
 
     send_cmd(sock, host, "STOP", wait=0.3)
 
-    hold_cmds = {"TEST,ON", "TEST,FULL", "TEST,A", "TEST,B", "DIAG,ON"}
-    if args.command and args.command.upper() in hold_cmds:
+    if args.command and is_hold_test_command(args.command):
         send_test_hold(sock, host, args.command)
         sock.close()
         return 0
@@ -93,7 +97,7 @@ def main() -> int:
     try:
         while True:
             if args.keepalive > 0 and time.time() - last_ping >= args.keepalive:
-                sock.sendto(b"PING\n", (host, CMD_PORT))
+                sock.sendto(encode_command("PING"), (host, WIFI_CMD_PORT))
                 last_ping = time.time()
             drain(sock, 0.2)
             try:

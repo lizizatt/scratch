@@ -53,6 +53,14 @@ cd c:\Users\liz\scratch\esp32_playground
 - [docs/WIFI.md](docs/WIFI.md) — SoftAP, ports, watchdog
 - [docs/memory.md](docs/memory.md) — bench session notes
 
+## Tests
+
+```powershell
+python run_tests.py
+```
+
+30 unit tests — protocol, pin map, WiFi constants, repo layout. See [AGENTS.md](AGENTS.md#tests).
+
 ## Board
 
 - FQBN: `esp32:esp32:waveshare_esp32s3_touch_lcd_128:PSRAM=enabled`

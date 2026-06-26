@@ -85,10 +85,25 @@ See `docs/MOTORS_WIRING.md` and `docs/memory.md`.
 
 ## Tests
 
-No automated firmware CI yet. After substantive changes:
+Python unit tests (no hardware, no pytest required):
 
-1. `.\build.ps1 -Action compile`
-2. Note if upload was not run (hardware may be unavailable).
+```powershell
+cd esp32_playground
+python run_tests.py
+```
+
+| Module | Covers |
+|--------|--------|
+| `tests/test_pg_protocol.py` | Command encoding, TLM/STATUS parse, WiFi ports |
+| `tests/test_board_pins.py` | `board_pins.h` vs `pin_finder.h` ribbon map |
+| `tests/test_wifi_constants.py` | `pg_link.cpp` / `docs/WIFI.md` / tools stay in sync |
+| `tests/test_motor_commands.py` | Firmware handler strings in `motor_drv8833.cpp` |
+| `tests/test_motor_tools.py` | `motor_app_wifi.py` UDP encoding (mocked) |
+| `tests/test_project_layout.py` | Libraries, projects, docs exist |
+
+Shared protocol constants live in `tools/pg_protocol.py` — update there when changing WiFi ports or hold commands.
+
+Firmware compile is manual: `.\build.ps1 -Action compile`. No on-device HIL yet.
 
 ## New project checklist
 
