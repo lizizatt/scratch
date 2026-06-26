@@ -92,6 +92,14 @@ class TestRewardWeights(unittest.TestCase):
         ):
             self.assertIn(key, weights)
 
+    def test_cross_track_default_nonzero(self):
+        from rewards import RewardConfig
+
+        cfg = RewardConfig()
+        self.assertGreater(cfg.w_cross_track, 0.0)
+        self.assertEqual(cfg.w_cross_track, 0.65)
+        self.assertEqual(cfg.cross_track_scale_m, 60.0)
+
 
 class TestContactStepMetrics(unittest.TestCase):
     def test_empty_contacts(self):

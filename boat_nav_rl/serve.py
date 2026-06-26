@@ -21,7 +21,7 @@ from device_util import torch_device_info
 from runs_util import InvalidRunIdError, latest_run_id, safe_run_dir, score_from_metrics, validate_run_id
 from curriculum import list_ui_training_presets
 from rewards import gated_hold_enabled, reward_weights_dict
-from vecenv_util import max_n_envs, recommended_n_envs, training_perf_defaults
+from vecenv_util import recommended_n_envs, training_perf_defaults
 
 
 ROOT = Path(__file__).resolve().parent
@@ -115,10 +115,11 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_file(self, path: Path) -> None:
+    def _send_file(self, path: Path, *, cache_control: Optional[str] = None) -> None:
         if not path.exists() or not path.is_file():
             self.send_error(404, "Not found")
             return
@@ -128,6 +129,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
+        if cache_control:
+            self.send_header("Cache-Control", cache_control)
         self.end_headers()
         self.wfile.write(data)
 
@@ -176,7 +179,7 @@ class Handler(BaseHTTPRequestHandler):
                 result = TJ.start_training(
                     mode=parse_mode(body.get("mode"), P.DEFAULT_MODE),
                     budget_sec=parse_int(
-                        body.get("budget_sec"), 600, name="budget_sec", minimum=1, maximum=36000
+                        body.get("budget_sec"), 600, name="budget_sec", minimum=1
                     ),
                     resume_run_id=resume_run_id,
                     notes=str(body.get("notes", "")),
@@ -185,7 +188,6 @@ class Handler(BaseHTTPRequestHandler):
                         recommended_n_envs(),
                         name="n_envs",
                         minimum=1,
-                        maximum=max_n_envs(),
                     ),
                     device=parse_device(body.get("device"), "auto"),
                     dynamics_jitter=bool(body.get("dynamics_jitter", False)),
@@ -203,7 +205,7 @@ class Handler(BaseHTTPRequestHandler):
                         body.get("curriculum_phase"), name="curriculum_phase", minimum=0, maximum=3
                     ),
                     snapshot_interval_min=parse_int(
-                        body.get("snapshot_interval_min"), 0, name="snapshot_interval_min", minimum=0, maximum=600
+                        body.get("snapshot_interval_min"), 0, name="snapshot_interval_min", minimum=0
                     ),
                 )
             except ApiParseError as exc:
@@ -481,7 +483,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._send_json({"error": "invalid run id"}, status=400)
                     return
                 fname = "eval_step_montage.png" if parts[3] == "step_montage.png" else "eval_trajectory_montage.png"
-                self._send_file(run_dir / fname)
+                self._send_file(run_dir / fname, cache_control="no-store")
                 return
 
         # Static viz files
@@ -504,7 +506,8 @@ class Handler(BaseHTTPRequestHandler):
         rel = path.lstrip("/")
         candidate = (VIZ_DIR / rel).resolve()
         if str(candidate).startswith(str(VIZ_DIR.resolve())) and candidate.exists():
-            self._send_file(candidate)
+            cc = "no-cache" if candidate.suffix in (".js", ".html", ".css") else None
+            self._send_file(candidate, cache_control=cc)
             return
 
         self.send_error(404, "Not found")

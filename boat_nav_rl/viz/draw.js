@@ -190,6 +190,24 @@ const BoatNavDraw = (() => {
     return Math.round(p * (steps.length - 1));
   }
 
+  function drawScoreBadge(ctx, cellX, cellY, cellW, score) {
+    if (typeof BoatNavScoring === "undefined") return;
+    const text = BoatNavScoring.formatScore(score);
+    const color = BoatNavScoring.scoreColor(score);
+    ctx.font = "700 10px Segoe UI, system-ui, sans-serif";
+    const padX = 4;
+    const padY = 2;
+    const tw = ctx.measureText(text).width;
+    const boxW = tw + padX * 2;
+    const boxH = 14;
+    const x = cellX + cellW - boxW - 3;
+    const y = cellY + 3;
+    ctx.fillStyle = "rgba(8, 16, 28, 0.82)";
+    ctx.fillRect(x, y, boxW, boxH);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x + padX, y + boxH - padY - 1);
+  }
+
   function drawStepMontage(ctx, episodes, progress, width, height, options = {}) {
     const maxEpisodes = options.maxEpisodes ?? 48;
     const picked = subsampleEpisodes(episodes, maxEpisodes);
@@ -228,6 +246,12 @@ const BoatNavDraw = (() => {
         ctx.fillStyle = "rgba(143, 163, 191, 0.95)";
         ctx.fillText(label, col * cellW + 4, row * cellH + 12);
       }
+
+      if (options.showScores !== false && typeof BoatNavScoring !== "undefined") {
+        const mode = options.mode || ep.mode || "navigate";
+        const score = BoatNavScoring.episodeMissionScore(ep, mode);
+        drawScoreBadge(ctx, col * cellW, row * cellH, cellW, score);
+      }
     }
 
     const globalFrame = Math.round(progress * Math.max(maxSteps - 1, 0));
@@ -248,6 +272,7 @@ const BoatNavDraw = (() => {
     drawEpisodeFull,
     drawEpisodeFrame,
     drawStepMontage,
+    drawScoreBadge,
     subsampleEpisodes,
     episodeFrameIndex,
     drawPolyline,

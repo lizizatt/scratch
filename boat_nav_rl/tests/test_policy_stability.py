@@ -61,9 +61,9 @@ class TestSafeModelPredict(unittest.TestCase):
                 calls.append(obs.shape)
                 return np.array([0.1, -0.2], dtype=np.float32), None
 
-        action, _ = PI.safe_model_predict(FakeModel(), np.zeros(77, dtype=np.float32))
+        action, _ = PI.safe_model_predict(FakeModel(), np.zeros(P.OBS_DIM, dtype=np.float32))
         self.assertEqual(action.shape, (2,))
-        self.assertEqual(calls, [(77,)])
+        self.assertEqual(calls, [(P.OBS_DIM,)])
 
     def test_concurrent_predict_calls_are_serialized(self):
         active = 0
@@ -84,7 +84,7 @@ class TestSafeModelPredict(unittest.TestCase):
         model = SlowModel()
         threads = [
             threading.Thread(
-                target=lambda: PI.safe_model_predict(model, np.zeros(77, dtype=np.float32))
+                target=lambda: PI.safe_model_predict(model, np.zeros(P.OBS_DIM, dtype=np.float32))
             )
             for _ in range(4)
         ]

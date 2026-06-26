@@ -12,12 +12,15 @@ sys.path.insert(0, str(ROOT))
 
 import prepare as P
 from eval_parallel import (
+    MISSION_SCORE_VERSION,
     aggregate_eval_metrics,
     alloc_eval_snapshot_stem,
+    approach_factor,
     checkpoint_stem,
     checkpoint_zip_path,
     colregs_enabled_for_mode,
     episode_mission_score,
+    hold_multiplier,
     rollout_episodes_sequential,
 )
 from async_eval import AsyncEvalRunner
@@ -52,66 +55,144 @@ class TestColregsGating(unittest.TestCase):
 
 
 class TestEpisodeMissionScore(unittest.TestCase):
-    def test_partial_credit_zone_buzz_not_zero(self):
-        ep = {
+    def _ep(self, **kwargs):
+        base = {
             "success": False,
             "collision": False,
             "cpa_unsafe_in_goal": False,
-            "final_goal_range_m": 20.0,
-            "min_goal_range_m": 15.0,
-            "entered_goal_zone": True,
-            "goal_hold_steps": 0,
+            "cpa_unsafe_at_end": False,
+            "initial_goal_range_m": 400.0,
             "goal_hold_required": 30,
-            "energy_score": 0.7,
-            "mean_goal_zone_speed_mps": 7.5,
+            "goal_zone_speeds": [],
         }
+        base.update(kwargs)
+        return base
+
+    def test_mission_score_version_constant(self):
+        self.assertEqual(MISSION_SCORE_VERSION, 3)
+
+    def test_timeout_near_goal_without_zone_entry_gets_approach_credit(self):
+        ep = self._ep(
+            min_goal_range_m=55.0,
+            final_goal_range_m=55.0,
+            entered_goal_zone=False,
+            goal_hold_steps=0,
+        )
+        self.assertGreater(approach_factor(ep), 0.8)
+        self.assertGreater(episode_mission_score(ep, "navigate"), 0.75)
+
+    def test_flyby_scores_lower_than_steady_approach(self):
+        flyby = self._ep(
+            min_goal_range_m=10.0,
+            final_goal_range_m=200.0,
+            entered_goal_zone=True,
+            goal_hold_steps=0,
+        )
+        steady = self._ep(
+            min_goal_range_m=55.0,
+            final_goal_range_m=55.0,
+            entered_goal_zone=False,
+            goal_hold_steps=0,
+        )
+        self.assertLess(episode_mission_score(flyby, "navigate"), episode_mission_score(steady, "navigate"))
+
+    def test_zone_buzz_without_hold_scores_zero(self):
+        ep = self._ep(
+            min_goal_range_m=15.0,
+            final_goal_range_m=20.0,
+            entered_goal_zone=True,
+            goal_hold_steps=0,
+        )
+        self.assertEqual(hold_multiplier(ep), 0.0)
+        self.assertLess(episode_mission_score(ep, "avoid"), 0.01)
+
+    def test_partial_hold_credit(self):
+        ep = self._ep(
+            min_goal_range_m=5.0,
+            final_goal_range_m=8.0,
+            entered_goal_zone=True,
+            goal_hold_steps=20,
+            goal_zone_speeds=[0.05, 0.04],
+        )
         score = episode_mission_score(ep, "avoid")
-        self.assertGreater(score, 0.05)
-        self.assertLess(score, 0.5)
+        self.assertGreater(score, 0.35)
+        self.assertLess(score, 0.95)
 
     def test_full_success_near_one(self):
-        ep = {
-            "success": True,
-            "collision": False,
-            "cpa_unsafe_in_goal": False,
-            "final_goal_range_m": 5.0,
-            "min_goal_range_m": 5.0,
-            "entered_goal_zone": True,
-            "goal_hold_steps": 30,
-            "goal_hold_required": 30,
-            "energy_score": 0.9,
-        }
-        self.assertGreater(episode_mission_score(ep, "avoid"), 0.8)
-
-    def test_collision_soft_penalty_not_zero_if_close(self):
-        ep = {
-            "success": False,
-            "collision": True,
-            "cpa_unsafe_in_goal": False,
-            "final_goal_range_m": 10.0,
-            "min_goal_range_m": 10.0,
-            "entered_goal_zone": True,
-            "goal_hold_steps": 5,
-            "goal_hold_required": 30,
-            "energy_score": 0.8,
-        }
-        clean = dict(ep, collision=False)
-        self.assertGreater(episode_mission_score(ep, "avoid"), 0.0)
-        self.assertLess(
-            episode_mission_score(ep, "avoid"),
-            episode_mission_score(clean, "avoid"),
+        ep = self._ep(
+            success=True,
+            min_goal_range_m=5.0,
+            final_goal_range_m=5.0,
+            entered_goal_zone=True,
+            goal_hold_steps=30,
+            goal_zone_speeds=[0.05] * 30,
         )
+        self.assertGreater(episode_mission_score(ep, "avoid"), 0.85)
+
+    def test_fast_cruise_not_crushed_vs_slow_when_not_in_zone(self):
+        ep = self._ep(
+            success=True,
+            min_goal_range_m=3.0,
+            final_goal_range_m=3.0,
+            entered_goal_zone=True,
+            goal_hold_steps=30,
+            goal_zone_speeds=[0.05] * 30,
+        )
+        slow = episode_mission_score(ep, "navigate")
+        self.assertGreater(slow, 0.85)
+
+    def test_collision_scores_below_clean_approach(self):
+        ep = self._ep(
+            collision=True,
+            min_goal_range_m=10.0,
+            final_goal_range_m=12.0,
+            entered_goal_zone=True,
+            goal_hold_steps=5,
+        )
+        clean = dict(ep, collision=False)
+        self.assertLess(episode_mission_score(ep, "avoid"), episode_mission_score(clean, "avoid"))
 
     def test_far_from_goal_near_zero(self):
-        ep = {
-            "success": False,
-            "collision": False,
-            "final_goal_range_m": 400.0,
-            "min_goal_range_m": 400.0,
-            "entered_goal_zone": False,
-            "energy_score": 0.9,
-        }
-        self.assertLess(episode_mission_score(ep, "avoid"), 0.01)
+        ep = self._ep(min_goal_range_m=400.0, final_goal_range_m=400.0, entered_goal_zone=False)
+        self.assertLess(episode_mission_score(ep, "avoid"), 0.05)
+
+    def test_cpa_unsafe_at_end_not_latched_mid_episode(self):
+        ep = self._ep(
+            cpa_unsafe_in_goal=True,
+            cpa_unsafe_at_end=False,
+            min_goal_range_m=5.0,
+            final_goal_range_m=5.0,
+            entered_goal_zone=True,
+            goal_hold_steps=30,
+            success=True,
+        )
+        self.assertGreater(episode_mission_score(ep, "avoid"), 0.8)
+
+    def test_direct_path_scores_above_wide_arc(self):
+        direct = self._ep(
+            success=True,
+            min_goal_range_m=5.0,
+            final_goal_range_m=5.0,
+            entered_goal_zone=True,
+            goal_hold_steps=30,
+            mean_cross_track_m=12.0,
+            max_cross_track_m=28.0,
+            goal_zone_speeds=[0.05] * 30,
+        )
+        wide_arc = self._ep(
+            success=True,
+            min_goal_range_m=4.0,
+            final_goal_range_m=4.0,
+            entered_goal_zone=True,
+            goal_hold_steps=30,
+            mean_cross_track_m=75.0,
+            max_cross_track_m=110.0,
+            goal_zone_speeds=[0.05] * 30,
+        )
+        self.assertGreater(
+            episode_mission_score(direct, "navigate"),
+            episode_mission_score(wide_arc, "navigate"),
+        )
 
 
 class TestAggregateEvalMetrics(unittest.TestCase):
@@ -158,6 +239,8 @@ class TestAggregateEvalMetrics(unittest.TestCase):
         metrics, traces = result.metrics, result.traces
         self.assertEqual(metrics["eval_episodes"], 1)
         self.assertEqual(len(traces), 1)
+        self.assertIn("mission_score", traces[0])
+        self.assertEqual(traces[0].get("mission_score_version"), MISSION_SCORE_VERSION)
         self.assertNotIn("colregs_mean_safety", metrics)
 
     def test_avoid_runs_colregs_when_traces(self):
@@ -225,13 +308,13 @@ class TestAggregateEvalMetrics(unittest.TestCase):
                 "success": False,
                 "collision": False,
                 "cpa_unsafe_in_goal": False,
-                "final_goal_range_m": 20.0,
-                "min_goal_range_m": 15.0,
-                "entered_goal_zone": True,
+                "final_goal_range_m": 55.0,
+                "min_goal_range_m": 55.0,
+                "initial_goal_range_m": 400.0,
+                "entered_goal_zone": False,
                 "goal_hold_steps": 0,
                 "goal_hold_required": 30,
-                "energy_score": 0.7,
-                "goal_zone_speeds": [7.0],
+                "goal_zone_speeds": [],
             }
         ]
         metrics = aggregate_eval_metrics(

@@ -35,6 +35,13 @@ def get_json(base: str, path: str, expect_ok: bool = True) -> dict:
         return data
 
 
+def get_response_headers(base: str, path: str) -> dict:
+    req = urllib.request.Request(base + path)
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        resp.read()
+        return dict(resp.headers)
+
+
 def post_json(base: str, path: str, payload: dict) -> tuple:
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
@@ -67,6 +74,10 @@ class TestHttpApi(unittest.TestCase):
         self.assertEqual(data["api_version"], API_VERSION)
         self.assertIn("gpu", data)
         self.assertIn("cuda_available", data["gpu"])
+
+    def test_api_json_no_store_cache(self):
+        headers = get_response_headers(self.base, "/api/health")
+        self.assertEqual(headers.get("Cache-Control"), "no-store")
 
     def test_history_is_json(self):
         data = get_json(self.base, "/api/history")
@@ -124,6 +135,23 @@ class TestHttpApi(unittest.TestCase):
         self.assertEqual(phase1["mode"], "avoid")
         self.assertFalse(phase1["gated_hold"])
         self.assertIsInstance(phase1["scenario_category_prefixes"], list)
+
+    def test_train_accepts_high_n_envs(self):
+        payload = {"mode": "navigate", "budget_sec": 60, "n_envs": 512}
+        try:
+            status, body = post_json(self.base, "/api/train", payload)
+            if body.get("ok"):
+                try:
+                    post_json(self.base, "/api/train/cancel", {})
+                except urllib.error.HTTPError:
+                    pass
+        except urllib.error.HTTPError as e:
+            body = json.loads(e.read().decode("utf-8"))
+            if e.code == 409:
+                self.assertIn("running", body.get("error", "").lower())
+                return
+            self.assertEqual(e.code, 400, body)
+            self.assertNotIn("must be <= 64", body.get("error", ""))
 
     def test_train_rejects_invalid_budget(self):
         req = urllib.request.Request(

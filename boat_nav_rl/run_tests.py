@@ -21,7 +21,7 @@ def run_js_tests() -> int:
         return 0
     print("Running Node viz unit tests...")
     result = subprocess.run(
-        [node, "--test", str(js_dir / "test_util.test.mjs"), str(js_dir / "test_train_form.test.mjs"), str(js_dir / "test_api_queue.test.mjs")],
+        [node, "--test", str(js_dir / "test_util.test.mjs"), str(js_dir / "test_train_form.test.mjs"), str(js_dir / "test_api_queue.test.mjs"), str(js_dir / "test_scoring.test.mjs")],
         cwd=str(ROOT),
     )
     return result.returncode

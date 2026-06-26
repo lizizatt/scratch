@@ -99,7 +99,9 @@ def _apply_exercise_spawn(
     env.own.x_m = sx
     env.own.y_m = sy
     env.own.speed_mps = 3.5
-    env.own.cmd_heading_rad = env.own.heading_rad
+    init_brg = math.atan2(goal_x - sx, goal_y - sy)
+    env.own.heading_rad = init_brg
+    env.own.cmd_heading_rad = init_brg
     env.own.cmd_speed_mps = 3.5
     env.origin_x = sx
     env.origin_y = sy

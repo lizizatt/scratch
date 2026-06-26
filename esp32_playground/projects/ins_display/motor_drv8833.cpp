@@ -1,5 +1,7 @@
 #include "motor_drv8833.h"
 
+#include <pg_link.h>
+
 #include "board_pins.h"
 
 namespace {
@@ -21,7 +23,7 @@ uint8_t g_pct_b = 0;
 const uint8_t kMotorPins[] = {PIN_MOTOR_A1, PIN_MOTOR_A2, PIN_MOTOR_B1, PIN_MOTOR_B2};
 
 void reply(const char* msg) {
-  Serial.println(msg);
+  pg_link_reply(msg);
 }
 
 void drv8833_wake() {
@@ -174,10 +176,8 @@ bool begin_test_hold(const String& line) {
   reply("DIAG,motor across OUT1-OUT2 not OUT-GND; meter OUT1 vs OUT2 ~7V");
   reply("DIAG,J2 OPEN; EEP -> GPIO4; ULT high=fault if low");
   while (g_test_on) {
-    if (Serial.available()) {
-      while (Serial.available()) {
-        Serial.read();
-      }
+    if (pg_link_input_pending()) {
+      pg_link_consume_input();
       motor_stop();
       reply("OK,TEST,OFF");
       return true;

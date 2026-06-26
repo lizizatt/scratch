@@ -2,7 +2,7 @@
  * boat_nav_rl_interface.h
  *
  * Stable C ABI between RL training (Python) and the vehicle control stack.
- * Must match prepare.pack_observation() flat layout (schema v3).
+ * Must match prepare.pack_observation() flat layout (schema v4).
  * Version bumps require BNRL_SCHEMA_VERSION increment and ONNX re-export.
  */
 #ifndef BOAT_NAV_RL_INTERFACE_H
@@ -16,21 +16,25 @@ extern "C" {
 #endif
 
 #define BNRL_MAX_CONTACTS 8
-#define BNRL_SCHEMA_VERSION 3
+#define BNRL_SCHEMA_VERSION 4
 
-/** Per-contact flat fields: bearing(2) + range(1) + cog(2) + sog(1) + radius(1) = 7 */
-#define BNRL_CONTACT_OBS_DIM 7
+/** Per-contact: bearing(2) + range(1) + rel_cog(2) + rel_vel_body(2) + radius(1) = 8 */
+#define BNRL_CONTACT_OBS_DIM 8
 
 /**
  * Flat obs row-major layout (matches prepare.pack_observation):
- *   own(6) + water_current(3) + contacts(7*8) + mask(8) + goal(3) + has_goal(1) = 77
+ *   own(6) + water_current(3) + contacts(8*8) + mask(8) + goal(3) + has_goal(1) = 85
  *
  * own[0..5]:   heading/pi, speed/V_MAX, yaw_rate/YAW_MAX, pos_x/POS_SCALE, pos_y/POS_SCALE, reserved(0)
- * current[6..8]: speed/CURRENT_MAX, sin(direction), cos(direction)  [wind slots repurposed]
- * contact i base 9+i*7: bearing_sin, bearing_cos, range/RANGE_SCALE, cog_sin, cog_cos, sog/V_MAX, radius/RADIUS_SCALE
- * mask[65..72]: 1.0 if contact slot active
- * goal[73..75]: bearing_sin, bearing_cos, range/RANGE_SCALE
- * has_goal[76]: 1.0 if goal fields valid
+ * current[6..8]: speed/CURRENT_MAX, sin(direction), cos(direction)
+ * contact i base 9+i*8:
+ *   bearing_sin, bearing_cos, range/RANGE_SCALE,
+ *   rel_cog_sin, rel_cog_cos (contact COG relative to own bow),
+ *   rel_vel_fwd/REL_VEL_SCALE, rel_vel_stbd/REL_VEL_SCALE (body-frame ground rel vel),
+ *   radius/RADIUS_SCALE
+ * mask[73..80]: 1.0 if contact slot active
+ * goal[81..83]: bearing_sin, bearing_cos, range/RANGE_SCALE
+ * has_goal[84]: 1.0 if goal fields valid
  */
 #define BNRL_OBS_FLAT_LEN (6 + 3 + (BNRL_MAX_CONTACTS * BNRL_CONTACT_OBS_DIM) + BNRL_MAX_CONTACTS + 3 + 1)
 
@@ -46,40 +50,37 @@ extern "C" {
 
 typedef struct {
     double timestamp_s;
-    double heading_rad;       /* true heading, 0 = north, +CW (document in stack) */
+    double heading_rad;       /* true heading, 0 = north, +CW */
     double speed_mps;         /* through-water speed at own ship */
     double yaw_rate_rps;
-    double pos_x_m;           /* local frame, origin at own ship at episode reset */
+    double pos_x_m;           /* local frame, origin at episode reset */
     double pos_y_m;
     double reserved_own;      /* flat obs index 5 — always 0.0 in training */
-    double current_speed_mps; /* water current speed (flat obs 6) */
-    double current_sin;       /* sin(current direction), flat obs 7 */
-    double current_cos;       /* cos(current direction), flat obs 8 */
-    uint32_t num_contacts;    /* active entries in contacts[]; remainder padded */
-    uint32_t has_goal;        /* BNRL_OBS_HAS_GOAL if goal fields valid */
+    double current_speed_mps;
+    double current_sin;
+    double current_cos;
+    uint32_t num_contacts;
+    uint32_t has_goal;
     double goal_bearing_sin;
     double goal_bearing_cos;
-    double goal_range_m;      /* slant range to waypoint (flat obs 75 uses range/RANGE_SCALE) */
+    double goal_range_m;
     struct {
         double bearing_sin;
         double bearing_cos;
         double range_m;
-        double cog_sin;
-        double cog_cos;
-        double sog_mps;
-        double radius_m;      /* contact vessel radius (flat obs uses radius/RADIUS_SCALE) */
+        double rel_cog_sin;
+        double rel_cog_cos;
+        double rel_vel_fwd_mps;
+        double rel_vel_stbd_mps;
+        double radius_m;
     } contacts[BNRL_MAX_CONTACTS];
 } bnrl_observation_t;
 
 typedef struct {
-    double desired_heading_rad; /* absolute setpoint */
+    double desired_heading_rad;
     double desired_speed_mps;
 } bnrl_action_t;
 
-/**
- * COLREGs compliance breakdown from the vehicle stack.
- * All fields use the same scale; document whether [0,1] or [-1,1] in stack README.
- */
 typedef struct {
     double total;
     double rule_applicability;
@@ -91,19 +92,10 @@ typedef struct {
 
 typedef struct bnrl_vessel_state bnrl_vessel_state_t;
 
-/** Create sim or live adapter from JSON config path. Returns NULL on failure. */
 bnrl_vessel_state_t* bnrl_create(const char* config_json_path);
 
 void bnrl_destroy(bnrl_vessel_state_t* state);
 
-/**
- * Apply setpoints to transfer-function plant (sim) or live stack (deploy),
- * advance one planner tick (dt in config), fill observation.
- *
- * colregs_out is written only when *encounter_closed_out is non-zero
- * (evaluator runs after encounter closes, not every tick).
- * Returns 0 on success, non-zero on error.
- */
 int bnrl_step(
     bnrl_vessel_state_t* state,
     const bnrl_action_t* action,
@@ -112,20 +104,11 @@ int bnrl_step(
     bnrl_colregs_score_t* colregs_out
 );
 
-/**
- * Pack observation into row-major float vector for ONNX / PyTorch.
- * Layout must match prepare.pack_observation() in Python training (schema v3).
- * mask[i] = 1.0 if contact i active, else 0.0.
- */
 int bnrl_observation_to_flat(
     const bnrl_observation_t* obs,
     float out[BNRL_OBS_FLAT_LEN]
 );
 
-/**
- * Denormalize policy outputs into action struct.
- * in[0], in[1] are normalized actions in [-1, 1] (SB3 Box space).
- */
 int bnrl_action_from_flat(
     bnrl_vessel_state_t* state,
     const float in[2],

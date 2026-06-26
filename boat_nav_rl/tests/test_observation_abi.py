@@ -10,13 +10,13 @@ import prepare as P
 
 class TestObservationAbi(unittest.TestCase):
     def test_schema_version_matches_header(self):
-        self.assertEqual(P.OBS_SCHEMA_VERSION, 3)
-        self.assertEqual(P.OBS_DIM, 77)
+        self.assertEqual(P.OBS_SCHEMA_VERSION, 4)
+        self.assertEqual(P.OBS_DIM, 85)
 
     def test_flat_layout_offsets_match_header(self):
-        self.assertEqual(P.OBS_MASK_OFFSET, 65)
-        self.assertEqual(P.OBS_GOAL_OFFSET, 73)
-        self.assertEqual(P.OBS_HAS_GOAL_OFFSET, 76)
+        self.assertEqual(P.OBS_MASK_OFFSET, 73)
+        self.assertEqual(P.OBS_GOAL_OFFSET, 81)
+        self.assertEqual(P.OBS_HAS_GOAL_OFFSET, 84)
         self.assertEqual(P.OBS_DIM, P.OBS_HAS_GOAL_OFFSET + 1)
 
     def test_golden_vector_no_contacts(self):
@@ -57,7 +57,7 @@ class TestObservationAbi(unittest.TestCase):
         )
         self.assertAlmostEqual(obs[P.OBS_HAS_GOAL_OFFSET], 1.0, places=5)
 
-    def test_golden_vector_one_contact_radius_slot(self):
+    def test_golden_vector_one_contact_relative_motion(self):
         own = P.VesselState(x_m=0.0, y_m=0.0, heading_rad=0.0, speed_mps=3.0)
         contact = P.ContactState(
             x_m=0.0,
@@ -71,13 +71,35 @@ class TestObservationAbi(unittest.TestCase):
         obs = P.pack_observation(own, 500.0, 0.0, True, [contact], 0.0, 0.0)
         base = P.OBS_OWN_DIM + P.OBS_CURRENT_DIM
         self.assertAlmostEqual(obs[P.OBS_MASK_OFFSET], 1.0, places=5)
+        rel_cog_sin, rel_cog_cos, rel_fwd, rel_stbd = P.contact_relative_motion(
+            own, contact
+        )
+        self.assertAlmostEqual(obs[base + 3], rel_cog_sin, places=5)
+        self.assertAlmostEqual(obs[base + 4], rel_cog_cos, places=5)
+        self.assertAlmostEqual(obs[base + 5], rel_fwd / P.REL_VEL_SCALE_MPS, places=5)
+        self.assertAlmostEqual(obs[base + 6], rel_stbd / P.REL_VEL_SCALE_MPS, places=5)
         self.assertAlmostEqual(
-            obs[base + 6],
+            obs[base + 7],
             contact.radius_m / P.RADIUS_SCALE_M,
             places=5,
-            msg="contact slot 6 must be normalized radius (schema v3)",
         )
-        self.assertAlmostEqual(obs[base + 5], 2.0 / P.SPEED_SCALE_MPS, places=5)
+        self.assertAlmostEqual(rel_fwd, -5.0, places=5)
+        self.assertAlmostEqual(rel_stbd, 0.0, places=5)
+
+    def test_relative_cog_rotates_with_own_heading(self):
+        contact = P.ContactState(
+            x_m=100.0,
+            y_m=0.0,
+            cog_rad=math.radians(90.0),
+            sog_mps=4.0,
+            speed_mps=4.0,
+        )
+        own_a = P.VesselState(heading_rad=0.0, speed_mps=3.0)
+        own_b = P.VesselState(heading_rad=math.radians(90.0), speed_mps=3.0)
+        _, cos_a, _, _ = P.contact_relative_motion(own_a, contact)
+        _, cos_b, _, _ = P.contact_relative_motion(own_b, contact)
+        self.assertAlmostEqual(cos_a, math.cos(math.radians(90.0)), places=5)
+        self.assertAlmostEqual(cos_b, 1.0, places=5)
 
     def test_golden_vector_digest(self):
         """Regression fingerprint — update only when OBS layout changes intentionally."""
@@ -85,3 +107,7 @@ class TestObservationAbi(unittest.TestCase):
         obs = P.pack_observation(own, 100.0, 0.0, True, [], 0.0, 0.0)
         digest = float(np.round(obs, 4).sum())
         self.assertAlmostEqual(digest, 3.3, places=3)
+
+
+if __name__ == "__main__":
+    unittest.main()

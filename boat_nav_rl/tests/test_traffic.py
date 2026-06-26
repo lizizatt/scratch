@@ -46,7 +46,7 @@ class TestVesselSizes(unittest.TestCase):
             vessel_class="freighter",
         )
         obs = P.pack_observation(own, 0.0, 900.0, True, [contact], 0.0, 0.0)
-        self.assertAlmostEqual(obs[9 + 6], 35.0 / P.RADIUS_SCALE_M, places=4)
+        self.assertAlmostEqual(obs[9 + 7], 35.0 / P.RADIUS_SCALE_M, places=4)
 
 
 class TestCpaGeometry(unittest.TestCase):
@@ -171,7 +171,7 @@ class TestTrainContactCount(unittest.TestCase):
             obs, _ = env.reset(seed=seed)
             n = len(env.contacts)
             counts.add(n)
-            mask_sum = int(obs[65:73].sum())
+            mask_sum = int(obs[P.OBS_MASK_OFFSET : P.OBS_GOAL_OFFSET].sum())
             self.assertEqual(mask_sum, n)
             self.assertGreaterEqual(n, 1)
             self.assertLessEqual(n, TRAIN_MAX_CONTACTS)

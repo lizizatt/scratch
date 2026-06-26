@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serial motor test for ESP32 + DRV8833 — same commands as heli L298N MVP."""
+"""Serial motor test for ESP32 playground ins_display — USB @ 115200."""
 
 import argparse
 import sys

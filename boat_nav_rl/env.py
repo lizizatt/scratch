@@ -146,31 +146,53 @@ class BoatNavEnv(gym.Env):
         while len(self.contacts) < target_n:
             self.contacts.append(self._spawn_random_contact())
 
+    def _scenario_allows_stretch_goal(self, scenario: Optional[P.ScenarioSeed]) -> bool:
+        if scenario is None:
+            return True
+        if scenario.waypoint_events:
+            return False
+        if scenario.goal_relocate_x_m is not None:
+            return False
+        return True
+
     def _sample_training_scenario(self) -> None:
+        loaded: Optional[P.ScenarioSeed] = None
         if self.train_seeds:
-            scenario = self.train_seeds[int(self.rng.integers(len(self.train_seeds)))]
-            self._load_scenario(scenario)
-            return
+            loaded = self.train_seeds[int(self.rng.integers(len(self.train_seeds)))]
+            self._load_scenario(loaded)
+        else:
+            self.own = P.VesselState()
+            self.own.heading_rad = float(self.rng.uniform(-math.pi, math.pi))
+            self.own.speed_mps = float(self.rng.uniform(2.5, 5.5))
+            self.own.cmd_heading_rad = self.own.heading_rad
+            self.own.cmd_speed_mps = self.own.speed_mps
 
-        self.own = P.VesselState()
-        self.own.heading_rad = math.radians(float(self.rng.uniform(-45, 45)))
-        self.own.speed_mps = float(self.rng.uniform(2.5, 5.5))
-        self.own.cmd_heading_rad = self.own.heading_rad
-        self.own.cmd_speed_mps = self.own.speed_mps
+            self.origin_x = self.own.x_m
+            self.origin_y = self.own.y_m
 
-        self.origin_x = self.own.x_m
-        self.origin_y = self.own.y_m
+            self.contacts = []
+            if self.mode in ("avoid", "all") and not self.train_seeds:
+                n = int(self.rng.integers(1, self._train_max_contacts() + 1))
+                for _ in range(n):
+                    self.contacts.append(self._spawn_random_contact())
 
-        angle = float(self.rng.uniform(-math.pi / 3, math.pi / 3))
-        dist = float(self.rng.uniform(500, 1200))
-        self.goal_x = self.own.x_m + dist * math.sin(angle)
-        self.goal_y = self.own.y_m + dist * math.cos(angle)
-
-        self.contacts = []
-        if self.mode in ("avoid", "all") and not self.train_seeds:
-            n = int(self.rng.integers(1, self._train_max_contacts() + 1))
-            for _ in range(n):
-                self.contacts.append(self._spawn_random_contact())
+        if loaded is None:
+            self.goal_x, self.goal_y = P.sample_training_goal_xy(
+                self.own.x_m,
+                self.own.y_m,
+                self.rng,
+                max_episode_steps=self._base_max_episode_steps,
+                goal_hold_sec=self.goal_hold_sec,
+            )
+        elif self._scenario_allows_stretch_goal(loaded) and self.rng.random() < P.STRETCH_GOAL_PROB:
+            self.goal_x, self.goal_y = P.sample_training_goal_xy(
+                self.own.x_m,
+                self.own.y_m,
+                self.rng,
+                max_episode_steps=self._base_max_episode_steps,
+                goal_hold_sec=self.goal_hold_sec,
+                force_stretch=True,
+            )
 
     def _load_scenario(self, scenario: P.ScenarioSeed) -> None:
         self.own = P.VesselState(
@@ -429,10 +451,13 @@ class BoatNavEnv(gym.Env):
 
         collision = False
         success = False
+        cpa_unsafe_at_end = False
         final_goal_range_m = P.goal_range(self.own, self.goal_x, self.goal_y)
+        initial_goal_range_m = float(self.initial_goal_range)
         min_goal_range_m = final_goal_range_m
         entered_goal_zone = final_goal_range_m < P.GOAL_SUCCESS_RANGE_M
         goal_zone_speeds: List[float] = []
+        en_route_cross_tracks: List[float] = []
         max_goal_hold_steps = 0
         goal_hold_required = self.goal_hold_steps_required
         breakdown_sums: Dict[str, float] = {}
@@ -453,6 +478,17 @@ class BoatNavEnv(gym.Env):
             speeds.append(speed_mps)
             if final_goal_range_m < P.GOAL_SUCCESS_RANGE_M:
                 goal_zone_speeds.append(speed_mps)
+            else:
+                en_route_cross_tracks.append(
+                    P.cross_track_m(
+                        self.leg_start_x,
+                        self.leg_start_y,
+                        self.goal_x,
+                        self.goal_y,
+                        self.own.x_m,
+                        self.own.y_m,
+                    )
+                )
             if collect_trace:
                 steps.append(
                     P.snapshot_step(
@@ -461,6 +497,7 @@ class BoatNavEnv(gym.Env):
                 )
             collision = collision or info["collision"]
             success = info["success"]
+            cpa_unsafe_at_end = bool(info.get("cpa_unsafe", False))
             max_goal_hold_steps = max(max_goal_hold_steps, int(info.get("goal_hold_steps") or 0))
             if info.get("goal_hold_required") is not None:
                 goal_hold_required = int(info["goal_hold_required"])
@@ -472,6 +509,8 @@ class BoatNavEnv(gym.Env):
             "collision": collision,
             "success": success,
             "cpa_unsafe_in_goal": self.episode_cpa_unsafe_in_goal,
+            "cpa_unsafe_at_end": cpa_unsafe_at_end,
+            "initial_goal_range_m": initial_goal_range_m,
             "final_goal_range_m": final_goal_range_m,
             "min_goal_range_m": min_goal_range_m,
             "entered_goal_zone": entered_goal_zone,
@@ -496,6 +535,14 @@ class BoatNavEnv(gym.Env):
             ),
             "goal_zone_steps": len(goal_zone_speeds),
             "goal_zone_speeds": goal_zone_speeds,
+            "mean_cross_track_m": (
+                round(sum(en_route_cross_tracks) / len(en_route_cross_tracks), 2)
+                if en_route_cross_tracks
+                else None
+            ),
+            "max_cross_track_m": (
+                round(max(en_route_cross_tracks), 2) if en_route_cross_tracks else None
+            ),
             "goal_hold_steps": max_goal_hold_steps,
             "goal_hold_required": goal_hold_required,
         }

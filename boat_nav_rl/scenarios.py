@@ -19,6 +19,9 @@ from scenario_templates import MissionShell, compose_scenario, default_traffic_s
 
 SINGLE_LEG = "single_leg"
 
+# Full compass at 30° steps (0° = north, clockwise +). Used for balanced heading coverage.
+COMPASS_BEARINGS_DEG: Tuple[int, ...] = tuple(range(-180, 180, 30))
+
 
 def _goal_from_polar(dist_m: float, bearing_deg: float) -> Tuple[float, float]:
     brg = math.radians(bearing_deg)
@@ -74,7 +77,7 @@ def generate_mission_shells() -> List[ScenarioSeed]:
         )
         seed_counter += 1
 
-    for bearing in (-90, -60, -30, 30, 60, 90, 135):
+    for bearing in COMPASS_BEARINGS_DEG:
         dist = 900.0
         gx, gy = _goal_from_polar(dist, bearing)
         scenarios.append(
@@ -110,22 +113,25 @@ def generate_mission_shells() -> List[ScenarioSeed]:
         )
         seed_counter += 1
 
-    for hdg in (-45, -20, 20, 45, 90, 135):
-        scenarios.append(
-            _clear_shell(
-                f"nav_hdg_{hdg:+d}",
-                seed_counter,
-                f"{SINGLE_LEG}/heading_mismatch",
-                f"Initial heading {hdg}°, goal ahead-right",
-                float(hdg),
-                4.0,
-                0,
-                0,
-                400,
-                900,
+    for hdg in (-135, -90, -45, -20, 20, 45, 90, 135):
+        for goal_brg in (-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180):
+            dist = 900.0
+            gx, gy = _goal_from_polar(dist, goal_brg)
+            scenarios.append(
+                _clear_shell(
+                    f"nav_hdg_{hdg:+d}_goal_{goal_brg:+d}",
+                    seed_counter,
+                    f"{SINGLE_LEG}/heading_mismatch",
+                    f"Initial heading {hdg}°, goal @ {goal_brg}° / {dist:.0f} m",
+                    float(hdg),
+                    4.0,
+                    0,
+                    0,
+                    gx,
+                    gy,
+                )
             )
-        )
-        seed_counter += 1
+            seed_counter += 1
 
     for dist in (500, 800, 1100):
         scenarios.append(
@@ -162,7 +168,7 @@ def generate_mission_shells() -> List[ScenarioSeed]:
         seed_counter += 1
 
     for dist in (700, 1000, 1300):
-        for bearing in (-120, -45, 0, 45, 120, 150):
+        for bearing in COMPASS_BEARINGS_DEG:
             gx, gy = _goal_from_polar(dist, bearing)
             scenarios.append(
                 _clear_shell(
@@ -264,7 +270,7 @@ def generate_goal_relocate_scenarios() -> List[ScenarioSeed]:
     delay_bands = ((3.0, 10.0), (8.0, 25.0))
 
     for dist in (600, 900, 1100):
-        for bearing in (-90, -60, -30, 0, 30, 60, 90):
+        for bearing in COMPASS_BEARINGS_DEG:
             offset_x, offset_y = _goal_from_polar(dist, bearing)
             for delay_min, delay_max in delay_bands:
                 scenarios.append(
@@ -372,7 +378,7 @@ def generate_exercise_spawn_scenarios() -> List[ScenarioSeed]:
     starts = [(-500.0, -250.0), (-500.0, 0.0), (-500.0, 250.0)]
     scenarios: List[ScenarioSeed] = []
     seed_counter = 8500
-    bearings = (-30, 0, 30, 60)
+    bearings = COMPASS_BEARINGS_DEG
     dists = (500, 700, 900)
     for sx, sy in starts:
         for dist in dists:
@@ -411,7 +417,7 @@ def generate_multi_leg_scenarios() -> List[ScenarioSeed]:
             legs: List[Tuple[float, float]] = []
             cx, cy = ox, oy
             for _ in range(n_legs):
-                bearing = float(rng.uniform(-80, 80))
+                bearing = float(rng.uniform(-180, 180))
                 dist = float(rng.uniform(450, 900))
                 cx += dist * math.sin(math.radians(bearing))
                 cy += dist * math.cos(math.radians(bearing))
@@ -446,7 +452,7 @@ def generate_reassign_scenarios() -> List[ScenarioSeed]:
     seed_counter = 9500
 
     for dist in (700, 900, 1100):
-        for bearing in (-60, -30, 0, 30, 60):
+        for bearing in (-120, -90, -60, -30, 0, 30, 60, 90, 120, 150):
             gx1, gy1 = _goal_from_polar(dist, bearing)
             for rng_offset in (40, 70):
                 gx2, gy2 = _goal_from_polar(dist * 0.9, bearing + rng_offset)
@@ -477,7 +483,7 @@ def generate_reassign_scenarios() -> List[ScenarioSeed]:
                 )
                 seed_counter += 1
 
-    for dist, bearing in product((600, 850), (-45, 0, 45)):
+    for dist, bearing in product((600, 850), COMPASS_BEARINGS_DEG):
         gx1, gy1 = _goal_from_polar(dist, bearing)
         gx2, gy2 = _goal_from_polar(750, bearing + 55)
         scenarios.append(
@@ -504,6 +510,31 @@ def generate_reassign_scenarios() -> List[ScenarioSeed]:
     return scenarios
 
 
+def generate_compass_rose_scenarios() -> List[ScenarioSeed]:
+    """Own at origin; goals on a full compass rose (Exercise-style click coverage)."""
+    scenarios: List[ScenarioSeed] = []
+    seed_counter = 7500
+    for dist in (500, 800, 1100):
+        for bearing in COMPASS_BEARINGS_DEG:
+            gx, gy = _goal_from_polar(dist, bearing)
+            scenarios.append(
+                _clear_shell(
+                    f"nav_compass_d{dist}_b{bearing:+d}",
+                    seed_counter,
+                    f"{SINGLE_LEG}/compass_rose",
+                    f"Goal {dist:.0f} m @ {bearing:+d}° (full compass)",
+                    float(np.clip(bearing * 0.35, -90, 90)),
+                    4.0,
+                    0,
+                    0,
+                    gx,
+                    gy,
+                )
+            )
+            seed_counter += 1
+    return scenarios
+
+
 def generate_traffic_scenarios() -> List[ScenarioSeed]:
     base = default_traffic_shell(seed=2000)
     scenarios, _ = generate_encounter_grid(base, seed_counter=2000)
@@ -518,6 +549,7 @@ def generate_all_scenarios() -> List[ScenarioSeed]:
         + generate_exercise_spawn_scenarios()
         + generate_multi_leg_scenarios()
         + generate_reassign_scenarios()
+        + generate_compass_rose_scenarios()
         + generate_traffic_scenarios()
     )
 

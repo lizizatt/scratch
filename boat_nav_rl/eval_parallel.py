@@ -14,17 +14,23 @@ import numpy as np
 from stable_baselines3 import PPO
 
 import prepare as P
-from rewards import HOLD_AT_STOP_EPS_MPS, aggregate_episode_breakdowns
+from rewards import HOLD_AT_STOP_EPS_MPS, aggregate_episode_breakdowns, energy_score_from_speeds
 
 EVAL_WORKERS = int(os.environ.get("EVAL_WORKERS", str(max(1, os.cpu_count() or 4))))
 EVAL_PARALLEL_MIN_SCENARIOS = int(os.environ.get("EVAL_PARALLEL_MIN_SCENARIOS", "4"))
 
-# Partial-credit headline score — penalties reduce by ~order of magnitude, not binary zero.
-COLLISION_SCORE_FACTOR = 0.15
-CPA_UNSAFE_GOAL_FACTOR = 0.4
-HOLD_PROGRESS_FLOOR = 0.25
-HOLD_PROGRESS_WEIGHT = 0.75
+# Mission score v3 — adds path directness (cross-track) to favor straight legs over wide arcs.
+MISSION_SCORE_VERSION = 3
+COLLISION_SCORE_FACTOR = 0.08
+CPA_UNSAFE_GOAL_FACTOR = 0.45
 DEFAULT_GOAL_HOLD_REQUIRED = 30
+APPROACH_FALLBACK_SCALE_M = 200.0
+APPROACH_MIN_RANGE_WEIGHT = 0.45
+APPROACH_FINAL_RANGE_WEIGHT = 0.55
+ENERGY_SCORE_BLEND = 0.25
+DIRECTNESS_SCORE_BLEND = 0.22
+DIRECTNESS_SCORE_SCALE_M = 60.0
+DIRECTNESS_MAX_SCALE_MULT = 1.25  # goal-zone efficiency only; cruise is neutral
 
 
 @dataclass
@@ -35,61 +41,173 @@ class EvalResult:
     traces: List[Dict[str, Any]]
 
 
-def _closest_goal_range_m(episode: Dict[str, Any]) -> float:
-    candidates = [
-        episode.get("min_goal_range_m"),
-        episode.get("final_goal_range_m"),
-    ]
-    vals = [float(v) for v in candidates if v is not None]
-    return min(vals) if vals else float("inf")
+def _episode_range_m(episode: Dict[str, Any], key: str) -> Optional[float]:
+    val = episode.get(key)
+    if val is None:
+        return None
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+def _approach_scale_m(episode: Dict[str, Any]) -> float:
+    initial = _episode_range_m(episode, "initial_goal_range_m")
+    if initial is not None and initial > P.GOAL_SUCCESS_RANGE_M:
+        return initial
+    return APPROACH_FALLBACK_SCALE_M
+
+
+def _range_quality(range_m: float, scale_m: float) -> float:
+    scale = max(scale_m, P.GOAL_SUCCESS_RANGE_M, 1e-6)
+    return max(0.0, min(1.0, 1.0 - range_m / scale))
 
 
 def approach_factor(episode: Dict[str, Any]) -> float:
-    """1.0 at the goal; linear falloff to 0 at GOAL_SUCCESS_RANGE_M."""
-    closest = _closest_goal_range_m(episode)
-    if not math.isfinite(closest):
+    """Geometric blend of min/final range quality — penalizes fly-bys that end far away."""
+    scale = _approach_scale_m(episode)
+    mn = _episode_range_m(episode, "min_goal_range_m")
+    fin = _episode_range_m(episode, "final_goal_range_m")
+    if mn is None and fin is None:
         return 0.0
-    thresh = max(P.GOAL_SUCCESS_RANGE_M, 1e-6)
-    return max(0.0, min(1.0, 1.0 - closest / thresh))
+    if mn is None:
+        mn = fin
+    if fin is None:
+        fin = mn
+    q_min = _range_quality(mn, scale)
+    q_fin = _range_quality(fin, scale)
+    return math.sqrt(max(0.0, q_min * q_fin))
+
+
+def hold_multiplier(episode: Dict[str, Any]) -> float:
+    """Hold credit only after zone entry with stationary steps; skipped if never entered."""
+    if episode.get("success"):
+        return 1.0
+    if not episode.get("entered_goal_zone"):
+        return 1.0
+    steps = int(episode.get("goal_hold_steps") or 0)
+    if steps <= 0:
+        return 0.0
+    required = int(episode.get("goal_hold_required") or DEFAULT_GOAL_HOLD_REQUIRED)
+    if required <= 0:
+        return 1.0
+    return min(1.0, steps / required)
 
 
 def hold_progress_factor(episode: Dict[str, Any]) -> float:
-    """Partial credit for stationary hold progress inside the goal zone."""
-    if episode.get("success"):
-        return 1.0
-    required = int(episode.get("goal_hold_required") or DEFAULT_GOAL_HOLD_REQUIRED)
-    if required <= 0:
-        return 1.0 if episode.get("entered_goal_zone") else 0.0
-    steps = int(episode.get("goal_hold_steps") or 0)
-    frac = min(1.0, steps / required)
-    if episode.get("entered_goal_zone"):
-        return HOLD_PROGRESS_FLOOR + HOLD_PROGRESS_WEIGHT * frac
-    return HOLD_PROGRESS_WEIGHT * frac
+    """Alias for hold_multiplier (legacy name)."""
+    return hold_multiplier(episode)
+
+
+def _cpa_unsafe_for_scoring(episode: Dict[str, Any], mode: str) -> bool:
+    if not colregs_enabled_for_mode(mode):
+        return False
+    if "cpa_unsafe_at_end" in episode:
+        return bool(episode.get("cpa_unsafe_at_end"))
+    return bool(episode.get("cpa_unsafe_in_goal"))
 
 
 def safety_factor(episode: Dict[str, Any], mode: str) -> float:
-    """Soft penalties for collision and CPA-unsafe time in the goal zone."""
+    """Soft penalties for collision and CPA-unsafe at episode end."""
     factor = 1.0
     if episode.get("collision"):
         factor *= COLLISION_SCORE_FACTOR
-    if colregs_enabled_for_mode(mode) and episode.get("cpa_unsafe_in_goal"):
+    if _cpa_unsafe_for_scoring(episode, mode):
         factor *= CPA_UNSAFE_GOAL_FACTOR
     return factor
 
 
+def energy_factor(episode: Dict[str, Any]) -> float:
+    """Goal-zone stopping efficiency; en-route cruise is neutral (1.0)."""
+    speeds = episode.get("goal_zone_speeds") or []
+    if not speeds:
+        return 1.0
+    return energy_score_from_speeds(speeds)
+
+
+def directness_factor(episode: Dict[str, Any]) -> float:
+    """Penalize wide arcs via en-route cross-track (mean × max geometric blend)."""
+    mean_ct = _episode_range_m(episode, "mean_cross_track_m")
+    max_ct = _episode_range_m(episode, "max_cross_track_m")
+    if mean_ct is None and max_ct is None:
+        mean_ct, max_ct = _cross_track_from_trace(episode)
+    if mean_ct is None and max_ct is None:
+        return 1.0
+    if mean_ct is None:
+        mean_ct = max_ct
+    if max_ct is None:
+        max_ct = mean_ct
+    scale = DIRECTNESS_SCORE_SCALE_M
+    q_mean = _range_quality(mean_ct, scale)
+    q_max = _range_quality(max_ct, scale * DIRECTNESS_MAX_SCALE_MULT)
+    return math.sqrt(max(0.0, q_mean * q_max))
+
+
+def _cross_track_from_trace(episode: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
+    """Fallback for traces saved before cross-track stats were recorded."""
+    steps = episode.get("steps") or []
+    if len(steps) < 2:
+        return None, None
+    start = steps[0]
+    goal = start.get("goal") or {}
+    leg_x = float((start.get("own") or {}).get("x", 0.0))
+    leg_y = float((start.get("own") or {}).get("y", 0.0))
+    goal_x = float(goal.get("x", 0.0))
+    goal_y = float(goal.get("y", 0.0))
+    samples: List[float] = []
+    for step in steps[1:]:
+        own = step.get("own") or {}
+        gr = math.hypot(goal_x - float(own.get("x", 0.0)), goal_y - float(own.get("y", 0.0)))
+        if gr < P.GOAL_SUCCESS_RANGE_M:
+            continue
+        samples.append(
+            P.cross_track_m(leg_x, leg_y, goal_x, goal_y, float(own.get("x", 0.0)), float(own.get("y", 0.0)))
+        )
+    if not samples:
+        return None, None
+    return float(sum(samples) / len(samples)), float(max(samples))
+
+
 def episode_mission_score(episode: Dict[str, Any], mode: str) -> float:
-    """Per-episode score in [0, 1]: approach × hold × safety × energy."""
-    core = approach_factor(episode) * hold_progress_factor(episode)
+    """Per-episode score in [0, 1]: approach × hold × safety × directness × energy."""
+    approach = approach_factor(episode)
+    hold = hold_multiplier(episode)
     safety = safety_factor(episode, mode)
-    energy = float(episode.get("energy_score") or 1.0)
-    return max(0.0, min(1.0, core * safety * energy))
+    directness = directness_factor(episode)
+    energy = energy_factor(episode)
+    core = approach * hold * safety
+    direct_blend = (1.0 - DIRECTNESS_SCORE_BLEND) + DIRECTNESS_SCORE_BLEND * directness
+    energy_blend = (1.0 - ENERGY_SCORE_BLEND) + ENERGY_SCORE_BLEND * energy
+    return max(0.0, min(1.0, core * direct_blend * energy_blend))
+
+
+def episode_mission_score_breakdown(episode: Dict[str, Any], mode: str) -> Dict[str, float]:
+    """Component factors for debugging / montage tooltips."""
+    approach = approach_factor(episode)
+    hold = hold_multiplier(episode)
+    safety = safety_factor(episode, mode)
+    directness = directness_factor(episode)
+    energy = energy_factor(episode)
+    direct_blend = (1.0 - DIRECTNESS_SCORE_BLEND) + DIRECTNESS_SCORE_BLEND * directness
+    energy_blend = (1.0 - ENERGY_SCORE_BLEND) + ENERGY_SCORE_BLEND * energy
+    return {
+        "approach": round(approach, 4),
+        "hold": round(hold, 4),
+        "safety": round(safety, 4),
+        "directness": round(directness, 4),
+        "directness_blend": round(direct_blend, 4),
+        "energy": round(energy, 4),
+        "energy_blend": round(energy_blend, 4),
+        "mission": round(episode_mission_score(episode, mode), 4),
+    }
 
 
 def strict_episode_score(episode: Dict[str, Any], mode: str) -> float:
     """Legacy binary success gate × safety × energy (one episode)."""
     if not episode.get("success"):
         return 0.0
-    return max(0.0, min(1.0, safety_factor(episode, mode) * float(episode.get("energy_score") or 1.0)))
+    return max(0.0, min(1.0, safety_factor(episode, mode) * energy_factor(episode)))
 
 
 def colregs_enabled_for_mode(mode: str) -> bool:
@@ -347,6 +465,8 @@ def aggregate_eval_metrics(
         rollup_episodes = None  # type: ignore
 
     for episode in episode_results:
+        episode["mission_score"] = round(episode_mission_score(episode, mode), 4)
+        episode["mission_score_version"] = MISSION_SCORE_VERSION
         if collect_traces:
             traces.append(episode)
             if (

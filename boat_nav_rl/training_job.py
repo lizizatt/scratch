@@ -39,11 +39,23 @@ def _atomic_write_json(path: Path, payload: Dict[str, Any]) -> None:
 
 
 def _pid_alive(pid: int) -> bool:
+    """Return whether process `pid` is running (cross-platform, Windows-safe)."""
     if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        import ctypes
+
+        # OpenProcess succeeds only when the PID exists; avoids Python 3.8
+        # SystemError from os.kill(pid, 0) on stale/recycled PIDs.
+        SYNCHRONIZE = 0x00100000
+        handle = ctypes.windll.kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+        if handle:
+            ctypes.windll.kernel32.CloseHandle(handle)
+            return True
         return False
     try:
         os.kill(pid, 0)
-    except OSError:
+    except (OSError, SystemError):
         return False
     return True
 

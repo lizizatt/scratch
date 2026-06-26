@@ -10,6 +10,7 @@ Edit CONFIG in train_config.py between experiments, then:
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +19,7 @@ from stable_baselines3.common.callbacks import BaseCallback, CallbackList
 from vecenv_util import (
     make_vec_env,
     ppo_batch_size,
+    resolve_vecenv_backend,
     rollout_steps_total,
     steps_per_env,
     training_perf_defaults,
@@ -106,7 +108,7 @@ def main() -> None:
     rollout_total = rollout_steps_total(C.N_ENVS)
     n_steps = steps_per_env(C.N_ENVS)
     batch_size = ppo_batch_size(device, rollout_total, base=C.BATCH_SIZE)
-    vec_backend = training_perf_defaults()["vecenv_backend"]
+    vec_backend = resolve_vecenv_backend(C.N_ENVS, os.environ.get("VECENV_BACKEND", "auto"))
     gpu_info = torch_device_info()
 
     print(f"[train] mode={C.MODE} budget={C.TRAIN_BUDGET_SEC}s n_envs={C.N_ENVS} run={run_dir.name}")
@@ -153,7 +155,16 @@ def main() -> None:
         )
         for i in range(C.N_ENVS)
     ]
-    env = make_vec_env(factories, C.N_ENVS)
+    env = make_vec_env(
+        factories,
+        C.N_ENVS,
+        backend=os.environ.get("VECENV_BACKEND", "auto"),
+        mode=C.MODE,
+        device=device,
+        goal_hold_sec=C.GOAL_HOLD_SEC,
+        max_episode_steps=C.MAX_EPISODE_STEPS,
+        current_enabled=C.CURRENT_ENABLED,
+    )
 
     model_holder: Dict[str, Any] = {}
     if resume_run_id:

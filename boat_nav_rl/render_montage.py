@@ -14,7 +14,9 @@ except ImportError:  # pragma: no cover - optional dependency
     ImageDraw = None  # type: ignore
     ImageFont = None  # type: ignore
 
-# Match viz/draw.js palette
+from eval_parallel import episode_mission_score
+
+# Match viz/scoring.js palette
 BG = (8, 16, 28)
 GRID = (21, 32, 51)
 GOAL = (69, 212, 131)
@@ -23,6 +25,35 @@ OWN_TRAIL = (107, 124, 255)
 CONTACT = (255, 107, 107)
 START = (159, 212, 255)
 FAIL = (143, 163, 191)
+SCORE_GOOD = (69, 212, 131)
+SCORE_MID = (240, 192, 64)
+SCORE_BAD = (255, 107, 107)
+
+
+def _score_color(score: float) -> Tuple[int, int, int]:
+    if score >= 0.8:
+        return SCORE_GOOD
+    if score >= 0.4:
+        return SCORE_MID
+    return SCORE_BAD
+
+
+def _episode_score(episode: dict) -> float:
+    if episode.get("mission_score") is not None:
+        return float(episode["mission_score"])
+    mode = episode.get("mode") or "navigate"
+    return episode_mission_score(episode, mode)
+
+
+def _draw_score_badge(draw: Any, x0: int, y0: int, w: int, score: float) -> None:
+    text = f"{round(score * 100)}%"
+    color = _score_color(score)
+    tw = len(text) * 6 + 8
+    box_h = 14
+    bx = x0 + w - tw - 3
+    by = y0 + 3
+    draw.rectangle([bx, by, bx + tw, by + box_h], fill=BG)
+    draw.text((bx + 4, by + 1), text, fill=color)
 
 
 def _compute_bounds(steps: Sequence[dict], pad: float = 60.0) -> Tuple[float, float, float, float]:
@@ -63,6 +94,7 @@ def _draw_frame(
     *,
     show_trail: bool = True,
     show_outcome: bool = False,
+    show_score: bool = False,
 ) -> None:
     steps = episode.get("steps") or []
     if not steps:
@@ -97,6 +129,8 @@ def _draw_frame(
         label = "COLL" if episode.get("collision") else "OK" if episode.get("success") else "—"
         color = CONTACT if episode.get("collision") else GOAL if episode.get("success") else FAIL
         draw.text((x0 + 4, y0 + 4), label, fill=color)
+    if show_score:
+        _draw_score_badge(draw, x0, y0, w, _episode_score(episode))
 
 
 def _draw_trajectory(
@@ -134,6 +168,7 @@ def _draw_trajectory(
     label = "COLL" if episode.get("collision") else "OK" if episode.get("success") else "—"
     color = CONTACT if episode.get("collision") else GOAL if episode.get("success") else FAIL
     draw.text((x0 + 4, y0 + 4), label, fill=color)
+    _draw_score_badge(draw, x0, y0, w, _episode_score(episode))
 
 
 def _pick_step_indices(max_steps: int, num_cols: int) -> List[int]:
@@ -197,7 +232,16 @@ def render_step_montage(
                 continue
             local_idx = min(global_step, len(steps) - 1)
             x = col_label_w + margin + ci * (cell_w + margin)
-            _draw_frame(draw, ep, local_idx, x, y, cell_w, cell_h)
+            _draw_frame(
+                draw,
+                ep,
+                local_idx,
+                x,
+                y,
+                cell_w,
+                cell_h,
+                show_score=ci == len(step_indices) - 1,
+            )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(out_path, optimize=True)

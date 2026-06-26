@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -54,6 +55,15 @@ DEFAULT_GOAL_HOLD_SEC = 30
 DEFAULT_GOAL_HOLD_SEC_UI = 15  # friendlier first-run default in train UI
 DEFAULT_MODE = "navigate"  # "navigate" | "avoid" | "all"
 
+# Training goal placement — ~20% of episodes use a stretch goal beyond typical reach.
+STRETCH_GOAL_PROB = float(os.environ.get("STRETCH_GOAL_PROB", "0.20"))
+TRAIN_GOAL_DIST_MIN_M = 500.0
+TRAIN_GOAL_DIST_NEAR_MAX_M = 1200.0
+STRETCH_GOAL_REACH_MULT_MIN = float(os.environ.get("STRETCH_GOAL_REACH_MULT_MIN", "1.20"))
+STRETCH_GOAL_REACH_MULT_MAX = float(os.environ.get("STRETCH_GOAL_REACH_MULT_MAX", "2.40"))
+TRAIN_GOAL_APPROACH_EFFICIENCY = 0.70  # straight-line × path efficiency
+TRAIN_GOAL_WORLD_MARGIN_M = 80.0
+
 # Shared world extent (Exercise sandbox + exercise_sampler scenarios).
 WORLD_BOUNDS = {
     "min_x": -1200.0,
@@ -79,16 +89,18 @@ RANGE_SCALE_M = 2000.0
 SPEED_SCALE_MPS = V_MAX_MPS
 YAW_RATE_SCALE_RPS = MAX_YAW_RATE_RPS
 
+REL_VEL_SCALE_MPS = 2.0 * V_MAX_MPS  # max |relative ground speed| for normalization
+
 # Flat observation layout — must match interface/boat_nav_rl_interface.h (BNRL_SCHEMA_VERSION).
-OBS_SCHEMA_VERSION = 3
+OBS_SCHEMA_VERSION = 4
 OBS_OWN_DIM = 6
 OBS_CURRENT_DIM = 3
-OBS_CONTACT_DIM = 7
+OBS_CONTACT_DIM = 8
 OBS_GOAL_DIM = 3
 OBS_MASK_OFFSET = OBS_OWN_DIM + OBS_CURRENT_DIM + N_MAX_CONTACTS * OBS_CONTACT_DIM
 OBS_GOAL_OFFSET = OBS_MASK_OFFSET + N_MAX_CONTACTS
 OBS_HAS_GOAL_OFFSET = OBS_GOAL_OFFSET + OBS_GOAL_DIM
-OBS_DIM = OBS_HAS_GOAL_OFFSET + 1  # 77
+OBS_DIM = OBS_HAS_GOAL_OFFSET + 1  # 85
 
 
 def wrap_angle(rad: float) -> float:
@@ -348,6 +360,39 @@ def bearing_range(own_x: float, own_y: float, tgt_x: float, tgt_y: float) -> Tup
     return bearing, rng
 
 
+def relative_velocity_body(
+    heading_rad: float,
+    own_vx: float,
+    own_vy: float,
+    other_vx: float,
+    other_vy: float,
+) -> Tuple[float, float]:
+    """Relative ground velocity (other - own) in body frame: forward, starboard (m/s)."""
+    rvx = other_vx - own_vx
+    rvy = other_vy - own_vy
+    sh = math.sin(heading_rad)
+    ch = math.cos(heading_rad)
+    rel_fwd = rvx * sh + rvy * ch
+    rel_stbd = rvx * ch - rvy * sh
+    return rel_fwd, rel_stbd
+
+
+def contact_relative_motion(
+    own: VesselState,
+    contact: ContactState,
+    current: Optional[WaterCurrent] = None,
+) -> Tuple[float, float, float, float]:
+    """Body-relative contact COG (sin, cos) and ground relative velocity (fwd, stbd)."""
+    cur = current or WaterCurrent()
+    own_vx, own_vy = own_velocity(own, cur)
+    cvx, cvy = contact_velocity(contact)
+    rel_cog = wrap_angle(contact.cog_rad - own.heading_rad)
+    rel_fwd, rel_stbd = relative_velocity_body(
+        own.heading_rad, own_vx, own_vy, cvx, cvy
+    )
+    return math.sin(rel_cog), math.cos(rel_cog), rel_fwd, rel_stbd
+
+
 def cross_track_m(
     leg_start_x: float,
     leg_start_y: float,
@@ -421,21 +466,25 @@ def pack_observation(
 
     base = 9
     for slot in range(N_MAX_CONTACTS):
-        offset = base + slot * 7
+        offset = base + slot * OBS_CONTACT_DIM
         if slot < len(indexed):
             rng_dist, c, brg = indexed[slot]
             obs[offset + 0] = math.sin(brg)
             obs[offset + 1] = math.cos(brg)
             obs[offset + 2] = min(rng_dist / RANGE_SCALE_M, 1.0)
-            obs[offset + 3] = math.sin(c.cog_rad)
-            obs[offset + 4] = math.cos(c.cog_rad)
-            obs[offset + 5] = c.sog_mps / SPEED_SCALE_MPS
-            obs[offset + 6] = c.radius_m / RADIUS_SCALE_M
-            obs[base + N_MAX_CONTACTS * 7 + slot] = 1.0  # mask
+            rel_cog_sin, rel_cog_cos, rel_fwd, rel_stbd = contact_relative_motion(
+                own, c, cur
+            )
+            obs[offset + 3] = rel_cog_sin
+            obs[offset + 4] = rel_cog_cos
+            obs[offset + 5] = rel_fwd / REL_VEL_SCALE_MPS
+            obs[offset + 6] = rel_stbd / REL_VEL_SCALE_MPS
+            obs[offset + 7] = c.radius_m / RADIUS_SCALE_M
+            obs[base + N_MAX_CONTACTS * OBS_CONTACT_DIM + slot] = 1.0  # mask
         else:
-            obs[base + N_MAX_CONTACTS * 7 + slot] = 0.0
+            obs[base + N_MAX_CONTACTS * OBS_CONTACT_DIM + slot] = 0.0
 
-    goal_base = base + N_MAX_CONTACTS * 7 + N_MAX_CONTACTS
+    goal_base = base + N_MAX_CONTACTS * OBS_CONTACT_DIM + N_MAX_CONTACTS
     if has_goal:
         g_brg, g_rng = bearing_range(own.x_m, own.y_m, goal_x, goal_y)
         obs[goal_base + 0] = math.sin(g_brg)
@@ -528,7 +577,7 @@ def write_scenario_splits(
     train_path.write_text(json.dumps([asdict(s) for s in train_seeds], indent=2), encoding="utf-8")
     eval_path.write_text(json.dumps([asdict(s) for s in eval_seeds], indent=2), encoding="utf-8")
     manifest = {
-        "version": 5,
+        "version": 6,
         "vessel_classes": dict(VESSEL_CLASSES),
         "own_radius_m": OWN_RADIUS_M,
         "cpa_margin_m": CPA_MARGIN_M,
@@ -618,6 +667,132 @@ def goal_range(own: VesselState, goal_x: float, goal_y: float) -> float:
 
 def goal_range_xy(own_x: float, own_y: float, goal_x: float, goal_y: float) -> float:
     return math.hypot(goal_x - own_x, goal_y - own_y)
+
+
+def estimate_reachable_goal_range_m(
+    max_episode_steps: int,
+    *,
+    goal_hold_sec: int = 0,
+    cruise_mps: float = 4.0,
+) -> float:
+    """Straight-line distance achievable in `max_episode_steps` at typical cruise."""
+    del goal_hold_sec  # hold only applies after arrival; unreachable stretch goals ignore it
+    travel_steps = max(1, int(max_episode_steps))
+    return cruise_mps * travel_steps * TRAIN_GOAL_APPROACH_EFFICIENCY
+
+
+def clip_world_xy(
+    x: float,
+    y: float,
+    margin: float = TRAIN_GOAL_WORLD_MARGIN_M,
+) -> Tuple[float, float]:
+    return (
+        float(np.clip(x, WORLD_BOUNDS["min_x"] + margin, WORLD_BOUNDS["max_x"] - margin)),
+        float(np.clip(y, WORLD_BOUNDS["min_y"] + margin, WORLD_BOUNDS["max_y"] - margin)),
+    )
+
+
+def max_goal_distance_from_xy(
+    own_x: float,
+    own_y: float,
+    margin: float = TRAIN_GOAL_WORLD_MARGIN_M,
+) -> float:
+    corners = (
+        (WORLD_BOUNDS["min_x"] + margin, WORLD_BOUNDS["min_y"] + margin),
+        (WORLD_BOUNDS["min_x"] + margin, WORLD_BOUNDS["max_y"] - margin),
+        (WORLD_BOUNDS["max_x"] - margin, WORLD_BOUNDS["min_y"] + margin),
+        (WORLD_BOUNDS["max_x"] - margin, WORLD_BOUNDS["max_y"] - margin),
+    )
+    return max(math.hypot(cx - own_x, cy - own_y) for cx, cy in corners)
+
+
+def sample_training_goal_distance_m(
+    rng: np.random.Generator,
+    own_x: float,
+    own_y: float,
+    *,
+    max_episode_steps: int,
+    goal_hold_sec: int = 0,
+    force_stretch: Optional[bool] = None,
+) -> float:
+    """Sample goal range: ~80% near/reachable, ~20% beyond typical reach."""
+    reachable = estimate_reachable_goal_range_m(
+        max_episode_steps, goal_hold_sec=goal_hold_sec
+    )
+    world_max = max_goal_distance_from_xy(own_x, own_y)
+    arrival_horizon = min(reachable, world_max)
+    near_hi = min(TRAIN_GOAL_DIST_NEAR_MAX_M, arrival_horizon * 0.95)
+    near_hi = max(near_hi, TRAIN_GOAL_DIST_MIN_M + 1.0)
+    stretch = (
+        bool(force_stretch)
+        if force_stretch is not None
+        else bool(rng.random() < STRETCH_GOAL_PROB)
+    )
+    if stretch:
+        if world_max > reachable * STRETCH_GOAL_REACH_MULT_MIN:
+            lo = max(TRAIN_GOAL_DIST_NEAR_MAX_M, reachable * STRETCH_GOAL_REACH_MULT_MIN)
+            hi = min(reachable * STRETCH_GOAL_REACH_MULT_MAX, world_max)
+        else:
+            lo = max(TRAIN_GOAL_DIST_NEAR_MAX_M, world_max * 0.82)
+            hi = world_max
+        if lo >= hi:
+            return float(hi)
+        return float(rng.uniform(lo, hi))
+    return float(rng.uniform(TRAIN_GOAL_DIST_MIN_M, near_hi))
+
+
+def sample_training_goal_xy(
+    own_x: float,
+    own_y: float,
+    rng: np.random.Generator,
+    *,
+    max_episode_steps: int,
+    goal_hold_sec: int = 0,
+    force_stretch: Optional[bool] = None,
+) -> Tuple[float, float]:
+    stretch = (
+        bool(force_stretch)
+        if force_stretch is not None
+        else bool(rng.random() < STRETCH_GOAL_PROB)
+    )
+    reachable = estimate_reachable_goal_range_m(
+        max_episode_steps, goal_hold_sec=goal_hold_sec
+    )
+    world_max = max_goal_distance_from_xy(own_x, own_y)
+    if world_max > reachable * STRETCH_GOAL_REACH_MULT_MIN:
+        stretch_min = max(TRAIN_GOAL_DIST_NEAR_MAX_M, reachable * STRETCH_GOAL_REACH_MULT_MIN)
+    else:
+        stretch_min = max(TRAIN_GOAL_DIST_NEAR_MAX_M, world_max * 0.82)
+    for _ in range(12):
+        angle = float(rng.uniform(-math.pi, math.pi))
+        dist = sample_training_goal_distance_m(
+            rng,
+            own_x,
+            own_y,
+            max_episode_steps=max_episode_steps,
+            goal_hold_sec=goal_hold_sec,
+            force_stretch=stretch,
+        )
+        gx = own_x + dist * math.sin(angle)
+        gy = own_y + dist * math.cos(angle)
+        gx, gy = clip_world_xy(gx, gy)
+        actual = goal_range_xy(own_x, own_y, gx, gy)
+        if actual < TRAIN_GOAL_DIST_MIN_M:
+            continue
+        if stretch and actual < stretch_min * 0.95:
+            continue
+        return gx, gy
+    angle = float(rng.uniform(-math.pi, math.pi))
+    dist = sample_training_goal_distance_m(
+        rng,
+        own_x,
+        own_y,
+        max_episode_steps=max_episode_steps,
+        goal_hold_sec=goal_hold_sec,
+        force_stretch=stretch,
+    )
+    gx, gy = clip_world_xy(own_x + dist * math.sin(angle), own_y + dist * math.cos(angle))
+    return gx, gy
 
 
 def snapshot_step(

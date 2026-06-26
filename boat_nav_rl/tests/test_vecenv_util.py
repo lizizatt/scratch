@@ -22,10 +22,15 @@ from vecenv_util import (
 
 class TestVecenvUtil(unittest.TestCase):
     def test_recommended_n_envs_scales_with_cores(self):
-        with mock.patch("vecenv_util.cpu_count", return_value=8):
-            self.assertEqual(recommended_n_envs(), 32)
-        with mock.patch("vecenv_util.cpu_count", return_value=16):
-            self.assertEqual(recommended_n_envs(), 64)
+        with mock.patch("vecenv_util._cuda_available", return_value=False):
+            with mock.patch("vecenv_util.cpu_count", return_value=8):
+                self.assertEqual(recommended_n_envs(), 32)
+            with mock.patch("vecenv_util.cpu_count", return_value=16):
+                self.assertEqual(recommended_n_envs(), 64)
+
+    def test_recommended_n_envs_gpu_when_cuda(self):
+        with mock.patch("vecenv_util._cuda_available", return_value=True):
+            self.assertEqual(recommended_n_envs(), 256)
 
     def test_rollout_steps_scales_with_env_count(self):
         self.assertGreaterEqual(rollout_steps_total(32), 4096)
@@ -38,9 +43,11 @@ class TestVecenvUtil(unittest.TestCase):
         self.assertGreaterEqual(gpu_batch, 512)
 
     def test_resolve_vecenv_backend(self):
-        self.assertEqual(resolve_vecenv_backend(1), "dummy")
-        self.assertEqual(resolve_vecenv_backend(8), "subproc")
+        with mock.patch("vecenv_util._cuda_available", return_value=False):
+            self.assertEqual(resolve_vecenv_backend(1), "dummy")
+            self.assertEqual(resolve_vecenv_backend(8), "subproc")
         self.assertEqual(resolve_vecenv_backend(8, "dummy"), "dummy")
+        self.assertEqual(resolve_vecenv_backend(8, "gpu"), "gpu")
 
     def test_training_perf_defaults_keys(self):
         perf = training_perf_defaults()

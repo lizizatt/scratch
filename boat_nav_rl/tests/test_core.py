@@ -17,13 +17,13 @@ import training_job as TJ
 
 
 class TestObservationLayout(unittest.TestCase):
-    def test_obs_dim_is_77(self):
-        self.assertEqual(P.OBS_DIM, 77)
+    def test_obs_dim_is_85(self):
+        self.assertEqual(P.OBS_DIM, 85)
 
     def test_pack_observation_shape(self):
         own = P.VesselState(heading_rad=0.5, speed_mps=4.0)
         obs = P.pack_observation(own, 100.0, 500.0, True, [], 0.0, 0.0)
-        self.assertEqual(obs.shape, (77,))
+        self.assertEqual(obs.shape, (P.OBS_DIM,))
         self.assertEqual(obs[6], 0.0)  # no current
         self.assertEqual(obs[-1], 1.0)  # has_goal
 
@@ -54,6 +54,33 @@ class TestScenarioLibrary(unittest.TestCase):
     def test_generate_nonempty(self):
         seeds = SC.generate_all_scenarios()
         self.assertGreater(len(seeds), 50)
+
+    def test_goal_bearing_octant_coverage(self):
+        seeds = SC.generate_all_scenarios()
+        nav = [s for s in seeds if s.mode == "navigate" and not s.contacts]
+
+        def octant(s):
+            dx = s.goal_x_m - s.own_x_m
+            dy = s.goal_y_m - s.own_y_m
+            b = math.degrees(math.atan2(dx, dy))
+            b = ((b + 180) % 360) - 180
+            names = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
+            return names[int((b + 180) // 45) % 8]
+
+        counts = {k: 0 for k in ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]}
+        for s in nav:
+            counts[octant(s)] += 1
+        total = len(nav)
+        self.assertGreater(total, 200)
+        for name, n in counts.items():
+            self.assertGreaterEqual(
+                n,
+                max(8, total // 16),
+                f"octant {name} under-represented: {n}/{total}",
+            )
+
+        compass = [s for s in nav if "compass_rose" in s.category]
+        self.assertGreaterEqual(len(compass), 36)
 
     def test_navigate_and_traffic_categories(self):
         seeds = SC.generate_all_scenarios()
@@ -426,6 +453,12 @@ class TestBoatNavEnv(unittest.TestCase):
 
 
 class TestTrainingHistory(unittest.TestCase):
+    def test_pid_alive_invalid_handles_windows(self):
+        self.assertFalse(TJ._pid_alive(0))
+        self.assertFalse(TJ._pid_alive(-1))
+        # Very large PID should not raise (stale pid file after crash).
+        self.assertFalse(TJ._pid_alive(2_000_000_000))
+
     def test_history_skips_training_dir(self):
         data = TJ.training_history()
         for run in data["runs"]:
@@ -486,6 +519,49 @@ class TestScenarioSplit(unittest.TestCase):
         self.assertGreater(len(eval_seeds), 0)
         overlap = {s.name for s in train} & {s.name for s in eval_seeds}
         self.assertEqual(len(overlap), 0)
+
+
+class TestTrainingGoalSampling(unittest.TestCase):
+    def test_reachable_estimate_scales_with_steps(self):
+        short = P.estimate_reachable_goal_range_m(300)
+        long = P.estimate_reachable_goal_range_m(600)
+        self.assertGreater(long, short)
+        self.assertAlmostEqual(long, short * 2.0, places=3)
+
+    def test_stretch_probability_near_twenty_percent(self):
+        rng = np.random.default_rng(0)
+        world_max = P.max_goal_distance_from_xy(0.0, 0.0)
+        stretch_min = max(P.TRAIN_GOAL_DIST_NEAR_MAX_M, world_max * 0.82)
+        n = 5000
+        stretch = 0
+        for _ in range(n):
+            d = P.sample_training_goal_distance_m(
+                rng, 0.0, 0.0, max_episode_steps=600, force_stretch=None
+            )
+            if d >= stretch_min * 0.99:
+                stretch += 1
+        frac = stretch / n
+        self.assertGreater(frac, 0.12)
+        self.assertLess(frac, 0.30)
+
+    def test_training_env_stretch_goals_beyond_reachable(self):
+        from train import BoatNavEnv
+
+        world_max = P.max_goal_distance_from_xy(0.0, 0.0)
+        stretch_min = max(P.TRAIN_GOAL_DIST_NEAR_MAX_M, world_max * 0.82)
+        env = BoatNavEnv(
+            mode="navigate",
+            training_randomize=True,
+            max_episode_steps=600,
+            current_enabled=False,
+        )
+        stretch = 0
+        trials = 400
+        for seed in range(trials):
+            env.reset(seed=seed)
+            if env.initial_goal_range >= stretch_min * 0.95:
+                stretch += 1
+        self.assertGreater(stretch / trials, 0.12)
 
 
 class TestRenderMontage(unittest.TestCase):

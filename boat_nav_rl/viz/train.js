@@ -57,7 +57,11 @@ let plantConfig = null;
 let defaultRewardWeights = null;
 let montageEpisodes = [];
 let montageRunId = null;
+let montageMode = "navigate";
+let montageMetaCache = "";
+let montageLockedRunId = null;
 let montageLoadSeq = 0;
+let montageHoverTimer = null;
 let trainingPresets = [];
 let activePresetId = "quick_start";
 let activeScenarioPrefixes = null;
@@ -221,7 +225,6 @@ function buildRewardWeightInputs() {
       input.name = `reward_${field.key}`;
       input.dataset.rewardKey = field.key;
       input.step = String(field.step ?? 0.1);
-      input.min = String(field.min ?? 0);
       input.value = String(field.default ?? 0);
       label.appendChild(document.createTextNode(field.label));
       label.appendChild(input);
@@ -283,13 +286,17 @@ async function loadPlantConfig() {
     if (tr.recommended_n_envs != null) {
       nEnvs.value = tr.recommended_n_envs;
     }
-    if (tr.max_n_envs != null) {
-      nEnvs.max = tr.max_n_envs;
-    }
+    nEnvs.removeAttribute("max");
+    nEnvs.removeAttribute("min");
     const hint = document.getElementById("nEnvsHint");
-    if (hint && tr.cpu_count != null) {
-      hint.textContent = `Rollouts on CPU (${tr.vecenv_backend || "subproc"}, ${tr.cpu_count} cores). `
-        + `Default ${tr.recommended_n_envs} envs, ${tr.rollout_steps_total || "?"} steps/update. GPU used for PPO learning.`;
+    if (hint) {
+      const backend = tr.vecenv_backend || "auto";
+      const cores = tr.cpu_count != null ? `${tr.cpu_count} CPU cores` : "CPU";
+      const note = tr.note || "PPO policy updates use GPU when available.";
+      hint.textContent =
+        `Rollouts: ${backend} (${cores}). `
+        + `Suggested ${tr.recommended_n_envs ?? "?"} envs, ${tr.rollout_steps_total ?? "?"} steps/update. `
+        + note;
     }
   }
   syncPlantUi();
@@ -329,6 +336,47 @@ function shortRunId(id) {
   return BoatNavUtil.shortRunId(id);
 }
 
+function clearMontageCanvas(message) {
+  if (!montageCanvas) return;
+  const ctx = montageCanvas.getContext("2d");
+  BoatNavDraw.drawBackground(ctx, montageCanvas.width, montageCanvas.height);
+  if (message) {
+    ctx.font = "600 13px Segoe UI, system-ui, sans-serif";
+    ctx.fillStyle = "#8fa3bf";
+    ctx.fillText(message, 16, 28);
+  }
+}
+
+function traceFingerprint(episodes) {
+  if (!episodes?.length) return "empty";
+  let s = episodes.length;
+  for (let i = 0; i < Math.min(3, episodes.length); i++) {
+    const steps = episodes[i].steps || [];
+    if (!steps.length) continue;
+    const st = steps[0].own;
+    const en = steps[steps.length - 1].own;
+    if (st) s += st.x * 1.31 + st.y * 0.71;
+    if (en) s += en.x * 0.29 + en.y * 1.17;
+  }
+  return Math.abs(Math.round(s * 1000)).toString(36);
+}
+
+function latestHistoryRunId() {
+  return history.length ? history[history.length - 1].run_id : null;
+}
+
+function restoreMontageDisplay() {
+  if (montageRunId && montageEpisodes.length) {
+    renderMontageCanvas();
+    if (montageMetaCache) montageMeta.textContent = montageMetaCache;
+    montageScrubber.disabled = false;
+    return;
+  }
+  clearMontageCanvas();
+  montageMeta.textContent = "Load a completed run to preview trajectories.";
+  montageScrubber.disabled = true;
+}
+
 async function loadHistory() {
   const data = await fetchJson("/api/history");
   history = data.runs || [];
@@ -336,9 +384,16 @@ async function loadHistory() {
   renderCharts();
   renderHistoryTable();
   statusLine.textContent = `${history.length} completed run(s)`;
-  if (!jobRunning && history.length) {
-    await loadMontageForRun(history[history.length - 1].run_id);
-  }
+}
+
+function scheduleMontagePreview(runId) {
+  if (!runId) return;
+  montageLockedRunId = runId;
+  if (montageHoverTimer != null) clearTimeout(montageHoverTimer);
+  montageHoverTimer = setTimeout(() => {
+    montageHoverTimer = null;
+    loadMontageForRun(runId, { force: true });
+  }, 120);
 }
 
 function montageProgressFromScrubber() {
@@ -348,7 +403,11 @@ function montageProgressFromScrubber() {
 }
 
 function renderMontageCanvas() {
-  if (!montageEpisodes.length || !montageCanvas) return;
+  if (!montageCanvas) return;
+  if (!montageEpisodes.length) {
+    clearMontageCanvas(montageRunId ? "No eval traces for this run" : null);
+    return;
+  }
   const ctx = montageCanvas.getContext("2d");
   const progress = montageProgressFromScrubber();
   const info = BoatNavDraw.drawStepMontage(
@@ -357,27 +416,63 @@ function renderMontageCanvas() {
     progress,
     montageCanvas.width,
     montageCanvas.height,
-    { maxEpisodes: 48, showLabels: true }
+    { maxEpisodes: 48, showLabels: true, showScores: true, mode: montageMode }
   );
   const lastStep = Math.max(info.maxSteps - 1, 0);
   montageStepLabel.textContent = `step ${info.frameIndex} / ${lastStep} · ${info.shown}/${info.total} scenarios`;
 }
 
-async function loadMontageForRun(runId) {
-  if (!runId || runId === montageRunId) {
+async function loadMontageForRun(runId, { force = false } = {}) {
+  if (!runId) return;
+  if (!force && montageLockedRunId && montageLockedRunId !== runId) return;
+  if (!force && runId === montageRunId) {
     renderMontageCanvas();
     return;
   }
   const seq = ++montageLoadSeq;
+  clearMontageCanvas(`Loading ${runId}…`);
+  montageMeta.textContent = `Loading ${runId}…`;
+  montageScrubber.disabled = true;
   try {
     const data = await fetchJson(`/api/runs/${runId}`);
-    if (seq !== montageLoadSeq) return;
-    montageEpisodes = data.traces?.episodes || [];
+    if (seq !== montageLoadSeq) {
+      restoreMontageDisplay();
+      return;
+    }
+
+    if (data.run_id && data.run_id !== runId) {
+      throw new Error(`server returned ${data.run_id}`);
+    }
+
+    const episodes = data.traces?.episodes || [];
+    const expected = data.metrics?.eval_episodes ?? data.metrics?.eval_scenarios ?? 0;
+    if (!episodes.length && expected > 0) {
+      await new Promise((r) => setTimeout(r, 400));
+      if (seq !== montageLoadSeq) {
+        restoreMontageDisplay();
+        return;
+      }
+      const retry = await fetchJson(`/api/runs/${runId}`);
+      if (seq !== montageLoadSeq) {
+        restoreMontageDisplay();
+        return;
+      }
+      if (retry.run_id && retry.run_id !== runId) {
+        throw new Error(`server returned ${retry.run_id}`);
+      }
+      montageEpisodes = retry.traces?.episodes || [];
+    } else {
+      montageEpisodes = episodes;
+    }
+
     montageRunId = runId;
+    montageMode = data.metrics?.mode || montageEpisodes[0]?.mode || "navigate";
     montageOverviewLink.href = `/scenarios.html?run=${runId}`;
 
+    const finishedAt = data.metrics?.finished_at;
+    const cacheV = finishedAt ? encodeURIComponent(finishedAt) : String(Date.now());
     if (data.metrics?.montage?.step_montage) {
-      montagePngLink.href = `/api/runs/${runId}/step_montage.png`;
+      montagePngLink.href = `/api/runs/${runId}/step_montage.png?v=${cacheV}`;
       montagePngLink.classList.remove("hidden");
       const sec = data.metrics.montage.montage_sec;
       montagePngLink.textContent = sec != null ? `Saved PNG (${sec}s)` : "Saved PNG";
@@ -393,11 +488,22 @@ async function loadMontageForRun(runId) {
     montageScrubber.value = montageScrubber.max;
 
     const score = data.metrics?.nav_score ?? data.metrics?.avoid_score;
-    montageMeta.textContent = `Run ${shortRunId(runId)} · ${montageEpisodes.length} eval episodes · score ${score != null ? score.toFixed(3) : "?"}`;
-    montageScrubber.disabled = false;
+    const fp = traceFingerprint(montageEpisodes);
+    const finishedLabel = finishedAt ? ` · ${finishedAt.replace("T", " ").slice(0, 19)}Z` : "";
+    montageMetaCache = `Run ${runId} · ${montageEpisodes.length} eval episodes · score ${score != null ? score.toFixed(3) : "?"} · id ${fp}${finishedLabel}`;
+    montageMeta.textContent = montageMetaCache;
+    montageScrubber.disabled = !montageEpisodes.length;
     renderMontageCanvas();
   } catch (err) {
-    montageMeta.textContent = `Montage unavailable: ${err.message}`;
+    if (seq !== montageLoadSeq) {
+      restoreMontageDisplay();
+      return;
+    }
+    montageEpisodes = [];
+    montageRunId = null;
+    montageMetaCache = "";
+    clearMontageCanvas("Montage unavailable");
+    montageMeta.textContent = `Montage unavailable for ${runId}: ${err.message}`;
     montageScrubber.disabled = true;
   }
 }
@@ -623,8 +729,10 @@ function renderHistoryTable() {
     tr.addEventListener("click", () => {
       resumeSelect.value = r.run_id;
       syncRewardWeightsFromResume();
+      montageLockedRunId = r.run_id;
+      loadMontageForRun(r.run_id, { force: true });
     });
-    tr.addEventListener("mouseenter", () => loadMontageForRun(r.run_id));
+    tr.addEventListener("mouseenter", () => scheduleMontagePreview(r.run_id));
     historyTable.appendChild(tr);
   });
 }
@@ -716,9 +824,12 @@ async function pollJobStatus() {
       lastCompletedRun = st.run_id;
       liveSeries = [];
       lastLiveHash = "";
+      montageLockedRunId = st.run_id;
       montageRunId = null;
+      montageEpisodes = [];
+      montageMetaCache = "";
       await loadHistory();
-      await loadMontageForRun(st.run_id);
+      await loadMontageForRun(st.run_id, { force: true });
     }
   } catch (err) {
     jobStatus.textContent = `Status error: ${err.message}`;
@@ -820,6 +931,12 @@ buildRewardWeightInputs();
 loadPlantConfig()
   .then(() => loadTrainingPresets())
   .then(() => loadHistory())
+  .then(() => {
+    if (!jobRunning && history.length) {
+      const initial = montageLockedRunId || latestHistoryRunId();
+      if (initial) return loadMontageForRun(initial, { force: true });
+    }
+  })
   .then(async () => {
     try {
       const health = await BoatNavApi.checkHealth();

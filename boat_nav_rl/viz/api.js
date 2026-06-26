@@ -10,7 +10,7 @@ const BoatNavApi = (() => {
   let simConstants = { ...DEFAULT_SIM_CONSTANTS };
 
   async function fetchJson(url, opts = {}) {
-    const res = await fetch(url, opts);
+    const res = await fetch(url, { cache: "no-store", ...opts });
     const contentType = res.headers.get("Content-Type") || "";
     const text = await res.text();
 

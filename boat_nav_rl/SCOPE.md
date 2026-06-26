@@ -93,13 +93,14 @@ Per contact `i` (order in flat vector):
 |-------|-----|-------|
 | `bearing` | 2 | sin/cos true bearing to contact from own ship |
 | `range` | 1 | Slant range, m |
-| `cog` | 2 | sin/cos contact course over ground |
-| `sog` | 1 | Contact speed over ground, m/s |
-| `speed` | 1 | Contact speed through water, m/s (equals SOG when leeway negligible) |
+| `rel_cog` | 2 | sin/cos contact COG **relative to own bow** |
+| `rel_vel_fwd` | 1 | Forward component of relative ground velocity / `REL_VEL_SCALE` |
+| `rel_vel_stbd` | 1 | Starboard component of relative ground velocity / `REL_VEL_SCALE` |
+| `radius` | 1 | Contact collision radius / `RADIUS_SCALE` |
 
 **Flat size:**  
-`own(6) + wind(3) + N_max × contact(7) + mask(N_max) + goal(3) + has_goal(1)`  
-With N_max=8 → 6 + 3 + 56 + 8 + 3 + 1 = **77 floats**.
+`own(6) + wind(3) + N_max × contact(8) + mask(N_max) + goal(3) + has_goal(1)`  
+With N_max=8 → 6 + 3 + 64 + 8 + 3 + 1 = **85 floats**.
 
 Sort contacts by **range ascending** before padding so the policy sees nearest threats first (order-invariant alternative: set transformer / attention — out of scope for v1).
 
