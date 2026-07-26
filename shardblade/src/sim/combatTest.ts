@@ -1,5 +1,6 @@
 import { movesetFor } from "../data/weapons";
-import { createCombatant, resolveHit, type AttackResult, type Combatant } from "./combat";
+import { createCombatant, type AttackResult, type Combatant } from "./combat";
+import { tickCombatants } from "./duelStep";
 import { spawnEncounter, type EncounterRuntime } from "./encounters";
 import type { RunSnapshot } from "./run";
 import type { SkinId, Style, WeaponClass } from "./types";
@@ -70,20 +71,7 @@ export class CombatTestSim {
     const fadeDur = tuning.COMBAT_UI_FADE_S;
     this.uiFade = fadeDur <= 0 ? 1 : Math.min(1, this.combatElapsed / fadeDur);
 
-    this.encounter.tickAi(dt, this.player.cooldown.style);
-    this.lastAttacks = [];
-
-    const playerHit = this.player.cooldown.tick(dt);
-    if (playerHit && !this.encounter.enemy.dead) {
-      this.lastAttacks.push(resolveHit(this.player, this.encounter.enemy, playerHit));
-    }
-
-    if (!this.encounter.enemy.dead && !this.player.dead) {
-      const enemyHit = this.encounter.enemy.cooldown.tick(dt);
-      if (enemyHit) {
-        this.lastAttacks.push(resolveHit(this.encounter.enemy, this.player, enemyHit));
-      }
-    }
+    this.lastAttacks = tickCombatants(dt, this.player, this.encounter);
 
     if (this.player.dead) {
       this.respawnPlayer();

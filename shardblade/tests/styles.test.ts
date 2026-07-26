@@ -39,6 +39,16 @@ describe("CooldownTracker", () => {
     expect(cd.progress).toBeLessThan(1);
   });
 
+  it("emits a hit when a large dt wraps past the hit window on the new swing", () => {
+    const cd = new CooldownTracker("fast", 0);
+    cd.seekProgress(0.9);
+    // 0.9 + 0.8 wraps to 0.7, which is past HIT_WINDOW_T — must emit for the new swing.
+    const hit = cd.tick(attackPeriod("fast") * 0.8);
+    expect(hit).not.toBeNull();
+    expect(hit!.hitAt).toBe(tuning.HIT_WINDOW_T);
+    expect(cd.progress).toBeCloseTo(0.7, 5);
+  });
+
   it("no-ops style switch to the same style", () => {
     const cd = new CooldownTracker("heavy", 0.3);
     cd.setStyle("heavy");

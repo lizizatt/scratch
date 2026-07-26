@@ -1,7 +1,8 @@
 import { tuning } from "../data/tuning";
 import { movesetFor } from "../data/weapons";
 import type { AttackResult } from "./combat";
-import { createCombatant, resolveHit, type Combatant } from "./combat";
+import { createCombatant, type Combatant } from "./combat";
+import { tickCombatants } from "./duelStep";
 import {
   ENCOUNTER_ORDER,
   spawnEncounter,
@@ -218,22 +219,7 @@ export class RunSim {
       const fadeDur = tuning.COMBAT_UI_FADE_S;
       this.uiFade = fadeDur <= 0 ? 1 : Math.min(1, this.combatElapsed / fadeDur);
 
-      this.encounter.tickAi(dt, this.player.cooldown.style);
-
-      this.lastAttacks = [];
-      const playerHit = this.player.cooldown.tick(dt);
-      if (playerHit && !this.encounter.enemy.dead) {
-        const result = resolveHit(this.player, this.encounter.enemy, playerHit);
-        this.lastAttacks.push(result);
-      }
-
-      if (!this.encounter.enemy.dead && !this.player.dead) {
-        const enemyHit = this.encounter.enemy.cooldown.tick(dt);
-        if (enemyHit) {
-          const result = resolveHit(this.encounter.enemy, this.player, enemyHit);
-          this.lastAttacks.push(result);
-        }
-      }
+      this.lastAttacks = tickCombatants(dt, this.player, this.encounter);
 
       if (this.player.dead) {
         this.finishDead();

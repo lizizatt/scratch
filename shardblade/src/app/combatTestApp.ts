@@ -1,7 +1,8 @@
 import type { MetaState } from "../sim/meta";
 import type { CombatTestSim } from "../sim/combatTest";
 import { drawFrame, type FrameModel, type UiRects } from "../render/draw";
-import { hitTestStyle, playerStyleButtons } from "../render/hitTest";
+import { layoutCombat } from "../render/layout";
+import { hitTestStyle } from "../render/hitTest";
 import { DEFAULT_META } from "../sim/meta";
 
 /**
@@ -11,7 +12,10 @@ export class CombatTestApp {
   private uiRects: UiRects | null = null;
   private readonly width: number;
   private readonly height: number;
-  private readonly meta: MetaState = { ...DEFAULT_META, unlockedClasses: [...DEFAULT_META.unlockedClasses] };
+  private readonly meta: MetaState = {
+    ...DEFAULT_META,
+    unlockedClasses: [...DEFAULT_META.unlockedClasses],
+  };
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -45,10 +49,9 @@ export class CombatTestApp {
 
   onClick(x: number, y: number): void {
     void this.uiRects;
-    const playerX = this.width * 0.28;
-    const groundY = this.height * 0.72;
-    const entityY = groundY - 70;
-    const style = hitTestStyle(x, y, playerStyleButtons(playerX, entityY));
+    const snap = this.sim.snapshot();
+    const layout = layoutCombat(this.width, this.height, snap);
+    const style = hitTestStyle(x, y, layout.styleButtons);
     if (style) {
       this.sim.setStyle(style);
     }

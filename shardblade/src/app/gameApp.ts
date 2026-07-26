@@ -11,7 +11,8 @@ import {
 import { RunSim } from "../sim/run";
 import type { SkinId, WeaponClass } from "../sim/types";
 import { drawFrame, type FrameModel, type UiRects } from "../render/draw";
-import { hitTestStyle, playerStyleButtons, pointInRect } from "../render/hitTest";
+import { layoutCombat } from "../render/layout";
+import { hitTestStyle, pointInRect } from "../render/hitTest";
 
 export class GameApp {
   readonly sim = new RunSim();
@@ -24,6 +25,8 @@ export class GameApp {
   private uiRects: UiRects | null = null;
   private readonly width: number;
   private readonly height: number;
+  /** Avoid writing localStorage every frame while sitting on won/dead. */
+  private metaSyncedForEnd = false;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -45,10 +48,14 @@ export class GameApp {
   }
 
   private syncMetaFromSim(): void {
-    if (this.sim.phase === "won" || this.sim.phase === "dead") {
-      this.meta = { ...this.meta, stormlight: this.sim.stormlightMeta };
-      this.persist();
+    if (this.sim.phase !== "won" && this.sim.phase !== "dead") {
+      this.metaSyncedForEnd = false;
+      return;
     }
+    if (this.metaSyncedForEnd) return;
+    this.meta = { ...this.meta, stormlight: this.sim.stormlightMeta };
+    this.persist();
+    this.metaSyncedForEnd = true;
   }
 
   tick(dt: number): void {
@@ -106,6 +113,7 @@ export class GameApp {
           return;
         }
         this.sim.stormlightMeta = this.meta.stormlight;
+        this.metaSyncedForEnd = false;
         this.sim.dispatch({
           type: "startRun",
           weaponClass: this.selectedClass,
@@ -117,7 +125,6 @@ export class GameApp {
       return;
     }
 
-    // Run screen
     const snap = this.sim.snapshot();
     if (snap.phase === "intro" && r.advance && pointInRect(x, y, r.advance)) {
       this.sim.dispatch({ type: "advanceDialogue" });
@@ -126,14 +133,13 @@ export class GameApp {
     if ((snap.phase === "won" || snap.phase === "dead") && r.backToSelect && pointInRect(x, y, r.backToSelect)) {
       this.meta = { ...this.meta, stormlight: this.sim.stormlightMeta };
       this.persist();
+      this.metaSyncedForEnd = true;
       this.screen = "select";
       return;
     }
     if (snap.phase === "combat") {
-      const playerX = this.width * 0.28;
-      const groundY = this.height * 0.72;
-      const entityY = groundY - 70;
-      const style = hitTestStyle(x, y, playerStyleButtons(playerX, entityY));
+      const layout = layoutCombat(this.width, this.height, snap);
+      const style = hitTestStyle(x, y, layout.styleButtons);
       if (style) {
         this.sim.dispatch({ type: "setStyle", style });
       }

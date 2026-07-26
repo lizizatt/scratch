@@ -2,7 +2,8 @@ import { tuning } from "../data/tuning";
 import type { MetaState } from "../sim/meta";
 import type { RunSnapshot } from "../sim/run";
 import type { SkinId, WeaponClass } from "../sim/types";
-import { playerStyleButtons, type Rect } from "./hitTest";
+import { type Rect } from "./hitTest";
+import { layoutCombat } from "./layout";
 
 export type UiRects = {
   start: Rect | null;
@@ -133,13 +134,13 @@ function drawRun(
 ): UiRects {
   const rects: UiRects = emptyRects();
   const snap = model.snap!;
-  const groundY = height * 0.72;
+  const layout = layoutCombat(width, height, snap);
+  const { groundY, playerX, enemyX, entityY, slope } = layout;
 
   // Ground / slope
   ctx.fillStyle = "#2c3a2e";
   ctx.beginPath();
   ctx.moveTo(0, groundY);
-  const slope = snap.stormLevel * 18;
   ctx.lineTo(width, groundY - slope);
   ctx.lineTo(width, height);
   ctx.lineTo(0, height);
@@ -172,10 +173,6 @@ function drawRun(
     ctx.fillStyle = "rgba(220, 230, 255, 0.15)";
     ctx.fillRect(0, 0, width, height);
   }
-
-  const playerX = width * 0.28;
-  const enemyX = width * 0.62;
-  const entityY = groundY - 70 - (snap.stormLevel > 2 ? slope * 0.3 : 0);
 
   // Player
   const isSpear = snap.weaponClass === "spear";
@@ -246,9 +243,7 @@ function drawRun(
     const fade = snap.uiFade;
     ctx.globalAlpha = fade;
 
-    // Player styles
-    const buttons = playerStyleButtons(playerX, entityY);
-    for (const b of buttons) {
+    for (const b of layout.styleButtons) {
       const active = snap.playerStyle === b.style;
       drawButton(ctx, b.rect, b.style, active);
     }
@@ -263,6 +258,20 @@ function drawRun(
       8,
       snap.enemyHp / (snap.enemyMaxHp ?? 1),
       "#ff6d6d",
+    );
+
+    // Attack-loop progress (charge → hit window → recovery)
+    const hitT = tuning.HIT_WINDOW_T;
+    drawAttackProgress(ctx, playerX - 40, entityY - 42, 80, 7, snap.playerProgress, hitT, "#9db7ff");
+    drawAttackProgress(
+      ctx,
+      enemyX - 40,
+      entityY - 42,
+      80,
+      7,
+      snap.enemyProgress ?? 0,
+      hitT,
+      "#e8a0a0",
     );
 
     // Enemy active style
@@ -330,4 +339,35 @@ function drawBar(
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = color;
   ctx.fillRect(x, y, w * Math.max(0, Math.min(1, frac)), h);
+}
+
+/** Attack charge bar with a tick at the damage-window fraction. */
+function drawAttackProgress(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  progress: number,
+  hitWindowT: number,
+  color: string,
+): void {
+  const p = Math.max(0, Math.min(1, progress));
+  ctx.fillStyle = "#1a2030";
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w * p, h);
+  // Hit-window marker
+  const mx = x + w * hitWindowT;
+  ctx.strokeStyle = "#ffe08a";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(mx, y - 1);
+  ctx.lineTo(mx, y + h + 1);
+  ctx.stroke();
+  // Flash brighter once past the window (recovery portion of the swing)
+  if (p >= hitWindowT) {
+    ctx.fillStyle = "rgba(255, 224, 138, 0.35)";
+    ctx.fillRect(x + w * hitWindowT, y, w * (p - hitWindowT), h);
+  }
 }

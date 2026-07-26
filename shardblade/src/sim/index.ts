@@ -33,6 +33,7 @@ export type {
 } from "./run";
 export { CombatTestSim, isCombatTestPath } from "./combatTest";
 export type { CombatTestOptions } from "./combatTest";
+export { tickCombatants } from "./duelStep";
 export {
   loadMeta,
   saveMeta,

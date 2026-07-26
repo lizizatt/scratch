@@ -54,6 +54,14 @@ export class CooldownTracker {
     return this.style === "fast" ? this.moveset.fastDamage : this.moveset.heavyDamage;
   }
 
+  private makeHit(): HitEvent {
+    return {
+      style: this.style,
+      damage: this.damage(),
+      hitAt: this.moveset.hitWindowT,
+    };
+  }
+
   tick(dt: number): HitEvent | null {
     const period = this.period();
     if (period <= 0) {
@@ -66,11 +74,7 @@ export class CooldownTracker {
     const windowT = this.moveset.hitWindowT;
     if (!this.hitThisSwing && prev < windowT && this.progress >= windowT) {
       this.hitThisSwing = true;
-      hit = {
-        style: this.style,
-        damage: this.damage(),
-        hitAt: windowT,
-      };
+      hit = this.makeHit();
     }
 
     if (this.progress >= 1) {
@@ -78,15 +82,12 @@ export class CooldownTracker {
       if (this.progress >= 1) {
         this.progress = this.progress % 1;
       }
-      this.hitThisSwing = this.progress >= windowT;
-      // If we wrapped past the window in one huge dt, still emit once for the new swing.
-      if (!this.hitThisSwing && this.progress >= windowT) {
+      // New swing after wrap: emit if we landed at/past the hit window.
+      if (this.progress >= windowT) {
         this.hitThisSwing = true;
-        hit = {
-          style: this.style,
-          damage: this.damage(),
-          hitAt: windowT,
-        };
+        hit = this.makeHit();
+      } else {
+        this.hitThisSwing = false;
       }
     }
 
