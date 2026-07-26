@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { tuning } from "../src/data/tuning";
 import { MatchStyleAi, createPolicyController } from "../src/sim/ai";
-import { CooldownTracker } from "../src/sim/cooldown";
 import { encounterDef, spawnEncounter } from "../src/sim/encounters";
 import { attackPeriod } from "../src/sim/styles";
 
@@ -71,14 +70,18 @@ describe("matchPlayerAfter", () => {
     expect(matcher.tick(0.2)).toBe("heavy");
   });
 
-  it("applies switch penalty on AI style switch", () => {
+  it("applies switch penalty on AI fast → heavy, not heavy → fast", () => {
     const enc = spawnEncounter("trash3");
-    const cd = enc.enemy.cooldown as CooldownTracker;
-    cd.progress = 0.4;
+    enc.enemy.cooldown.progress = 0.4;
     enc.tickAi(5.1, "heavy");
     expect(enc.enemy.cooldown.style).toBe("heavy");
     const expected = 0.4 - tuning.STYLE_SWITCH_PENALTY_S / attackPeriod("heavy");
     expect(enc.enemy.cooldown.progress).toBeCloseTo(expected, 5);
+
+    enc.enemy.cooldown.progress = 0.4;
+    // Restart match timer by changing player style away then back... simpler: setStyle directly
+    enc.enemy.cooldown.setStyle("fast");
+    expect(enc.enemy.cooldown.progress).toBeCloseTo(0.4, 5);
   });
 });
 

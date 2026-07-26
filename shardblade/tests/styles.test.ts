@@ -16,15 +16,19 @@ describe("style lookups", () => {
 });
 
 describe("CooldownTracker", () => {
-  it("applies a 0.5s penalty when switching fast ↔ heavy", () => {
-    const cd = new CooldownTracker("fast", 0);
-    cd.tick(attackPeriod("fast") * 0.5);
-    expect(cd.progress).toBeCloseTo(0.5, 5);
+  it("applies a 0.5s penalty only when switching fast → heavy", () => {
+    const toHeavy = new CooldownTracker("fast", 0);
+    toHeavy.tick(attackPeriod("fast") * 0.5);
+    toHeavy.setStyle("heavy");
+    expect(toHeavy.progress).toBeCloseTo(
+      0.5 - tuning.STYLE_SWITCH_PENALTY_S / attackPeriod("heavy"),
+      5,
+    );
 
-    cd.setStyle("heavy");
-    expect(cd.style).toBe("heavy");
-    const expected = 0.5 - tuning.STYLE_SWITCH_PENALTY_S / attackPeriod("heavy");
-    expect(cd.progress).toBeCloseTo(expected, 5);
+    const toFast = new CooldownTracker("heavy", 0);
+    toFast.tick(attackPeriod("heavy") * 0.5);
+    toFast.setStyle("fast");
+    expect(toFast.progress).toBeCloseTo(0.5, 5);
   });
 
   it("resets and freezes the attack timer while defending", () => {

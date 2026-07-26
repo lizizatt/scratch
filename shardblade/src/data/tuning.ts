@@ -22,7 +22,7 @@ export const tuning = {
   COMBAT_UI_FADE_S: 0.4,
   /** Fraction of attack duration when damage is attempted (1 = end of swing / blade horizontal). */
   HIT_WINDOW_T: 1,
-  /** Extra delay applied when switching between fast and heavy. */
+  /** Extra delay applied when switching from fast to heavy. */
   STYLE_SWITCH_PENALTY_S: 0.5,
 } as const;
 

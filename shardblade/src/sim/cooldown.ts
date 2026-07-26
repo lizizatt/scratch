@@ -18,14 +18,10 @@ export type CooldownTickOptions = {
   onNewSwing?: () => void;
 };
 
-function isAttackStyle(style: Style): boolean {
-  return style === "fast" || style === "heavy";
-}
-
 /**
  * Tracks attack charge as progress in [0, 1].
  * Damage fires once when progress crosses the moveset hit window.
- * Defend resets and freezes the timer; fast↔heavy applies a time penalty.
+ * Defend resets and freezes the timer; fast→heavy applies a time penalty.
  */
 export class CooldownTracker {
   style: Style;
@@ -60,7 +56,8 @@ export class CooldownTracker {
       return;
     }
 
-    if (isAttackStyle(prev) && isAttackStyle(next)) {
+    // Only fast → heavy is penalized; heavy → fast keeps charge fraction.
+    if (prev === "fast" && next === "heavy") {
       const penaltyFrac = tuning.STYLE_SWITCH_PENALTY_S / this.period();
       this.progress = Math.max(0, this.progress - penaltyFrac);
       this.hitThisSwing = this.progress >= this.moveset.hitWindowT;
