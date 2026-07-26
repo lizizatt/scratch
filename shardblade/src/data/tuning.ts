@@ -22,6 +22,8 @@ export const tuning = {
   COMBAT_UI_FADE_S: 0.4,
   /** Fraction of attack duration when damage is attempted (1 = end of swing / blade horizontal). */
   HIT_WINDOW_T: 1,
+  /** Extra delay applied when switching between fast and heavy. */
+  STYLE_SWITCH_PENALTY_S: 0.5,
 } as const;
 
 export type Tuning = typeof tuning;
@@ -45,4 +47,5 @@ export const TUNING_KEYS = [
   "PARRY_SAME_STYLE",
   "COMBAT_UI_FADE_S",
   "HIT_WINDOW_T",
+  "STYLE_SWITCH_PENALTY_S",
 ] as const;

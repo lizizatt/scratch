@@ -16,14 +16,27 @@ describe("style lookups", () => {
 });
 
 describe("CooldownTracker", () => {
-  it("preserves progress fraction when switching styles", () => {
+  it("applies a 0.5s penalty when switching fast ↔ heavy", () => {
     const cd = new CooldownTracker("fast", 0);
     cd.tick(attackPeriod("fast") * 0.5);
     expect(cd.progress).toBeCloseTo(0.5, 5);
 
     cd.setStyle("heavy");
     expect(cd.style).toBe("heavy");
-    expect(cd.progress).toBeCloseTo(0.5, 5);
+    const expected = 0.5 - tuning.STYLE_SWITCH_PENALTY_S / attackPeriod("heavy");
+    expect(cd.progress).toBeCloseTo(expected, 5);
+  });
+
+  it("resets and freezes the attack timer while defending", () => {
+    const cd = new CooldownTracker("fast", 0);
+    cd.tick(attackPeriod("fast") * 0.7);
+    cd.setStyle("defend");
+    expect(cd.progress).toBe(0);
+
+    cd.tick(1.0);
+    expect(cd.style).toBe("defend");
+    expect(cd.progress).toBe(0);
+    expect(cd.tick(0.5)).toBeNull();
   });
 
   it("fires when crossing the hit window, not only at swing end", () => {

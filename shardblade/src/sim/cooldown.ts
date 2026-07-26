@@ -1,3 +1,4 @@
+import { tuning } from "../data/tuning";
 import { GREATSWORD, type WeaponMoveset } from "../data/weapons";
 import type { Style } from "./types";
 
@@ -17,10 +18,14 @@ export type CooldownTickOptions = {
   onNewSwing?: () => void;
 };
 
+function isAttackStyle(style: Style): boolean {
+  return style === "fast" || style === "heavy";
+}
+
 /**
  * Tracks attack charge as progress in [0, 1].
  * Damage fires once when progress crosses the moveset hit window.
- * Style switches preserve the same fraction of charge.
+ * Defend resets and freezes the timer; fast↔heavy applies a time penalty.
  */
 export class CooldownTracker {
   style: Style;
@@ -35,9 +40,9 @@ export class CooldownTracker {
     moveset: WeaponMoveset = GREATSWORD,
   ) {
     this.style = style;
-    this.progress = progress;
+    this.progress = style === "defend" ? 0 : progress;
     this.moveset = moveset;
-    this.hitThisSwing = progress >= moveset.hitWindowT;
+    this.hitThisSwing = this.progress >= moveset.hitWindowT;
   }
 
   setMoveset(moveset: WeaponMoveset): void {
@@ -46,7 +51,20 @@ export class CooldownTracker {
 
   setStyle(next: Style): void {
     if (next === this.style) return;
+    const prev = this.style;
     this.style = next;
+
+    if (next === "defend") {
+      this.progress = 0;
+      this.hitThisSwing = false;
+      return;
+    }
+
+    if (isAttackStyle(prev) && isAttackStyle(next)) {
+      const penaltyFrac = tuning.STYLE_SWITCH_PENALTY_S / this.period();
+      this.progress = Math.max(0, this.progress - penaltyFrac);
+      this.hitThisSwing = this.progress >= this.moveset.hitWindowT;
+    }
   }
 
   /** Test/helper: set swing progress; hit window may still fire if not yet crossed. */
@@ -76,6 +94,12 @@ export class CooldownTracker {
   }
 
   tick(dt: number, opts?: CooldownTickOptions): HitEvent | null {
+    if (this.style === "defend") {
+      this.progress = 0;
+      this.hitThisSwing = false;
+      return null;
+    }
+
     const period = this.period();
     if (period <= 0) {
       throw new Error("attack period must be positive");

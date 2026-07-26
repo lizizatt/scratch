@@ -3,6 +3,7 @@ import { tuning } from "../src/data/tuning";
 import { MatchStyleAi, createPolicyController } from "../src/sim/ai";
 import { CooldownTracker } from "../src/sim/cooldown";
 import { encounterDef, spawnEncounter } from "../src/sim/encounters";
+import { attackPeriod } from "../src/sim/styles";
 
 describe("encounter defs", () => {
   it("sets correct HP and policies", () => {
@@ -70,13 +71,14 @@ describe("matchPlayerAfter", () => {
     expect(matcher.tick(0.2)).toBe("heavy");
   });
 
-  it("preserves cooldown fraction on AI style switch", () => {
+  it("applies switch penalty on AI style switch", () => {
     const enc = spawnEncounter("trash3");
     const cd = enc.enemy.cooldown as CooldownTracker;
     cd.progress = 0.4;
     enc.tickAi(5.1, "heavy");
     expect(enc.enemy.cooldown.style).toBe("heavy");
-    expect(enc.enemy.cooldown.progress).toBeCloseTo(0.4, 5);
+    const expected = 0.4 - tuning.STYLE_SWITCH_PENALTY_S / attackPeriod("heavy");
+    expect(enc.enemy.cooldown.progress).toBeCloseTo(expected, 5);
   });
 });
 
