@@ -23,3 +23,11 @@ export {
   ENCOUNTER_ORDER,
 } from "./encounters";
 export type { EncounterDef, EncounterKind, EncounterRuntime } from "./encounters";
+export { RunSim, simulateRun } from "./run";
+export type {
+  RunIntent,
+  RunPhase,
+  RunSnapshot,
+  RunSimOptions,
+  StyleScheduleEntry,
+} from "./run";
