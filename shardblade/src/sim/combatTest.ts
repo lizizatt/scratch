@@ -88,7 +88,6 @@ export class CombatTestSim {
     this.uiFade = fadeDur <= 0 ? 1 : Math.min(1, this.combatElapsed / fadeDur);
 
     this.lastAttacks = tickCombatants(dt, this.player, this.encounter, {
-      skipEncounterAi: true,
       onEnemyNewSwing: () => this.applySwingDecision(),
     });
 
@@ -124,6 +123,7 @@ export class CombatTestSim {
       enemyStyle: this.encounter.enemy.cooldown.style,
       enemyKind: "boss",
       enemyProgress: this.encounter.enemy.cooldown.progress,
+      tutorial: null,
       uiFade: this.uiFade,
       stormLevel: 3,
       waterHeight: 0.5,

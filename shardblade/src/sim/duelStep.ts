@@ -3,14 +3,15 @@ import { resolveHit } from "./combat";
 import type { EncounterRuntime } from "./encounters";
 
 export type TickCombatantsOptions = {
-  /** Skip encounter.tickAi (combat-test uses swing-cycle brain instead). */
-  skipEncounterAi?: boolean;
-  /** Invoked at the start of each new enemy swing, before its hit resolves. */
+  /**
+   * Called at the start of each new enemy swing.
+   * Defaults to encounter.beginSwing(playerStyle).
+   */
   onEnemyNewSwing?: () => void;
 };
 
 /**
- * Shared auto-attack step: AI → player hit → enemy hit.
+ * Shared auto-attack step: player hit → enemy hit (swing-cycle AI on wrap).
  * Caller handles death / victory / respawn.
  */
 export function tickCombatants(
@@ -19,9 +20,10 @@ export function tickCombatants(
   encounter: EncounterRuntime,
   opts: TickCombatantsOptions = {},
 ): AttackResult[] {
-  if (!opts.skipEncounterAi) {
-    encounter.tickAi(dt, player.cooldown.style);
-  }
+  const onEnemyNewSwing =
+    opts.onEnemyNewSwing ??
+    (() => encounter.beginSwing(player.cooldown.style));
+
   const results: AttackResult[] = [];
 
   if (!player.dead) {
@@ -33,7 +35,7 @@ export function tickCombatants(
 
   if (!encounter.enemy.dead && !player.dead) {
     const enemyHit = encounter.enemy.cooldown.tick(dt, {
-      onNewSwing: opts.onEnemyNewSwing,
+      onNewSwing: onEnemyNewSwing,
     });
     if (enemyHit) {
       results.push(resolveHit(encounter.enemy, player, enemyHit));

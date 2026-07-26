@@ -46,6 +46,7 @@ export type RunSnapshot = {
   enemyStyle: Style | null;
   enemyKind: EncounterKind | null;
   enemyProgress: number | null;
+  tutorial: string | null;
   uiFade: number;
   stormLevel: number;
   waterHeight: number;
@@ -154,6 +155,7 @@ export class RunSim {
       return;
     }
     this.encounter = spawnEncounter(kind);
+    this.encounter.beginSwing(this.player.cooldown.style);
     this.phase = "combat";
     this.combatElapsed = 0;
     this.uiFade = 0;
@@ -253,6 +255,7 @@ export class RunSim {
       enemyStyle: this.encounter?.enemy.cooldown.style ?? null,
       enemyKind: this.encounter?.def.kind ?? null,
       enemyProgress: this.encounter?.enemy.cooldown.progress ?? null,
+      tutorial: this.encounter?.def.tutorial ?? null,
       uiFade: this.uiFade,
       stormLevel: this.stormLevel,
       waterHeight: this.waterHeight,

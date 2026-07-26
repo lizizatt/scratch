@@ -15,8 +15,9 @@ npm run build    # production bundle
 
 1. Choose **Greatsword** (and a skin). Unlock **Spear** with stormlight after runs.
 2. Click through intro dialogue, then walk right into combat.
-3. Click **fast** / **heavy** over your head to switch styles (same-style parries).
-4. Clear three foes and the baby chasmfiend — or die and bank stormlight.
+3. Styles: **Q** fast, **E** heavy, **S** defend — same-style parries; defend blocks everything.
+4. Five fights teach the modes, then a baby chasmfiend that **opposes** your style.
+5. Win or die — bank stormlight and unlock spear.
 
 ### Combat test arena
 

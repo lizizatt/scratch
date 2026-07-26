@@ -1,46 +1,61 @@
 import { tuning } from "../data/tuning";
-import { createPolicyController, type AiPolicy } from "./ai";
 import { createCombatant, type Combatant } from "./combat";
+import { SwingCycleBrain, type TestAiKind } from "./testAi";
+import type { Style } from "./types";
 
-export type EncounterKind = "trash1" | "trash2" | "trash3" | "boss";
+export type EncounterKind = "fight1" | "fight2" | "fight3" | "fight4" | "boss";
 
 export type EncounterDef = {
   kind: EncounterKind;
   hp: number;
-  policy: AiPolicy;
+  aiKind: TestAiKind;
   stormlightReward: number;
+  /** Shown during combat in the main demo (null for the chasmfiend). */
+  tutorial: string | null;
 };
 
 export function encounterDef(kind: EncounterKind): EncounterDef {
   const base = tuning.BASE_ENEMY_HP;
   switch (kind) {
-    case "trash1":
+    case "fight1":
       return {
         kind,
         hp: base,
-        policy: { kind: "alwaysFast" },
+        aiKind: "alwaysFast",
         stormlightReward: tuning.STORMLIGHT_PER_TRASH,
+        tutorial: "fast (q) parries fast",
       };
-    case "trash2":
+    case "fight2":
       return {
         kind,
         hp: base,
-        policy: { kind: "alwaysHeavy" },
+        aiKind: "alwaysHeavy",
         stormlightReward: tuning.STORMLIGHT_PER_TRASH,
+        tutorial: "heavy (e) parries heavy",
       };
-    case "trash3":
+    case "fight3":
       return {
         kind,
         hp: base,
-        policy: { kind: "matchPlayerAfter", delayS: tuning.ENEMY3_MATCH_DELAY_S },
+        aiKind: "alternate",
         stormlightReward: tuning.STORMLIGHT_PER_TRASH,
+        tutorial: "defend (s) parries everything",
+      };
+    case "fight4":
+      return {
+        kind,
+        hp: base,
+        aiKind: "mirror",
+        stormlightReward: tuning.STORMLIGHT_PER_TRASH,
+        tutorial: "escape the chasm",
       };
     case "boss":
       return {
         kind,
         hp: base * tuning.CHASMFIEND_HP_MULT,
-        policy: { kind: "matchPlayerAfter", delayS: tuning.BOSS_MATCH_DELAY_S },
+        aiKind: "oppose",
         stormlightReward: tuning.STORMLIGHT_PER_BOSS,
+        tutorial: null,
       };
   }
 }
@@ -48,28 +63,26 @@ export function encounterDef(kind: EncounterKind): EncounterDef {
 export type EncounterRuntime = {
   def: EncounterDef;
   enemy: Combatant;
-  tickAi: (dt: number, playerStyle: import("./types").Style) => void;
+  brain: SwingCycleBrain;
+  /** Call at the start of each enemy swing (and on spawn). */
+  beginSwing: (playerStyle: Style) => void;
 };
 
 export function spawnEncounter(kind: EncounterKind): EncounterRuntime {
   const def = encounterDef(kind);
-  const controller = createPolicyController(def.policy);
-  const enemy = createCombatant("enemy", def.hp, controller.initialStyle);
-  return {
-    def,
-    enemy,
-    tickAi: (dt, playerStyle) => {
-      const next = controller.tick(dt, playerStyle, enemy.cooldown.style);
-      if (next) {
-        enemy.cooldown.setStyle(next);
-      }
-    },
+  const brain = new SwingCycleBrain(def.aiKind);
+  const enemy = createCombatant("enemy", def.hp, "fast");
+  const beginSwing = (playerStyle: Style) => {
+    enemy.cooldown.setStyle(brain.decide(playerStyle));
   };
+  beginSwing("fast");
+  return { def, enemy, brain, beginSwing };
 }
 
 export const ENCOUNTER_ORDER: EncounterKind[] = [
-  "trash1",
-  "trash2",
-  "trash3",
+  "fight1",
+  "fight2",
+  "fight3",
+  "fight4",
   "boss",
 ];

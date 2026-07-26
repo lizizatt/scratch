@@ -274,6 +274,20 @@ function drawRun(
     const fade = snap.uiFade;
     ctx.globalAlpha = fade;
 
+    if (snap.tutorial) {
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = "rgba(10, 14, 28, 0.55)";
+      const tw = Math.min(520, width - 80);
+      const tx = (width - tw) / 2;
+      const ty = height * 0.14;
+      ctx.fillRect(tx, ty, tw, 44);
+      ctx.fillStyle = "#e8eefc";
+      ctx.font = "20px Georgia";
+      const text = snap.tutorial;
+      const metrics = ctx.measureText(text);
+      ctx.fillText(text, tx + (tw - metrics.width) / 2, ty + 28);
+    }
+
     for (const b of layout.styleButtons) {
       const active = snap.playerStyle === b.style;
       drawButton(ctx, b.rect, b.style, active);
