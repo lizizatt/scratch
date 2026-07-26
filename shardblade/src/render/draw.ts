@@ -110,9 +110,15 @@ function drawSelect(
 
   // Preview blade
   ctx.fillStyle = skinColor(model.selectedSkin);
-  ctx.fillRect(width - 220, 180, 24, 160);
-  ctx.fillStyle = "#8a96b0";
-  ctx.fillRect(width - 230, 330, 44, 18);
+  if (model.selectedClass === "spear") {
+    ctx.fillRect(width - 210, 160, 8, 180);
+    ctx.fillStyle = "#8a96b0";
+    ctx.fillRect(width - 220, 330, 28, 14);
+  } else {
+    ctx.fillRect(width - 220, 180, 24, 160);
+    ctx.fillStyle = "#8a96b0";
+    ctx.fillRect(width - 230, 330, 44, 18);
+  }
 
   return rects;
 }
@@ -170,16 +176,25 @@ function drawRun(
   const entityY = groundY - 70 - (snap.stormLevel > 2 ? slope * 0.3 : 0);
 
   // Player
+  const isSpear = snap.weaponClass === "spear";
   ctx.fillStyle = skinColor(snap.skin ?? "skin_a");
-  ctx.fillRect(playerX - 14, entityY, 28, 70);
-  // Swing telegraph
+  if (isSpear) {
+    ctx.fillRect(playerX - 10, entityY + 10, 20, 60);
+    ctx.fillStyle = skinColor(snap.skin ?? "skin_a");
+    ctx.fillRect(playerX + 8, entityY - 10, 6, 90);
+  } else {
+    ctx.fillRect(playerX - 14, entityY, 28, 70);
+  }
+  // Swing telegraph from attack progress (damage window at HIT_WINDOW_T)
   if (snap.phase === "combat") {
     const swing = snap.playerStyle === "heavy" ? 50 : 30;
-    ctx.strokeStyle = "#e8eefc";
-    ctx.lineWidth = 3;
+    const windup = Math.min(1, snap.playerProgress / Math.max(0.001, tuning.HIT_WINDOW_T));
+    ctx.strokeStyle = snap.playerProgress >= tuning.HIT_WINDOW_T ? "#ffe08a" : "#e8eefc";
+    ctx.lineWidth = isSpear ? 2 : 3;
     ctx.beginPath();
     ctx.moveTo(playerX + 10, entityY + 20);
-    ctx.lineTo(playerX + 10 + swing * (0.3 + snap.uiFade * 0.7), entityY + 10);
+    const reach = swing * (0.2 + windup * 0.8);
+    ctx.lineTo(playerX + 10 + reach, entityY + (isSpear ? -10 : 10));
     ctx.stroke();
   }
 

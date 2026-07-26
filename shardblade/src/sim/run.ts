@@ -1,4 +1,5 @@
 import { tuning } from "../data/tuning";
+import { movesetFor } from "../data/weapons";
 import type { AttackResult } from "./combat";
 import { createCombatant, resolveHit, type Combatant } from "./combat";
 import {
@@ -38,10 +39,12 @@ export type RunSnapshot = {
   playerStyle: Style;
   playerHp: number;
   playerMaxHp: number;
+  playerProgress: number;
   enemyHp: number | null;
   enemyMaxHp: number | null;
   enemyStyle: Style | null;
   enemyKind: EncounterKind | null;
+  enemyProgress: number | null;
   uiFade: number;
   stormLevel: number;
   waterHeight: number;
@@ -129,7 +132,12 @@ export class RunSim {
     this.dialogueIndex = 0;
     this.weaponClass = weaponClass;
     this.skin = skin;
-    this.player = createCombatant("player", this.playerMaxHp, "fast");
+    this.player = createCombatant(
+      "player",
+      this.playerMaxHp,
+      "fast",
+      movesetFor(weaponClass),
+    );
     this.encounter = null;
     this.combatElapsed = 0;
     this.uiFade = 0;
@@ -253,10 +261,12 @@ export class RunSim {
       playerStyle: this.player.cooldown.style,
       playerHp: this.player.hp,
       playerMaxHp: this.player.maxHp,
+      playerProgress: this.player.cooldown.progress,
       enemyHp: this.encounter?.enemy.hp ?? null,
       enemyMaxHp: this.encounter?.enemy.maxHp ?? null,
       enemyStyle: this.encounter?.enemy.cooldown.style ?? null,
       enemyKind: this.encounter?.def.kind ?? null,
+      enemyProgress: this.encounter?.enemy.cooldown.progress ?? null,
       uiFade: this.uiFade,
       stormLevel: this.stormLevel,
       waterHeight: this.waterHeight,

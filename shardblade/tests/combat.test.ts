@@ -7,7 +7,7 @@ describe("resolveHit", () => {
   it("parries same-style attacks with no HP change", () => {
     const attacker = createCombatant("player", 15, "fast");
     const defender = createCombatant("enemy", 15, "fast");
-    const result = resolveHit(attacker, defender, { style: "fast", damage: 3 });
+    const result = resolveHit(attacker, defender, { style: "fast", damage: 3, hitAt: 0.55 });
     expect(result.parried).toBe(true);
     expect(result.damage).toBe(0);
     expect(defender.hp).toBe(15);
@@ -16,7 +16,7 @@ describe("resolveHit", () => {
   it("applies damage on cross-style hits", () => {
     const attacker = createCombatant("player", 15, "heavy");
     const defender = createCombatant("enemy", 15, "fast");
-    const result = resolveHit(attacker, defender, { style: "heavy", damage: 5 });
+    const result = resolveHit(attacker, defender, { style: "heavy", damage: 5, hitAt: 0.55 });
     expect(result.parried).toBe(false);
     expect(result.damage).toBe(5);
     expect(defender.hp).toBe(10);
@@ -25,7 +25,7 @@ describe("resolveHit", () => {
   it("marks lethal when HP reaches zero", () => {
     const attacker = createCombatant("player", 15, "heavy");
     const defender = createCombatant("enemy", 5, "fast");
-    const result = resolveHit(attacker, defender, { style: "heavy", damage: 5 });
+    const result = resolveHit(attacker, defender, { style: "heavy", damage: 5, hitAt: 0.55 });
     expect(result.lethal).toBe(true);
     expect(defender.dead).toBe(true);
     expect(defender.hp).toBe(0);
@@ -43,10 +43,10 @@ describe("CombatDuel", () => {
 
   it("resolves player attacks before enemy within a tick", () => {
     const duel = new CombatDuel(15, 15, "heavy", "fast");
-    // Force both to be one tick from firing
-    duel.player.cooldown.progress = 0.999;
-    duel.enemy.cooldown.progress = 0.999;
-    const results = duel.tick(attackPeriod("heavy"));
+    const t = tuning.HIT_WINDOW_T - 0.01;
+    duel.player.cooldown.seekProgress(t);
+    duel.enemy.cooldown.seekProgress(t);
+    const results = duel.tick(attackPeriod("heavy") * 0.05);
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results[0].attacker).toBe("player");
   });

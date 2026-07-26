@@ -24,20 +24,18 @@ describe("CooldownTracker", () => {
     cd.setStyle("heavy");
     expect(cd.style).toBe("heavy");
     expect(cd.progress).toBeCloseTo(0.5, 5);
-
-    // Remaining half of heavy period should fire
-    const hit = cd.tick(attackPeriod("heavy") * 0.5);
-    expect(hit).not.toBeNull();
-    expect(hit!.style).toBe("heavy");
-    expect(hit!.damage).toBe(tuning.HEAVY_DAMAGE);
   });
 
-  it("fires at progress >= 1, resets progress, and emits hit", () => {
+  it("fires when crossing the hit window, not only at swing end", () => {
     const cd = new CooldownTracker("fast", 0);
-    expect(cd.tick(attackPeriod("fast") * 0.99)).toBeNull();
-    const hit = cd.tick(attackPeriod("fast") * 0.02);
-    expect(hit).toEqual({ style: "fast", damage: tuning.FAST_DAMAGE });
-    expect(cd.progress).toBeGreaterThanOrEqual(0);
+    const windowT = tuning.HIT_WINDOW_T;
+    expect(cd.tick(attackPeriod("fast") * (windowT - 0.05))).toBeNull();
+    const hit = cd.tick(attackPeriod("fast") * 0.1);
+    expect(hit).not.toBeNull();
+    expect(hit!.style).toBe("fast");
+    expect(hit!.damage).toBe(tuning.FAST_DAMAGE);
+    expect(hit!.hitAt).toBe(windowT);
+    expect(cd.progress).toBeGreaterThanOrEqual(windowT);
     expect(cd.progress).toBeLessThan(1);
   });
 

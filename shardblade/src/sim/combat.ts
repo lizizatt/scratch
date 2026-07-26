@@ -1,4 +1,5 @@
 import { tuning } from "../data/tuning";
+import { GREATSWORD, type WeaponMoveset } from "../data/weapons";
 import { CooldownTracker, type HitEvent } from "./cooldown";
 import type { Style } from "./types";
 
@@ -54,12 +55,13 @@ export function createCombatant(
   id: CombatantId,
   maxHp: number,
   style: Style = "fast",
+  moveset: WeaponMoveset = GREATSWORD,
 ): Combatant {
   return {
     id,
     hp: maxHp,
     maxHp,
-    cooldown: new CooldownTracker(style, 0),
+    cooldown: new CooldownTracker(style, 0, moveset),
     dead: false,
   };
 }
