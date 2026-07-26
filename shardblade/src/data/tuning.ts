@@ -1,13 +1,13 @@
-/** Single source of truth for MVP balance knobs (Phase 0 skeleton). */
+/** Single source of truth for MVP balance knobs. */
 export const tuning = {
   SCREEN_WIDTH_PX: 960,
   WALK_SECONDS_PER_SCREEN: 7.5,
-  // Combat numbers filled in Phase 1 so 5 fast / 3 heavy kill base HP.
+  // 5 fast or 3 heavy kills base HP exactly.
   FAST_ATTACK_PERIOD: 0.6,
   HEAVY_ATTACK_PERIOD: 1.2,
-  FAST_DAMAGE: 1,
-  HEAVY_DAMAGE: 1,
-  BASE_ENEMY_HP: 5,
+  FAST_DAMAGE: 3,
+  HEAVY_DAMAGE: 5,
+  BASE_ENEMY_HP: 15,
   CHASMFIEND_HP_MULT: 2,
   ENEMY3_MATCH_DELAY_S: 5,
   BOSS_MATCH_DELAY_S: 1,
@@ -16,6 +16,8 @@ export const tuning = {
   SPEAR_UNLOCK_COST: 50,
   PARRY_SAME_STYLE: true,
   COMBAT_UI_FADE_S: 0.4,
+  /** Fraction of attack duration when damage is attempted. */
+  HIT_WINDOW_T: 0.55,
 } as const;
 
 export type Tuning = typeof tuning;
@@ -36,4 +38,5 @@ export const TUNING_KEYS = [
   "SPEAR_UNLOCK_COST",
   "PARRY_SAME_STYLE",
   "COMBAT_UI_FADE_S",
+  "HIT_WINDOW_T",
 ] as const;
