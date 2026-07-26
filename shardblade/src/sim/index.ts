@@ -31,3 +31,14 @@ export type {
   RunSimOptions,
   StyleScheduleEntry,
 } from "./run";
+export {
+  loadMeta,
+  saveMeta,
+  purchaseSpear,
+  canPurchaseSpear,
+  isClassUnlocked,
+  addStormlight,
+  DEFAULT_META,
+  META_STORAGE_KEY,
+} from "./meta";
+export type { MetaState } from "./meta";
