@@ -4,7 +4,14 @@ export type Rect = { x: number; y: number; w: number; h: number };
 
 export type StyleButtonLayout = {
   style: Style;
+  label: string;
   rect: Rect;
+};
+
+export const STYLE_BUTTON_LABELS: Record<Style, string> = {
+  fast: "fast (q)",
+  heavy: "heavy (e)",
+  defend: "defend (s)",
 };
 
 /** Layout for clickable style buttons above the player. */
@@ -12,17 +19,25 @@ export function playerStyleButtons(
   playerHeadX: number,
   playerHeadY: number,
 ): StyleButtonLayout[] {
-  const w = 56;
+  const w = 78;
   const h = Math.round(28 * (2 / 3)); // ~19
   const gap = 6;
   const total = w * 2 + gap;
   const left = playerHeadX - total / 2;
-  const bottomRowY = playerHeadY - 40;
-  const topRowY = bottomRowY - gap - h;
+  const topRowY = playerHeadY - 40;
+  const bottomRowY = topRowY + h + gap;
   return [
-    { style: "defend", rect: { x: left, y: topRowY, w: total, h } },
-    { style: "fast", rect: { x: left, y: bottomRowY, w, h } },
-    { style: "heavy", rect: { x: left + w + gap, y: bottomRowY, w, h } },
+    { style: "fast", label: STYLE_BUTTON_LABELS.fast, rect: { x: left, y: topRowY, w, h } },
+    {
+      style: "heavy",
+      label: STYLE_BUTTON_LABELS.heavy,
+      rect: { x: left + w + gap, y: topRowY, w, h },
+    },
+    {
+      style: "defend",
+      label: STYLE_BUTTON_LABELS.defend,
+      rect: { x: left, y: bottomRowY, w: total, h },
+    },
   ];
 }
 

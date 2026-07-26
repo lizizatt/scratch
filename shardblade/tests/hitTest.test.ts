@@ -8,7 +8,10 @@ describe("style hit-test", () => {
     const heavy = buttons.find((b) => b.style === "heavy")!;
     const defend = buttons.find((b) => b.style === "defend")!;
 
-    expect(defend.rect.y).toBeLessThan(fast.rect.y);
+    expect(defend.rect.y).toBeGreaterThan(fast.rect.y);
+    expect(defend.label).toBe("defend (s)");
+    expect(fast.label).toBe("fast (q)");
+    expect(heavy.label).toBe("heavy (e)");
     expect(defend.rect.h).toBe(Math.round(28 * (2 / 3)));
     expect(fast.rect.h).toBe(defend.rect.h);
 

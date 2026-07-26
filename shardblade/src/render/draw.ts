@@ -169,10 +169,11 @@ function drawRun(
   if (snap.stormLevel > 0) {
     ctx.strokeStyle = "rgba(180, 200, 255, 0.35)";
     ctx.beginPath();
-    const drops = 40 + snap.stormLevel * 25;
+    // Rain — denser at higher storm so gaps shrink (~⅓ at peak intensity)
+    const drops = Math.round((40 + snap.stormLevel * 25) * 3);
     for (let i = 0; i < drops; i++) {
-      const x = ((i * 97 + snap.time * 120) % width);
-      const y = ((i * 53 + snap.time * 400) % height);
+      const x = ((i * 37 + snap.time * 120) % width);
+      const y = ((i * 23 + snap.time * 400) % height);
       ctx.moveTo(x, y);
       ctx.lineTo(x + 2, y + 10);
     }
@@ -290,7 +291,7 @@ function drawRun(
 
     for (const b of layout.styleButtons) {
       const active = snap.playerStyle === b.style;
-      drawButton(ctx, b.rect, b.style, active);
+      drawButton(ctx, b.rect, b.label, active);
     }
 
     // HP bars (above style buttons so they don't overlap)

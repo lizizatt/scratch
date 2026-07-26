@@ -14,6 +14,6 @@ describe("layoutCombat", () => {
     expect(hitTestStyle(fast.rect.x + 4, fast.rect.y + 4, layout.styleButtons)).toBe("fast");
     expect(hitTestStyle(heavy.rect.x + 4, heavy.rect.y + 4, layout.styleButtons)).toBe("heavy");
     expect(hitTestStyle(defend.rect.x + 4, defend.rect.y + 4, layout.styleButtons)).toBe("defend");
-    expect(defend.rect.y).toBeLessThan(fast.rect.y);
+    expect(defend.rect.y).toBeGreaterThan(fast.rect.y);
   });
 });
