@@ -30,6 +30,7 @@ export type {
   RunSnapshot,
   RunSimOptions,
   StyleScheduleEntry,
+  FloatText,
 } from "./run";
 export { CombatTestSim, isCombatTestPath } from "./combatTest";
 export type { CombatTestOptions } from "./combatTest";

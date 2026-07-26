@@ -15,6 +15,7 @@ export type RunPhase =
   | "select"
   | "intro"
   | "walk"
+  | "approach"
   | "combat"
   | "storm"
   | "won"
@@ -24,6 +25,17 @@ export type RunIntent =
   | { type: "startRun"; weaponClass: WeaponClass; skin: SkinId }
   | { type: "advanceDialogue" }
   | { type: "setStyle"; style: Style };
+
+export type FloatText = {
+  id: number;
+  text: string;
+  kind: "heal" | "storm";
+  /** Normalized 0–1 along the player (for layout). */
+  xN: number;
+  yN: number;
+  age: number;
+  life: number;
+};
 
 export type RunSnapshot = {
   phase: RunPhase;
@@ -46,10 +58,13 @@ export type RunSnapshot = {
   enemyStyle: Style | null;
   enemyKind: EncounterKind | null;
   enemyProgress: number | null;
+  /** 0 = off-screen right, 1 = in fight stance. */
+  enemyApproach: number | null;
   tutorial: string | null;
   uiFade: number;
   stormLevel: number;
   waterHeight: number;
+  floatTexts: FloatText[];
 };
 
 const INTRO_LINES = [
@@ -84,6 +99,10 @@ export class RunSim {
   uiFade = 0;
   stormLevel = 0;
   stormTimer = 0;
+  approachT = 0;
+  walkHealAcc = 0;
+  floatTexts: FloatText[] = [];
+  private nextFloatId = 1;
   readonly playerMaxHp: number;
   lastAttacks: AttackResult[] = [];
 
@@ -98,7 +117,6 @@ export class RunSim {
   }
 
   get waterHeight(): number {
-    // 0 at start; rises with storm level (spectacle / chase vibe).
     return Math.min(1, this.stormLevel * 0.22);
   }
 
@@ -145,20 +163,71 @@ export class RunSim {
     this.uiFade = 0;
     this.stormLevel = 0;
     this.stormTimer = 0;
+    this.approachT = 0;
+    this.walkHealAcc = 0;
+    this.floatTexts = [];
     this.lastAttacks = [];
   }
 
-  private startCombat(): void {
+  private spawnFloat(text: string, kind: "heal" | "storm"): void {
+    const jitter = (this.nextFloatId % 5) * 0.02;
+    this.floatTexts.push({
+      id: this.nextFloatId++,
+      text,
+      kind,
+      xN: 0.28 + (kind === "heal" ? -0.04 : 0.04) + jitter,
+      yN: 0.42,
+      age: 0,
+      life: 1.1,
+    });
+  }
+
+  private tickFloats(dt: number): void {
+    for (const f of this.floatTexts) {
+      f.age += dt;
+    }
+    this.floatTexts = this.floatTexts.filter((f) => f.age < f.life);
+  }
+
+  private tickWalkHeal(dt: number): void {
+    if (this.player.hp >= this.player.maxHp || this.stormlightRun <= 0) {
+      this.walkHealAcc = 0;
+      return;
+    }
+    this.walkHealAcc += dt;
+    while (
+      this.walkHealAcc >= tuning.WALK_HEAL_INTERVAL_S &&
+      this.player.hp < this.player.maxHp &&
+      this.stormlightRun > 0
+    ) {
+      this.walkHealAcc -= tuning.WALK_HEAL_INTERVAL_S;
+      this.stormlightRun -= 1;
+      this.player.hp += 1;
+      this.spawnFloat("+1", "heal");
+      this.spawnFloat("-1", "storm");
+    }
+  }
+
+  private startApproach(): void {
     const kind = ENCOUNTER_ORDER[this.encounterIndex];
     if (!kind) {
       this.finishWin();
       return;
     }
     this.encounter = spawnEncounter(kind);
+    this.phase = "approach";
+    this.approachT = 0;
+    this.combatElapsed = 0;
+    this.uiFade = 0;
+  }
+
+  private startCombat(): void {
+    if (!this.encounter) return;
     this.encounter.beginSwing(this.player.cooldown.style);
     this.phase = "combat";
     this.combatElapsed = 0;
     this.uiFade = 0;
+    this.approachT = 1;
   }
 
   private finishWin(): void {
@@ -183,8 +252,10 @@ export class RunSim {
     }
     this.phase = "storm";
     this.stormLevel += 1;
-    this.stormTimer = 1.0; // brief beat before walking again
+    this.stormTimer = 1.0;
     this.encounter = null;
+    this.approachT = 0;
+    this.walkHealAcc = 0;
   }
 
   tick(dt: number): void {
@@ -197,20 +268,32 @@ export class RunSim {
     }
 
     this.time += dt;
+    this.tickFloats(dt);
 
     if (this.phase === "storm") {
       this.stormTimer -= dt;
       if (this.stormTimer <= 0) {
         this.phase = "walk";
+        this.walkHealAcc = 0;
       }
       return;
     }
 
     if (this.phase === "walk") {
+      this.tickWalkHeal(dt);
       this.distance += this.walkSpeed * dt;
       const screens = Math.floor(this.distance / tuning.SCREEN_WIDTH_PX);
       if (screens > this.screensTraversed) {
         this.screensTraversed = screens;
+        this.startApproach();
+      }
+      return;
+    }
+
+    if (this.phase === "approach") {
+      this.approachT += dt / tuning.APPROACH_SECONDS;
+      if (this.approachT >= 1) {
+        this.approachT = 1;
         this.startCombat();
       }
       return;
@@ -234,6 +317,7 @@ export class RunSim {
   }
 
   snapshot(): RunSnapshot {
+    const approaching = this.phase === "approach" || this.phase === "combat";
     return {
       phase: this.phase,
       time: this.time,
@@ -255,10 +339,12 @@ export class RunSim {
       enemyStyle: this.encounter?.enemy.cooldown.style ?? null,
       enemyKind: this.encounter?.def.kind ?? null,
       enemyProgress: this.encounter?.enemy.cooldown.progress ?? null,
-      tutorial: this.encounter?.def.tutorial ?? null,
+      enemyApproach: approaching ? Math.min(1, this.approachT) : null,
+      tutorial: this.phase === "combat" ? (this.encounter?.def.tutorial ?? null) : null,
       uiFade: this.uiFade,
       stormLevel: this.stormLevel,
       waterHeight: this.waterHeight,
+      floatTexts: this.floatTexts.map((f) => ({ ...f })),
     };
   }
 }

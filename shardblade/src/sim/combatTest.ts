@@ -123,10 +123,12 @@ export class CombatTestSim {
       enemyStyle: this.encounter.enemy.cooldown.style,
       enemyKind: "boss",
       enemyProgress: this.encounter.enemy.cooldown.progress,
+      enemyApproach: 1,
       tutorial: null,
       uiFade: this.uiFade,
       stormLevel: 3,
       waterHeight: 0.5,
+      floatTexts: [],
     };
   }
 }

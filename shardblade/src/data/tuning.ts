@@ -2,6 +2,10 @@
 export const tuning = {
   SCREEN_WIDTH_PX: 960,
   WALK_SECONDS_PER_SCREEN: 7.5,
+  /** Enemy scrolls on-screen for this long before combat begins. */
+  APPROACH_SECONDS: 2.0,
+  /** While walking, spend 1 stormlight to heal 1 HP this often (seconds). */
+  WALK_HEAL_INTERVAL_S: 1.0,
   // Slowed ×2 from initial MVP so style reads are thinkable.
   // 5 fast or 3 heavy kills base HP exactly.
   FAST_ATTACK_PERIOD: 1.2,
@@ -31,6 +35,8 @@ export type Tuning = typeof tuning;
 export const TUNING_KEYS = [
   "SCREEN_WIDTH_PX",
   "WALK_SECONDS_PER_SCREEN",
+  "APPROACH_SECONDS",
+  "WALK_HEAL_INTERVAL_S",
   "FAST_ATTACK_PERIOD",
   "HEAVY_ATTACK_PERIOD",
   "DEFEND_PERIOD",
