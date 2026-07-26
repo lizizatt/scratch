@@ -15,3 +15,11 @@ export type {
   CombatantId,
   CombatantView,
 } from "./combat";
+export { MatchStyleAi, createPolicyController } from "./ai";
+export type { AiPolicy, AiPolicyKind } from "./ai";
+export {
+  encounterDef,
+  spawnEncounter,
+  ENCOUNTER_ORDER,
+} from "./encounters";
+export type { EncounterDef, EncounterKind, EncounterRuntime } from "./encounters";
