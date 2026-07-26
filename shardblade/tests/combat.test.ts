@@ -7,7 +7,7 @@ describe("resolveHit", () => {
   it("parries same-style attacks with no HP change", () => {
     const attacker = createCombatant("player", 15, "fast");
     const defender = createCombatant("enemy", 15, "fast");
-    const result = resolveHit(attacker, defender, { style: "fast", damage: 3, hitAt: 0.55 });
+    const result = resolveHit(attacker, defender, { style: "fast", damage: 3, hitAt: 1 });
     expect(result.parried).toBe(true);
     expect(result.damage).toBe(0);
     expect(defender.hp).toBe(15);
@@ -16,7 +16,7 @@ describe("resolveHit", () => {
   it("applies damage on cross-style hits", () => {
     const attacker = createCombatant("player", 15, "heavy");
     const defender = createCombatant("enemy", 15, "fast");
-    const result = resolveHit(attacker, defender, { style: "heavy", damage: 5, hitAt: 0.55 });
+    const result = resolveHit(attacker, defender, { style: "heavy", damage: 5, hitAt: 1 });
     expect(result.parried).toBe(false);
     expect(result.damage).toBe(5);
     expect(defender.hp).toBe(10);
@@ -25,7 +25,7 @@ describe("resolveHit", () => {
   it("marks lethal when HP reaches zero", () => {
     const attacker = createCombatant("player", 15, "heavy");
     const defender = createCombatant("enemy", 5, "fast");
-    const result = resolveHit(attacker, defender, { style: "heavy", damage: 5, hitAt: 0.55 });
+    const result = resolveHit(attacker, defender, { style: "heavy", damage: 5, hitAt: 1 });
     expect(result.lethal).toBe(true);
     expect(defender.dead).toBe(true);
     expect(defender.hp).toBe(0);

@@ -17,8 +17,8 @@ export const tuning = {
   SPEAR_UNLOCK_COST: 50,
   PARRY_SAME_STYLE: true,
   COMBAT_UI_FADE_S: 0.4,
-  /** Fraction of attack duration when damage is attempted. */
-  HIT_WINDOW_T: 0.55,
+  /** Fraction of attack duration when damage is attempted (1 = end of swing / blade horizontal). */
+  HIT_WINDOW_T: 1,
 } as const;
 
 export type Tuning = typeof tuning;

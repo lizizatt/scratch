@@ -6,6 +6,8 @@ export {
   overheadSwingAngle,
   drawShardblade,
   drawGenericBlade,
+  COMBAT_BLADE_LENGTH,
+  COMBAT_TIP_REACH,
 } from "./blade";
 export { drawFrame } from "./draw";
 export type { FrameModel, UiRects } from "./draw";

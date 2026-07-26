@@ -1,8 +1,15 @@
 import type { SkinId } from "../sim/types";
 import { tuning } from "../data/tuning";
 
+/** Shared blade length so layout spacing matches drawn tips. */
+export const COMBAT_BLADE_LENGTH = 110;
+
+/** Horizontal tip reach from body center (grip offset + blade). */
+export const COMBAT_TIP_REACH = 6 + COMBAT_BLADE_LENGTH;
+
 /**
  * Overhead swing: ~30° past vertical (behind) → horizontal (front) at impact.
+ * Impact / horizontal lands at `hitWindowT` (default: end of swing).
  * `facing` 1 = right (player), -1 = left (enemy).
  */
 export function overheadSwingAngle(
@@ -31,7 +38,7 @@ export function drawShardblade(
   gripY: number,
   angle: number,
   skin: SkinId,
-  length = 110,
+  length = COMBAT_BLADE_LENGTH,
 ): void {
   const colors = skinMetal(skin);
   ctx.save();
@@ -87,7 +94,7 @@ export function drawGenericBlade(
   gripX: number,
   gripY: number,
   angle: number,
-  length = 100,
+  length = COMBAT_BLADE_LENGTH,
 ): void {
   ctx.save();
   ctx.translate(gripX, gripY);

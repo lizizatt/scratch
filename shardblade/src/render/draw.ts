@@ -186,7 +186,6 @@ function drawRun(
   }
 
   // Player body
-  const isSpear = snap.weaponClass === "spear";
   ctx.fillStyle = "#4a5568";
   ctx.fillRect(playerX - 12, entityY + 8, 24, 62);
   // Head
@@ -201,12 +200,7 @@ function drawRun(
     const angle = overheadSwingAngle(progress, 1);
     const gripX = playerX + 6;
     const gripY = entityY + 22;
-    if (isSpear) {
-      // MVP spear still uses the same arc; thinner shard look
-      drawShardblade(ctx, gripX, gripY, angle, snap.skin ?? "skin_a", 100);
-    } else {
-      drawShardblade(ctx, gripX, gripY, angle, snap.skin ?? "skin_a", 110);
-    }
+    drawShardblade(ctx, gripX, gripY, angle, snap.skin ?? "skin_a");
   }
 
   // Enemy body + generic blade
@@ -225,7 +219,7 @@ function drawRun(
     const angle = overheadSwingAngle(snap.enemyProgress ?? 0, -1);
     const gripX = enemyX - 6;
     const gripY = bodyTop + 28;
-    drawGenericBlade(ctx, gripX, gripY, angle, boss ? 120 : 100);
+    drawGenericBlade(ctx, gripX, gripY, angle);
   }
 
   // HUD stormlight
