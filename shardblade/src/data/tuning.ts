@@ -2,9 +2,10 @@
 export const tuning = {
   SCREEN_WIDTH_PX: 960,
   WALK_SECONDS_PER_SCREEN: 7.5,
+  // Slowed ×2 from initial MVP so style reads are thinkable.
   // 5 fast or 3 heavy kills base HP exactly.
-  FAST_ATTACK_PERIOD: 0.6,
-  HEAVY_ATTACK_PERIOD: 1.2,
+  FAST_ATTACK_PERIOD: 1.2,
+  HEAVY_ATTACK_PERIOD: 2.4,
   FAST_DAMAGE: 3,
   HEAVY_DAMAGE: 5,
   BASE_ENEMY_HP: 15,

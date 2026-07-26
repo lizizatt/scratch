@@ -34,6 +34,8 @@ export type {
 export { CombatTestSim, isCombatTestPath } from "./combatTest";
 export type { CombatTestOptions } from "./combatTest";
 export { tickCombatants } from "./duelStep";
+export { SwingCycleBrain, TEST_AI_OPTIONS } from "./testAi";
+export type { TestAiKind, TestAiOption } from "./testAi";
 export {
   loadMeta,
   saveMeta,

@@ -22,6 +22,15 @@ canvas.addEventListener("click", (ev) => {
   app.onClick(x, y);
 });
 
+window.addEventListener("keydown", (ev) => {
+  if (ev.repeat) return;
+  if (ev.key === "q" || ev.key === "Q") {
+    app.setStyle("fast");
+  } else if (ev.key === "e" || ev.key === "E") {
+    app.setStyle("heavy");
+  }
+});
+
 let last = performance.now();
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);

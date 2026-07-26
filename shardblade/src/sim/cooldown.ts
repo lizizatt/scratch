@@ -8,6 +8,15 @@ export type HitEvent = {
   hitAt: number;
 };
 
+export type CooldownTickOptions = {
+  /**
+   * Invoked at the start of a new swing (when the previous swing wraps),
+   * before that swing's hit window is evaluated — so AI can pick a style
+   * for the upcoming cycle.
+   */
+  onNewSwing?: () => void;
+};
+
 /**
  * Tracks attack charge as progress in [0, 1].
  * Damage fires once when progress crosses the moveset hit window.
@@ -62,7 +71,7 @@ export class CooldownTracker {
     };
   }
 
-  tick(dt: number): HitEvent | null {
+  tick(dt: number, opts?: CooldownTickOptions): HitEvent | null {
     const period = this.period();
     if (period <= 0) {
       throw new Error("attack period must be positive");
@@ -82,7 +91,8 @@ export class CooldownTracker {
       if (this.progress >= 1) {
         this.progress = this.progress % 1;
       }
-      // New swing after wrap: emit if we landed at/past the hit window.
+      // New swing begins — AI decides here before hit evaluation.
+      opts?.onNewSwing?.();
       if (this.progress >= windowT) {
         this.hitThisSwing = true;
         hit = this.makeHit();

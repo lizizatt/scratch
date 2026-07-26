@@ -9,7 +9,7 @@ import {
   type MetaState,
 } from "../sim/meta";
 import { RunSim } from "../sim/run";
-import type { SkinId, WeaponClass } from "../sim/types";
+import type { SkinId, Style, WeaponClass } from "../sim/types";
 import { drawFrame, type FrameModel, type UiRects } from "../render/draw";
 import { layoutCombat } from "../render/layout";
 import { hitTestStyle, pointInRect } from "../render/hitTest";
@@ -62,6 +62,12 @@ export class GameApp {
     if (this.screen === "run") {
       this.sim.tick(dt);
       this.syncMetaFromSim();
+    }
+  }
+
+  setStyle(style: Style): void {
+    if (this.screen === "run" && this.sim.phase === "combat") {
+      this.sim.dispatch({ type: "setStyle", style });
     }
   }
 

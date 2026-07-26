@@ -3,6 +3,7 @@ import { createCombatant, type AttackResult, type Combatant } from "./combat";
 import { tickCombatants } from "./duelStep";
 import { spawnEncounter, type EncounterRuntime } from "./encounters";
 import type { RunSnapshot } from "./run";
+import { SwingCycleBrain, type TestAiKind } from "./testAi";
 import type { SkinId, Style, WeaponClass } from "./types";
 import { tuning } from "../data/tuning";
 
@@ -10,6 +11,7 @@ export type CombatTestOptions = {
   playerMaxHp?: number;
   weaponClass?: WeaponClass;
   skin?: SkinId;
+  aiKind?: TestAiKind;
 };
 
 /**
@@ -26,6 +28,7 @@ export class CombatTestSim {
   skin: SkinId;
   player: Combatant;
   encounter: EncounterRuntime;
+  brain: SwingCycleBrain;
   lastAttacks: AttackResult[] = [];
   readonly playerMaxHp: number;
 
@@ -33,6 +36,7 @@ export class CombatTestSim {
     this.playerMaxHp = opts.playerMaxHp ?? tuning.BASE_ENEMY_HP * 2;
     this.weaponClass = opts.weaponClass ?? "greatsword";
     this.skin = opts.skin ?? "skin_a";
+    this.brain = new SwingCycleBrain(opts.aiKind ?? "alwaysFast");
     this.player = createCombatant(
       "player",
       this.playerMaxHp,
@@ -41,10 +45,21 @@ export class CombatTestSim {
     );
     this.encounter = spawnEncounter("boss");
     this.uiFade = 1;
+    this.applySwingDecision();
   }
 
   setStyle(style: Style): void {
     this.player.cooldown.setStyle(style);
+  }
+
+  setAiKind(kind: TestAiKind): void {
+    this.brain.setKind(kind);
+    // Takes effect at the beginning of the enemy's next swing cycle.
+  }
+
+  private applySwingDecision(): void {
+    const next = this.brain.decide(this.player.cooldown.style);
+    this.encounter.enemy.cooldown.setStyle(next);
   }
 
   private respawnPlayer(): void {
@@ -63,6 +78,7 @@ export class CombatTestSim {
     this.kills += 1;
     this.encounter = spawnEncounter("boss");
     this.combatElapsed = 0;
+    this.applySwingDecision();
   }
 
   tick(dt: number): void {
@@ -71,7 +87,10 @@ export class CombatTestSim {
     const fadeDur = tuning.COMBAT_UI_FADE_S;
     this.uiFade = fadeDur <= 0 ? 1 : Math.min(1, this.combatElapsed / fadeDur);
 
-    this.lastAttacks = tickCombatants(dt, this.player, this.encounter);
+    this.lastAttacks = tickCombatants(dt, this.player, this.encounter, {
+      skipEncounterAi: true,
+      onEnemyNewSwing: () => this.applySwingDecision(),
+    });
 
     if (this.player.dead) {
       this.respawnPlayer();

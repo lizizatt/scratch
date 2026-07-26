@@ -1,7 +1,13 @@
 import { tuning } from "../data/tuning";
 import type { MetaState } from "../sim/meta";
 import type { RunSnapshot } from "../sim/run";
+import { TEST_AI_OPTIONS } from "../sim/testAi";
 import type { SkinId, WeaponClass } from "../sim/types";
+import {
+  drawGenericBlade,
+  drawShardblade,
+  overheadSwingAngle,
+} from "./blade";
 import { type Rect } from "./hitTest";
 import { layoutCombat } from "./layout";
 
@@ -14,6 +20,7 @@ export type UiRects = {
   unlockSpear: Rect | null;
   advance: Rect | null;
   backToSelect: Rect | null;
+  aiButtons: Array<{ kind: import("../sim/testAi").TestAiKind; rect: Rect }>;
 };
 
 export type FrameModel = {
@@ -24,7 +31,11 @@ export type FrameModel = {
   selectedSkin: SkinId;
   message: string | null;
   /** Present when running the /combat-test arena. */
-  combatTest?: { deaths: number; kills: number };
+  combatTest?: {
+    deaths: number;
+    kills: number;
+    aiKind: import("../sim/testAi").TestAiKind;
+  };
 };
 
 function skinColor(skin: SkinId): string {
@@ -174,36 +185,47 @@ function drawRun(
     ctx.fillRect(0, 0, width, height);
   }
 
-  // Player
+  // Player body
   const isSpear = snap.weaponClass === "spear";
-  ctx.fillStyle = skinColor(snap.skin ?? "skin_a");
-  if (isSpear) {
-    ctx.fillRect(playerX - 10, entityY + 10, 20, 60);
-    ctx.fillStyle = skinColor(snap.skin ?? "skin_a");
-    ctx.fillRect(playerX + 8, entityY - 10, 6, 90);
-  } else {
-    ctx.fillRect(playerX - 14, entityY, 28, 70);
-  }
-  // Swing telegraph from attack progress (damage window at HIT_WINDOW_T)
-  if (snap.phase === "combat") {
-    const swing = snap.playerStyle === "heavy" ? 50 : 30;
-    const windup = Math.min(1, snap.playerProgress / Math.max(0.001, tuning.HIT_WINDOW_T));
-    ctx.strokeStyle = snap.playerProgress >= tuning.HIT_WINDOW_T ? "#ffe08a" : "#e8eefc";
-    ctx.lineWidth = isSpear ? 2 : 3;
-    ctx.beginPath();
-    ctx.moveTo(playerX + 10, entityY + 20);
-    const reach = swing * (0.2 + windup * 0.8);
-    ctx.lineTo(playerX + 10 + reach, entityY + (isSpear ? -10 : 10));
-    ctx.stroke();
+  ctx.fillStyle = "#4a5568";
+  ctx.fillRect(playerX - 12, entityY + 8, 24, 62);
+  // Head
+  ctx.fillStyle = "#c4a882";
+  ctx.beginPath();
+  ctx.arc(playerX, entityY + 4, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Player overhead shardblade swing (or idle windup when not in combat)
+  {
+    const progress = snap.phase === "combat" ? snap.playerProgress : 0;
+    const angle = overheadSwingAngle(progress, 1);
+    const gripX = playerX + 6;
+    const gripY = entityY + 22;
+    if (isSpear) {
+      // MVP spear still uses the same arc; thinner shard look
+      drawShardblade(ctx, gripX, gripY, angle, snap.skin ?? "skin_a", 100);
+    } else {
+      drawShardblade(ctx, gripX, gripY, angle, snap.skin ?? "skin_a", 110);
+    }
   }
 
-  // Enemy
+  // Enemy body + generic blade
   if (snap.phase === "combat" && snap.enemyHp !== null) {
     const boss = snap.enemyKind === "boss";
-    ctx.fillStyle = boss ? "#6b2d3c" : "#4a5568";
     const ew = boss ? 48 : 32;
     const eh = boss ? 90 : 70;
-    ctx.fillRect(enemyX - ew / 2, entityY - (boss ? 20 : 0), ew, eh);
+    const bodyTop = entityY - (boss ? 20 : 0);
+    ctx.fillStyle = boss ? "#6b2d3c" : "#4a5568";
+    ctx.fillRect(enemyX - ew / 2, bodyTop, ew, eh);
+    ctx.fillStyle = boss ? "#8a4050" : "#c4a882";
+    ctx.beginPath();
+    ctx.arc(enemyX, bodyTop + 6, boss ? 14 : 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    const angle = overheadSwingAngle(snap.enemyProgress ?? 0, -1);
+    const gripX = enemyX - 6;
+    const gripY = bodyTop + 28;
+    drawGenericBlade(ctx, gripX, gripY, angle, boss ? 120 : 100);
   }
 
   // HUD stormlight
@@ -216,7 +238,22 @@ function drawRun(
       28,
     );
     ctx.fillStyle = "#a8b8d8";
-    ctx.fillText("Infinite chasmfiend · click fast/heavy to switch styles", 16, 52);
+    ctx.fillText("Q = fast · E = heavy · AI switches at start of its next swing", 16, 52);
+
+    // AI preset buttons along the bottom
+    ctx.fillStyle = "#e8eefc";
+    ctx.font = "14px Georgia";
+    ctx.fillText("Enemy AI:", 16, height - 58);
+    const btnW = 150;
+    const btnH = 32;
+    const gap = 8;
+    const startX = 16;
+    const y = height - 44;
+    TEST_AI_OPTIONS.forEach((opt, i) => {
+      const rect = { x: startX + i * (btnW + gap), y, w: btnW, h: btnH };
+      rects.aiButtons.push({ kind: opt.kind, rect });
+      drawButton(ctx, rect, opt.label, model.combatTest!.aiKind === opt.kind);
+    });
   } else {
     ctx.fillText(`Stormlight: ${snap.stormlightRun} (bank ${model.meta.stormlight})`, 16, 28);
   }
@@ -307,6 +344,7 @@ function emptyRects(): UiRects {
     unlockSpear: null,
     advance: null,
     backToSelect: null,
+    aiButtons: [],
   };
 }
 
