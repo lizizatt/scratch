@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shardblade</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b1020;
+        color: #e8eefc;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      #app {
+        display: grid;
+        place-items: center;
+        min-height: 100%;
+      }
+      canvas {
+        display: block;
+        background: #152038;
+        image-rendering: pixelated;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game" width="960" height="540"></canvas>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
