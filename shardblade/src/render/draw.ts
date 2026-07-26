@@ -4,9 +4,9 @@ import type { RunSnapshot } from "../sim/run";
 import { TEST_AI_OPTIONS } from "../sim/testAi";
 import type { SkinId, WeaponClass } from "../sim/types";
 import {
+  bladeAngleForStyle,
   drawGenericBlade,
   drawShardblade,
-  overheadSwingAngle,
 } from "./blade";
 import { type Rect } from "./hitTest";
 import { layoutCombat } from "./layout";
@@ -197,7 +197,7 @@ function drawRun(
   // Player overhead shardblade swing (or idle windup when not in combat)
   {
     const progress = snap.phase === "combat" ? snap.playerProgress : 0;
-    const angle = overheadSwingAngle(progress, 1);
+    const angle = bladeAngleForStyle(snap.playerStyle, progress, 1);
     const gripX = playerX + 6;
     const gripY = entityY + 22;
     drawShardblade(ctx, gripX, gripY, angle, snap.skin ?? "skin_a");
@@ -216,7 +216,7 @@ function drawRun(
     ctx.arc(enemyX, bodyTop + 6, boss ? 14 : 10, 0, Math.PI * 2);
     ctx.fill();
 
-    const angle = overheadSwingAngle(snap.enemyProgress ?? 0, -1);
+    const angle = bladeAngleForStyle(snap.enemyStyle ?? "fast", snap.enemyProgress ?? 0, -1);
     const gripX = enemyX - 6;
     const gripY = bodyTop + 28;
     drawGenericBlade(ctx, gripX, gripY, angle);
@@ -232,7 +232,7 @@ function drawRun(
       28,
     );
     ctx.fillStyle = "#a8b8d8";
-    ctx.fillText("Q = fast · E = heavy · AI switches at start of its next swing", 16, 52);
+    ctx.fillText("Q = fast · E = heavy · S = defend · AI switches at start of its next swing", 16, 52);
 
     // AI preset buttons along the bottom
     ctx.fillStyle = "#e8eefc";
@@ -354,8 +354,8 @@ function drawButton(
   ctx.strokeStyle = active ? "#9db7ff" : "#4a5a78";
   ctx.strokeRect(r.x, r.y, r.w, r.h);
   ctx.fillStyle = disabled ? "#6a7a9a" : "#e8eefc";
-  ctx.font = "16px Georgia";
-  ctx.fillText(label, r.x + 12, r.y + r.h / 2 + 5);
+  ctx.font = r.h < 24 ? "12px Georgia" : "16px Georgia";
+  ctx.fillText(label, r.x + 10, r.y + r.h / 2 + 4);
 }
 
 function drawBar(

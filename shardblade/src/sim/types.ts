@@ -1,4 +1,4 @@
-export type Style = "fast" | "heavy";
+export type Style = "fast" | "heavy" | "defend";
 
 export type WeaponClass = "greatsword" | "spear";
 

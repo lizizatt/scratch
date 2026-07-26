@@ -22,7 +22,8 @@ npm run build    # production bundle
 
 Open [`/combat-test`](http://localhost:5173/combat-test) (with `npm run dev`) for an infinite chasmfiend duel. You respawn on death; the fiend respawns when killed. No meta progression.
 
-- **Q** = fast, **E** = heavy (also click the style buttons)
+- **Q** = fast, **E** = heavy, **S** = defend (also click the style buttons)
+- Defend blocks both fast and heavy; it deals no damage while held
 - Bottom buttons pick enemy AI: Always Fast / Always Heavy / Alternate / Mirror / Oppose  
   AI choices apply at the **start of the enemy's next swing**.
 

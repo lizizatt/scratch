@@ -6,8 +6,10 @@ export type WeaponMoveset = {
   label: string;
   fastPeriod: number;
   heavyPeriod: number;
+  defendPeriod: number;
   fastDamage: number;
   heavyDamage: number;
+  defendDamage: number;
   hitWindowT: number;
 };
 
@@ -17,8 +19,10 @@ export const GREATSWORD: WeaponMoveset = {
   label: "Greatsword",
   fastPeriod: tuning.FAST_ATTACK_PERIOD,
   heavyPeriod: tuning.HEAVY_ATTACK_PERIOD,
+  defendPeriod: tuning.DEFEND_PERIOD,
   fastDamage: tuning.FAST_DAMAGE,
   heavyDamage: tuning.HEAVY_DAMAGE,
+  defendDamage: tuning.DEFEND_DAMAGE,
   hitWindowT: tuning.HIT_WINDOW_T,
 };
 
@@ -31,8 +35,10 @@ export const SPEAR: WeaponMoveset = {
   label: "Spear",
   fastPeriod: tuning.FAST_ATTACK_PERIOD,
   heavyPeriod: tuning.HEAVY_ATTACK_PERIOD,
+  defendPeriod: tuning.DEFEND_PERIOD,
   fastDamage: tuning.FAST_DAMAGE,
   heavyDamage: tuning.HEAVY_DAMAGE,
+  defendDamage: tuning.DEFEND_DAMAGE,
   hitWindowT: tuning.HIT_WINDOW_T,
 };
 

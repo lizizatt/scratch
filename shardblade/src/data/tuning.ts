@@ -6,8 +6,11 @@ export const tuning = {
   // 5 fast or 3 heavy kills base HP exactly.
   FAST_ATTACK_PERIOD: 1.2,
   HEAVY_ATTACK_PERIOD: 2.4,
+  /** Guard stance cycle (no damage); keeps the swing meter readable. */
+  DEFEND_PERIOD: 1.2,
   FAST_DAMAGE: 3,
   HEAVY_DAMAGE: 5,
+  DEFEND_DAMAGE: 0,
   BASE_ENEMY_HP: 15,
   CHASMFIEND_HP_MULT: 2,
   ENEMY3_MATCH_DELAY_S: 5,
@@ -28,8 +31,10 @@ export const TUNING_KEYS = [
   "WALK_SECONDS_PER_SCREEN",
   "FAST_ATTACK_PERIOD",
   "HEAVY_ATTACK_PERIOD",
+  "DEFEND_PERIOD",
   "FAST_DAMAGE",
   "HEAVY_DAMAGE",
+  "DEFEND_DAMAGE",
   "BASE_ENEMY_HP",
   "CHASMFIEND_HP_MULT",
   "ENEMY3_MATCH_DELAY_S",

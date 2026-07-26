@@ -4,6 +4,7 @@ export { layoutCombat } from "./layout";
 export type { CombatLayout } from "./layout";
 export {
   overheadSwingAngle,
+  bladeAngleForStyle,
   drawShardblade,
   drawGenericBlade,
   COMBAT_BLADE_LENGTH,

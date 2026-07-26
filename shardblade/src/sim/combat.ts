@@ -69,14 +69,19 @@ export function createCombatant(
 /**
  * Resolve a hit against a defender.
  * Same-style attacks are parried when PARRY_SAME_STYLE is enabled.
+ * Defend blocks both fast and heavy.
  */
 export function resolveHit(
   attacker: Combatant,
   defender: Combatant,
   hit: HitEvent,
 ): AttackResult {
+  const defending = defender.cooldown.style === "defend";
   const sameStyle = hit.style === defender.cooldown.style;
-  const parried = tuning.PARRY_SAME_STYLE && sameStyle && !defender.dead;
+  const parried =
+    !defender.dead &&
+    hit.damage > 0 &&
+    (defending || (tuning.PARRY_SAME_STYLE && sameStyle));
   let damage = 0;
   let lethal = false;
 

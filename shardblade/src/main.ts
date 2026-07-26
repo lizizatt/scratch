@@ -28,6 +28,8 @@ window.addEventListener("keydown", (ev) => {
     app.setStyle("fast");
   } else if (ev.key === "e" || ev.key === "E") {
     app.setStyle("heavy");
+  } else if (ev.key === "s" || ev.key === "S") {
+    app.setStyle("defend");
   }
 });
 

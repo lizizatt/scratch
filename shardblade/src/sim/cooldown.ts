@@ -56,11 +56,15 @@ export class CooldownTracker {
   }
 
   private period(): number {
-    return this.style === "fast" ? this.moveset.fastPeriod : this.moveset.heavyPeriod;
+    if (this.style === "fast") return this.moveset.fastPeriod;
+    if (this.style === "heavy") return this.moveset.heavyPeriod;
+    return this.moveset.defendPeriod;
   }
 
   private damage(): number {
-    return this.style === "fast" ? this.moveset.fastDamage : this.moveset.heavyDamage;
+    if (this.style === "fast") return this.moveset.fastDamage;
+    if (this.style === "heavy") return this.moveset.heavyDamage;
+    return this.moveset.defendDamage;
   }
 
   private makeHit(): HitEvent {

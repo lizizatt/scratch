@@ -30,9 +30,11 @@ describe("SwingCycleBrain", () => {
   it("mirror and oppose read the player style", () => {
     const mirror = new SwingCycleBrain("mirror");
     expect(mirror.decide("heavy")).toBe("heavy");
+    expect(mirror.decide("defend")).toBe("defend");
     const oppose = new SwingCycleBrain("oppose");
     expect(oppose.decide("heavy")).toBe("fast");
     expect(oppose.decide("fast")).toBe("heavy");
+    expect(oppose.decide("defend")).toBe("heavy");
   });
 });
 

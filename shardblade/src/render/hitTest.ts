@@ -13,14 +13,16 @@ export function playerStyleButtons(
   playerHeadY: number,
 ): StyleButtonLayout[] {
   const w = 56;
-  const h = 28;
-  const gap = 8;
+  const h = Math.round(28 * (2 / 3)); // ~19
+  const gap = 6;
   const total = w * 2 + gap;
   const left = playerHeadX - total / 2;
-  const y = playerHeadY - 40;
+  const bottomRowY = playerHeadY - 40;
+  const topRowY = bottomRowY - gap - h;
   return [
-    { style: "fast", rect: { x: left, y, w, h } },
-    { style: "heavy", rect: { x: left + w + gap, y, w, h } },
+    { style: "defend", rect: { x: left, y: topRowY, w: total, h } },
+    { style: "fast", rect: { x: left, y: bottomRowY, w, h } },
+    { style: "heavy", rect: { x: left + w + gap, y: bottomRowY, w, h } },
   ];
 }
 

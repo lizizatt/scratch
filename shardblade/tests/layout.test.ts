@@ -10,7 +10,10 @@ describe("layoutCombat", () => {
 
     const fast = layout.styleButtons.find((b) => b.style === "fast")!;
     const heavy = layout.styleButtons.find((b) => b.style === "heavy")!;
+    const defend = layout.styleButtons.find((b) => b.style === "defend")!;
     expect(hitTestStyle(fast.rect.x + 4, fast.rect.y + 4, layout.styleButtons)).toBe("fast");
     expect(hitTestStyle(heavy.rect.x + 4, heavy.rect.y + 4, layout.styleButtons)).toBe("heavy");
+    expect(hitTestStyle(defend.rect.x + 4, defend.rect.y + 4, layout.styleButtons)).toBe("defend");
+    expect(defend.rect.y).toBeLessThan(fast.rect.y);
   });
 });

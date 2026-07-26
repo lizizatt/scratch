@@ -24,6 +24,19 @@ export function overheadSwingAngle(
   return start + (end - start) * s;
 }
 
+/** Blade angle for the active style (defend holds a high guard). */
+export function bladeAngleForStyle(
+  style: import("../sim/types").Style,
+  progress: number,
+  facing: 1 | -1,
+): number {
+  if (style === "defend") {
+    // High guard: nearly vertical, tipped slightly forward
+    return -Math.PI / 2 + facing * (Math.PI / 12);
+  }
+  return overheadSwingAngle(progress, facing);
+}
+
 function skinMetal(skin: SkinId): { blade: string; glow: string; edge: string } {
   if (skin === "skin_b") {
     return { blade: "#ffe0b8", glow: "rgba(255, 180, 100, 0.45)", edge: "#fff6e8" };

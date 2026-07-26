@@ -13,6 +13,34 @@ describe("resolveHit", () => {
     expect(defender.hp).toBe(15);
   });
 
+  it("defend blocks both fast and heavy", () => {
+    const defender = createCombatant("enemy", 15, "defend");
+    const fromFast = resolveHit(
+      createCombatant("player", 15, "fast"),
+      defender,
+      { style: "fast", damage: 3, hitAt: 1 },
+    );
+    expect(fromFast.parried).toBe(true);
+    expect(defender.hp).toBe(15);
+
+    const fromHeavy = resolveHit(
+      createCombatant("player", 15, "heavy"),
+      defender,
+      { style: "heavy", damage: 5, hitAt: 1 },
+    );
+    expect(fromHeavy.parried).toBe(true);
+    expect(defender.hp).toBe(15);
+  });
+
+  it("defend deals no damage on its own swing", () => {
+    const attacker = createCombatant("player", 15, "defend");
+    const defender = createCombatant("enemy", 15, "fast");
+    const result = resolveHit(attacker, defender, { style: "defend", damage: 0, hitAt: 1 });
+    expect(result.parried).toBe(false);
+    expect(result.damage).toBe(0);
+    expect(defender.hp).toBe(15);
+  });
+
   it("applies damage on cross-style hits", () => {
     const attacker = createCombatant("player", 15, "heavy");
     const defender = createCombatant("enemy", 15, "fast");

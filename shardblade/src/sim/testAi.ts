@@ -52,7 +52,9 @@ export class SwingCycleBrain {
       case "mirror":
         return playerStyle;
       case "oppose":
-        return playerStyle === "fast" ? "heavy" : "fast";
+        if (playerStyle === "fast") return "heavy";
+        if (playerStyle === "heavy") return "fast";
+        return "heavy"; // poke a defender
     }
   }
 }
