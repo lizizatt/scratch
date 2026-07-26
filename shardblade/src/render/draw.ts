@@ -279,12 +279,12 @@ function drawRun(
       drawButton(ctx, b.rect, b.style, active);
     }
 
-    // HP bars
-    drawBar(ctx, playerX - 40, entityY - 56, 80, 8, snap.playerHp / snap.playerMaxHp, "#6dffa8");
+    // HP bars (above style buttons so they don't overlap)
+    drawBar(ctx, playerX - 40, entityY - 92, 80, 8, snap.playerHp / snap.playerMaxHp, "#6dffa8");
     drawBar(
       ctx,
       enemyX - 40,
-      entityY - 56,
+      entityY - 92,
       80,
       8,
       snap.enemyHp / (snap.enemyMaxHp ?? 1),
@@ -293,11 +293,11 @@ function drawRun(
 
     // Attack-loop progress (charge → hit window → recovery)
     const hitT = tuning.HIT_WINDOW_T;
-    drawAttackProgress(ctx, playerX - 40, entityY - 42, 80, 7, snap.playerProgress, hitT, "#9db7ff");
+    drawAttackProgress(ctx, playerX - 40, entityY - 78, 80, 7, snap.playerProgress, hitT, "#9db7ff");
     drawAttackProgress(
       ctx,
       enemyX - 40,
-      entityY - 42,
+      entityY - 78,
       80,
       7,
       snap.enemyProgress ?? 0,
@@ -308,7 +308,7 @@ function drawRun(
     // Enemy active style
     ctx.fillStyle = "#e8eefc";
     ctx.font = "14px Georgia";
-    ctx.fillText(snap.enemyStyle ?? "", enemyX - 20, entityY - 64);
+    ctx.fillText(snap.enemyStyle ?? "", enemyX - 20, entityY - 100);
 
     ctx.globalAlpha = 1;
   }
