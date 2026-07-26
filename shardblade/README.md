@@ -18,6 +18,10 @@ npm run build    # production bundle
 3. Click **fast** / **heavy** over your head to switch styles (same-style parries).
 4. Clear three foes and the baby chasmfiend — or die and bank stormlight.
 
+### Combat test arena
+
+Open [`/combat-test`](http://localhost:5173/combat-test) (with `npm run dev`) for an infinite chasmfiend duel. You respawn on death; the fiend respawns when killed. No meta progression.
+
 ## Layout
 
 - `src/sim/` — pure game rules (agent-tested)

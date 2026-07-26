@@ -1,7 +1,17 @@
+import { CombatTestApp } from "./app/combatTestApp";
 import { GameApp } from "./app/gameApp";
+import { CombatTestSim, isCombatTestPath } from "./sim/combatTest";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
-const app = new GameApp(canvas);
+
+const combatTest = isCombatTestPath(window.location.pathname);
+const app = combatTest
+  ? new CombatTestApp(canvas, new CombatTestSim())
+  : new GameApp(canvas);
+
+if (combatTest) {
+  document.title = "Shardblade — Combat Test";
+}
 
 canvas.addEventListener("click", (ev) => {
   const rect = canvas.getBoundingClientRect();

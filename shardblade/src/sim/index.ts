@@ -31,6 +31,8 @@ export type {
   RunSimOptions,
   StyleScheduleEntry,
 } from "./run";
+export { CombatTestSim, isCombatTestPath } from "./combatTest";
+export type { CombatTestOptions } from "./combatTest";
 export {
   loadMeta,
   saveMeta,

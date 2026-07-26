@@ -22,6 +22,8 @@ export type FrameModel = {
   selectedClass: WeaponClass;
   selectedSkin: SkinId;
   message: string | null;
+  /** Present when running the /combat-test arena. */
+  combatTest?: { deaths: number; kills: number };
 };
 
 function skinColor(skin: SkinId): string {
@@ -210,7 +212,17 @@ function drawRun(
   // HUD stormlight
   ctx.fillStyle = "#e8eefc";
   ctx.font = "16px Georgia";
-  ctx.fillText(`Stormlight: ${snap.stormlightRun} (bank ${model.meta.stormlight})`, 16, 28);
+  if (model.combatTest) {
+    ctx.fillText(
+      `Combat test — kills: ${model.combatTest.kills}  deaths: ${model.combatTest.deaths}`,
+      16,
+      28,
+    );
+    ctx.fillStyle = "#a8b8d8";
+    ctx.fillText("Infinite chasmfiend · click fast/heavy to switch styles", 16, 52);
+  } else {
+    ctx.fillText(`Stormlight: ${snap.stormlightRun} (bank ${model.meta.stormlight})`, 16, 28);
+  }
 
   // Dialogue / phase text
   if (snap.phase === "intro") {
