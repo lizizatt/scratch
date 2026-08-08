@@ -11,6 +11,7 @@ Personal experiments — terminal games, RL sims, 3D-print tooling, and small ut
 | [map_llm](map_llm/README.md) | Chat with a local LLM; log prompts and explore responses as a similarity graph |
 | `terminalhero` | Terminal rhythm game for Clone Hero `.chart` files |
 | `invisalign` | Dental mesh fetch and CTM→OBJ export from Invisalign share links |
+| [sigil_demo](sigil_demo/README.md) | Self-contained procedural sigil generator demo with static SVG samples |
 
 ## Terminal toys
 

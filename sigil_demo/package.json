@@ -1,0 +1,12 @@
+{
+  "name": "sigil-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "samples": "node scripts/generate_samples.js"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sigil Demo</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #14161c;
+        color: #e6e8ee;
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        min-height: 100vh;
+      }
+      .stage {
+        display: grid;
+        place-items: center;
+        padding: 20px;
+      }
+      #display {
+        width: min(80vmin, 700px);
+        height: min(80vmin, 700px);
+        border-radius: 8px;
+        background-color: #2b2f3a;
+        background-image:
+          linear-gradient(45deg, #20232c 25%, transparent 25%),
+          linear-gradient(-45deg, #20232c 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #20232c 75%),
+          linear-gradient(-45deg, transparent 75%, #20232c 75%);
+        background-size: 24px 24px;
+        background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+      }
+      .panel {
+        border-left: 1px solid #2a2e39;
+        background: #1d2029;
+        padding: 16px;
+      }
+      h1 { margin: 0 0 12px; font-size: 18px; }
+      label { font-size: 12px; opacity: 0.85; display: block; margin-top: 10px; }
+      input, button {
+        width: 100%;
+        margin-top: 4px;
+      }
+      input[type='text'] {
+        background: #11131a;
+        border: 1px solid #2f3340;
+        color: #e6e8ee;
+        border-radius: 6px;
+        padding: 8px;
+        font-family: ui-monospace, monospace;
+      }
+      input[type='range'] { accent-color: #6cb6ff; }
+      .buttons { display: flex; gap: 8px; margin-top: 14px; }
+      button {
+        background: #2f3542;
+        color: #e6e8ee;
+        border: 1px solid #353a48;
+        border-radius: 6px;
+        padding: 8px;
+        cursor: pointer;
+      }
+      .primary { background: #6cb6ff; color: #0c1018; border-color: #6cb6ff; }
+      .hint { font-size: 12px; opacity: 0.7; margin-top: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <canvas id="display" width="768" height="768"></canvas>
+    </div>
+
+    <aside class="panel">
+      <h1>Sigil Demo</h1>
+      <label>Seed <input id="seed" type="text" value="materia" /></label>
+      <label>Max depth <input id="depth" type="range" min="1" max="7" step="1" value="5" /></label>
+      <label>First layer nodes <input id="firstLayer" type="range" min="1" max="8" step="1" value="6" /></label>
+      <label>Stop chance <input id="stop" type="range" min="0" max="1" step="0.05" value="0.5" /></label>
+      <label>Ring period (s) <input id="period" type="range" min="-30" max="30" step="0.5" value="8" /></label>
+
+      <div class="buttons">
+        <button id="regen" class="primary">Regenerate</button>
+        <button id="play">Pause</button>
+      </div>
+      <div class="buttons">
+        <button id="preset">Game preset</button>
+      </div>
+      <div class="hint">Run with <code>python -m http.server</code> in <code>sigil_demo</code>, then open this page.</div>
+    </aside>
+
+    <script type="module" src="./src/demo.js"></script>
+  </body>
+</html>
