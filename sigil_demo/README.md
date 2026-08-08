@@ -24,7 +24,7 @@ This writes deterministic SVG and PNG files to `sigil_demo/samples/`.
 
 ### Seed: `materia`
 
-![materia sample](samples/sample-materia.png)
+![materia sample](samples/sample-materia.svg)
 
 ### Seed: `leviathan`
 
