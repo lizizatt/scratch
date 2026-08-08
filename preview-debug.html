@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preview debug page</title>
+  <style>
+    body { margin: 0; padding: 24px; background: #10151a; color: #e8edf0; font: 16px/1.5 -apple-system, system-ui, sans-serif; }
+    h1 { color: #7fd1ff; }
+    .card { padding: 16px; margin: 16px 0; background: #1b232b; border: 1px solid #2c3742; border-radius: 8px; }
+    button { padding: 8px 14px; font-size: 15px; }
+    #log { white-space: pre-wrap; font-family: monospace; font-size: 13px; color: #9fd8a6; }
+  </style>
+</head>
+<body>
+  <h1>Preview debug page</h1>
+  <p>Untracked scratch file for manually checking the Jarvis HTML preview iframe: styling, images, relative links, and script execution.</p>
+
+  <div class="card">
+    <h2>Image (relative path, working)</h2>
+    <img src="./preview-debug.png" alt="Working test image" width="60" height="60">
+  </div>
+
+  <div class="card">
+    <h2>Image (relative path, intentionally missing)</h2>
+    <img src="./missing-image.png" alt="Intentionally missing image" width="120" height="80">
+  </div>
+
+  <div class="card">
+    <h2>Relative link</h2>
+    <a href="./README.md">Link to README.md in this repo</a>
+  </div>
+
+  <div class="card">
+    <h2>Script execution</h2>
+    <button id="ping">Click to log</button>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    document.getElementById('ping').addEventListener('click', () => {
+      document.getElementById('log').textContent = 'Script ran at ' + new Date().toISOString();
+    });
+    console.log('preview-debug.html loaded');
+  </script>
+</body>
+</html>
