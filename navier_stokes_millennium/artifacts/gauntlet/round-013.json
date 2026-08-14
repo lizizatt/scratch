@@ -1,0 +1,38 @@
+{
+  "schema_version": 2,
+  "round_id": "round-013",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "63cb971247584c476636dc483c19accf5fc035d516b37dd3baab3b030c37ee12",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-013-claims.json",
+  "claims_snapshot_sha256": "63cb971247584c476636dc483c19accf5fc035d516b37dd3baab3b030c37ee12",
+  "previous_round": "artifacts/gauntlet/round-012.json",
+  "previous_round_sha256": "df2973e2cbd32b1d91d8c2b89e111262629e360d41b48894ddad51743bff5b47",
+  "post_repair_claims_sha256": "63cb971247584c476636dc483c19accf5fc035d516b37dd3baab3b030c37ee12",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "3072e934d8ad9e255835e21366448bfdd65ae57c1a8f20af5a8973ec12e62b6a",
+  "reviewers": [],
+  "findings": [
+    {
+      "id": "R13-001",
+      "fingerprint": "phase-space-packing-refinement",
+      "disposition": "valid",
+      "finding": "The frequency-domain route was refined from time-frequency occupancy to a phase-space Carleson conjecture with an unresolved spatial weight and pressure-defect term.",
+      "repair": "Added FREQ_PACKING_ITERATION_002.md and canonical conjectural claim FREQ-PHASESPACE; explicitly left the phase-space weight, pressure bridge, and continuation bridge blocked."
+    }
+  ],
+  "validation": [
+    "claims snapshot matches canonical claims bytes",
+    "reviewed-tree digest includes FREQ_PACKING_ITERATION_002.md",
+    "full ledger/test validation pending fresh phase-space review"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-packing-refinement",
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
