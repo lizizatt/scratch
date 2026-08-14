@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "round_id": "round-009",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-009-claims.json",
+  "claims_snapshot_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "previous_round": "artifacts/gauntlet/round-008.json",
+  "previous_round_sha256": "648204e67152fc2220eb5d6361baebb0e21b67002b610de1003e0d2eb0a7683d",
+  "post_repair_claims_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "3965e7c7fddaeda019895dff3681ca8be739ef786c419f58cf5b9a90407f7379",
+  "reviewers": [],
+  "findings": [
+    {
+      "id": "R9-001",
+      "fingerprint": "historical-reviewed-tree-head-binding",
+      "disposition": "valid",
+      "finding": "Manifest validation compared historical reviewed-tree hashes with current files instead of binding only the current head.",
+      "repair": "Historical schema-v2 rounds remain snapshot-bound; only the current manifest head is compared to the live reviewed-tree digest."
+    }
+  ],
+  "validation": [
+    "current claims and round-nine snapshot have identical SHA-256",
+    "round-eight predecessor hash matches current bytes",
+    "full ledger/test validation pending round-nine head hash"
+  ],
+  "unresolved_valid_findings": ["Version-control durability requires explicit user authorization to stage and commit this untracked project."],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

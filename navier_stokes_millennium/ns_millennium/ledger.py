@@ -226,6 +226,31 @@ def _file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _reviewed_tree_sha256(root: Path, reviewed_roots: list[str]) -> str:
+    files: list[Path] = []
+    root_path = root.resolve()
+    for relative in reviewed_roots:
+        candidate = (root_path / relative).resolve()
+        candidate.relative_to(root_path)
+        if candidate.is_file():
+            files.append(candidate)
+        elif candidate.is_dir():
+            files.extend(
+                path
+                for path in candidate.rglob("*")
+                if path.is_file()
+                and "__pycache__" not in path.parts
+                and path.suffix not in {".pyc", ".pyo"}
+            )
+
+    entries = []
+    for path in sorted(set(files)):
+        entries.append(
+            f"{path.relative_to(root_path).as_posix()} {_file_sha256(path)}"
+        )
+    return hashlib.sha256("\n".join(entries).encode("utf-8")).hexdigest()
+
+
 def _documented_claims(
     root: Path,
 ) -> tuple[set[str], dict[str, set[str]], list[str]]:
@@ -482,7 +507,7 @@ def _validate_gauntlet_certification(
 
 
 def _validate_round_convergence(
-    review: Mapping[str, Any], owner: str
+    review: Mapping[str, Any], owner: str, root: Path | None = None
 ) -> list[str]:
     errors: list[str] = []
     converged = review.get("converged")
@@ -519,6 +544,40 @@ def _validate_round_convergence(
                     or not finding.get("duplicate_of").strip()
                 ):
                     errors.append(f"{owner} duplicate finding has no duplicate_of")
+        reviewers = review.get("reviewers")
+        required_roles = {"scaling", "pde", "counterexample", "source", "arbiter"}
+        completed_roles = {
+            reviewer.get("role")
+            for reviewer in reviewers
+            if isinstance(reviewer, Mapping)
+            and reviewer.get("outcome") == "completed"
+            and isinstance(reviewer.get("actual_model"), str)
+            and reviewer.get("actual_model")
+            and not reviewer.get("actual_model").startswith("unknown")
+        } if isinstance(reviewers, list) else set()
+        missing_roles = sorted(required_roles - completed_roles)
+        if missing_roles:
+            errors.append(f"{owner} lacks completed convergence reviewers: {missing_roles}")
+
+        resolved = review.get("resolved_findings", [])
+        resolution_artifacts = review.get("resolution_artifacts")
+        if resolved:
+            if not isinstance(resolution_artifacts, Mapping):
+                errors.append(f"{owner} has no resolution_artifacts map")
+            else:
+                for fingerprint in resolved:
+                    references = resolution_artifacts.get(fingerprint)
+                    if not _nonempty_strings(references):
+                        errors.append(
+                            f"{owner} has no artifacts for resolved finding: {fingerprint}"
+                        )
+                    elif root is not None:
+                        for reference in references:
+                            errors.extend(
+                                _validate_reference(
+                                    reference, root, f"{owner}.resolution_artifacts"
+                                )
+                            )
     elif result in CONVERGED_GAUNTLET_RESULTS:
         errors.append(f"{owner} has a converged result but converged is not true")
     return errors
@@ -639,7 +698,7 @@ def _validate_gauntlet_manifest(root: Path) -> list[str]:
                 errors.append(f"{owner} has invalid {field}")
         if record.get("result") not in GAUNTLET_RESULTS:
             errors.append(f"{owner} has invalid result")
-        errors.extend(_validate_round_convergence(record, owner))
+        errors.extend(_validate_round_convergence(record, owner, root=root))
 
         if index == 0:
             if record.get("previous_round") is not None:
@@ -725,6 +784,26 @@ def _validate_gauntlet_manifest(root: Path) -> list[str]:
                             snapshot_data.get("claims"), list
                         ):
                             errors.append(f"{owner} claims snapshot is not a ledger")
+
+            if index == len(records) - 1:
+                reviewed_roots = record.get("reviewed_roots")
+                reviewed_hash = record.get("reviewed_tree_sha256")
+                if not _nonempty_strings(reviewed_roots):
+                    errors.append(f"{owner} has no reviewed_roots")
+                elif not isinstance(reviewed_hash, str) or not reviewed_hash:
+                    errors.append(f"{owner} has no reviewed_tree_sha256")
+                else:
+                    try:
+                        actual_reviewed_hash = _reviewed_tree_sha256(
+                            root, reviewed_roots
+                        )
+                    except (OSError, ValueError):
+                        errors.append(f"{owner} reviewed_roots are invalid")
+                    else:
+                        if reviewed_hash != actual_reviewed_hash:
+                            errors.append(
+                                f"{owner} reviewed tree hash does not match current files"
+                            )
 
     if records:
         head = records[-1]

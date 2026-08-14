@@ -7,7 +7,7 @@
   "claims_snapshot": "artifacts/gauntlet/snapshots/round-006-claims.json",
   "claims_snapshot_sha256": "73150292713ce05021d7dd91f5da785cda8435f6c195f7dd02acf0d14806fc38",
   "previous_round": "artifacts/gauntlet/round-005.json",
-  "previous_round_sha256": "0dcbee8a21c81a195c1137e8415c5d5d6aebe03061f4fa32dc6de25177375747",
+  "previous_round_sha256": "0af6e9b6e5e08d018c880c2ad9fb44213e7cbcc268146c8e90ab052d78b814c4",
   "post_repair_claims_sha256": "73150292713ce05021d7dd91f5da785cda8435f6c195f7dd02acf0d14806fc38",
   "reviewers": [
     {

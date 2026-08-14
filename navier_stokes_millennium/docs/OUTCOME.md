@@ -1,6 +1,6 @@
 # Research Outcome
 
-**Date:** 2026-08-13
+**Date:** 2026-08-14
 **Mathematical status:** `blocked`
 **Millennium problem status:** unsolved
 
@@ -8,7 +8,7 @@
 
 This project does not contain a proof or counterexample resolving the
 three-dimensional incompressible Navier-Stokes Millennium problem. Six
-adversarial rounds produced valid corrections to the literature record,
+adversarial review rounds plus one administrative rebaseline produced valid corrections to the literature record,
 mathematical claims, and audit tooling. No round produced a candidate proof
 whose dependency closure was settled.
 
@@ -17,7 +17,7 @@ The shortest positive route remains
 $$
 \sup_{0<t<T_*}\|u(t)\|_{L^3(\mathbb R^3)}<\infty
 \quad\Longrightarrow_{\mathrm{ESS}}\quad
-	ext{no singularity at }T_*.
+  \mathrm{no\ singularity\ at\ }T_*.
 $$
 
 The missing implication is canonical claim `CRITICAL-BOUND`: prove the boxed
@@ -44,7 +44,8 @@ it; its interpolation line remains supercritical.
   explicit triadic partition counterexample.
 - Determined that compact $L^3$ ancient-orbit rigidity was already implied by
   Albritton-Barker's stronger sequence-$L^3$ Liouville theorem.
-- Recorded six non-converged gauntlet rounds, an always-validated hash manifest,
+- Recorded six non-converged adversarial rounds plus round 007's administrative
+  rebaseline, an always-validated hash manifest,
   and content-addressed claim snapshots from schema v2 onward.
 
 ## Candidate Dispositions
@@ -67,8 +68,12 @@ python -m ns_millennium.ledger artifacts/claims.json
 python -m unittest discover -s tests -v
 ```
 
-The suite contains 34 ledger regressions plus 3 exact Fourier-triad tests.
+The suite contains 34 ledger regressions plus 3 exact Fourier-triad tests (37 total).
 Editor diagnostics report no errors.
+
+Round 007 remains open: user or formatter edits changed the bytes of reviewed
+literature and claim files, so a fresh adversarial review of those mathematical
+changes is required before any convergence claim.
 
 ## Limits
 

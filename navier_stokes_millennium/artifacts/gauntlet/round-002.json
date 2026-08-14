@@ -4,7 +4,7 @@
   "date": "2026-08-13",
   "target": "entire navier_stokes_millennium research program",
   "previous_round": "artifacts/gauntlet/round-001.json",
-  "previous_round_sha256": "e2c0ae8f5194709217123757add70fcc91eab40b1bac68836805e6fc610925c8",
+  "previous_round_sha256": "989e014685dc364e451b87a3e74c3430e2142ca14923961b60f6bf32f2f3b9aa",
   "post_repair_claims_sha256": "f34c556a9e0ae9c6555334d5a009cf8aa8fc9e62062d06822b87ad2ccb6eb5ca",
   "reviewers": [
     {

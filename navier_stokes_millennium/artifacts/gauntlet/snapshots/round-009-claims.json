@@ -657,18 +657,6 @@
       ]
     },
     {
-      "id": "FREQ-PACKING",
-      "kind": "lemma",
-      "statement": "Bad dyadic frequency-time boxes, where nonlinear transfer exceeds a fixed fraction of viscous shell dissipation, obey a scale-time Carleson packing bound strong enough to force a regular scale near every putative singularity.",
-      "status": "conjectured",
-      "depends_on": ["NS-SCALING", "PR-08"],
-      "evidence": [],
-      "falsification_attempts": [
-        "The exact high-high-to-low triad refutes pointwise absence of bad boxes but does not yet test nested Carleson packing.",
-        "A concentrating dyadic packet family could violate the conjecture if its bad boxes have divergent parabolic packing."
-      ]
-    },
-    {
       "id": "CRITICAL-BOUND",
       "kind": "lemma",
       "statement": "If the unique maximal smooth whole-space solution from a Fefferman-admissible datum has finite endpoint T_max, then sup over 0<t<T_max of its L3 norm is finite.",

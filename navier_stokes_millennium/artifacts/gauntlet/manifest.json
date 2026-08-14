@@ -1,30 +1,46 @@
 {
   "schema_version": 1,
-  "head": "artifacts/gauntlet/round-006.json",
+  "head": "artifacts/gauntlet/round-010.json",
   "rounds": [
     {
       "path": "artifacts/gauntlet/round-001.json",
-      "sha256": "e2c0ae8f5194709217123757add70fcc91eab40b1bac68836805e6fc610925c8"
+      "sha256": "989e014685dc364e451b87a3e74c3430e2142ca14923961b60f6bf32f2f3b9aa"
     },
     {
       "path": "artifacts/gauntlet/round-002.json",
-      "sha256": "c4d2e348e90bb6d8c6a024537721c787592076bfe687236c65f6c444cb0a6a53"
+      "sha256": "00642f4f8d854a68c0a010d763adefeb7dc48340e93557aa2e3af897224cbadd"
     },
     {
       "path": "artifacts/gauntlet/round-003.json",
-      "sha256": "7fd5d0987f54347554110b40f2f678ba99e3d5ea4fa7dc6d57c00275878792fb"
+      "sha256": "ae3263fc71ea8839d6c2271bde2c21bfc52827cccde6f6fcc483f9c7f1bf5be7"
     },
     {
       "path": "artifacts/gauntlet/round-004.json",
-      "sha256": "5f08b78bfb1d01d01342ed72941498ae6bfd4e2375f90e495aea167750a16205"
+      "sha256": "e3628fa3e3304367efd8890ac4b359f75d7ceef5c751a3a88ec0a474ddfd09f2"
     },
     {
       "path": "artifacts/gauntlet/round-005.json",
-      "sha256": "0dcbee8a21c81a195c1137e8415c5d5d6aebe03061f4fa32dc6de25177375747"
+      "sha256": "0af6e9b6e5e08d018c880c2ad9fb44213e7cbcc268146c8e90ab052d78b814c4"
     },
     {
       "path": "artifacts/gauntlet/round-006.json",
-      "sha256": "b5af4ae2e75707d5816fa2c76af8fc67734ed98d8c92358a5b404467e2268f8c"
+      "sha256": "b02266f22c11d75c254eb3866c884d160a3d84b8b094678fa71e45e1b7e6aa9a"
+    },
+    {
+      "path": "artifacts/gauntlet/round-007.json",
+      "sha256": "08ddd722d2454d7f60d3cf0e9a60d7be407c1ef1ab818ff787a2d1ce50edbebb"
+    },
+    {
+      "path": "artifacts/gauntlet/round-008.json",
+      "sha256": "648204e67152fc2220eb5d6361baebb0e21b67002b610de1003e0d2eb0a7683d"
+    },
+    {
+      "path": "artifacts/gauntlet/round-009.json",
+      "sha256": "211721bd66530a7d45e4a48f701f82c349cc034ba2e8ec50f81ee1c5cc4c0103"
+    },
+    {
+      "path": "artifacts/gauntlet/round-010.json",
+      "sha256": "79a967951768f76a0b060b49d8b10e8d8bf9792c1bbff9c405096bb811cc750d"
     }
   ]
 }

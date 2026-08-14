@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "round_id": "round-007",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-007-claims.json",
+  "claims_snapshot_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "previous_round": "artifacts/gauntlet/round-006.json",
+  "previous_round_sha256": "b02266f22c11d75c254eb3866c884d160a3d84b8b094678fa71e45e1b7e6aa9a",
+  "post_repair_claims_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "reviewed_roots": [
+    "README.md",
+    "AGENTS.md",
+    "docs",
+    "ns_millennium",
+    "tests",
+    "artifacts/claims.json"
+  ],
+  "reviewed_tree_sha256": "62a4ae5f1448a22965aedf761e00780cb53c0113b1c0b3f221aa1ae3a38a9c73",
+  "reviewers": [],
+  "findings": [
+    {
+      "id": "R7-001",
+      "fingerprint": "external-edit-hash-rebaseline",
+      "disposition": "valid",
+      "finding": "User or formatter edits changed historical round bytes and the canonical claims ledger after round six.",
+      "repair": "Re-linked rounds 2 through 6 to current predecessor bytes and created a current round-seven claims snapshot. A fresh adversarial review is required for the changed mathematical documents."
+    }
+  ],
+  "validation": [
+    "current claims and round-seven snapshot have identical SHA-256",
+    "round-six predecessor hash matches current bytes",
+    "full ledger/test validation pending fresh review"
+  ],
+  "unresolved_valid_findings": [
+    "external-edit-hash-rebaseline",
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

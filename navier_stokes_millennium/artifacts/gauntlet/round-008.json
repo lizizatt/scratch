@@ -1,0 +1,45 @@
+{
+  "schema_version": 2,
+  "round_id": "round-008",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-007-claims.json",
+  "claims_snapshot_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "previous_round": "artifacts/gauntlet/round-007.json",
+  "previous_round_sha256": "08ddd722d2454d7f60d3cf0e9a60d7be407c1ef1ab818ff787a2d1ce50edbebb",
+  "post_repair_claims_sha256": "0bf44d83378050f73def94c99cf80ff63f8d9fcc3fed3cc5c27fc0382b481713",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "dec51199ae7e5cbdb4ef03988a25661ce36f8b9ccc872e0e501154f3cc7df700",
+  "reviewers": [
+    {"role": "mathematics", "actual_agent": "implementer", "actual_model": "unknown (runtime did not expose provider/model)", "counts_for_model_rotation": false, "outcome": "completed_without_new_findings"},
+    {"role": "code", "actual_agent": "Explore", "actual_model": "unknown (runtime did not expose provider/model)", "counts_for_model_rotation": false, "outcome": "completed_without_report_not_counted"},
+    {"role": "process", "actual_agent": "expensive-agent", "actual_model": "unknown (runtime did not expose provider/model)", "counts_for_model_rotation": false, "outcome": "completed_findings_report"},
+    {"role": "arbiter", "actual_agent": "GitHub Copilot primary agent", "actual_model": "unknown (runtime did not expose provider/model)", "counts_for_model_rotation": false, "outcome": "completed_primary_verification_of_each_disposition"}
+  ],
+  "findings": [
+    {
+      "id": "R8-001",
+      "fingerprint": "outcome-ess-tex-regression",
+      "disposition": "valid",
+      "finding": "The ESS conclusion in OUTCOME.md lost its TeX command after post-rebaseline edits.",
+      "repair": "Restored the display with a byte-checked \\mathrm form and reran the ledger and 37 tests."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (37 tests)",
+    "literal-byte check of docs/OUTCOME.md",
+    "reviewed-tree digest recomputed after repair",
+    "editor diagnostics: none"
+  ],
+  "unresolved_valid_findings": [
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "resolved_findings": ["external-edit-hash-rebaseline"],
+  "resolution_artifacts": {
+    "external-edit-hash-rebaseline": ["docs/OUTCOME.md#limits"]
+  },
+  "result": "valid_findings_repaired",
+  "converged": false
+}

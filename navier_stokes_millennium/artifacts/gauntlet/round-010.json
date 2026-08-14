@@ -1,0 +1,36 @@
+{
+  "schema_version": 2,
+  "round_id": "round-010",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "df51e8d47f94a200466fc93a2689e0955a194dac48babe25cefc3174a32501b8",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-010-claims.json",
+  "claims_snapshot_sha256": "df51e8d47f94a200466fc93a2689e0955a194dac48babe25cefc3174a32501b8",
+  "previous_round": "artifacts/gauntlet/round-009.json",
+  "previous_round_sha256": "211721bd66530a7d45e4a48f701f82c349cc034ba2e8ec50f81ee1c5cc4c0103",
+  "post_repair_claims_sha256": "df51e8d47f94a200466fc93a2689e0955a194dac48babe25cefc3174a32501b8",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "c0bf770010e5baaa842ca36293e55ca2d6e3e5c375bb9548fe2f386adb0f04e8",
+  "reviewers": [],
+  "findings": [
+    {
+      "id": "R10-001",
+      "fingerprint": "frequency-packing-hypothesis-added",
+      "disposition": "valid",
+      "finding": "The cross-field review now records FREQ-PACKING, a conjectural Carleson-style packing route for bad frequency-time boxes.",
+      "repair": "Added the claim to the canonical ledger with explicit dependencies, scaling context, and falsification tests. Fresh adversarial review is required before any status change."
+    }
+  ],
+  "validation": [
+    "claims snapshot matches canonical claims bytes",
+    "reviewed-tree digest includes the edited cross-field note and canonical ledger",
+    "full ledger/test validation pending fresh frequency-domain review"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
