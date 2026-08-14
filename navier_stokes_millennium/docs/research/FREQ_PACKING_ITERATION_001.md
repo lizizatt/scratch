@@ -7,7 +7,17 @@ pointwise absorption idea is already refuted by the exact high-high-to-low
 triad. The target is instead a packing statement about when and at which
 scales bad transfer occurs.
 
-## Definitions
+## Definitions and normalization
+
+This iteration is formulated on the unit three-torus with dimensionless time.
+For a physical torus of side length $L$ and viscosity $\nu$, use
+
+$$
+\widetilde t=\frac{\nu t}{L^2}.
+$$
+
+A whole-space version would need an explicit spatial phase-space measure; this
+note does not define one.
 
 Let `Delta_j` be a homogeneous Littlewood-Paley block and write
 
@@ -25,6 +35,11 @@ For `E_j(t)>0`, call `(j,t)` bad when
 $$
 \Pi_j(t)>\theta\,\nu\,2^{2j}E_j(t).
 $$
+
+This displayed threshold is dimensionless under the unit-volume periodic
+normalization. On $\mathbb R^3$, it must be replaced by a spatially localized
+energy density; the global $L^2$ shell energy cannot be inserted into the same
+formula without that qualification.
 
 The natural parabolic time height of shell `j` is
 
@@ -53,13 +68,16 @@ $$
 
 The refined conjecture is
 
-> There is a meaningful threshold `theta`, and every smooth solution has
-> `mu_theta(T(I)) <= C |I|` for every interval `I`, possibly after adding a
-> spatial localization and pressure-defect term.
+> There exists a dimensionless threshold $\theta>0$ such that every smooth
+> normalized periodic solution has a finite solution-dependent constant
+> $C(u,\theta)$ satisfying $\mu_\theta(T(I))\leq C(u,\theta)|I|$ for every
+> dimensionless interval $I$, possibly after adding spatial localization and
+> pressure-defect terms.
 
 This says bad activity can occur, including at arbitrarily high frequencies,
 but cannot occupy too much total parabolic time beneath one time interval.
-It is a conjecture, not an established bridge to regularity.
+It is a conjecture for the normalized periodic setting, not an established
+bridge to regularity or a whole-space statement.
 
 ## Why this is better than pointwise absorption
 
@@ -117,6 +135,12 @@ A valid finite Galerkin probe should:
    `mu_theta(T(I)) / |I|` over every dyadic time interval;
 5. increase the Fourier cutoff and test whether the observed packing ratio is
    stable or grows with the cutoff.
+
+The repository now provides `galerkin_rhs` and `shell_observables` in
+`ns_millennium/triad.py`. The RHS uses the Navier-Stokes sign convention,
+projects onto the retained modes, and exposes shell energy, influx,
+dissipation, and badness. It is an exact finite Galerkin diagnostic, not a
+closed model of the infinite PDE.
 
 A growing ratio is a counterexample to that finite-family inequality, not a
 proof of Navier-Stokes blowup. A bounded ratio is only evidence about the

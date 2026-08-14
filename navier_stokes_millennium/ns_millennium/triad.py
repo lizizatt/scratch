@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import math
 
 Wavevector = tuple[int, int, int]
 Vector = tuple[complex, complex, complex]
 Modes = Mapping[Wavevector, Vector]
+
+
+def _zero_vector() -> Vector:
+    return (0j, 0j, 0j)
 
 
 def _dot(left: Sequence[complex], right: Sequence[complex]) -> complex:
@@ -50,6 +55,80 @@ def convective_mode(modes: Modes, output: Wavevector) -> Vector:
         contribution = _scale(1j * _dot(first_value, second), second_value)
         total = _add(total, contribution)
     return leray_project(output, total)
+
+
+def galerkin_rhs(
+    modes: Modes,
+    *,
+    viscosity: float,
+    active_modes: set[Wavevector] | None = None,
+) -> dict[Wavevector, Vector]:
+    """Return the exact projected ODE RHS on a finite Fourier mode set.
+
+    Modes outside ``active_modes`` are discarded by the Galerkin projection;
+    they are not silently evolved or treated as resolved physical modes.
+    """
+    active = set(modes) if active_modes is None else set(active_modes)
+    active_modes_dict = {
+        wavevector: modes[wavevector]
+        for wavevector in active
+        if wavevector in modes
+    }
+    rhs: dict[Wavevector, Vector] = {}
+    for wavevector in active:
+        value = modes.get(wavevector, _zero_vector())
+        nonlinear = convective_mode(active_modes_dict, wavevector)
+        frequency_squared = sum(component * component for component in wavevector)
+        rhs[wavevector] = tuple(
+            -nonlinear[index] - viscosity * frequency_squared * value[index]
+            for index in range(3)
+        )  # type: ignore[assignment]
+    return rhs
+
+
+def dyadic_shell_index(wavevector: Wavevector) -> int | None:
+    """Return the shell index for ``2**j <= |k| < 2**(j+1)``."""
+    frequency = math.sqrt(sum(component * component for component in wavevector))
+    if frequency < 1:
+        return None
+    return math.floor(math.log2(frequency))
+
+
+def shell_observables(
+    modes: Modes,
+    *,
+    viscosity: float,
+    theta: float,
+) -> dict[int, dict[str, float | bool]]:
+    """Measure shell energy, nonlinear influx, and badness for a finite field."""
+    observables: dict[int, dict[str, float | bool]] = {}
+    for wavevector, value in modes.items():
+        shell = dyadic_shell_index(wavevector)
+        if shell is None:
+            continue
+        entry = observables.setdefault(
+            shell, {"energy": 0.0, "influx": 0.0, "dissipation": 0.0}
+        )
+        frequency_squared = sum(component * component for component in wavevector)
+        energy = 0.5 * _norm_squared(value)
+        nonlinear = convective_mode(modes, wavevector)
+        influx = -_dot(
+            tuple(item.conjugate() for item in value), nonlinear
+        ).real
+        entry["energy"] = float(entry["energy"]) + energy
+        entry["influx"] = float(entry["influx"]) + influx
+        entry["dissipation"] = (
+            float(entry["dissipation"]) + viscosity * frequency_squared * _norm_squared(value)
+        )
+
+    for entry in observables.values():
+        energy = float(entry["energy"])
+        dissipation = float(entry["dissipation"])
+        entry["bad"] = bool(
+            energy > 0
+            and float(entry["influx"]) > theta * dissipation
+        )
+    return observables
 
 
 def critical_flux(modes: Modes, cutoff: float) -> float:

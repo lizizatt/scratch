@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "round_id": "round-012",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "38e04d8d7de4f5abba50508d850bda154756f44f83221220af7255e6ec9e8e39",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-012-claims.json",
+  "claims_snapshot_sha256": "38e04d8d7de4f5abba50508d850bda154756f44f83221220af7255e6ec9e8e39",
+  "previous_round": "artifacts/gauntlet/round-011.json",
+  "previous_round_sha256": "596dd72fb77837088897227b5b662c11129e308551d2e675a7a42d6d094e4a2d",
+  "post_repair_claims_sha256": "38e04d8d7de4f5abba50508d850bda154756f44f83221220af7255e6ec9e8e39",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "e5edb1832737ea8f7abeb42a1f44617ab7811ff38cd0bc7943f7fcf0949f5614",
+  "reviewers": [],
+  "findings": [
+    {
+      "id": "R12-001",
+      "fingerprint": "galerkin-active-mode-filter",
+      "disposition": "valid",
+      "finding": "The finite Galerkin RHS used inactive modes in nonlinear interactions despite its active-set contract.",
+      "repair": "Filtered the nonlinear mode dictionary and added an inactive-mode regression."
+    },
+    {
+      "id": "R12-002",
+      "fingerprint": "packing-normalization-and-quantifiers",
+      "disposition": "valid",
+      "finding": "FREQ-PACKING needed explicit unit-torus normalization and quantifier order.",
+      "repair": "Specified dimensionless time, periodic-only scope, existential theta, and solution-dependent C(u,theta)."
+    },
+    {
+      "id": "R12-003",
+      "fingerprint": "closed-galerkin-probe-limitations",
+      "disposition": "valid",
+      "finding": "The probe is a finite Galerkin diagnostic, not a closed infinite cascade or universal test.",
+      "repair": "Recorded active-set projection, exact invariants, time-stepping requirements, and finite-mode limitations in the iteration note."
+    }
+  ],
+  "validation": [
+    "python -m unittest tests.test_triad -v (7 tests)",
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v",
+    "reviewed-tree digest includes the Galerkin and packing edits",
+    "editor diagnostics: none"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

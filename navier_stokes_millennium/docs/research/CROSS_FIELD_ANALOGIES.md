@@ -241,7 +241,10 @@ simulation or formally verified discretization would establish only the
 > **Main idea:** replace impossible pointwise flux absorption with a
 > **Carleson packing estimate for bad frequency-time boxes**.
 
-Let $\Delta_j$ be a Littlewood-Paley block, define shell energy
+Work on the unit three-torus with dimensionless time
+$\widetilde t=\nu t/L^2$. A whole-space version needs an explicit spatial
+phase-space measure and is not defined here. Let $\Delta_j$ be a
+Littlewood-Paley block, define shell energy
 
 $$
 E_j(t)=\frac12\|\Delta_j u(t)\|_2^2,
@@ -257,8 +260,10 @@ $$
 The already-checked high-high-to-low triad refutes the stronger dream that no
 bad boxes exist. The working conjecture is weaker:
 
-> **Claim FREQ-PACKING (`conjectured`).** Bad boxes obey a scale-time Carleson
-> packing bound strong enough that they cannot accumulate along every shrinking
+> **Claim FREQ-PACKING (`conjectured`).** There exists a dimensionless
+> threshold $\theta>0$ such that every smooth normalized periodic solution has
+> a finite solution-dependent constant $C(u,\theta)$ giving a scale-time
+> Carleson bound strong enough to prevent accumulation along every shrinking
 > parabolic neighborhood of a putative singularity.
 
 One concrete bookkeeping model is the measure
