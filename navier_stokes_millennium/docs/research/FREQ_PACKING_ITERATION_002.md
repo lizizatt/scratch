@@ -120,11 +120,19 @@ probe should:
 
 The implementation now has a closed integer Fourier-ball constructor, a
  classical RK4 step for the projected finite ODE, and 2pi-periodic-torus spatial
-reconstruction with shell energy density. These are probe infrastructure only:
+reconstruction with shell energy, nonlinear flux, and viscous dissipation
+density. These are probe infrastructure only:
 the tests verify exact small-ball membership, viscous single-mode
-amplification, projection, reality, active-mode closure, and discrete Parseval,
-but do not compute the phase-space measure, pressure split, cutoff-uniformity
-constant, or packing-to-epsilon bridge.
+amplification, projection, reality, active-mode closure, discrete Parseval, and
+modal/local flux and dissipation agreement, but do not compute the phase-space
+measure, pressure split, cutoff-uniformity constant, or packing-to-epsilon
+bridge.
+
+The localized flux includes every retained convolution output in the selected
+shell, including outputs whose velocity coefficient is currently zero. Grid
+averages require a non-aliasing resolution for every frequency in the sampled
+products; the tests use a 17-point grid for the $\pm8$ dissipation boundary.
+Viscosity is required to be finite and non-negative.
 
 A violation at finite cutoff falsifies that finite inequality. Passing the probe
 is evidence about the chosen Galerkin systems, not a universal PDE result.

@@ -48,6 +48,11 @@ it; its interpolation line remains supercritical.
   checked against discrete Parseval. This supplies a spatial observable for
   future probes but does not provide pressure localization or an epsilon
   regularity estimate.
+- Added localized shell nonlinear-flux and viscous-dissipation densities,
+  whose grid averages match the existing modal observables. These still omit
+  pressure decomposition and do not establish a phase-space packing estimate.
+  The probe now includes zero-padding invariance, a non-aliasing grid boundary,
+  and non-negative-viscosity validation.
 - Rejected the distributed-systems transfer after amplitude scaling and an
   explicit triadic partition counterexample.
 - Determined that compact $L^3$ ancient-orbit rigidity was already implied by
@@ -76,8 +81,8 @@ python -m ns_millennium.ledger artifacts/claims.json
 python -m unittest discover -s tests -v
 ```
 
-The suite contains 34 ledger regressions plus 11 exact Fourier/Galerkin tests
-(45 total).
+The suite contains 34 ledger regressions plus 15 exact Fourier/Galerkin tests
+(49 total).
 Editor diagnostics report no errors.
 
 The phase-space route is explicitly blocked on four named measure,

@@ -12,7 +12,9 @@ from ns_millennium.triad import (
     low_h32_dissipation,
     rk4_step,
     shell_observables,
+    spatial_shell_dissipation_density,
     spatial_shell_energy_density,
+    spatial_shell_flux_density,
 )
 
 
@@ -193,6 +195,79 @@ class FourierTriadTests(unittest.TestCase):
         )
 
         self.assertAlmostEqual(sampled_mean, modal_energy)
+
+    def test_spatial_flux_and_dissipation_match_modal_observables(self) -> None:
+        modes = high_high_to_low_fixture(amplitude=2.0)
+        grid_size = 16
+        shell = 0
+        viscosity = 0.1
+        sampled_flux = 0.0
+        sampled_dissipation = 0.0
+        for first in range(grid_size):
+            for second in range(grid_size):
+                for third in range(grid_size):
+                    point = (
+                        2 * pi * first / grid_size,
+                        2 * pi * second / grid_size,
+                        2 * pi * third / grid_size,
+                    )
+                    sampled_flux += spatial_shell_flux_density(
+                        modes, point, shell=shell
+                    )
+                    sampled_dissipation += spatial_shell_dissipation_density(
+                        modes, point, shell=shell, viscosity=viscosity
+                    )
+        sampled_flux /= grid_size**3
+        sampled_dissipation /= grid_size**3
+        expected = shell_observables(
+            modes, viscosity=viscosity, theta=0.5
+        )[shell]
+
+        self.assertAlmostEqual(sampled_flux, float(expected["influx"]))
+        self.assertAlmostEqual(
+            sampled_dissipation, float(expected["dissipation"])
+        )
+
+    def test_spatial_flux_is_invariant_to_zero_padding(self) -> None:
+        modes = high_high_to_low_fixture(amplitude=2.0)
+        padded = dict(modes)
+        for first in modes:
+            for second in modes:
+                output = tuple(first[index] + second[index] for index in range(3))
+                padded.setdefault(output, (0j, 0j, 0j))
+
+        point = (0.31, 0.47, 0.29)
+        self.assertAlmostEqual(
+            spatial_shell_flux_density(modes, point, shell=2),
+            spatial_shell_flux_density(padded, point, shell=2),
+        )
+
+    def test_spatial_dissipation_requires_non_aliasing_grid(self) -> None:
+        modes = {
+            (8, 0, 0): (0j, 1.0 + 0j, 0j),
+            (-8, 0, 0): (0j, 1.0 + 0j, 0j),
+        }
+        viscosity = 0.1
+        sampled = sum(
+            spatial_shell_dissipation_density(
+                modes,
+                (2 * pi * index / 17, 0.0, 0.0),
+                shell=3,
+                viscosity=viscosity,
+            )
+            for index in range(17)
+        ) / 17
+
+        self.assertAlmostEqual(sampled, 12.8)
+
+    def test_spatial_dissipation_rejects_negative_viscosity(self) -> None:
+        with self.assertRaises(ValueError):
+            spatial_shell_dissipation_density(
+                {(1, 0, 0): (0j, 1 + 0j, 0j)},
+                (0.0, 0.0, 0.0),
+                shell=0,
+                viscosity=-0.1,
+            )
 
     def test_shell_observables_mark_high_amplitude_low_shell_bad(self) -> None:
         modes = high_high_to_low_fixture(amplitude=5.0)

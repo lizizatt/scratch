@@ -1,0 +1,77 @@
+{
+  "schema_version": 2,
+  "round_id": "round-016",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-016-claims.json",
+  "claims_snapshot_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "previous_round": "artifacts/gauntlet/round-015.json",
+  "previous_round_sha256": "3a45343029c4d60b96f0ecbafb810fb9d89f6c92f233db586fb8515fac7f32d5",
+  "post_repair_claims_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "6bcfa8713f363f2c5e998a7a0eccee3ab668b86294df55023fe1ca78f219542c",
+  "reviewers": [
+    "expensive-agent: localized flux and dissipation review",
+    "expensive-agent: localized probe repair verification"
+  ],
+  "findings": [
+    {
+      "id": "R16-001",
+      "fingerprint": "localized-flux-output-support",
+      "disposition": "valid",
+      "finding": "Localized shell flux omitted generated nonlinear outputs whose velocity coefficients were absent from the input dictionary.",
+      "repair": "Enumerated all retained convolution outputs in the selected shell and added a zero-padding invariance test."
+    },
+    {
+      "id": "R16-002",
+      "fingerprint": "localized-grid-aliasing",
+      "disposition": "valid",
+      "finding": "Grid-based local observables did not state or test a non-aliasing resolution boundary.",
+      "repair": "Documented the resolution requirement and added a 17-point boundary test for the +/-8 mode."
+    },
+    {
+      "id": "R16-003",
+      "fingerprint": "negative-viscosity-input",
+      "disposition": "valid",
+      "finding": "Localized dissipation accepted negative viscosity and returned a negative dissipation density.",
+      "repair": "Added finite non-negative viscosity validation and a rejection test."
+    },
+    {
+      "id": "R16-004",
+      "fingerprint": "localized-flux-shell-binding",
+      "disposition": "valid",
+      "finding": "The first repair cleanup removed the selected-shell velocity binding, causing localized flux calls to raise NameError.",
+      "repair": "Restored shell-mode filtering and reran the focused and full suites."
+    },
+    {
+      "id": "R16-005",
+      "fingerprint": "round-015-stale-tree",
+      "disposition": "valid",
+      "finding": "Round 015 no longer represented the current localized-observable implementation and documentation.",
+      "repair": "Created this round-016 snapshot and rebaselined the reviewed-tree digest."
+    }
+  ],
+  "validation": [
+    "python -m unittest tests.test_triad -v (15 tests)",
+    "python -m unittest discover -s tests -v (49 tests)",
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "editor diagnostics: none",
+    "git diff --check",
+    "localized flux and dissipation match modal observables on a resolved 2pi-periodic grid"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "localized-flux-output-support",
+    "localized-grid-aliasing",
+    "negative-viscosity-input",
+    "localized-flux-shell-binding",
+    "round-015-stale-tree"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

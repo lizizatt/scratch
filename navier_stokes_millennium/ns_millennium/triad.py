@@ -30,6 +30,11 @@ def _norm_squared(vector: Sequence[complex]) -> float:
     return float(sum(abs(value) ** 2 for value in vector))
 
 
+def _require_viscosity(viscosity: float) -> None:
+    if not math.isfinite(viscosity) or viscosity < 0:
+        raise ValueError("viscosity must be finite and non-negative")
+
+
 def leray_project(wavevector: Wavevector, vector: Vector) -> Vector:
     """Project a Fourier coefficient onto the plane normal to its wavevector."""
     length_squared = sum(value * value for value in wavevector)
@@ -68,6 +73,7 @@ def galerkin_rhs(
     Modes outside ``active_modes`` are discarded by the Galerkin projection;
     they are not silently evolved or treated as resolved physical modes.
     """
+    _require_viscosity(viscosity)
     active = set(modes) if active_modes is None else set(active_modes)
     active_modes_dict = {
         wavevector: modes[wavevector]
@@ -185,6 +191,64 @@ def spatial_shell_energy_density(
     return 0.5 * _norm_squared(reconstruct_velocity(shell_modes, point))
 
 
+def spatial_shell_flux_density(
+    modes: Modes,
+    point: Sequence[float],
+    *,
+    shell: int,
+) -> float:
+    """Return the local nonlinear influx into a dyadic shell."""
+    shell_modes = {
+        wavevector: value
+        for wavevector, value in modes.items()
+        if dyadic_shell_index(wavevector) == shell
+    }
+    output_modes = {
+        tuple(first[index] + second[index] for index in range(3))
+        for first in modes
+        for second in modes
+    }
+    nonlinear_modes = {
+        wavevector: convective_mode(modes, wavevector)
+        for wavevector in output_modes
+        if dyadic_shell_index(wavevector) == shell
+    }
+    velocity = reconstruct_velocity(shell_modes, point)
+    nonlinear = reconstruct_velocity(nonlinear_modes, point)
+    return float(-_dot(tuple(value.conjugate() for value in velocity), nonlinear).real)
+
+
+def spatial_shell_dissipation_density(
+    modes: Modes,
+    point: Sequence[float],
+    *,
+    shell: int,
+    viscosity: float,
+) -> float:
+    """Return the local viscous dissipation density for a dyadic shell."""
+    _require_viscosity(viscosity)
+    if len(point) != 3:
+        raise ValueError("point must have three coordinates")
+    gradients = [[0j, 0j, 0j] for _ in range(3)]
+    for wavevector, coefficient in modes.items():
+        if dyadic_shell_index(wavevector) != shell:
+            continue
+        phase = sum(
+            wavevector[index] * point[index] for index in range(3)
+        )
+        factor = complex(math.cos(phase), math.sin(phase))
+        for direction in range(3):
+            derivative = 1j * wavevector[direction]
+            for component in range(3):
+                gradients[direction][component] += (
+                    derivative * factor * coefficient[component]
+                )
+    return float(
+        viscosity
+        * sum(abs(component) ** 2 for gradient in gradients for component in gradient)
+    )
+
+
 def dyadic_shell_index(wavevector: Wavevector) -> int | None:
     """Return the shell index for ``2**j <= |k| < 2**(j+1)``."""
     frequency = math.sqrt(sum(component * component for component in wavevector))
@@ -200,6 +264,7 @@ def shell_observables(
     theta: float,
 ) -> dict[int, dict[str, float | bool]]:
     """Measure shell energy, nonlinear influx, and badness for a finite field."""
+    _require_viscosity(viscosity)
     observables: dict[int, dict[str, float | bool]] = {}
     for wavevector, value in modes.items():
         shell = dyadic_shell_index(wavevector)
