@@ -40,12 +40,16 @@ it; its interpolation line remains supercritical.
 - Implemented an exact finite Fourier-mode evaluator. Its tests prove a
   periodic high-high-to-low triad refutes universal instantaneous critical-flux
   absorption.
+- Added a closed Fourier-ball constructor and RK4 integrator for finite
+  projected ODE probes, with tests for exact small-ball membership, viscous
+  amplification, projection, reality, and active-mode closure. These remain
+  computational infrastructure, not a regularity argument.
 - Rejected the distributed-systems transfer after amplitude scaling and an
   explicit triadic partition counterexample.
 - Determined that compact $L^3$ ancient-orbit rigidity was already implied by
   Albritton-Barker's stronger sequence-$L^3$ Liouville theorem.
-- Recorded six non-converged adversarial rounds plus round 007's administrative
-  rebaseline, an always-validated hash manifest,
+- Recorded the adversarial rounds through the current phase-space rebaseline,
+  an always-validated hash manifest,
   and content-addressed claim snapshots from schema v2 onward.
 
 ## Candidate Dispositions
@@ -68,12 +72,14 @@ python -m ns_millennium.ledger artifacts/claims.json
 python -m unittest discover -s tests -v
 ```
 
-The suite contains 34 ledger regressions plus 3 exact Fourier-triad tests (37 total).
+The suite contains 34 ledger regressions plus 10 exact Fourier/Galerkin tests
+(44 total).
 Editor diagnostics report no errors.
 
-Round 007 remains open: user or formatter edits changed the bytes of reviewed
-literature and claim files, so a fresh adversarial review of those mathematical
-changes is required before any convergence claim.
+The phase-space route is explicitly blocked on four named measure,
+pressure/commutator, packing-to-epsilon, and cutoff-uniformity obligations. No
+convergence claim is made for the finite RK4 probe or for the research program
+as a whole.
 
 ## Limits
 

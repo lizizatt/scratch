@@ -86,6 +86,77 @@ def galerkin_rhs(
     return rhs
 
 
+def closed_ball_modes(radius: int) -> set[Wavevector]:
+    """Return the integer Fourier ball used by a finite Galerkin probe."""
+    if radius < 0:
+        raise ValueError("radius must be non-negative")
+    return {
+        (first, second, third)
+        for first in range(-radius, radius + 1)
+        for second in range(-radius, radius + 1)
+        for third in range(-radius, radius + 1)
+        if first * first + second * second + third * third <= radius * radius
+    }
+
+
+def rk4_step(
+    modes: Modes,
+    *,
+    viscosity: float,
+    timestep: float,
+    active_modes: set[Wavevector] | None = None,
+) -> dict[Wavevector, Vector]:
+    """Advance the projected finite-mode ODE by one classical RK4 step."""
+    active = set(modes) if active_modes is None else set(active_modes)
+    state = {
+        wavevector: modes.get(wavevector, _zero_vector())
+        for wavevector in active
+    }
+
+    def shifted(
+        base: Modes,
+        derivative: Modes,
+        factor: float,
+    ) -> dict[Wavevector, Vector]:
+        return {
+            wavevector: _add(
+                base[wavevector],
+                _scale(factor, derivative[wavevector]),
+            )
+            for wavevector in active
+        }
+
+    first = galerkin_rhs(state, viscosity=viscosity, active_modes=active)
+    second = galerkin_rhs(
+        shifted(state, first, 0.5 * timestep),
+        viscosity=viscosity,
+        active_modes=active,
+    )
+    third = galerkin_rhs(
+        shifted(state, second, 0.5 * timestep),
+        viscosity=viscosity,
+        active_modes=active,
+    )
+    fourth = galerkin_rhs(
+        shifted(state, third, timestep),
+        viscosity=viscosity,
+        active_modes=active,
+    )
+    return {
+        wavevector: _add(
+            state[wavevector],
+            _scale(
+                timestep / 6.0,
+                _add(
+                    _add(first[wavevector], _scale(2.0, second[wavevector])),
+                    _add(_scale(2.0, third[wavevector]), fourth[wavevector]),
+                ),
+            ),
+        )
+        for wavevector in active
+    }
+
+
 def dyadic_shell_index(wavevector: Wavevector) -> int | None:
     """Return the shell index for ``2**j <= |k| < 2**(j+1)``."""
     frequency = math.sqrt(sum(component * component for component in wavevector))

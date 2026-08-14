@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "round_id": "round-014",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-014-claims.json",
+  "claims_snapshot_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "previous_round": "artifacts/gauntlet/round-013.json",
+  "previous_round_sha256": "7c0184b6ebb5cb9c1d365661a61ff2e0915af3fb12e8b175dc3a4730d84b4071",
+  "post_repair_claims_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "df50fc86cba59b59f38b776d15feb4ecfce8bc0deef809d8cd6d02348439c7ea",
+  "reviewers": [
+    "expensive-agent: runtime and numerical correctness",
+    "expensive-agent: API integration and test adequacy",
+    "expensive-agent: mathematical phase-space review"
+  ],
+  "findings": [
+    {
+      "id": "R14-001",
+      "fingerprint": "rk4-test-noop",
+      "disposition": "valid",
+      "finding": "The RK4 invariant test passed for a no-op step and did not verify integration or timestep dependence.",
+      "repair": "Added an analytic single-mode viscous amplification assertion using the classical RK4 polynomial."
+    },
+    {
+      "id": "R14-002",
+      "fingerprint": "closed-ball-completeness",
+      "disposition": "valid",
+      "finding": "The closed-ball test checked symmetry and containment but not exact membership or invalid-radius handling.",
+      "repair": "Added exact radius-one membership, radius-two cardinality, and negative-radius rejection checks."
+    },
+    {
+      "id": "R14-003",
+      "fingerprint": "phase-space-claim-status",
+      "disposition": "valid",
+      "finding": "FREQ-PHASESPACE was labeled conjectured even though its measure, pressure/commutator, and epsilon-regularity bridges were explicitly unresolved.",
+      "repair": "Reclassified the parent claim as blocked and added named blocked ledger obligations for each missing bridge."
+    },
+    {
+      "id": "R14-004",
+      "fingerprint": "phase-space-cutoff-uniformity",
+      "disposition": "valid",
+      "finding": "A finite probe cannot test a universal packing statement with an unspecified constant that may depend on cutoff or partition.",
+      "repair": "Added the cutoff-uniformity gate and blocked FREQ-PACKING-UNIFORM obligation; the RK4 probe is documented as infrastructure only."
+    },
+    {
+      "id": "R14-005",
+      "fingerprint": "round-013-stale-rebaseline",
+      "disposition": "valid",
+      "finding": "Round 013 no longer hashed the current reviewed tree or claims after the RK4 and status changes.",
+      "repair": "Created this round-014 snapshot and rebaselined the reviewed-tree and claims digests."
+    },
+    {
+      "id": "R14-006",
+      "fingerprint": "phase-space-obligation-count",
+      "disposition": "valid",
+      "finding": "The research note and outcome summary listed three phase-space obligations while the canonical ledger also required cutoff-uniformity.",
+      "repair": "Listed all four blocked obligations and refreshed the reviewed-tree and round hashes."
+    }
+  ],
+  "validation": [
+    "python -m unittest tests.test_triad -v (10 tests)",
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v",
+    "independent review found no implementation defect in equations, signs, active-state handling, conjugacy, or divergence preservation",
+    "finite probe remains non-evidentiary for universal phase-space packing"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "phase-space-packing-refinement",
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project.",
+    "rk4-test-noop",
+    "closed-ball-completeness",
+    "phase-space-claim-status",
+    "round-013-stale-rebaseline",
+    "phase-space-obligation-count"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

@@ -52,11 +52,18 @@ and so that summing over the spatial cubes at one scale does not count the
 same physical event once per overlapping decomposition. The tempting factor
 $w(Q,j)=r_Q^{-1}$ is not accepted without a full dimensional calculation.
 
-> **Claim FREQ-PHASESPACE (`conjectured`).** There exists a scale-invariant
+> **Claim FREQ-PHASESPACE (`blocked`).** There exists a scale-invariant
 > choice of $w(Q,j)$ and a pressure-defect term for which a phase-space Carleson
 > packing bound forces at least one epsilon-regular scale inside every
 > sufficiently small parabolic cylinder.
 
+The parent claim is split in the canonical ledger into four blocked
+obligations: `FREQ-PHASESPACE-MEASURE` (a scale-invariant, non-overcounting
+weight), `FREQ-PRESSURE-COMMUTATOR` (localized pressure and cutoff estimates),
+`FREQ-PACKING-EPSILON` (the local packing-to-CKN bridge), and
+`FREQ-PACKING-UNIFORM` (cutoff-uniform constants and a Galerkin-to-PDE
+convergence hypothesis). No finite numerical run settles any of these
+obligations.
 This is stronger and more relevant than time-frequency packing, but also more
 fragile: spatial localization introduces cutoff commutators and a harmonic
 pressure component.
@@ -75,6 +82,15 @@ pressure component.
 4. **Bridge gap:** even a valid phase-space packing estimate does not by itself
    imply $L^\infty_tL^3_x$. The good-scale conclusion must be proved separately
    using suitable local energy and pressure bounds.
+
+## Cutoff-uniformity gate
+
+Any computationally testable packing inequality must specify constants uniform
+in Fourier cutoff and spatial partition, plus a convergence hypothesis linking
+the finite Galerkin systems to a suitable Navier-Stokes solution. A
+solution-dependent constant chosen separately for each finite cutoff is not a
+universal inequality and cannot be falsified by observing growth across
+cutoffs.
 
 ## Minimal next lemma
 
@@ -102,6 +118,13 @@ probe should:
   pieces, and cutoff commutators separately;
 - refine both Fourier cutoff and spatial partition.
 
+The implementation now has a closed integer Fourier-ball constructor and a
+classical RK4 step for the projected finite ODE. These are probe
+infrastructure only: the tests verify exact small-ball membership, viscous
+single-mode amplification, projection, reality, and active-mode closure, but
+do not compute the phase-space measure, pressure split, cutoff-uniformity
+constant, or packing-to-epsilon bridge.
+
 A violation at finite cutoff falsifies that finite inequality. Passing the probe
 is evidence about the chosen Galerkin systems, not a universal PDE result.
 
@@ -109,6 +132,7 @@ is evidence about the chosen Galerkin systems, not a universal PDE result.
 
 - Time-frequency packing alone: **insufficient for the epsilon bridge**.
 - Naive fixed spatial weight: **unverified; do not use**.
-- Phase-space packing with pressure-defect control: **conjectured**.
+- Phase-space packing with pressure-defect control: **blocked** on the four
+   named obligations above.
 - Local packing-to-epsilon lemma: **blocked**.
 - Global critical continuation: **blocked at CRITICAL-BOUND**.
