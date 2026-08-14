@@ -1,0 +1,127 @@
+{
+  "schema_version": 2,
+  "round_id": "round-005",
+  "date": "2026-08-13",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "73150292713ce05021d7dd91f5da785cda8435f6c195f7dd02acf0d14806fc38",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-005-claims.json",
+  "claims_snapshot_sha256": "73150292713ce05021d7dd91f5da785cda8435f6c195f7dd02acf0d14806fc38",
+  "previous_round": "artifacts/gauntlet/round-004.json",
+  "previous_round_sha256": "5f08b78bfb1d01d01342ed72941498ae6bfd4e2375f90e495aea167750a16205",
+  "post_repair_claims_sha256": "73150292713ce05021d7dd91f5da785cda8435f6c195f7dd02acf0d14806fc38",
+  "reviewers": [
+    {
+      "role": "mathematics",
+      "actual_agent": "expensive-agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "source",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_without_report_not_counted"
+    },
+    {
+      "role": "code",
+      "actual_agent": "Explore",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "process",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "arbiter",
+      "actual_agent": "GitHub Copilot primary agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_primary_verification_of_each_disposition"
+    }
+  ],
+  "findings": [
+    {
+      "id": "R5-001",
+      "fingerprint": "exact-homogeneous-energy-class",
+      "disposition": "valid",
+      "finding": "ENERGY-CLASS used global inhomogeneous L2-time H1 rather than L2-time homogeneous H1.",
+      "repair": "Changed the canonical statement to L-infinity-time L2 intersect L2-time dot H1."
+    },
+    {
+      "id": "R5-002",
+      "fingerprint": "claims-vs-source-tree-hash-category",
+      "disposition": "invalid",
+      "finding": "Different claims and source-tree hashes prove undocumented modification.",
+      "reason": "The final-review prompt explicitly supplied separate hashes for different byte sets; no equality was expected."
+    },
+    {
+      "id": "R5-003",
+      "fingerprint": "program-round-target-binding",
+      "disposition": "valid",
+      "finding": "Program-wide legacy rounds were ineligible for later target certification and lacked always-on validation.",
+      "repair": "Kept legacy rounds program-scoped, added an always-validated manifest, and reserved target_claim_id for future target-specific certification rounds."
+    },
+    {
+      "id": "R5-004",
+      "fingerprint": "unresolved-finding-transition",
+      "disposition": "valid",
+      "finding": "Unresolved findings could disappear between rounds without a repair record.",
+      "repair": "The manifest validator now requires each prior unresolved string to remain open or appear in resolved_findings."
+    },
+    {
+      "id": "R5-005",
+      "fingerprint": "proof-review-required-roles",
+      "disposition": "valid",
+      "finding": "Certification roles did not match the documented scaling, PDE, and counterexample critics.",
+      "repair": "Target certification now requires completed known-model scaling, PDE, counterexample, source, and arbiter roles."
+    },
+    {
+      "id": "R5-006",
+      "fingerprint": "structured-computation-bridge",
+      "disposition": "valid",
+      "finding": "An unrelated proved lemma could masquerade as a computation bridge.",
+      "repair": "Added computation_bridge kind and required each bridge claim to be proved and directly depend on the mapped computation."
+    },
+    {
+      "id": "R5-007",
+      "fingerprint": "historical-claim-snapshots",
+      "disposition": "valid",
+      "finding": "Legacy claim states cannot be reconstructed from hashes alone.",
+      "repair": "Introduced schema-v2 rounds with mandatory content-addressed claims snapshots beginning at round 005; pre-v2 loss remains documented."
+    },
+    {
+      "id": "R5-008",
+      "fingerprint": "manifest-every-round-always-on",
+      "disposition": "valid",
+      "finding": "Gauntlet history was checked only when a Clay target became resolved.",
+      "repair": "Added an always-on manifest that validates every round file, hash link, ordering, unresolved transition, and snapshot."
+    },
+    {
+      "id": "R5-009",
+      "fingerprint": "untracked-git-durability",
+      "disposition": "valid_needs_user_authorization",
+      "finding": "The project remains untracked and therefore lacks Git-backed durability.",
+      "reason": "No staging or commit was requested."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest tests.test_ledger -v (29 tests)",
+    "always-on manifest validation of rounds 001-004",
+    "round-005 claims snapshot hash equals canonical claims hash",
+    "editor diagnostics: none"
+  ],
+  "unresolved_valid_findings": [
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "resolved_findings": [],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

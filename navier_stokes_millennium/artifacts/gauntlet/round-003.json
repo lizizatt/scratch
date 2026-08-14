@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "round_id": "round-003",
+  "date": "2026-08-13",
+  "target": "entire navier_stokes_millennium research program",
+  "previous_round": "artifacts/gauntlet/round-002.json",
+  "previous_round_sha256": "c4d2e348e90bb6d8c6a024537721c787592076bfe687236c65f6c444cb0a6a53",
+  "post_repair_claims_sha256": "ac3a6aa4aa9131bf1640036ba626cda327ea377c7589a741b3fd60bd4dbad4d4",
+  "reviewers": [
+    {
+      "role": "mathematics",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "source",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "code",
+      "actual_agent": "Explore",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "process",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "arbiter",
+      "actual_agent": "GitHub Copilot primary agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_primary_verification_of_each_disposition"
+    }
+  ],
+  "findings": [
+    {
+      "id": "R3-001",
+      "disposition": "valid",
+      "finding": "REG-005's smooth family disproved uniform control, not literal set membership.",
+      "repair": "Restated the canonical and report claim as a uniform Serrin-norm estimate and calculated every Serrin pair's growth."
+    },
+    {
+      "id": "R3-002",
+      "disposition": "valid",
+      "finding": "FND-003's proof artifact omitted the force term present in its statement.",
+      "repair": "Added the forcing inner product and integrability hypothesis; retained the unforced special case."
+    },
+    {
+      "id": "R3-003",
+      "disposition": "valid",
+      "finding": "CF-06 named Proposition 5.5 rather than conditional Proposition 5.4.",
+      "repair": "Restored Proposition 5.4 after checking the primary paper's statement."
+    },
+    {
+      "id": "R3-004",
+      "disposition": "valid",
+      "finding": "PR-13 asserted a dimension-one zero-measure Cantor set without construction or dependency.",
+      "repair": "Added an explicit variable-ratio Cantor set, zero-H1 cover, and mass-distribution dimension proof."
+    },
+    {
+      "id": "R3-005",
+      "disposition": "valid",
+      "finding": "Three formula prefixes still contained literal tab/control bytes despite round 2's prose repair.",
+      "repair": "Replaced them with safe TeX commands and verified exact 0x5c prefixes and absence of 0x15."
+    },
+    {
+      "id": "R3-006",
+      "disposition": "valid",
+      "finding": "Punctuation-only Markdown headings generated an empty internal anchor.",
+      "repair": "Skipped empty normalized anchors."
+    },
+    {
+      "id": "R3-007",
+      "disposition": "valid",
+      "finding": "Only whitelisted claim prefixes were synchronized from documentation.",
+      "repair": "Made explicit inline Claim declarations and table first-cell IDs prefix-agnostic, with regression coverage."
+    },
+    {
+      "id": "R3-008",
+      "disposition": "valid",
+      "finding": "docs/proofs/../ path traversal bypassed proof placement.",
+      "repair": "Resolved proof paths and enforced containment beneath the resolved docs/proofs directory."
+    },
+    {
+      "id": "R3-009",
+      "disposition": "valid",
+      "finding": "A proved analytic theorem could depend directly on a computation claim.",
+      "repair": "Required an explicit settled non-computation analytic bridge for every computational dependency."
+    },
+    {
+      "id": "R3-010",
+      "disposition": "valid",
+      "finding": "A converged review could hide actionable findings behind an empty unresolved list.",
+      "repair": "Derived acceptance constraints from finding dispositions and required rejection reasons."
+    },
+    {
+      "id": "R3-011",
+      "disposition": "valid",
+      "finding": "Certification did not validate complete gauntlet history.",
+      "repair": "Validated contiguous round IDs, previous paths, hashes, and cycles back to round 001."
+    },
+    {
+      "id": "R3-012",
+      "disposition": "valid",
+      "finding": "One JSON artifact or reviewer identity could be reused across certification roles.",
+      "repair": "Required typed directories, unique paths, disjoint internal/external sets, and distinct external name-affiliation pairs."
+    },
+    {
+      "id": "R3-013",
+      "disposition": "trust_boundary",
+      "finding": "Local JSON model and reviewer identities remain self-attested without an external signed trust root.",
+      "reason": "The local validator now states this limitation; it cannot manufacture provider or human authentication."
+    },
+    {
+      "id": "R3-014",
+      "disposition": "trust_boundary",
+      "finding": "Arbitrary prose can restate a Clay alternative without declaring semantic equivalence.",
+      "reason": "Generic claims are now canonicalized, but semantic equivalence remains a mathematical-review obligation."
+    },
+    {
+      "id": "R3-015",
+      "disposition": "valid_needs_user_authorization",
+      "finding": "The project remains untracked, so the hash-linked records lack Git durability.",
+      "reason": "No staging or commit was requested."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (24 tests)",
+    "round-001.json and round-002.json parsed with python -m json.tool",
+    "literal-byte check confirmed 0x5c TeX prefixes and no 0x15 corruption",
+    "editor diagnostics: none"
+  ],
+  "unresolved_valid_findings": [
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

@@ -1,0 +1,101 @@
+{
+  "schema_version": 2,
+  "round_id": "round-006",
+  "date": "2026-08-13",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "73150292713ce05021d7dd91f5da785cda8435f6c195f7dd02acf0d14806fc38",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-006-claims.json",
+  "claims_snapshot_sha256": "73150292713ce05021d7dd91f5da785cda8435f6c195f7dd02acf0d14806fc38",
+  "previous_round": "artifacts/gauntlet/round-005.json",
+  "previous_round_sha256": "0dcbee8a21c81a195c1137e8415c5d5d6aebe03061f4fa32dc6de25177375747",
+  "post_repair_claims_sha256": "73150292713ce05021d7dd91f5da785cda8435f6c195f7dd02acf0d14806fc38",
+  "reviewers": [
+    {
+      "role": "mathematics",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "source",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_without_report_not_counted"
+    },
+    {
+      "role": "code",
+      "actual_agent": "Explore",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_without_report_not_counted"
+    },
+    {
+      "role": "process",
+      "actual_agent": "expensive-agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "arbiter",
+      "actual_agent": "GitHub Copilot primary agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_primary_verification_of_each_disposition"
+    }
+  ],
+  "findings": [
+    {
+      "id": "R6-001",
+      "fingerprint": "target-suffix-over-program-history",
+      "disposition": "valid",
+      "finding": "Target-specific certification could not build on program-wide predecessor rounds and rejected schema-v2 heads.",
+      "repair": "Allowed schema 1 or 2 and required target/subject binding only on the target-specific head while retaining its full program history."
+    },
+    {
+      "id": "R6-002",
+      "fingerprint": "mandatory-schema-v2-snapshot-binding",
+      "disposition": "valid",
+      "finding": "Future rounds could downgrade to schema v1 or use escaping, stale, or non-ledger snapshots.",
+      "repair": "Required schema v2 from round 005 onward, confined and parsed JSON snapshots, and equated snapshot hash with post-repair and manifest-head canonical claims bytes."
+    },
+    {
+      "id": "R6-003",
+      "fingerprint": "manifest-convergence-consistency",
+      "disposition": "valid",
+      "finding": "Always-on manifest validation accepted contradictory converged rounds.",
+      "repair": "Applied closed finding dispositions, reasons, fingerprints, unresolved-list, and result/flag consistency to every converged manifest round."
+    },
+    {
+      "id": "R6-004",
+      "fingerprint": "refuted-transitive-computation-bridge",
+      "disposition": "valid",
+      "finding": "Refuted analytic claims bypassed transitive computation-bridge enforcement.",
+      "repair": "Applied structured computation bridges to established, proved, and refuted analytic claims."
+    },
+    {
+      "id": "R6-005",
+      "fingerprint": "untracked-git-durability",
+      "disposition": "valid_needs_user_authorization",
+      "finding": "The project remains untracked and therefore lacks Git-backed durability.",
+      "reason": "No staging or commit was requested."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest tests.test_ledger -v (34 tests)",
+    "target-specific schema-v2 head over program history regression",
+    "contradictory manifest convergence regression",
+    "snapshot escape and stale-hash regression",
+    "refuted computation bridge regression",
+    "editor diagnostics: none"
+  ],
+  "unresolved_valid_findings": [
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "resolved_findings": [],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

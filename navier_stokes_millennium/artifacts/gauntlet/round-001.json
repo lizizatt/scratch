@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "round_id": "round-001",
+  "date": "2026-08-13",
+  "target": "entire navier_stokes_millennium research program",
+  "post_repair_claims_sha256": "7e8a1d786d397b91d576503b1241c74d502858f6b1f12390ad998d5155d02585",
+  "model_availability": {
+    "requested_by_user": ["sonnet-5", "opus-4.8", "gpt-5.6"],
+    "available_nearby_models": ["sonnet-4.6", "gpt-5.4"],
+    "limitation": "Preferred exact models were unavailable; nearby profiles lacked workspace tools for this round."
+  },
+  "reviewers": [
+    {
+      "role": "mathematics",
+      "requested_agent": "sonnet-4.6",
+      "outcome": "blocked_no_filesystem_tools"
+    },
+    {
+      "role": "mathematics_reroute",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "source",
+      "requested_agent": "gpt-5.4",
+      "outcome": "blocked_no_filesystem_tools"
+    },
+    {
+      "role": "source_reroute",
+      "actual_agent": "expensive-agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "incomplete_no_final_findings_report"
+    },
+    {
+      "role": "code",
+      "requested_agent": "sonnet-4.6",
+      "outcome": "blocked_no_filesystem_tools"
+    },
+    {
+      "role": "code_reroute",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "process",
+      "requested_agent": "gpt-5.4",
+      "outcome": "blocked_no_filesystem_tools"
+    },
+    {
+      "role": "process_reroute",
+      "actual_agent": "Explore",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "arbiter",
+      "actual_agent": "GitHub Copilot primary agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_primary_verification_of_each_disposition"
+    }
+  ],
+  "findings": [
+    {
+      "id": "R1-001",
+      "disposition": "valid",
+      "finding": "CRITICAL-BOUND stopped before the maximal endpoint and was tautologically too weak.",
+      "repair": "Quantified the uniform L3 bound on the complete finite maximal interval."
+    },
+    {
+      "id": "R1-002",
+      "disposition": "valid",
+      "finding": "The Clay-A chain omitted local classical existence and the smooth energy identity.",
+      "repair": "Added LOCAL-CLASSICAL and SMOOTH-ENERGY and strengthened GLOBAL-CONTINUATION."
+    },
+    {
+      "id": "R1-003",
+      "disposition": "valid",
+      "finding": "The exact triad test was periodic but had been discussed as a whole-space refutation.",
+      "repair": "Scoped the claim and route to the three-torus."
+    },
+    {
+      "id": "R1-004",
+      "disposition": "valid",
+      "finding": "The cascade artifact refuted only a shell-time diagonal inference, not a full exact cascade.",
+      "repair": "Narrowed the refuted claim and left exact synchronized cascade construction blocked."
+    },
+    {
+      "id": "R1-005",
+      "disposition": "valid",
+      "finding": "ENERGY-CLASS used a weak-solution label broader than Leray-Hopf.",
+      "repair": "Named the exact Leray-Hopf existence and energy class."
+    },
+    {
+      "id": "R1-006",
+      "disposition": "valid",
+      "finding": "Type-I-to-self-similar and all-critical-space compactness claims lacked counterexamples.",
+      "repair": "Downgraded BUP-003 and BUP-006 from refuted to blocked."
+    },
+    {
+      "id": "R1-007",
+      "disposition": "valid",
+      "finding": "The ESS summary omitted the uniform time quantifier.",
+      "repair": "Restored L-infinity-time L3-space through the putative endpoint."
+    },
+    {
+      "id": "R1-008",
+      "disposition": "valid",
+      "finding": "The compact-orbit corollary omitted its orbit formula and scaling dependency.",
+      "repair": "Defined the all-time orbit and added NS-SCALING."
+    },
+    {
+      "id": "R1-009",
+      "disposition": "valid",
+      "finding": "Scaling and interpolation claims had no complete proof artifacts.",
+      "repair": "Added docs/proofs/FOUNDATIONAL_DERIVATIONS.md with exact change-of-variable and interpolation calculations."
+    },
+    {
+      "id": "R1-010",
+      "disposition": "valid",
+      "finding": "One flux direction, one periodic scaling range, and one computation-source locator were wrong.",
+      "repair": "Corrected influx terminology, required nonnegative integer torus scaling, and changed Proposition 5.4 to 5.5."
+    },
+    {
+      "id": "R1-011",
+      "disposition": "valid",
+      "finding": "Settled claims could hide blocked dependencies.",
+      "repair": "Applied dependency checks to both proved and established claims with a regression test."
+    },
+    {
+      "id": "R1-012",
+      "disposition": "valid",
+      "finding": "Evidence and proof-artifact strings did not need to resolve.",
+      "repair": "Added repository path and Markdown-anchor validation; proved artifacts must live under docs/proofs."
+    },
+    {
+      "id": "R1-013",
+      "disposition": "valid",
+      "finding": "Malformed ledgers crashed and cycle paths duplicated their endpoint.",
+      "repair": "Made malformed input total, repaired cycle output, and added CLI regressions."
+    },
+    {
+      "id": "R1-014",
+      "disposition": "valid",
+      "finding": "No target contract, review record, or external-certification gate prevented silent Clay-target promotion.",
+      "repair": "Added canonical A-D contracts, settled-target certification requirements, and durable gauntlet records."
+    },
+    {
+      "id": "R1-015",
+      "disposition": "invalid",
+      "finding": "Reject every status upgrade when evidence appears in the same session.",
+      "reason": "A legitimate proof necessarily adds evidence with an upgrade; structural checks, git review, fresh gauntlets, and external certification address the actual risk."
+    }
+  ],
+  "validation": [
+    "python -m unittest tests.test_ledger -v",
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v"
+  ],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

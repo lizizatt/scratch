@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "head": "artifacts/gauntlet/round-006.json",
+  "rounds": [
+    {
+      "path": "artifacts/gauntlet/round-001.json",
+      "sha256": "e2c0ae8f5194709217123757add70fcc91eab40b1bac68836805e6fc610925c8"
+    },
+    {
+      "path": "artifacts/gauntlet/round-002.json",
+      "sha256": "c4d2e348e90bb6d8c6a024537721c787592076bfe687236c65f6c444cb0a6a53"
+    },
+    {
+      "path": "artifacts/gauntlet/round-003.json",
+      "sha256": "7fd5d0987f54347554110b40f2f678ba99e3d5ea4fa7dc6d57c00275878792fb"
+    },
+    {
+      "path": "artifacts/gauntlet/round-004.json",
+      "sha256": "5f08b78bfb1d01d01342ed72941498ae6bfd4e2375f90e495aea167750a16205"
+    },
+    {
+      "path": "artifacts/gauntlet/round-005.json",
+      "sha256": "0dcbee8a21c81a195c1137e8415c5d5d6aebe03061f4fa32dc6de25177375747"
+    },
+    {
+      "path": "artifacts/gauntlet/round-006.json",
+      "sha256": "b5af4ae2e75707d5816fa2c76af8fc67734ed98d8c92358a5b404467e2268f8c"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+[project]
+name = "ns-millennium-research"
+version = "0.1.0"
+description = "Auditable research tooling for the Navier-Stokes Millennium problem"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 88

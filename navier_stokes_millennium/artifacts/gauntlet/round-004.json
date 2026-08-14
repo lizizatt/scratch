@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "round_id": "round-004",
+  "date": "2026-08-13",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "ac3a6aa4aa9131bf1640036ba626cda327ea377c7589a741b3fd60bd4dbad4d4",
+  "previous_round": "artifacts/gauntlet/round-003.json",
+  "previous_round_sha256": "7fd5d0987f54347554110b40f2f678ba99e3d5ea4fa7dc6d57c00275878792fb",
+  "post_repair_claims_sha256": "ac3a6aa4aa9131bf1640036ba626cda327ea377c7589a741b3fd60bd4dbad4d4",
+  "reviewers": [
+    {
+      "role": "mathematics",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "source",
+      "actual_agent": "Explore",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_without_report_not_counted"
+    },
+    {
+      "role": "code",
+      "actual_agent": "implementer",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "process",
+      "actual_agent": "expensive-agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_findings_report"
+    },
+    {
+      "role": "arbiter",
+      "actual_agent": "GitHub Copilot primary agent",
+      "actual_model": "unknown (runtime did not expose provider/model)",
+      "counts_for_model_rotation": false,
+      "outcome": "completed_primary_verification_of_each_disposition"
+    }
+  ],
+  "findings": [
+    {
+      "id": "R4-001",
+      "fingerprint": "malformed-status-totality",
+      "disposition": "valid",
+      "finding": "List-valued statuses still crashed late validation passes.",
+      "repair": "Normalized status values before every membership check and added malformed status and Clay-alternative regressions."
+    },
+    {
+      "id": "R4-002",
+      "fingerprint": "target-hash-artifact-bytes",
+      "disposition": "valid",
+      "finding": "Target subject hashes omitted proof, evidence, and counterexample bytes.",
+      "repair": "Included SHA-256 digests of every resolved dependency-closure artifact in the subject hash."
+    },
+    {
+      "id": "R4-003",
+      "fingerprint": "converged-disposition-closed-set",
+      "disposition": "valid",
+      "finding": "Unknown or decision finding dispositions passed converged review validation.",
+      "repair": "Closed convergence dispositions to invalid, hallucinated, and duplicate; required reasons and fingerprints."
+    },
+    {
+      "id": "R4-004",
+      "fingerprint": "certification-canonical-path-separation",
+      "disposition": "valid",
+      "finding": "Raw-path comparison allowed one physical file to occupy internal and external roles.",
+      "repair": "Resolved paths, enforced role directories, uniqueness, and cross-role disjointness."
+    },
+    {
+      "id": "R4-005",
+      "fingerprint": "gauntlet-complete-history-chain",
+      "disposition": "valid",
+      "finding": "Certification could truncate or hollow out gauntlet history.",
+      "repair": "Bound filenames to round IDs, validated every node's minimum schema, required contiguous hashes and latest same-target head, and checked duplicate fingerprints chronologically."
+    },
+    {
+      "id": "R4-006",
+      "fingerprint": "transitive-computation-analytic-bridge",
+      "disposition": "valid",
+      "finding": "Analytic claims could hide unbridged computations transitively.",
+      "repair": "Required a proved non-computation bridge mapping for every transitive computation dependency of every settled analytic claim."
+    },
+    {
+      "id": "R4-007",
+      "fingerprint": "refuted-dependency-settlement",
+      "disposition": "valid",
+      "finding": "Refuted claims could depend on blocked premises.",
+      "repair": "Applied dependency settlement to established, proved, and refuted owners."
+    },
+    {
+      "id": "R4-008",
+      "fingerprint": "exact-clay-id-alternative-map",
+      "disposition": "valid",
+      "finding": "Canonical Clay IDs could name a different alternative.",
+      "repair": "Required exact CLAY-A through CLAY-D ID/alternative matching."
+    },
+    {
+      "id": "R4-009",
+      "fingerprint": "rootless-validation-explicit-mode",
+      "disposition": "valid",
+      "finding": "Rootless direct API validation could report success without checking artifacts.",
+      "repair": "Full validation now requires a root; structural-only callers must opt in explicitly."
+    },
+    {
+      "id": "R4-010",
+      "fingerprint": "duplicate-json-members",
+      "disposition": "valid",
+      "finding": "Duplicate JSON member names were silently accepted by last-value wins parsing.",
+      "repair": "Added duplicate-rejecting JSON parsing for ledgers and reviews."
+    },
+    {
+      "id": "R4-011",
+      "fingerprint": "documented-status-fail-closed",
+      "disposition": "valid",
+      "finding": "Missing or ambiguous Markdown claim statuses disabled synchronization.",
+      "repair": "Normalized formatting and rejected every claim row with zero or multiple statuses."
+    },
+    {
+      "id": "R4-012",
+      "fingerprint": "iterative-dependency-cycle-dfs",
+      "disposition": "valid",
+      "finding": "A deep acyclic claim graph caused recursive cycle detection to overflow.",
+      "repair": "Replaced recursion with iterative tri-color DFS and passed a 1,100-node regression."
+    },
+    {
+      "id": "R4-013",
+      "fingerprint": "empty-markdown-anchor",
+      "disposition": "valid",
+      "finding": "Punctuation-only headings produced an empty internal anchor.",
+      "repair": "Skipped empty normalized anchors."
+    },
+    {
+      "id": "R4-014",
+      "fingerprint": "reviewer-identity-external-trust",
+      "disposition": "trust_boundary",
+      "finding": "Local model and reviewer identity strings remain self-attested.",
+      "reason": "Authenticity requires an external signed, human-controlled trust root; the local validator documents but cannot create it."
+    },
+    {
+      "id": "R4-015",
+      "fingerprint": "semantic-shadow-clay-target",
+      "disposition": "trust_boundary",
+      "finding": "Arbitrary prose may be semantically equivalent to a Clay target without structured declaration.",
+      "reason": "Generic explicit claims are canonicalized, but semantic equivalence is a mathematical-review obligation."
+    },
+    {
+      "id": "R4-016",
+      "fingerprint": "untracked-git-durability",
+      "disposition": "valid_needs_user_authorization",
+      "finding": "The project remains untracked and therefore lacks Git-backed durability.",
+      "reason": "No staging or commit was requested."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest tests.test_ledger -v (29 tests)",
+    "deep acyclic dependency chain of 1,100 claims",
+    "artifact-byte subject hash mutation regression",
+    "editor diagnostics: none"
+  ],
+  "unresolved_valid_findings": [
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

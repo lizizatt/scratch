@@ -12,6 +12,7 @@ Personal experiments — terminal games, RL sims, 3D-print tooling, and small ut
 | `terminalhero` | Terminal rhythm game for Clone Hero `.chart` files |
 | `invisalign` | Dental mesh fetch and CTM→OBJ export from Invisalign share links |
 | [sigil_demo](sigil_demo/README.md) | Self-contained procedural sigil generator demo with static SVG samples |
+| [navier_stokes_millennium](navier_stokes_millennium/README.md) | Auditable Navier-Stokes Millennium research program with claims, proofs, and gauntlet reviews |
 
 ## Terminal toys
 
