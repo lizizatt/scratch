@@ -62,3 +62,42 @@ initial time and proves multiplicity of suitable Leray-Hopf solutions. Clay C
 requires smooth rapidly decreasing data and force and the nonexistence of any
 accepted global smooth solution. Failing both the force hypothesis and the
 logical conclusion refutes the implication from that theorem to Clay C.
+
+## Zero nonlinear flux does not imply CKN smallness
+
+On the three-torus, choose $a,k\in\mathbb R^3$ with $a\cdot k=0$, $|a|=1$,
+and define
+
+$$
+u_A(x,t)=A e^{-\nu|k|^2(t+t_0)}a\cos(k\cdot x),
+\qquad p(x,t)=0,
+$$
+
+for $t_0>0$. This is a smooth divergence-free Navier-Stokes solution because
+
+$$
+(u_A\cdot\nabla)u_A=0,
+\qquad
+\partial_tu_A-\nu\Delta u_A=0.
+$$
+
+Every quadratic Fourier interaction vanishes: each factor contains the
+polarization contraction $a\cdot k=0$. Therefore every nonlinear shell flux
+and every strict bad-event indicator based only on that flux is zero, with no
+pressure remainder.
+
+Nevertheless, take a parabolic cylinder centered where $\cos(k\cdot x)$ is
+near one and choose $|k|r\leq 1/3$. Its scale-invariant cubic velocity
+quantity obeys
+
+$$
+r^{-2}\iint_{Q_r}|u_A|^3
+\geq c\,(Ar)^3
+$$
+
+for a fixed $c>0$. Choosing $Ar$ sufficiently large violates the CKN
+smallness threshold while the flux-indicator measure and pressure defect stay
+zero. Thus a zero-bad-flux condition alone cannot imply the CKN epsilon
+criterion. This refutes only the flux-only bridge; it does not refute a future
+defect functional that explicitly controls absolute velocity, pressure, and
+localization errors.

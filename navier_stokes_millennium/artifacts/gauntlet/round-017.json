@@ -1,0 +1,69 @@
+{
+  "schema_version": 2,
+  "round_id": "round-017",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "4a82a44c76c0d94c13282d163ed655cbfad96df58364bd69e55f55f6dd0a930b",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-017-claims.json",
+  "claims_snapshot_sha256": "4a82a44c76c0d94c13282d163ed655cbfad96df58364bd69e55f55f6dd0a930b",
+  "previous_round": "artifacts/gauntlet/round-016.json",
+  "previous_round_sha256": "2448790dab03c5afc8080008f171fb255ddbbe3dd1a7b252ba8f9c8c037ea7ba",
+  "post_repair_claims_sha256": "4a82a44c76c0d94c13282d163ed655cbfad96df58364bd69e55f55f6dd0a930b",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "9acd0abbd99efe1b31650d420e1c9acfcc955c4e4c2b1bdc072f8972c96fe157",
+  "reviewers": [
+    "expensive-agent: phase-space packing attack",
+    "expensive-agent: critical L3 route attack",
+    "expensive-agent: pressure counterexample search",
+    "expensive-agent: cross-field proof search"
+  ],
+  "findings": [
+    {
+      "id": "R17-001",
+      "fingerprint": "flux-only-ckn-bridge-refuted",
+      "disposition": "valid",
+      "finding": "Zero nonlinear bad-event flux and zero pressure defect do not imply the CKN cubic smallness criterion.",
+      "repair": "Added the smooth periodic shear-flow counterexample and canonical refuted claim FREQ-FLUX-CKN."
+    },
+    {
+      "id": "R17-002",
+      "fingerprint": "phase-space-proposition-underdefined",
+      "disposition": "valid",
+      "finding": "The broader phase-space route remains underdefined: weight, stopping family, defect, scale coupling, and quantitative conclusion are not fixed.",
+      "repair": "Kept FREQ-PHASESPACE blocked and documented that any surviving defect must control absolute velocity and pressure, not only bad-event occupancy."
+    },
+    {
+      "id": "R17-003",
+      "fingerprint": "critical-l3-unresolved",
+      "disposition": "valid",
+      "finding": "Independent attacks produced neither a proof nor a valid counterexample to the canonical finite-time critical L3 bound.",
+      "repair": "No status upgrade; CRITICAL-BOUND remains blocked."
+    },
+    {
+      "id": "R17-004",
+      "fingerprint": "pressure-harmonic-tail-unresolved",
+      "disposition": "valid",
+      "finding": "Remote-data harmonic pressure tails and matched-scale cutoff commutators remain uncontrolled for the local bridge.",
+      "repair": "No status upgrade; FREQ-PRESSURE-COMMUTATOR remains blocked."
+    }
+  ],
+  "validation": [
+    "python -m unittest discover -s tests -v (49 tests)",
+    "independent mathematical attacks returned no solid proof of the broader route",
+    "FREQ-FLUX-CKN counterexample is explicit and recorded under docs/proofs",
+    "broader phase-space and critical-L3 claims remain blocked rather than upgraded"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "flux-only-ckn-bridge-refuted",
+    "phase-space-proposition-underdefined",
+    "critical-l3-unresolved",
+    "pressure-harmonic-tail-unresolved"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

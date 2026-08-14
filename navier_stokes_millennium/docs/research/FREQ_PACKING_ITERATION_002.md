@@ -1,6 +1,6 @@
 # Frequency-Packing Iteration 002
 
-**Status:** conjectural; no regularity theorem claimed.
+**Status:** blocked; no regularity theorem claimed.
 
 This iteration follows the first phase-space brainstorm. The time-frequency
 measure from Iteration 001 does not see where in space a bad shell is active.
@@ -21,6 +21,12 @@ $$
 
 The first exact triad refutes pointwise flux absorption, but it does not by
 itself refute a packing statement that allows rare bad events.
+
+The narrower flux-only bridge is now refuted: `FREQ-FLUX-CKN` fails for a
+smooth periodic shear flow with zero nonlinear flux and zero pressure but
+large scale-invariant cubic velocity. Any surviving phase-space defect must
+control absolute velocity and pressure quantities in addition to bad-event
+occupancy.
 
 ## Phase-space candidate
 

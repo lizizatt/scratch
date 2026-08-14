@@ -66,6 +66,7 @@ it; its interpolation line remains supercritical.
 | Route | Disposition | First decisive issue |
 |---|---|---|
 | Universal critical-flux absorption on $\mathbb T^3$ | `refuted` | Exact high-high-to-low influx grows like $A^2$ while low-mode dissipation stays fixed. |
+| Flux-only packing-to-CKN bridge | `refuted` | A smooth periodic shear has zero nonlinear flux and pressure but arbitrarily large scale-invariant cubic velocity. |
 | Shell-time diagonal blowup inference | `refuted` | Values at shell-dependent times do not imply one-time $H^1$ divergence. |
 | Compact centered $L^3$ ancient orbit | `proved`, not new | Albritton-Barker Theorem 1.2 is stronger in the mild ancient class. |
 | Fault-tolerant quorum shell band | `refuted` | Amplitude scaling and a triad crossing an empty band. |
