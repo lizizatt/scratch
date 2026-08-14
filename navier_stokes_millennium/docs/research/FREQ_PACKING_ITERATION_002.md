@@ -118,11 +118,12 @@ probe should:
   pieces, and cutoff commutators separately;
 - refine both Fourier cutoff and spatial partition.
 
-The implementation now has a closed integer Fourier-ball constructor and a
-classical RK4 step for the projected finite ODE. These are probe
-infrastructure only: the tests verify exact small-ball membership, viscous
-single-mode amplification, projection, reality, and active-mode closure, but
-do not compute the phase-space measure, pressure split, cutoff-uniformity
+The implementation now has a closed integer Fourier-ball constructor, a
+ classical RK4 step for the projected finite ODE, and 2pi-periodic-torus spatial
+reconstruction with shell energy density. These are probe infrastructure only:
+the tests verify exact small-ball membership, viscous single-mode
+amplification, projection, reality, active-mode closure, and discrete Parseval,
+but do not compute the phase-space measure, pressure split, cutoff-uniformity
 constant, or packing-to-epsilon bridge.
 
 A violation at finite cutoff falsifies that finite inequality. Passing the probe

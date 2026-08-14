@@ -157,6 +157,34 @@ def rk4_step(
     }
 
 
+def reconstruct_velocity(modes: Modes, point: Sequence[float]) -> Vector:
+    """Evaluate a finite Fourier field on the 2pi-periodic torus."""
+    if len(point) != 3:
+        raise ValueError("point must have three coordinates")
+    value: Vector = _zero_vector()
+    for wavevector, coefficient in modes.items():
+        phase = sum(
+            wavevector[index] * point[index] for index in range(3)
+        )
+        value = _add(value, _scale(complex(math.cos(phase), math.sin(phase)), coefficient))
+    return value
+
+
+def spatial_shell_energy_density(
+    modes: Modes,
+    point: Sequence[float],
+    *,
+    shell: int,
+) -> float:
+    """Return ``0.5 |Delta_shell u(point)|^2`` on the 2pi-periodic torus."""
+    shell_modes = {
+        wavevector: value
+        for wavevector, value in modes.items()
+        if dyadic_shell_index(wavevector) == shell
+    }
+    return 0.5 * _norm_squared(reconstruct_velocity(shell_modes, point))
+
+
 def dyadic_shell_index(wavevector: Wavevector) -> int | None:
     """Return the shell index for ``2**j <= |k| < 2**(j+1)``."""
     frequency = math.sqrt(sum(component * component for component in wavevector))

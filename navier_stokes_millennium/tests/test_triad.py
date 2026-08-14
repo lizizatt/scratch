@@ -1,15 +1,18 @@
 import unittest
+from math import factorial, pi
 
 from ns_millennium.triad import (
     closed_ball_modes,
     convective_mode,
     critical_flux,
+    dyadic_shell_index,
     galerkin_rhs,
     high_high_to_low_fixture,
     leray_project,
     low_h32_dissipation,
     rk4_step,
     shell_observables,
+    spatial_shell_energy_density,
 )
 
 
@@ -162,6 +165,34 @@ class FourierTriadTests(unittest.TestCase):
         )
         self.assertAlmostEqual(updated[wavevector][1].real, expected_factor)
         self.assertAlmostEqual(updated[wavevector][1].imag, 0.0)
+
+    def test_spatial_shell_density_satisfies_discrete_parseval(self) -> None:
+        modes = high_high_to_low_fixture(amplitude=2.0)
+        modes[(8, 0, 0)] = (0j, 1.0 + 0j, 0j)
+        modes[(-8, 0, 0)] = (0j, 1.0 + 0j, 0j)
+        grid_size = 16
+        shell = 2
+        sampled_mean = sum(
+            spatial_shell_energy_density(
+                modes,
+                (
+                    2 * pi * first / grid_size,
+                    2 * pi * second / grid_size,
+                    2 * pi * third / grid_size,
+                ),
+                shell=shell,
+            )
+            for first in range(grid_size)
+            for second in range(grid_size)
+            for third in range(grid_size)
+        ) / grid_size**3
+        modal_energy = 0.5 * sum(
+            sum(abs(component) ** 2 for component in value)
+            for wavevector, value in modes.items()
+            if dyadic_shell_index(wavevector) == shell
+        )
+
+        self.assertAlmostEqual(sampled_mean, modal_energy)
 
     def test_shell_observables_mark_high_amplitude_low_shell_bad(self) -> None:
         modes = high_high_to_low_fixture(amplitude=5.0)

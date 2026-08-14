@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "round_id": "round-015",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-015-claims.json",
+  "claims_snapshot_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "previous_round": "artifacts/gauntlet/round-014.json",
+  "previous_round_sha256": "dd8b24bbffbe443c0a5a594285cf0c2d1fb8cae0ccd4debe8b5b8917285301b2",
+  "post_repair_claims_sha256": "ced5f260fb8e51bfdf0098a7ff28a2209660a42489501424116f09a5e1aee363",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "a5c9d5d557738960d7426ef5c4dde839dbc545e3958102a73e9d05a7b248d5a6",
+  "reviewers": [
+    "expensive-agent: spatial probe numerical review"
+  ],
+  "findings": [
+    {
+      "id": "R15-001",
+      "fingerprint": "spatial-fourier-normalization",
+      "disposition": "valid",
+      "finding": "Spatial reconstruction used a unit-period basis while the existing Galerkin ODE used the 2pi-periodic convention.",
+      "repair": "Changed reconstruction and documentation to the existing 2pi-periodic convention and verified the spatial observable with discrete Parseval."
+    },
+    {
+      "id": "R15-002",
+      "fingerprint": "spatial-shell-parseval-oracle",
+      "disposition": "valid",
+      "finding": "The first shell Parseval test did not reject higher-shell leakage or verify exact shell selection.",
+      "repair": "Added a shell-3 sentinel and computed the modal oracle using exact dyadic shell equality."
+    },
+    {
+      "id": "R15-003",
+      "fingerprint": "spatial-test-count",
+      "disposition": "valid",
+      "finding": "The outcome note reported the pre-spatial-probe test count.",
+      "repair": "Updated the outcome to 34 ledger plus 11 Fourier/Galerkin tests, 45 total."
+    }
+  ],
+  "validation": [
+    "python -m unittest tests.test_triad -v (11 tests)",
+    "editor diagnostics: none",
+    "spatial reconstruction checked against discrete Parseval on a 16^3 2pi-periodic grid",
+    "spatial probe remains non-evidentiary for pressure localization and epsilon regularity"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "spatial-fourier-normalization",
+    "spatial-shell-parseval-oracle",
+    "spatial-test-count"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

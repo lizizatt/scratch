@@ -44,6 +44,10 @@ it; its interpolation line remains supercritical.
   projected ODE probes, with tests for exact small-ball membership, viscous
   amplification, projection, reality, and active-mode closure. These remain
   computational infrastructure, not a regularity argument.
+- Added 2pi-periodic-torus spatial reconstruction and shell energy-density sampling,
+  checked against discrete Parseval. This supplies a spatial observable for
+  future probes but does not provide pressure localization or an epsilon
+  regularity estimate.
 - Rejected the distributed-systems transfer after amplitude scaling and an
   explicit triadic partition counterexample.
 - Determined that compact $L^3$ ancient-orbit rigidity was already implied by
@@ -72,8 +76,8 @@ python -m ns_millennium.ledger artifacts/claims.json
 python -m unittest discover -s tests -v
 ```
 
-The suite contains 34 ledger regressions plus 10 exact Fourier/Galerkin tests
-(44 total).
+The suite contains 34 ledger regressions plus 11 exact Fourier/Galerkin tests
+(45 total).
 Editor diagnostics report no errors.
 
 The phase-space route is explicitly blocked on four named measure,

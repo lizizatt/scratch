@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "head": "artifacts/gauntlet/round-014.json",
+  "head": "artifacts/gauntlet/round-015.json",
   "rounds": [
     {
       "path": "artifacts/gauntlet/round-001.json",
@@ -57,6 +57,10 @@
     {
       "path": "artifacts/gauntlet/round-014.json",
       "sha256": "dd8b24bbffbe443c0a5a594285cf0c2d1fb8cae0ccd4debe8b5b8917285301b2"
+    },
+    {
+      "path": "artifacts/gauntlet/round-015.json",
+      "sha256": "3a45343029c4d60b96f0ecbafb810fb9d89f6c92f233db586fb8515fac7f32d5"
     }
   ]
 }
