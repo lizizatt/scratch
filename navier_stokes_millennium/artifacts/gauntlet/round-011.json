@@ -1,0 +1,37 @@
+{
+  "schema_version": 2,
+  "round_id": "round-011",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "38e04d8d7de4f5abba50508d850bda154756f44f83221220af7255e6ec9e8e39",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-011-claims.json",
+  "claims_snapshot_sha256": "38e04d8d7de4f5abba50508d850bda154756f44f83221220af7255e6ec9e8e39",
+  "previous_round": "artifacts/gauntlet/round-010.json",
+  "previous_round_sha256": "79a967951768f76a0b060b49d8b10e8d8bf9792c1bbff9c405096bb811cc750d",
+  "post_repair_claims_sha256": "38e04d8d7de4f5abba50508d850bda154756f44f83221220af7255e6ec9e8e39",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "1de6751e1c2096995726467c14abc4eea6d300b38d6fd94abb4639304e45688e",
+  "reviewers": [],
+  "findings": [
+    {
+      "id": "R11-001",
+      "fingerprint": "frequency-packing-iteration-001",
+      "disposition": "valid",
+      "finding": "The FREQ-PACKING conjecture was refined into a standard time-scale measure and its computational probe limitations were recorded.",
+      "repair": "Added FREQ_PACKING_ITERATION_001.md, linked the conjecture to it, and split the next work into flux, local bridge, and continuation gates. Fresh review is required."
+    }
+  ],
+  "validation": [
+    "claims snapshot matches canonical claims bytes",
+    "reviewed-tree digest includes the new frequency iteration note",
+    "full ledger/test validation pending fresh frequency review"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "Version-control durability requires explicit user authorization to stage and commit this untracked project."
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
