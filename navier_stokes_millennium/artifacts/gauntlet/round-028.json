@@ -1,0 +1,22 @@
+{
+  "schema_version": 2,
+  "round_id": "round-028",
+  "date": "2026-08-15",
+  "target": "critical-profile-transfer-modalities",
+  "target_claim_id": "CRITICAL-ORBIT-COMPACT",
+  "subject_sha256": "7f80a3989ab7b400c289be3d70a57ad220c8ff2d937ed6771cc719e29d0d213a",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-028-claims.json",
+  "claims_snapshot_sha256": "7f80a3989ab7b400c289be3d70a57ad220c8ff2d937ed6771cc719e29d0d213a",
+  "previous_round": "artifacts/gauntlet/round-027.json",
+  "previous_round_sha256": "f382dab1d82a620e776cf76b3e4f3407cb1d6149303771b91b647f6513ffa53c",
+  "post_repair_claims_sha256": "7f80a3989ab7b400c289be3d70a57ad220c8ff2d937ed6771cc719e29d0d213a",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "a4567c6afadd7a955605c96be353162144867d70a853f7517cae6a8a9e01b99a",
+  "reviewers": ["expensive-agent: orbit compactness iterations 1-3"],
+  "findings": [{"id":"R28-001","fingerprint":"profile-orbit-compactness-blocked","disposition":"valid","finding":"Concentration functions can exclude vanishing but not separated-bubble dichotomy; local energy and pressure bounds do not imply global L3 orbit precompactness.","repair":"Recorded CRITICAL-ORBIT-COMPACT as blocked with the conditional Frechet-Kolmogorov theorem and missing one-bubble hypothesis."}],
+  "validation": ["Three orbit-compactness attacks completed.","Conditional compactness theorem separated from the unavailable Navier-Stokes bridge."],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added","frequency-packing-iteration-001","phase-space-cutoff-uniformity"],
+  "resolved_findings": ["profile-orbit-compactness-blocked"],
+  "result":"stopped_with_blocker",
+  "converged":false
+}

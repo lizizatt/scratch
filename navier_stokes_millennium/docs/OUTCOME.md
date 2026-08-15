@@ -68,6 +68,10 @@ it; its interpolation line remains supercritical.
 - A fresh critical-profile iteration found no proof or admissible counterexample.
   The exact gap is global backward $L^3$ boundedness and pressure/mildness
   control for the ancient profile needed by the Liouville theorem.
+- Three modalities were each tested for three iterations: scale-adapted tail
+  transfer, dynamically recentered orbit compactness, and fixed backward-time
+  selection. Each yielded a conditional sufficient lemma plus an estimate-level
+  obstruction, but none closed the Navier--Stokes-specific implication.
 
 ## Candidate Dispositions
 
@@ -108,6 +112,8 @@ as a whole.
 
 Rounds 18-25 are recorded in
 [`GAUNTLET_ROUNDS_018_025.md`](docs/research/GAUNTLET_ROUNDS_018_025.md).
+The nine profile attacks are recorded in
+[`CRITICAL_PROFILE_ITERATION_002_003.md`](docs/research/CRITICAL_PROFILE_ITERATION_002_003.md).
 
 ## Limits
 

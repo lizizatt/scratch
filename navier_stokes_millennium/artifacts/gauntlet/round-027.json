@@ -1,0 +1,22 @@
+{
+  "schema_version": 2,
+  "round_id": "round-027",
+  "date": "2026-08-15",
+  "target": "critical-profile-transfer-modalities",
+  "target_claim_id": "CRITICAL-TAIL-TRANSFER",
+  "subject_sha256": "7f80a3989ab7b400c289be3d70a57ad220c8ff2d937ed6771cc719e29d0d213a",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-027-claims.json",
+  "claims_snapshot_sha256": "7f80a3989ab7b400c289be3d70a57ad220c8ff2d937ed6771cc719e29d0d213a",
+  "previous_round": "artifacts/gauntlet/round-026.json",
+  "previous_round_sha256": "ce50237fba9b58a3d93ca9024c63055927a75c058c11c46e00567f01f52a420d",
+  "post_repair_claims_sha256": "7f80a3989ab7b400c289be3d70a57ad220c8ff2d937ed6771cc719e29d0d213a",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "a4567c6afadd7a955605c96be353162144867d70a853f7517cae6a8a9e01b99a",
+  "reviewers": ["expensive-agent: tail tightness iterations 1-3"],
+  "findings": [{"id":"R27-001","fingerprint":"profile-tail-transfer-blocked","disposition":"valid","finding":"Fixed physical slices become maximally non-tight after critical zooming; physical moments and energy do not imply scale-adapted rescaled tail bounds.","repair":"Recorded CRITICAL-TAIL-TRANSFER as blocked with the exact scale-adapted weighted condition."}],
+  "validation": ["Three tail attacks completed.","Estimate-level non-tightness distinguished from a PDE counterexample."],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added","frequency-packing-iteration-001","phase-space-cutoff-uniformity"],
+  "resolved_findings": ["profile-tail-transfer-blocked"],
+  "result":"stopped_with_blocker",
+  "converged":false
+}
