@@ -65,6 +65,9 @@ it; its interpolation line remains supercritical.
   smallness, the CLMS suitability transfer, finite-probe-to-PDE uniformity,
   and the occupancy-only packing-to-CKN bridge. The broader claims remain
   blocked.
+- A fresh critical-profile iteration found no proof or admissible counterexample.
+  The exact gap is global backward $L^3$ boundedness and pressure/mildness
+  control for the ancient profile needed by the Liouville theorem.
 
 ## Candidate Dispositions
 
@@ -77,6 +80,7 @@ it; its interpolation line remains supercritical.
 | Fault-tolerant quorum shell band | `refuted` | Amplitude scaling and a triad crossing an empty band. |
 | Exact synchronized cascade | `blocked` | No derived phase-locking, sign-definite transfer, or persistence estimate for the exact operator. |
 | Critical $L^3$ a priori bound | `blocked` | This is the central open estimate. |
+| Critical ancient-profile bridge | `blocked` | Rescaling gives local ancient limits, not the backward $L^3$ sequence required by Liouville rigidity. |
 | Naive $r_Q^{-1}$ cube measure | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
 | Local-only harmonic pressure control | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
 | Matched-scale commutator smallness | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |

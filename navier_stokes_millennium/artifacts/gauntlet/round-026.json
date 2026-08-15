@@ -1,0 +1,54 @@
+{
+  "schema_version": 2,
+  "round_id": "round-026",
+  "date": "2026-08-15",
+  "target": "critical-profile-bridge",
+  "target_claim_id": "CRITICAL-PROFILE-GAP",
+  "subject_sha256": "96d5f9094db91ee1a0592594e8510318bcd6446a50f7d806d726965afe6d3140",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-026-claims.json",
+  "claims_snapshot_sha256": "96d5f9094db91ee1a0592594e8510318bcd6446a50f7d806d726965afe6d3140",
+  "previous_round": "artifacts/gauntlet/round-025.json",
+  "previous_round_sha256": "d8c6553f5d5601d91ab2e900cc0fd529d6eaa376b5561ca62006340dcb9e5add",
+  "post_repair_claims_sha256": "96d5f9094db91ee1a0592594e8510318bcd6446a50f7d806d726965afe6d3140",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "bdd95854916b0b987c69977c1359ac619302297371b0601d654fb82162c09318",
+  "reviewers": [
+    "expensive-agent: Liouville theorem scope",
+    "expensive-agent: minimal profile route",
+    "expensive-agent: profile compactness attack",
+    "expensive-agent: final profile verdict"
+  ],
+  "findings": [
+    {
+      "id": "R26-001",
+      "fingerprint": "critical-profile-backward-l3-gap",
+      "disposition": "valid",
+      "finding": "Blowup rescaling can yield a local nonzero ancient profile, but does not supply the globally bounded strong L3 sequence at backward times required by the recorded Liouville theorem.",
+      "repair": "Added CRITICAL_PROFILE_ITERATION_001.md and canonical blocked claim CRITICAL-PROFILE-GAP; retained CRITICAL-BOUND as blocked."
+    },
+    {
+      "id": "R26-002",
+      "fingerprint": "critical-profile-pressure-mildness",
+      "disposition": "valid",
+      "finding": "Pressure-tail control, global Duhamel mildness, and nontrivial global profile compactness are not established by local rescaling alone.",
+      "repair": "Named these as remaining obligations in the profile note; no theorem status upgrade was made."
+    }
+  ],
+  "validation": [
+    "python -m unittest discover -s tests -v (49 tests)",
+    "independent profile attacks returned BLOCKED, not SOLID PROOF or SOLID DISPROOF",
+    "Liouville theorem hypothesis matching checked against the recorded source audit",
+    "critical-profile research note and claim anchor validated"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "critical-profile-backward-l3-gap",
+    "critical-profile-pressure-mildness"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
