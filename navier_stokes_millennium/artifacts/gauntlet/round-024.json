@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "round_id": "round-024",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-024-claims.json",
+  "claims_snapshot_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "previous_round": "artifacts/gauntlet/round-023.json",
+  "previous_round_sha256": "ee1f7f2f92a728fda6c8d1d7bebf5d0b45a207c350d32f99cc3b9f49b2810ce5",
+  "post_repair_claims_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "cc7ee2041ab8dcc4d8258ede21ba023594bde4e4da039ce50a74ef51d5bb12f9",
+  "reviewers": ["expensive-agent: packing-to-CKN bridge"],
+  "findings": [{"id":"R24-001","fingerprint":"comparable-packing-ckn","disposition":"valid","finding":"Small bad-event packing plus bounded local energy and pressure does not force a centered or comparable-scale CKN cylinder.","repair":"Added FREQ-PACKING-EPSILON-COMPARABLE as refuted; a coercive absolute-velocity term remains necessary."}],
+  "validation": ["Exact matched-scale shear gives zero flux and pressure defect but arbitrarily large CKN cubic quantity.","The unrestricted arbitrarily tiny subcylinder implication was distinguished as vacuous for smooth fields."],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added","frequency-packing-iteration-001","phase-space-cutoff-uniformity"],
+  "resolved_findings": ["comparable-packing-ckn"],
+  "result":"stopped_with_blocker",
+  "converged":false
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "round_id": "round-019",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-019-claims.json",
+  "claims_snapshot_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "previous_round": "artifacts/gauntlet/round-018.json",
+  "previous_round_sha256": "2cb02c7d9edf409dfb3c3cb8f1e5ec0cf98e3af703f4c7a7b3ad6e32a8416856",
+  "post_repair_claims_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "cc7ee2041ab8dcc4d8258ede21ba023594bde4e4da039ce50a74ef51d5bb12f9",
+  "reviewers": ["expensive-agent: harmonic pressure tail"],
+  "findings": [{"id":"R19-001","fingerprint":"local-pressure-tail","disposition":"valid","finding":"A remote divergence-free packet can vanish on the observation ball while producing a nonzero mean-free harmonic pressure gradient there.","repair":"Added FREQ-PRESSURE-LOCAL as refuted; broader pressure/commutator obligation remains blocked."}],
+  "validation": ["Explicit translated-packet pressure kernel expansion.","Local-only control was refuted without claiming a full Navier-Stokes pressure theorem is impossible."],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added","frequency-packing-iteration-001","phase-space-cutoff-uniformity"],
+  "resolved_findings": ["local-pressure-tail"],
+  "result":"stopped_with_blocker",
+  "converged":false
+}

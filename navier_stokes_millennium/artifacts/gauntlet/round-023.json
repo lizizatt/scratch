@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "round_id": "round-023",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-023-claims.json",
+  "claims_snapshot_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "previous_round": "artifacts/gauntlet/round-022.json",
+  "previous_round_sha256": "977f48b4541ce156840050549d218677d1e26bb0067c4a3594c972ae73ee3786",
+  "post_repair_claims_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "cc7ee2041ab8dcc4d8258ede21ba023594bde4e4da039ce50a74ef51d5bb12f9",
+  "reviewers": ["expensive-agent: Galerkin uniformity"],
+  "findings": [{"id":"R23-001","fingerprint":"galerkin-uniform-transfer","disposition":"valid","finding":"Finite zero-flux observations do not by themselves provide compactness, suitability, nonlinear identification, or a CKN limit conclusion.","repair":"Added FREQ-GALERKIN-UNIFORM as refuted; FREQ-PACKING-UNIFORM remains blocked for a stronger quantified theorem."}],
+  "validation": ["High-frequency and concentrating exact shears provide the finite-probe obstruction.","Required fixed-data and local-energy residual hypotheses were listed."],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added","frequency-packing-iteration-001","phase-space-cutoff-uniformity"],
+  "resolved_findings": ["galerkin-uniform-transfer"],
+  "result":"stopped_with_blocker",
+  "converged":false
+}

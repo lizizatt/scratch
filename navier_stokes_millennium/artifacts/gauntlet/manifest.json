@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "head": "artifacts/gauntlet/round-017.json",
+  "head": "artifacts/gauntlet/round-025.json",
   "rounds": [
     {
       "path": "artifacts/gauntlet/round-001.json",
@@ -69,6 +69,38 @@
     {
       "path": "artifacts/gauntlet/round-017.json",
       "sha256": "acb419e3776320029f41222112ea70894525e85a275b737a3066dead3c6a3b42"
+    },
+    {
+      "path": "artifacts/gauntlet/round-018.json",
+      "sha256": "2cb02c7d9edf409dfb3c3cb8f1e5ec0cf98e3af703f4c7a7b3ad6e32a8416856"
+    },
+    {
+      "path": "artifacts/gauntlet/round-019.json",
+      "sha256": "ff4fe66cdeefbdeb44a703e81dcc25da6111759a7c1c592bf4c14f8567119361"
+    },
+    {
+      "path": "artifacts/gauntlet/round-020.json",
+      "sha256": "6426c4a5e3a3a1c543a804405eb75a4e4629d6316b2fa8111dc5c507caac9cd6"
+    },
+    {
+      "path": "artifacts/gauntlet/round-021.json",
+      "sha256": "3a0a4acddbc7e86678ed37b2a2bb670bc735789ff4b7fbb51bacaa3a566d8ad2"
+    },
+    {
+      "path": "artifacts/gauntlet/round-022.json",
+      "sha256": "977f48b4541ce156840050549d218677d1e26bb0067c4a3594c972ae73ee3786"
+    },
+    {
+      "path": "artifacts/gauntlet/round-023.json",
+      "sha256": "ee1f7f2f92a728fda6c8d1d7bebf5d0b45a207c350d32f99cc3b9f49b2810ce5"
+    },
+    {
+      "path": "artifacts/gauntlet/round-024.json",
+      "sha256": "44e191d5232ae8d116dc4e6bd044c776f8b78e46474db8ce1392f956c4a69b65"
+    },
+    {
+      "path": "artifacts/gauntlet/round-025.json",
+      "sha256": "d8c6553f5d5601d91ab2e900cc0fd529d6eaa376b5561ca62006340dcb9e5add"
     }
   ]
 }

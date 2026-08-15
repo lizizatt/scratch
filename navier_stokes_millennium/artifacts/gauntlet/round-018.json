@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "round_id": "round-018",
+  "date": "2026-08-14",
+  "target": "entire navier_stokes_millennium research program",
+  "subject_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-018-claims.json",
+  "claims_snapshot_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "previous_round": "artifacts/gauntlet/round-017.json",
+  "previous_round_sha256": "acb419e3776320029f41222112ea70894525e85a275b737a3066dead3c6a3b42",
+  "post_repair_claims_sha256": "06e77b4360ac4b53df1c08e0561a44f676488faca492b60d79ba721cab57609c",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "cc7ee2041ab8dcc4d8258ede21ba023594bde4e4da039ce50a74ef51d5bb12f9",
+  "reviewers": ["expensive-agent: naive measure geometry"],
+  "findings": [{"id":"R18-001","fingerprint":"naive-measure-geometry","disposition":"valid","finding":"Unit spatial atoms with w(Q,j)=r_Q^-1 and unrestricted overlapping generations have an unbounded Carleson ratio on a matched binary tree.","repair":"Added FREQ-NAIVE-MEASURE as refuted; broader measure obligation remains blocked."}],
+  "validation": ["Explicit binary stopping-tree calculation: depth N contributes (N+1)R.","No claim that every possible stopping-tree measure is refuted."],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added","frequency-packing-iteration-001","phase-space-cutoff-uniformity"],
+  "resolved_findings": ["naive-measure-geometry"],
+  "result":"stopped_with_blocker",
+  "converged":false
+}
