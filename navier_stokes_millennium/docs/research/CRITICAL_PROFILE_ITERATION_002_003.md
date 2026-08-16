@@ -105,3 +105,22 @@ $$
 The profile route remains blocked by global $L^3$ tightness, one-bubble orbit
 compactness, pressure/mildness passage, and backward time selection. No
 admissible finite-time singular solution was found.
+
+## New conditional route
+
+The failed global-tail requirement can be replaced by a fixed-radius local
+critical bound:
+
+$$
+\operatorname*{ess\ sup}_{T-\delta<t<T}\sup_a
+\int_{B_R(a)}|u(x,t)|^3dx<\infty.
+$$
+
+KNSS record-point rescaling plus the local bound gives a global $L^3$ bound
+for every fixed backward time of the ancient limit, because every fixed
+rescaled ball corresponds to a physical ball of radius $Lr_n<R$. The
+Albritton--Barker theorem then contradicts the nonzero profile. This argument
+is recorded as proved `LOCAL-L3-CONTINUATION` with a complete proof artifact.
+
+The new unresolved question is narrower and more concrete: derive this
+uniform-over-centers local $L^3$ bound from the smooth finite-energy hypotheses.

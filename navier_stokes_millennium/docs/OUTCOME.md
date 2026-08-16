@@ -72,6 +72,10 @@ it; its interpolation line remains supercritical.
   transfer, dynamically recentered orbit compactness, and fixed backward-time
   selection. Each yielded a conditional sufficient lemma plus an estimate-level
   obstruction, but none closed the Navier--Stokes-specific implication.
+- Proved `LOCAL-L3-CONTINUATION`: a fixed-radius local $L^3$ bound uniform over
+  all spatial centers near a finite endpoint yields a bounded ancient profile
+  by KNSS rescaling and contradicts Albritton--Barker rigidity. The new open
+  estimate is deriving that local bound from smooth finite-energy data.
 
 ## Candidate Dispositions
 
@@ -85,6 +89,7 @@ it; its interpolation line remains supercritical.
 | Exact synchronized cascade | `blocked` | No derived phase-locking, sign-definite transfer, or persistence estimate for the exact operator. |
 | Critical $L^3$ a priori bound | `blocked` | This is the central open estimate. |
 | Critical ancient-profile bridge | `blocked` | Rescaling gives local ancient limits, not the backward $L^3$ sequence required by Liouville rigidity. |
+| Uniform local $L^3$ continuation criterion | `proved` | KNSS record-point rescaling plus local control yields a globally $L^3$-bounded ancient profile; deriving the local control remains open. |
 | Naive $r_Q^{-1}$ cube measure | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
 | Local-only harmonic pressure control | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
 | Matched-scale commutator smallness | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |

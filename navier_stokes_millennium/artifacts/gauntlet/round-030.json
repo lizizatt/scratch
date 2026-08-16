@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "round_id": "round-030",
+  "date": "2026-08-16",
+  "target": "local-critical-continuation-criterion",
+  "target_claim_id": "LOCAL-L3-CONTINUATION",
+  "subject_sha256": "4fbdb5a9789a8ef2c9f938a31e902ecf94e4ee7399d52a1ca1c09cc6cad3fdba",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-030-claims.json",
+  "claims_snapshot_sha256": "4fbdb5a9789a8ef2c9f938a31e902ecf94e4ee7399d52a1ca1c09cc6cad3fdba",
+  "previous_round": "artifacts/gauntlet/round-029.json",
+  "previous_round_sha256": "7bedff555196925eed5478effffae810d8006d623b27e5a7f3dad7ef8b236bef",
+  "post_repair_claims_sha256": "4fbdb5a9789a8ef2c9f938a31e902ecf94e4ee7399d52a1ca1c09cc6cad3fdba",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "958038432e8153aeeb30fda11bd61aacb75bc7ca08cad3ec5af3e42fa7a4144b",
+  "reviewers": [
+    "expensive-agent: local Morrey bridge verification",
+    "expensive-agent: alternative critical norm review"
+  ],
+  "findings": [
+    {
+      "id": "R30-001",
+      "fingerprint": "local-l3-continuation-proved",
+      "disposition": "valid",
+      "finding": "A fixed-radius local L3 bound uniform over all spatial centers near a finite endpoint transfers through KNSS record-point rescaling to a globally L3-bounded ancient profile, contradicting Albritton-Barker rigidity.",
+      "repair": "Added proof artifact LOCAL_L3_CONTINUATION.md and proved claim LOCAL-L3-CONTINUATION."
+    },
+    {
+      "id": "R30-002",
+      "fingerprint": "local-l3-estimate-open",
+      "disposition": "valid",
+      "finding": "The conditional criterion does not derive its uniform local L3 hypothesis from finite-energy data; bounded Morrey quantities alone also do not imply CKN smallness.",
+      "repair": "Kept CRITICAL-BOUND and the local estimate derivation blocked; recorded the conditional theorem as a narrower positive route."
+    },
+    {
+      "id": "R30-003",
+      "fingerprint": "critical-norm-alternatives-blocked",
+      "disposition": "valid",
+      "finding": "Weak-L3, Besov, BMO^{-1}, and bounded critical Morrey alternatives provide conditional or finite-q results but no unconditional replacement for CRITICAL-BOUND.",
+      "repair": "Preserved the central blocker and documented the exact large-data or endpoint gaps."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (49 tests)",
+    "LOCAL_L3_CONTINUATION proof artifact resolves under docs/proofs",
+    "KNSS record-profile and Albritton-Barker dependencies are established in the ledger"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "local-l3-continuation-proved",
+    "local-l3-estimate-open",
+    "critical-norm-alternatives-blocked"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
