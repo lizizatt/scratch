@@ -26,6 +26,18 @@ Research notes, proof obligations, and gauntlet prompts will live under
 The current result and stopping condition are recorded in
 [`docs/OUTCOME.md`](docs/OUTCOME.md).
 
+## Current status (2026-08-17)
+
+The problem remains open. Thirty-one adversarial gauntlet rounds have
+attacked frequency-packing, phase-space, and critical-profile routes; several
+narrow sub-claims were refuted with explicit counterexamples, and one
+conditional theorem, `LOCAL-L3-CONTINUATION`
+([proof](docs/proofs/LOCAL_L3_CONTINUATION.md)), was proved: a local,
+fixed-radius uniform $L^3$ bound near a hypothetical singular time already
+rules out that singularity. Deriving that local bound from finite-energy data
+remains the open step; see [`docs/OUTCOME.md`](docs/OUTCOME.md) for the full
+candidate-disposition table and gauntlet history.
+
 ## Resolution standard
 
 An internal candidate may be called `proved` only when every dependency is

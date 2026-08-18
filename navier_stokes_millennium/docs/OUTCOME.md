@@ -1,16 +1,18 @@
 # Research Outcome
 
-**Date:** 2026-08-14
+**Date:** 2026-08-17
 **Mathematical status:** `blocked`
 **Millennium problem status:** unsolved
 
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. Six
-adversarial review rounds plus one administrative rebaseline produced valid corrections to the literature record,
-mathematical claims, and audit tooling. No round produced a candidate proof
-whose dependency closure was settled.
+three-dimensional incompressible Navier-Stokes Millennium problem. Thirty-one
+adversarial gauntlet rounds have been recorded, spanning literature
+synthesis, exact finite-mode computation, frequency/phase-space packing,
+critical-profile compactness, and a proved conditional continuation
+criterion. No round produced a candidate proof whose dependency closure was
+settled.
 
 The shortest positive route remains
 
@@ -24,6 +26,17 @@ The missing implication is canonical claim `CRITICAL-BOUND`: prove the boxed
 critical estimate for every Fefferman-admissible smooth datum if its maximal
 smooth lifespan has a finite endpoint. The energy inequality does not supply
 it; its interpolation line remains supercritical.
+
+The most significant refinement of that route is the proved conditional
+theorem `LOCAL-L3-CONTINUATION` (see [`docs/proofs/LOCAL_L3_CONTINUATION.md`](proofs/LOCAL_L3_CONTINUATION.md)):
+replacing the global bound above with a *local, fixed-radius* $L^3$ bound
+uniform over all spatial centers near a finite endpoint is already sufficient,
+via KNSS record-point rescaling and Albritton-Barker rigidity, to rule out
+that endpoint. Two natural derivation routes for that local bound (energy plus
+Serrin interpolation, and CKN singular-set smallness) have since been
+rigorously ruled out at the estimate level. The genuinely open step is now a
+single, sharply stated local anti-concentration estimate rather than the
+original diffuse global bound.
 
 ## Work Completed
 
@@ -121,6 +134,11 @@ Rounds 18-25 are recorded in
 [`GAUNTLET_ROUNDS_018_025.md`](docs/research/GAUNTLET_ROUNDS_018_025.md).
 The nine profile attacks are recorded in
 [`CRITICAL_PROFILE_ITERATION_002_003.md`](docs/research/CRITICAL_PROFILE_ITERATION_002_003.md).
+Rounds 26-31 (the critical-profile gap, the three transfer modalities, the
+proved local continuation criterion, and the two refuted derivation routes
+for its hypothesis) are recorded individually under
+[`artifacts/gauntlet/`](../artifacts/gauntlet/), with full immutable
+claim snapshots and hash chaining back to round 1.
 
 ## Limits
 

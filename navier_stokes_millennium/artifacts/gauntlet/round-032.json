@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "round_id": "round-032",
+  "date": "2026-08-17",
+  "target": "documentation-synchronization",
+  "target_claim_id": "ROUND-025-CLOSURE",
+  "subject_sha256": "181dacebfd6c0028d580199296d931220dc31514bd03c1c57f2d82410f2282ed",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-032-claims.json",
+  "claims_snapshot_sha256": "181dacebfd6c0028d580199296d931220dc31514bd03c1c57f2d82410f2282ed",
+  "previous_round": "artifacts/gauntlet/round-031.json",
+  "previous_round_sha256": "b0b41eb16b927a5094e1c614b81f6f58ef2f7ccdb84e922f81f1d79e446895f9",
+  "post_repair_claims_sha256": "181dacebfd6c0028d580199296d931220dc31514bd03c1c57f2d82410f2282ed",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "5bb8e0ecc6e093ee317e2de19aea2fafba6ee0c5bbe47bad26f20527ca8106eb",
+  "reviewers": ["user-directed documentation synchronization"],
+  "findings": [
+    {
+      "id": "R32-001",
+      "fingerprint": "outcome-summary-stale-round-count",
+      "disposition": "valid",
+      "finding": "README.md and docs/OUTCOME.md described only the first six adversarial rounds and did not reflect the proved LOCAL-L3-CONTINUATION theorem or rounds 26-31.",
+      "repair": "Rewrote the OUTCOME.md result summary and gauntlet pointers, and added a Current status section to README.md summarizing the proved conditional criterion and open local-bound estimate."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (49 tests)",
+    "claims.json unchanged (documentation-only round); reviewed-tree hash rebaselined for README.md and docs/OUTCOME.md edits"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "outcome-summary-stale-round-count"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
