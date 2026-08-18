@@ -63,6 +63,61 @@ requires smooth rapidly decreasing data and force and the nonexistence of any
 accepted global smooth solution. Failing both the force hypothesis and the
 logical conclusion refutes the implication from that theorem to Clay C.
 
+## Energy interpolation does not give a uniform local L3 bound
+
+Let $\phi\in C_c^\infty(B_1;\mathbb R^3)$ be nonzero and divergence-free,
+let $\kappa=12\nu\|\nabla\phi\|_2^2/\|\phi\|_2^2$, and set
+$\rho(t)=\sqrt{\kappa(T-t)}$. Define
+
+$$
+w(x,t)=A\,\rho(t)^{-4/3}\,\phi(x/\rho(t)).
+$$
+
+The choice of $\kappa$ makes $w$ satisfy the exact scalar energy identity
+$\tfrac12\tfrac d{dt}\|w(t)\|_2^2+\nu\|\nabla w(t)\|_2^2=0$, so
+$m_R(t):=\sup_a\int_{B_R(a)}|w|^3\in L^{4/3}(0,T)$, matching the bound that
+energy plus Serrin interpolation actually supplies. Nevertheless, once
+$\rho(t)<R$,
+
+$$
+m_R(t)\ge\int_{B_R}|w|^3=A^3\|\phi\|_3^3\,\rho(t)^{-1}\to\infty
+\qquad(t\uparrow T).
+$$
+
+Thus $m_R\in L^{4/3}_t$ but $m_R\notin L^\infty_t$: the exact energy law is
+compatible with an unbounded local $L^3$ mass at every fixed radius near $T$.
+This field is not asserted to solve the full Navier-Stokes system; it refutes
+only the inference from the energy inequality and Serrin-type interpolation to
+the local $L^3$ hypothesis of `LOCAL-L3-CONTINUATION`
+(`docs/proofs/LOCAL_L3_CONTINUATION.md`).
+
+## CKN singular-set smallness does not give a uniform local L3 bound
+
+Let $\phi\in C_c^\infty(B_1;\mathbb R^3)$ be nonzero, divergence-free, with
+$\phi(0)\neq0$, and set $\tau=T-t$, $\ell(t)=c\sqrt\tau$ for
+$c^2\ge8\|\nabla\phi\|_2^2/\|\phi\|_2^2$. Define
+
+$$
+w(x,t)=\ell(t)^{-5/4}\phi(x/\ell(t)).
+$$
+
+Then $w\in L^\infty_tL^2_x\cap L^2_t\dot H^1_x$ and satisfies the scalar
+energy inequality $\tfrac d{dt}\|w(t)\|_2^2+2\|\nabla w(t)\|_2^2\le0$. Its
+terminal singular set at $t=T$ is the single point $x=0$, so it has zero
+$\mathcal H^1$ measure, matching CKN's partial-regularity conclusion.
+Nevertheless, for every fixed $R,\delta>0$,
+
+$$
+\operatorname*{ess\ sup}_{T-\delta<t<T}\int_{B_R(0)}|w(x,t)|^3\,dx=\infty,
+$$
+
+and the CKN cubic quantity centered at the singular point diverges,
+$\rho^{-2}\iint_{Q_\rho(0,T)}|w|^3\gtrsim\rho^{-3/4}\to\infty$. Thus
+Hausdorff-measure-zero singular-set geometry is fully compatible with an
+unbounded local $L^3$ mass exactly at the singular center. This refutes the
+inference from CKN singular-set finiteness to the local $L^3$ hypothesis of
+`LOCAL-L3-CONTINUATION`, not a Navier-Stokes solution.
+
 ## Zero nonlinear flux does not imply CKN smallness
 
 On the three-torus, choose $a,k\in\mathbb R^3$ with $a\cdot k=0$, $|a|=1$,

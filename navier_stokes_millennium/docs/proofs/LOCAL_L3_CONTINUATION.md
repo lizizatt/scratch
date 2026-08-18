@@ -67,3 +67,12 @@ no independent global pressure-tail estimate is needed for this conditional
 criterion. The criterion is not a CKN smallness statement: boundedness of
 $M_R$ supplies a Liouville contradiction after rescaling rather than direct
 one-scale epsilon smallness.
+
+Two natural derivation routes for $M_R<\infty$ are ruled out at the estimate
+level in `docs/proofs/COUNTEREXAMPLES.md`: the energy inequality plus
+Serrin-type interpolation gives only $m_R\in L^{4/3}_t$, not
+$L^\infty_t$, and CKN singular-set smallness is compatible with unbounded
+local $L^3$ mass concentrated exactly at a singular point. Neither
+counterexample is a Navier-Stokes solution; both target only the inferred
+estimate. The uniform local $L^3$ bound therefore remains an open,
+genuinely new proof obligation.

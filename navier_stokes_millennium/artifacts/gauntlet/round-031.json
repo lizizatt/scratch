@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "round_id": "round-031",
+  "date": "2026-08-17",
+  "target": "local-critical-continuation-criterion",
+  "target_claim_id": "LOCAL-L3-CONTINUATION",
+  "subject_sha256": "181dacebfd6c0028d580199296d931220dc31514bd03c1c57f2d82410f2282ed",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-031-claims.json",
+  "claims_snapshot_sha256": "181dacebfd6c0028d580199296d931220dc31514bd03c1c57f2d82410f2282ed",
+  "previous_round": "artifacts/gauntlet/round-030.json",
+  "previous_round_sha256": "4545c3d4930c32496b481d7e63bccd0d78725f907be26277c0e1afa3064193ec",
+  "post_repair_claims_sha256": "181dacebfd6c0028d580199296d931220dc31514bd03c1c57f2d82410f2282ed",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "2fc1b767026e31bb1a580ed076faada06dec7a0337f6c2f76510d9d861e3e9dd",
+  "reviewers": [
+    "expensive-agent: energy/Serrin derivation attack",
+    "expensive-agent: CKN singular-set derivation attack"
+  ],
+  "findings": [
+    {
+      "id": "R31-001",
+      "fingerprint": "local-l3-from-energy-refuted",
+      "disposition": "valid",
+      "finding": "Energy plus Serrin-type interpolation gives only m_R in L^4/3 of time; a self-similar concentrating scalar field with the exact energy identity has m_R diverging pointwise as t approaches T.",
+      "repair": "Added counterexample and refuted claim LOCAL-L3-FROM-ENERGY."
+    },
+    {
+      "id": "R31-002",
+      "fingerprint": "local-l3-from-ckn-refuted",
+      "disposition": "valid",
+      "finding": "CKN singular-set Hausdorff-measure-zero geometry is compatible with unbounded local L3 mass concentrated exactly at the singular point.",
+      "repair": "Added counterexample and refuted claim LOCAL-L3-FROM-CKN."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (49 tests)",
+    "Both counterexamples verified as exact energy-consistent scalar concentrating fields, not asserted Navier-Stokes singularities",
+    "LOCAL-L3-CONTINUATION theorem itself remains unaffected; only two derivation routes for its hypothesis are closed"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "local-l3-from-energy-refuted",
+    "local-l3-from-ckn-refuted"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
