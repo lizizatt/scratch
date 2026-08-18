@@ -383,6 +383,85 @@ class ValidateLedgerTests(unittest.TestCase):
             any(error.startswith("candidate.status must be") for error in errors)
         )
 
+    def test_documented_status_check_tolerates_unhashable_status(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "docs").mkdir()
+            (root / "docs" / "report.md").write_text(
+                "| ID | Status |\n|---|---|\n| PR-999 | `blocked` |\n",
+                encoding="utf-8",
+            )
+            malformed = claim("PR-999")
+            malformed["status"] = ["blocked"]
+
+            errors = validate_ledger(
+                {"schema_version": 1, "claims": [malformed]}, root=root
+            )
+
+        self.assertTrue(
+            any(
+                error.startswith("documented status mismatch for PR-999")
+                for error in errors
+            )
+        )
+
+    def test_manifest_tolerates_malformed_entries_without_crashing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            gauntlet = root / "artifacts" / "gauntlet"
+            gauntlet.mkdir(parents=True)
+            round_path = gauntlet / "round-001.json"
+            round_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "round_id": "round-001",
+                        "date": "2026-08-17",
+                        "target": "whole program",
+                        "reviewers": [],
+                        "findings": [],
+                        "validation": [],
+                        "unresolved_valid_findings": [],
+                        "resolved_findings": [],
+                        "result": "stopped_with_blocker",
+                        "converged": False,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            digest = __import__("hashlib").sha256(round_path.read_bytes()).hexdigest()
+            (gauntlet / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "head": "artifacts/gauntlet/round-001.json",
+                        "rounds": [
+                            None,
+                            "not-an-object",
+                            {
+                                "path": "artifacts/gauntlet/round-001.json",
+                                "sha256": digest,
+                            },
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            errors = _validate_gauntlet_manifest(root)
+
+        self.assertTrue(
+            any("must be an object" in error for error in errors),
+            errors,
+        )
+        self.assertTrue(
+            any(
+                "does not list every round exactly once" in error
+                for error in errors
+            ),
+            errors,
+        )
+
     def test_rootless_full_validation_is_explicitly_incomplete(self) -> None:
         errors = validate_ledger(
             {"schema_version": 1, "claims": [claim("candidate", status="proved")]}

@@ -1,0 +1,97 @@
+{
+  "schema_version": 2,
+  "round_id": "round-033",
+  "date": "2026-08-17",
+  "target": "fan-out-adversarial-validation",
+  "target_claim_id": "ROUND-025-CLOSURE",
+  "subject_sha256": "06834eeed666f9910db8dc0bb0f4d3394370f7023dbe296e5a38e4e7fa5afaf6",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-033-claims.json",
+  "claims_snapshot_sha256": "06834eeed666f9910db8dc0bb0f4d3394370f7023dbe296e5a38e4e7fa5afaf6",
+  "previous_round": "artifacts/gauntlet/round-032.json",
+  "previous_round_sha256": "3ca50df484868ee5dace17cbe9d892100255f48a1cbbfef0911f052b9666752a",
+  "post_repair_claims_sha256": "06834eeed666f9910db8dc0bb0f4d3394370f7023dbe296e5a38e4e7fa5afaf6",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "f31fb93b76ad07101022855b50279e3461d1a8beca9e389969e67d758dbbba1c",
+  "reviewers": [
+    "expensive-agent: validate LOCAL-L3-CONTINUATION proof",
+    "expensive-agent: validate two new counterexamples",
+    "expensive-agent: validate ledger structural integrity",
+    "expensive-agent: validate gauntlet hash chain",
+    "expensive-agent: validate code/tests against claims",
+    "expensive-agent: validate documentation accuracy"
+  ],
+  "findings": [
+    {
+      "id": "R33-001",
+      "fingerprint": "local-l3-continuation-esssup-gap",
+      "disposition": "valid",
+      "finding": "The LOCAL_L3_CONTINUATION.md proof applied the ess-sup bound M_R at specific selected times without justifying the upgrade from an almost-everywhere bound to a bound at those exact times.",
+      "repair": "Added the lower-semicontinuity argument (G(t) as a supremum of continuous functions) upgrading the ess-sup hypothesis to a pointwise bound at every t in (T-delta,T)."
+    },
+    {
+      "id": "R33-002",
+      "fingerprint": "ledger-validator-unhashable-status-crash",
+      "disposition": "valid",
+      "finding": "ledger.py raised TypeError when a claim's status field was a malformed unhashable value (list) during the documented-status cross-check.",
+      "repair": "Guarded the comparison with isinstance(canonical, str); added regression test test_documented_status_check_tolerates_unhashable_status."
+    },
+    {
+      "id": "R33-003",
+      "fingerprint": "ledger-validator-manifest-index-crash",
+      "disposition": "valid",
+      "finding": "_validate_gauntlet_manifest raised IndexError when malformed manifest round entries caused manifest_paths to fall out of index alignment with records/hashes.",
+      "repair": "Appended a placeholder to manifest_paths in both malformed-entry branches to keep all three lists index-aligned; added regression test test_manifest_tolerates_malformed_entries_without_crashing."
+    },
+    {
+      "id": "R33-004",
+      "fingerprint": "local-l3-from-ckn-overclaim",
+      "disposition": "valid",
+      "finding": "LOCAL-L3-FROM-CKN's statement and counterexample prose claimed the constructed field satisfies the full CKN suitable-solution hypotheses, when it only satisfies the scalar energy inequality.",
+      "repair": "Narrowed the claim statement, falsification text, and COUNTEREXAMPLES.md prose to scope the refutation to singular-set-measure-zero geometry alone, not PR-07's full hypotheses."
+    },
+    {
+      "id": "R33-005",
+      "fingerprint": "profile-claim-dependency-mismatches",
+      "disposition": "valid",
+      "finding": "CRITICAL-PROFILE-GAP, CRITICAL-TAIL-TRANSFER, CRITICAL-ORBIT-COMPACT, CRITICAL-TIME-SELECT, LOCAL-L3-FROM-ENERGY, and LOCAL-L3-FROM-CKN listed depends_on values that did not match the prerequisite claims their evidence actually invokes (several pointed at the very target they attack).",
+      "repair": "Corrected depends_on for all six claims to name the actual prerequisite claims (KNSS-RECORD-PROFILE, AB-L3-ANCIENT, NS-SCALING, ENERGY-SUPERCRITICAL, PR-07, LOCAL-L3-CONTINUATION as appropriate)."
+    },
+    {
+      "id": "R33-006",
+      "fingerprint": "missing-local-bound-derivation-claim",
+      "disposition": "valid",
+      "finding": "OUTCOME.md described deriving the local L3 bound from finite-energy data as the new open estimate, but no ledger claim represented that obligation.",
+      "repair": "Added blocked claim LOCAL-L3-BOUND-DERIVATION referencing both refuted derivation routes."
+    },
+    {
+      "id": "R33-007",
+      "fingerprint": "stale-round-count-and-broken-links",
+      "disposition": "valid",
+      "finding": "README.md and docs/OUTCOME.md stated a stale round count (31, immediately wrong after round 32 was created in the same commit), used broken relative markdown links (docs/research/... from within docs/), described the project as untracked in git, and included an unledgered table row without noting its narrative-only status.",
+      "repair": "Updated round count to 33, fixed relative links, corrected the tracked-in-git statement, added canonical claim ID annotations to every ledgered Candidate Dispositions row, and flagged the one narrative-only row explicitly."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (51 tests, up from 49; two new ledger regression tests added)",
+    "git diff --check",
+    "Six independent expensive-agent subagents validated the LOCAL-L3-CONTINUATION proof, the two newest counterexamples, ledger structural integrity, the full 32-round gauntlet hash chain, code/test correctness, and documentation accuracy against claims.json",
+    "Gauntlet hash-chain audit (pre-repair) found 32/32 manifest hashes and 31/31 previous-round links consistent with no cycle or dropped findings"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "local-l3-continuation-esssup-gap",
+    "ledger-validator-unhashable-status-crash",
+    "ledger-validator-manifest-index-crash",
+    "local-l3-from-ckn-overclaim",
+    "profile-claim-dependency-mismatches",
+    "missing-local-bound-derivation-claim",
+    "stale-round-count-and-broken-links"
+  ],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

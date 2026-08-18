@@ -76,8 +76,8 @@ original diffuse global bound.
 - Rounds 18-25 produced solid narrow disproofs of naive cube charging,
   local-only harmonic-pressure control, automatic matched-scale commutator
   smallness, the CLMS suitability transfer, finite-probe-to-PDE uniformity,
-  and the occupancy-only packing-to-CKN bridge. The broader claims remain
-  blocked.
+  and the occupancy-only packing-to-CKN bridge. `FREQ-PHASESPACE` remains
+  `blocked` and `FREQ-PACKING` remains `conjectured`; neither was upgraded.
 - A fresh critical-profile iteration found no proof or admissible counterexample.
   The exact gap is global backward $L^3$ boundedness and pressure/mildness
   control for the ancient profile needed by the Liouville theorem.
@@ -92,25 +92,31 @@ original diffuse global bound.
 
 ## Candidate Dispositions
 
+Rows below cite the canonical claim ID in `artifacts/claims.json` where one
+exists. "Exact synchronized cascade" was never formalized into a ledger claim
+(no derived operator or estimate to check) and is recorded narratively only,
+per round 1's findings.
+
 | Route | Disposition | First decisive issue |
 |---|---|---|
-| Universal critical-flux absorption on $\mathbb T^3$ | `refuted` | Exact high-high-to-low influx grows like $A^2$ while low-mode dissipation stays fixed. |
-| Flux-only packing-to-CKN bridge | `refuted` | A smooth periodic shear has zero nonlinear flux and pressure but arbitrarily large scale-invariant cubic velocity. |
-| Shell-time diagonal blowup inference | `refuted` | Values at shell-dependent times do not imply one-time $H^1$ divergence. |
-| Compact centered $L^3$ ancient orbit | `proved`, not new | Albritton-Barker Theorem 1.2 is stronger in the mild ancient class. |
-| Fault-tolerant quorum shell band | `refuted` | Amplitude scaling and a triad crossing an empty band. |
-| Exact synchronized cascade | `blocked` | No derived phase-locking, sign-definite transfer, or persistence estimate for the exact operator. |
-| Critical $L^3$ a priori bound | `blocked` | This is the central open estimate. |
-| Critical ancient-profile bridge | `blocked` | Rescaling gives local ancient limits, not the backward $L^3$ sequence required by Liouville rigidity. |
-| Uniform local $L^3$ continuation criterion | `proved` | KNSS record-point rescaling plus local control yields a globally $L^3$-bounded ancient profile; deriving the local control remains open. |
-| Local $L^3$ bound from energy/Serrin interpolation | `refuted` | A self-similar concentrating field has $m_R\in L^{4/3}_t$ but $m_R\to\infty$ pointwise as $t\uparrow T$. |
-| Local $L^3$ bound from CKN singular-set smallness | `refuted` | A single-point-singularity field has zero-measure singular set yet unbounded local $L^3$ mass at that point. |
-| Naive $r_Q^{-1}$ cube measure | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
-| Local-only harmonic pressure control | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
-| Matched-scale commutator smallness | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |
-| CLMS-to-suitability transfer | `refuted` | Energy bounds do not supply the required Hardy-BMO pairing. |
-| Finite-Galerkin zero-flux transfer | `refuted` | Zero flux does not supply compactness, suitability, or CKN control. |
-| Occupancy-only packing-to-CKN bridge | `refuted` | Exact shear flow has zero defect but arbitrarily large CKN cubic quantity. |
+| Universal critical-flux absorption on $\mathbb T^3$ (`UNIVERSAL-FLUX-ABSORPTION`) | `refuted` | Exact high-high-to-low influx grows like $A^2$ while low-mode dissipation stays fixed. |
+| Flux-only packing-to-CKN bridge (`FREQ-FLUX-CKN`) | `refuted` | A smooth periodic shear has zero nonlinear flux and pressure but arbitrarily large scale-invariant cubic velocity. |
+| Shell-time diagonal blowup inference (`CASCADE-DIAGONAL-SUFFICIENCY`) | `refuted` | Values at shell-dependent times do not imply one-time $H^1$ divergence. |
+| Compact centered $L^3$ ancient orbit (`COMPACT-L3-ORBIT`) | `proved` | Already implied by Albritton-Barker Theorem 1.2 in the mild ancient class; not a new result. |
+| Fault-tolerant quorum shell band (`FTDS-PDE-1`) | `refuted` | Amplitude scaling and a triad crossing an empty band. |
+| Exact synchronized cascade (no ledger claim) | `blocked`, narrative only | No derived phase-locking, sign-definite transfer, or persistence estimate for the exact operator. |
+| Critical $L^3$ a priori bound (`CRITICAL-BOUND`) | `blocked` | This is the central open estimate. |
+| Critical ancient-profile bridge (`CRITICAL-PROFILE-GAP`) | `blocked` | Rescaling gives local ancient limits, not the backward $L^3$ sequence required by Liouville rigidity. |
+| Uniform local $L^3$ continuation criterion (`LOCAL-L3-CONTINUATION`) | `proved` | KNSS record-point rescaling plus local control yields a globally $L^3$-bounded ancient profile; deriving the local control remains open. |
+| Deriving the local $L^3$ bound from finite-energy data (`LOCAL-L3-BOUND-DERIVATION`) | `blocked` | No known technique currently supplies this estimate; see the two refuted routes below. |
+| Local $L^3$ bound from energy/Serrin interpolation (`LOCAL-L3-FROM-ENERGY`) | `refuted` | A self-similar concentrating field has $m_R\in L^{4/3}_t$ but $m_R\to\infty$ pointwise as $t\uparrow T$. |
+| Local $L^3$ bound from CKN singular-set smallness (`LOCAL-L3-FROM-CKN`) | `refuted` | A single-point-singularity field has zero-measure singular set yet unbounded local $L^3$ mass at that point. |
+| Naive $r_Q^{-1}$ cube measure (`FREQ-NAIVE-MEASURE`) | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
+| Local-only harmonic pressure control (`FREQ-PRESSURE-LOCAL`) | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
+| Matched-scale commutator smallness (`FREQ-MATCHED-COMMUTATOR`) | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |
+| CLMS-to-suitability transfer (`PR-CLMS-TRANSFER`) | `refuted` | Energy bounds do not supply the required Hardy-BMO pairing. |
+| Finite-Galerkin zero-flux transfer (`FREQ-GALERKIN-UNIFORM`) | `refuted` | Zero flux does not supply compactness, suitability, or CKN control. |
+| Occupancy-only packing-to-CKN bridge (`FREQ-PACKING-EPSILON-COMPARABLE`) | `refuted` | Exact shear flow has zero defect but arbitrarily large CKN cubic quantity. |
 
 ## Verification
 
@@ -131,9 +137,9 @@ convergence claim is made for the finite RK4 probe or for the research program
 as a whole.
 
 Rounds 18-25 are recorded in
-[`GAUNTLET_ROUNDS_018_025.md`](docs/research/GAUNTLET_ROUNDS_018_025.md).
+[`GAUNTLET_ROUNDS_018_025.md`](research/GAUNTLET_ROUNDS_018_025.md).
 The nine profile attacks are recorded in
-[`CRITICAL_PROFILE_ITERATION_002_003.md`](docs/research/CRITICAL_PROFILE_ITERATION_002_003.md).
+[`CRITICAL_PROFILE_ITERATION_002_003.md`](research/CRITICAL_PROFILE_ITERATION_002_003.md).
 Rounds 26-31 (the critical-profile gap, the three transfer modalities, the
 proved local continuation criterion, and the two refuted derivation routes
 for its hypothesis) are recorded individually under
@@ -148,9 +154,8 @@ claim snapshots and hash chaining back to round 1.
   credit.
 - Local files cannot authenticate human or model identity without an external
   signed trust root.
-- The project is untracked in the parent Git repository. Hash chaining detects
-  edits only while the files remain present; durable history requires an
-  explicitly authorized commit.
+- This project is tracked in the parent Git repository and is pushed to a
+  remote; hash chaining and version control jointly detect edits.
 - Numerical and finite-mode checks refute universal statements but do not prove
   universal regularity.
 

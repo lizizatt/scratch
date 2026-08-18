@@ -114,9 +114,13 @@ $$
 and the CKN cubic quantity centered at the singular point diverges,
 $\rho^{-2}\iint_{Q_\rho(0,T)}|w|^3\gtrsim\rho^{-3/4}\to\infty$. Thus
 Hausdorff-measure-zero singular-set geometry is fully compatible with an
-unbounded local $L^3$ mass exactly at the singular center. This refutes the
-inference from CKN singular-set finiteness to the local $L^3$ hypothesis of
-`LOCAL-L3-CONTINUATION`, not a Navier-Stokes solution.
+unbounded local $L^3$ mass exactly at the singular center. This field
+satisfies only the scalar energy inequality, not the full suitable-solution
+hypotheses (pressure, the distributional Navier-Stokes equations, and the
+local energy inequality) behind PR-07's actual theorem; it refutes only the
+narrower inference from singular-set-measure-zero geometry alone to the local
+$L^3$ hypothesis of `LOCAL-L3-CONTINUATION`, not PR-07 itself and not a
+Navier-Stokes solution.
 
 ## Zero nonlinear flux does not imply CKN smallness
 

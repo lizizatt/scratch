@@ -37,6 +37,16 @@ $$
 \le M_R.
 $$
 
+This last inequality requires care: $M_R$ is an essential supremum over $t$,
+which only controls almost every time, while $t_n+r_n^2s$ is a specific
+selected time. For fixed $a$, $t\mapsto\int_{B_R(a)}|u(x,t)|^3dx$ is
+continuous because $u$ is smooth on $[0,T)$. The pointwise supremum
+$G(t):=\sup_a\int_{B_R(a)}|u(x,t)|^3dx$ of a family of continuous functions is
+lower semicontinuous, hence Borel measurable, and it satisfies
+$G(t)\le\operatorname{ess\,sup}G=M_R$ at every $t\in(T-\delta,T)$, not merely
+almost every $t$. This upgrades the essential-supremum hypothesis to a bound
+at the specific selected times used above.
+
 Local uniform convergence implies convergence in $L^3(B_L)$, hence
 
 $$

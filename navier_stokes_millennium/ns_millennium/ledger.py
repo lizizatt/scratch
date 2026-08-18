@@ -627,13 +627,14 @@ def _validate_gauntlet_manifest(root: Path) -> list[str]:
     if not isinstance(entries, list):
         return [*errors, "gauntlet manifest rounds must be a list"]
 
-    manifest_paths: list[str] = []
+    manifest_paths: list[str | None] = []
     records: list[Mapping[str, Any] | None] = []
     hashes: list[str | None] = []
     for index, entry in enumerate(entries):
         owner = f"gauntlet manifest rounds[{index}]"
         if not isinstance(entry, Mapping):
             errors.append(f"{owner} must be an object")
+            manifest_paths.append(None)
             records.append(None)
             hashes.append(None)
             continue
@@ -643,6 +644,7 @@ def _validate_gauntlet_manifest(root: Path) -> list[str]:
             r"artifacts/gauntlet/round-\d{3}\.json", reference
         ):
             errors.append(f"{owner}.path must name round-NNN.json")
+            manifest_paths.append(None)
             records.append(None)
             hashes.append(None)
             continue
@@ -1087,7 +1089,7 @@ def validate_ledger(
             if claim is None:
                 continue
             canonical = claim.get("status")
-            if statuses != {canonical}:
+            if not isinstance(canonical, str) or statuses != {canonical}:
                 errors.append(
                     f"documented status mismatch for {claim_id}: "
                     f"documents={sorted(statuses)}, ledger={canonical}"
