@@ -7,6 +7,6 @@
     "samples": "node scripts/generate_samples.js"
   },
   "dependencies": {
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.0"
   }
 }
