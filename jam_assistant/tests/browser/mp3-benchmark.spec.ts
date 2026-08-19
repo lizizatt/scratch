@@ -33,7 +33,7 @@ test("loads a file into the chord display and fretboard", async ({ page }) => {
   await page.goto("/");
   await page.locator('input[type="file"]').setInputFiles(fixturePath);
 
-  await expect(page.getByText("Analysis ready")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".chord-symbol")).toBeVisible({ timeout: 10_000 });
   await expect(page.locator(".chord-symbol")).toContainText("C");
   await expect(page.locator(".chord-details strong").nth(1)).toHaveText("Major");
   await expect(page.locator(".role-root")).toHaveCount(6);
@@ -41,12 +41,33 @@ test("loads a file into the chord display and fretboard", async ({ page }) => {
 
   await page.locator("#scale").selectOption("major");
   await expect(page.locator(".role-scale-tone").first()).toBeVisible();
+  const playAudio = page.getByLabel("Play audio");
+  await playAudio.check();
+  await expect(playAudio).toBeChecked();
+  await expect(page.locator("audio")).toHaveJSProperty("paused", false);
+});
+
+test("shows chord names and seeks when a marker is clicked", async ({ page }) => {
+  const fixturePath = fileURLToPath(
+    new URL("../fixtures/c-major-d-minor.wav", import.meta.url),
+  );
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles(fixturePath);
+
+  const markers = page.locator(".chord-marker");
+  await expect.poll(() => markers.count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+  await expect(markers.nth(0)).toContainText("C");
+  const dMinorMarker = page.getByRole("button", { name: "Seek to Dm" });
+  await expect(dMinorMarker).toBeVisible();
+  await dMinorMarker.click();
+  await expect(page.locator(".chord-symbol")).toHaveText("Dm");
 });
 
 test("keeps the fretboard surface usable on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Playable map" })).toBeVisible();
-  await expect(page.getByLabel("Guitar fretboard visualization")).toBeVisible();
-  await expect(page.getByLabel("Analysis timeline")).toBeDisabled();
+  await expect(page.locator('input[type="file"]')).toBeVisible();
+  await page.locator('input[type="file"]').setInputFiles(fileURLToPath(new URL("../fixtures/c-major.wav", import.meta.url)));
+  await expect(page.getByLabel("Guitar fretboard visualization")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByLabel("Analysis timeline")).toBeEnabled();
 });
