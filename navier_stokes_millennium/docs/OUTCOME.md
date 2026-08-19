@@ -1,13 +1,13 @@
 # Research Outcome
 
-**Date:** 2026-08-18
+**Date:** 2026-08-19
 **Mathematical status:** `blocked`
 **Millennium problem status:** unsolved
 
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. Thirty-six
+three-dimensional incompressible Navier-Stokes Millennium problem. Forty-one
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -107,6 +107,16 @@ original diffuse global bound.
   finite energy alone supplies) and showed the local pressure decomposition
   is circular at short range and supercritical at long range, so this remains
   `blocked` rather than refuted.
+- Ran profile iterations 006-011 and isolated three additional failures:
+  Morrey-scale local-energy upgrades do not gain the missing $M_k^{-1}$ factor,
+  backward heat-kernel weighting is non-coercive at critical scaling, and
+  record-window quantile-time extraction does not transfer to fixed profile
+  offsets.
+- Ran multi-domain fanout iterations 012-016 across five non-frequency tracks
+  (defect-measure to CKN bridge, record-center compactness with pressure
+  defects, Carleman rigidity for ancient limits, vorticity-geometry depletion,
+  and cutoff-uniform robustness). All tracks remain `blocked`, with the
+  Carleman direct route ruled circular at the first absorbability step.
 
 ## Candidate Dispositions
 
