@@ -1,6 +1,6 @@
 # Critical Profile Iterations 006-008: Record-Trajectory Anti-Concentration Attacks
 
-**Status:** blocked; no proof or disproof of the Millennium problem.
+**Status:** exploratory note; no canonical claim or gauntlet round is recorded.
 
 These iterations continue the `LOCAL-L3-BOUND-DERIVATION` burn-down after
 Iteration 005 isolated the missing ingredient: a local $L^2$

@@ -1,18 +1,21 @@
 # Research Outcome
 
-**Date:** 2026-08-19
+**Date:** 2026-08-18
 **Mathematical status:** `blocked`
 **Millennium problem status:** unsolved
 
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. Forty-one
+three-dimensional incompressible Navier-Stokes Millennium problem. 36
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
 criterion. No round produced a candidate proof whose dependency closure was
-settled.
+settled. Subsequent profile and multi-domain fanout iterations are exploratory
+research notes; they are not additional gauntlet rounds and do not add claims
+to the canonical ledger. The manifest also contains two non-mathematical
+synchronization/audit heads, bringing its hash-chain record count to 38.
 
 The shortest positive route remains
 
@@ -107,16 +110,19 @@ original diffuse global bound.
   finite energy alone supplies) and showed the local pressure decomposition
   is circular at short range and supercritical at long range, so this remains
   `blocked` rather than refuted.
-- Ran profile iterations 006-011 and isolated three additional failures:
+- Recorded exploratory profile iterations 006-011 and isolated three additional failures:
   Morrey-scale local-energy upgrades do not gain the missing $M_k^{-1}$ factor,
   backward heat-kernel weighting is non-coercive at critical scaling, and
   record-window quantile-time extraction does not transfer to fixed profile
   offsets.
-- Ran multi-domain fanout iterations 012-016 across five non-frequency tracks
-  (defect-measure to CKN bridge, record-center compactness with pressure
+- Recorded exploratory multi-domain fanout iterations 012-016 across five
+  non-frequency tracks (defect-measure to CKN bridge, record-center compactness with pressure
   defects, Carleman rigidity for ancient limits, vorticity-geometry depletion,
   and cutoff-uniform robustness). All tracks remain `blocked`, with the
   Carleman direct route ruled circular at the first absorbability step.
+- Formalized the missing record-scale local $L^2$ anti-concentration estimate as
+  `LOCAL-L2-ANTI-CONCENTRATION`; it remains `blocked` and is a target for a
+  future focused adversarial round.
 
 ## Candidate Dispositions
 
@@ -144,6 +150,7 @@ per round 1's findings.
 | Local $L^3$ bound from Type I rate plus self-similar exclusion (`LOCAL-L3-FROM-TYPE-I`) | `refuted` | The Type I rate alone lets local $L^3$ mass diverge, and Type I to self-similar tangent is unproven (`BUP-003`). |
 | Weaker record-center-only local $L^3$ hypothesis (`LOCAL-L3-RECORD-CENTERS`) | `proved` | Genuinely weaker than $M_R$ over all centers, verified by independent review, but still not derivable from finite energy alone. |
 | Local energy inequality along record-center trajectory (`LOCAL-L3-FROM-LOCAL-ENERGY`) | `blocked` | Local pressure decomposition is circular at short range and supercritical at long range; missing estimate identified precisely. |
+| Record-scale local $L^2$ anti-concentration (`LOCAL-L2-ANTI-CONCENTRATION`) | `blocked` | The exact estimate needed to convert KNSS pointwise control into the record-center local $L^3$ hypothesis remains unavailable. |
 | Naive $r_Q^{-1}$ cube measure (`FREQ-NAIVE-MEASURE`) | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
 | Local-only harmonic pressure control (`FREQ-PRESSURE-LOCAL`) | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
 | Matched-scale commutator smallness (`FREQ-MATCHED-COMMUTATOR`) | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |

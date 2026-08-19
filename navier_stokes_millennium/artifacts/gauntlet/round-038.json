@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "round_id": "round-038",
+  "date": "2026-08-18",
+  "target": "local-l2-anti-concentration-target-audit",
+  "target_claim_id": "LOCAL-L2-ANTI-CONCENTRATION",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-038-claims.json",
+  "claims_snapshot_sha256": "9d2c49dd3bb3d8db3495ac8092a35e22a13ee3227d6a0ce1a6d9b83dfb5b35d2",
+  "previous_round": "artifacts/gauntlet/round-037.json",
+  "previous_round_sha256": "9a77b30cb0a38892caddf2d84d8db08a58485db87f0c5f423488fe2f10f9087c",
+  "post_repair_claims_sha256": "9d2c49dd3bb3d8db3495ac8092a35e22a13ee3227d6a0ce1a6d9b83dfb5b35d2",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "b3ff6dd01c263f4d2cda4bb85761113eb07a0f1d9982e83e4f8702d6f7599526",
+  "reviewers": [
+    "Explore: audit anti-concentration claim"
+  ],
+  "findings": [
+    {
+      "id": "R38-001",
+      "fingerprint": "anti-concentration-dependency-direction",
+      "disposition": "valid",
+      "finding": "LOCAL-L2-ANTI-CONCENTRATION supplies the local L3 hypothesis used by LOCAL-L3-RECORD-CENTERS; listing the continuation claim as a dependency reverses the logical direction.",
+      "repair": "Changed the claim dependencies to KNSS-RECORD-PROFILE and ENERGY-CLASS."
+    },
+    {
+      "id": "R38-002",
+      "fingerprint": "anti-concentration-outcome-documentation",
+      "disposition": "valid",
+      "finding": "The new canonical anti-concentration claim was absent from the OUTCOME candidate-disposition table.",
+      "repair": "Added the blocked claim to the OUTCOME work-completed section and candidate-disposition table, and extended the documentation regression to require it there."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v",
+    "Focused documentation consistency regression passed before freezing this head",
+    "Read-only audit confirmed the target statement matches the research document and its blocked status is appropriate"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked"
+  ],
+  "resolved_findings": [
+    "anti-concentration-dependency-direction",
+    "anti-concentration-outcome-documentation"
+  ],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

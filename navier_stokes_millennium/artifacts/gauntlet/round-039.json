@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "round_id": "round-039",
+  "date": "2026-08-18",
+  "target": "adversarial-round-count-model-audit",
+  "target_claim_id": "LOCAL-L2-ANTI-CONCENTRATION",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-039-claims.json",
+  "claims_snapshot_sha256": "9d2c49dd3bb3d8db3495ac8092a35e22a13ee3227d6a0ce1a6d9b83dfb5b35d2",
+  "previous_round": "artifacts/gauntlet/round-038.json",
+  "previous_round_sha256": "9a51c1b06ca98e3f41cb73e2f293d40a0f3d4a6191ac2fbd132f9c7a72ce89d1",
+  "post_repair_claims_sha256": "9d2c49dd3bb3d8db3495ac8092a35e22a13ee3227d6a0ce1a6d9b83dfb5b35d2",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "22f3679112bd4ed4095d41d04d431c31ad638de169ce80fa2b5a475774f9a9af",
+  "reviewers": [
+    "Explore: recheck test-only repair"
+  ],
+  "findings": [
+    {
+      "id": "R39-001",
+      "fingerprint": "adversarial-round-count-model",
+      "disposition": "valid",
+      "finding": "The manifest contains 38 hash-chain records while the research documents correctly describe only 36 mathematical adversarial gauntlet rounds; synchronization and audit heads must not be silently counted as mathematical rounds.",
+      "repair": "Added manifest.adversarial_round_count=36, documented the two administrative heads, and made the regression derive the documented count from that manifest field while checking the current head and all record files."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v",
+    "Focused documentation consistency regression passed after the repair",
+    "Read-only recheck confirmed the regression no longer hardcodes a round number"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked"
+  ],
+  "resolved_findings": [
+    "adversarial-round-count-model"
+  ],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

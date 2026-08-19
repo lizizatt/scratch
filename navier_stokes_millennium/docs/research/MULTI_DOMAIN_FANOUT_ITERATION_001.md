@@ -1,6 +1,6 @@
 # Multi-domain Fanout Iteration 001
 
-**Status:** exploratory; no regularity theorem claimed.
+**Status:** exploratory note; no canonical claim or gauntlet round is recorded.
 
 Objective: run parallel framework probes outside the current frequency-first path, each with a falsifiable gate.
 

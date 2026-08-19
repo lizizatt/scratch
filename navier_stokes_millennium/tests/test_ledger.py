@@ -840,6 +840,33 @@ class ValidateLedgerTests(unittest.TestCase):
             errors,
         )
 
+    def test_documented_round_count_matches_manifest_head(self) -> None:
+        root = Path(__file__).parents[1]
+        manifest = json.loads(
+            (root / "artifacts" / "gauntlet" / "manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        rounds = manifest["rounds"]
+        round_files = list((root / "artifacts" / "gauntlet").glob("round-*.json"))
+        adversarial_round_count = manifest["adversarial_round_count"]
+
+        self.assertEqual(manifest["head"], rounds[-1]["path"])
+        self.assertEqual(len(rounds), len(round_files))
+        self.assertLessEqual(adversarial_round_count, len(rounds))
+
+        documented_count = f"{adversarial_round_count} adversarial gauntlet rounds"
+        for relative_path in ("README.md", "docs/OUTCOME.md"):
+            document = (root / relative_path).read_text(encoding="utf-8")
+            normalized_document = " ".join(document.split())
+            self.assertIn(documented_count, normalized_document)
+            self.assertIn("exploratory", normalized_document)
+
+        outcome = " ".join(
+            (root / "docs" / "OUTCOME.md").read_text(encoding="utf-8").split()
+        )
+        self.assertIn("LOCAL-L2-ANTI-CONCENTRATION", outcome)
+
     def test_cli_reports_malformed_json(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             ledger = Path(directory) / "claims.json"

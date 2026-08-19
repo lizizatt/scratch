@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "round_id": "round-037",
+  "date": "2026-08-18",
+  "target": "documentation-synchronization-audit",
+  "target_claim_id": "LOCAL-L3-BOUND-DERIVATION",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-037-claims.json",
+  "claims_snapshot_sha256": "6ae5de23d1f354965f27c406a087291d9d9a3f47cdfe0034558dbc55f29a1d50",
+  "previous_round": "artifacts/gauntlet/round-036.json",
+  "previous_round_sha256": "3faa3385cf6a08179336ca1227244f27ec5a451382a950e16db36e5dbe76b475",
+  "post_repair_claims_sha256": "6ae5de23d1f354965f27c406a087291d9d9a3f47cdfe0034558dbc55f29a1d50",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "e72ff8e08f36fbf2f1a604e9fdcf3dd27e95d026920fb7ec138d7014473a72d4",
+  "reviewers": [
+    "Explore: documentation synchronization audit"
+  ],
+  "findings": [],
+  "validation": [
+    "git diff --check -- README.md docs/OUTCOME.md",
+    "Read-only audit confirmed the profile and multi-domain fanout notes introduce no canonical ledger claims or status changes",
+    "The current claims snapshot is byte-identical to artifacts/claims.json"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked"
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

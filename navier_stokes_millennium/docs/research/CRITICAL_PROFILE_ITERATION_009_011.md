@@ -1,6 +1,6 @@
 # Critical Profile Iterations 009-011: Anti-Concentration Follow-ups
 
-**Status:** blocked; no proof or disproof of the Millennium problem.
+**Status:** exploratory note; no canonical claim or gauntlet round is recorded.
 
 These iterations continue the `LOCAL-L3-BOUND-DERIVATION` burn-down after
 Iteration 008. Target: derive the record-center local $L^3$ bound from finite

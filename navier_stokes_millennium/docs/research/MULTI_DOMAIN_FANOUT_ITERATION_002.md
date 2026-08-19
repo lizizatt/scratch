@@ -1,6 +1,6 @@
 # Multi-domain Fanout Iteration 002
 
-**Status:** blocked; no proof or disproof of the Millennium problem.
+**Status:** exploratory note; no canonical claim or gauntlet round is recorded.
 
 This round executes one gate attempt per Track A-E from `MULTI_DOMAIN_FANOUT_ITERATION_001.md`.
 

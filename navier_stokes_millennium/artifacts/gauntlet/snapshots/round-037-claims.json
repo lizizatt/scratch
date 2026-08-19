@@ -138,19 +138,6 @@
       ]
     },
     {
-      "id": "LOCAL-L2-ANTI-CONCENTRATION",
-      "kind": "lemma",
-      "statement": "For every hypothetical finite singular endpoint and KNSS record-point sequence, there are centers a_k and radii rho_k with |a_k-x_k| tending to zero and M_k(rho_k-|a_k-x_k|) tending to infinity such that sup over fixed profile times s_j of limsup as k tends to infinity of M_k times the integral of |u(x,t_k+M_k^-2 s_j)|^2 over B_{rho_k}(a_k) is finite.",
-      "status": "blocked",
-      "depends_on": ["KNSS-RECORD-PROFILE", "ENERGY-CLASS"],
-      "evidence": ["docs/research/LOCAL_L2_ANTI_CONCENTRATION_TARGET.md#canonical-target"],
-      "falsification_attempts": [
-        "Finite energy supplies only an O(M_k) loss at record scale, so the global energy inequality does not establish the target.",
-        "A bounded-energy rescaled divergence-free bump matches the pointwise KNSS normalization while violating the target algebraically; it is not a Navier-Stokes solution and is not a PDE counterexample.",
-        "The local Scheffer/CKN energy inequality attack remains circular in the near pressure term and supercritical in the far tail, with no transfer to fixed profile times."
-      ]
-    },
-    {
       "id": "LOCAL-L3-FROM-VORTICITY-COHERENCE",
       "kind": "lemma",
       "statement": "Constantin-Fefferman vorticity-direction coherence of the KNSS record-point ancient profile supplies the local L3 bound M_R via a route independent of already invoking the full CF regularity theorem directly.",

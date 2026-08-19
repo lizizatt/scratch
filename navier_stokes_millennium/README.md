@@ -26,20 +26,23 @@ Research notes, proof obligations, and gauntlet prompts will live under
 The current result and stopping condition are recorded in
 [`docs/OUTCOME.md`](docs/OUTCOME.md).
 
-## Current status (2026-08-17)
+## Current status (2026-08-18)
 
-The problem remains open. Thirty-six adversarial gauntlet rounds (and
-counting) have attacked frequency-packing, phase-space, and critical-profile
-routes; several narrow sub-claims were refuted with explicit counterexamples,
-and two conditional theorems, `LOCAL-L3-CONTINUATION`
+The problem remains open. 36 adversarial gauntlet rounds have attacked
+frequency-packing, phase-space, and critical-profile routes; several narrow
+sub-claims were refuted with explicit counterexamples, and two conditional
+theorems, `LOCAL-L3-CONTINUATION`
 ([proof](docs/proofs/LOCAL_L3_CONTINUATION.md)) and its record-center
 weakening `LOCAL-L3-RECORD-CENTERS`
 ([proof](docs/proofs/LOCAL_L3_RECORD_CENTERS.md)), were proved: a local,
 fixed-radius uniform $L^3$ bound near a hypothetical singular time already
 rules out that singularity, even if only assumed along one backward-tracked
 trajectory of centers. Deriving that local bound from finite-energy data
-remains the open step; see [`docs/OUTCOME.md`](docs/OUTCOME.md) for the
-candidate-disposition table and gauntlet history.
+remains the open step. Later profile and multi-domain fanout iterations are
+recorded as exploratory notes, not additional gauntlet rounds or ledger
+claims; see [`docs/OUTCOME.md`](docs/OUTCOME.md) for the candidate-disposition
+table and gauntlet history. The hash-chain manifest also contains two
+non-mathematical synchronization/audit heads for the current research record.
 
 ## Resolution standard
 
