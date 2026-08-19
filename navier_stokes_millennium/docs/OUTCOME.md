@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 45
+three-dimensional incompressible Navier-Stokes Millennium problem. 46
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -169,6 +169,9 @@ original diffuse global bound.
   order one, the high-high-to-low receiver escapes the donor window, and fixed
   spatial/time suprema recreate the anti-concentration target;
   `MODULATION-SPACE-FUNCTIONAL` remains `blocked`.
+- Tested a localized Biot--Savart/Riesz functional. It is critical $L^3$ mass
+  written nonlocally; a sign-indefinite Riesz-pressure pairing and remote
+  kernel tails remain, so `RIESZ-BIOTSAVART-FUNCTIONAL` is `blocked`.
 
 ## Candidate Dispositions
 
