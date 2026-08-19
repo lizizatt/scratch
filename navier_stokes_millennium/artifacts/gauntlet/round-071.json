@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "round_id": "round-071",
+  "date": "2026-08-19",
+  "target": "lagrangian-flowmap-functional-audit",
+  "target_claim_id": "LAGRANGIAN-FLOWMAP-FUNCTIONAL",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-071-claims.json",
+  "claims_snapshot_sha256": "005c08d6c81c72c6854515aee9683dc08e88336d35942f525aff5178bb680ddf",
+  "previous_round": "artifacts/gauntlet/round-070.json",
+  "previous_round_sha256": "29dcf2091417af33af5b54234a7c6b0983cefd29c92faba4d04fc625c95aef6a",
+  "post_repair_claims_sha256": "005c08d6c81c72c6854515aee9683dc08e88336d35942f525aff5178bb680ddf",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "1148eaf3f97361c85a44abe386a54c4836bedb2e36a7383527143da840ba3a15",
+  "reviewers": ["expensive-agent: Lagrangian deformation route audit"],
+  "capability_failures": [],
+  "findings": [{
+    "id": "R71-001",
+    "fingerprint": "lagrangian-pressure-traction-deformation-growth",
+    "disposition": "valid",
+    "finding": "Material coordinates remove cubic advective flux, but the material kinetic identity exposes sign-indefinite pressure traction through the boundary; deformation has no dissipative sign, viscosity breaks the Euler Cauchy invariant, and bounded deformation does not control concentrated local mass.",
+    "repair": "Recorded docs/research/LAGRANGIAN_FLOWMAP_FUNCTIONAL_AUDIT.md and kept LAGRANGIAN-FLOWMAP-FUNCTIONAL blocked."
+  }],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json after advancing manifest", "python -m unittest discover -s tests -v", "git diff --check", "Shear, Beltrami, vortex-tube, remote-packet, and fixed-profile tests were audited"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy", "frequency-packing-underspecified-occupancy-bridge", "sos-fixed-cutoff-survives-continuum-blocked", "shell-synchronized-criterion-valid-production-blocked", "shell-production-activation-and-persistence-blocked", "lagrangian-pressure-traction-deformation-growth"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

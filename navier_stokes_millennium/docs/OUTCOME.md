@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 51
+three-dimensional incompressible Navier-Stokes Millennium problem. 52
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -185,6 +185,10 @@ original diffuse global bound.
   $\dot H^{1/2}$ criterion is valid conditionally, but finite energy does not
   force synchronized shell activation and Bernstein loses one cutoff power in
   the persistence estimate; `SHELL-PERSISTENCE-FROM-NS` remains `blocked`.
+- Audited the deterministic Lagrangian flow-map functional. Material
+  coordinates remove cubic advection, but pressure traction through material
+  boundaries and deformation growth remain uncontrolled; `LAGRANGIAN-
+  FLOWMAP-FUNCTIONAL` is `blocked`.
 - Sharpened `FREQ-PACKING`: the combined regularity conjecture was
   underspecified, and a bounded occupancy norm permits one bad event at every
   nested scale. Occupancy-only packing-to-CKN is therefore insufficient;
