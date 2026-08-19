@@ -1,6 +1,6 @@
 # Quantitative Singular-Set Geometry Audit
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Disposition:** blocked; CKN measure information does not yield the target.
 
 ## First lemma

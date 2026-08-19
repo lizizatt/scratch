@@ -1,0 +1,64 @@
+{
+  "schema_version": 2,
+  "round_id": "round-049",
+  "date": "2026-08-19",
+  "target": "polynomial-triad-no-go-review-repair",
+  "target_claim_id": "WAVELET-PHASESPACE-FUNCTIONAL",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-049-claims.json",
+  "claims_snapshot_sha256": "d20f3fcf6a63e3ee43270252b7c090ee1dc5e2bde7c3b13db50ee6eb696d3bf8",
+  "previous_round": "artifacts/gauntlet/round-048.json",
+  "previous_round_sha256": "cbe00bf8f65d9915ddc4f18c83c51a9a2531f735f74bbaeabbc3eb8619fbec6d",
+  "post_repair_claims_sha256": "d20f3fcf6a63e3ee43270252b7c090ee1dc5e2bde7c3b13db50ee6eb696d3bf8",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "3563eb4e9a33c8b0b472fd8869c2deb3c2f56ca6097147c77b72ca4afa62f87e",
+  "reviewers": [
+    "Explore: polynomial no-go mathematics review",
+    "Explore: repository iteration scope review"
+  ],
+  "capability_failures": [],
+  "findings": [
+    {
+      "id": "R49-001",
+      "fingerprint": "triad-uniform-vs-high-only-scaling-mismatch",
+      "disposition": "valid",
+      "finding": "The no-go note incorrectly described the existing high-high-to-low fixture parameter as uniform scaling and claimed 2A^3, while the fixture keeps the low recipient fixed and measures 2A^2.",
+      "repair": "Clarified the high-only quadratic stress test, added a separate exact uniform-field-scaling cubic regression at A=3, and revised the no-go note."
+    }
+  ],
+  "validation": [
+    "python -m unittest tests.test_triad tests.test_functional_degree -v (21 tests)",
+    "git diff --check",
+    "Uniform scaling regression verifies critical_flux=54 for A=3",
+    "The repaired note explicitly separates homogeneous degree from the asymmetric fixture amplitude parameter"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked",
+    "bogovskii-temporal-commutator-restores-pressure",
+    "bogovskii-critical-transport-remainder",
+    "bogovskii-fixed-profile-time-gap",
+    "bogovskii-source-hypothesis-gap",
+    "lin-source-scope-no-anti-concentration",
+    "ess-source-scope-no-local-l2-bridge",
+    "bogovskii-primary-source-gap",
+    "besov-route-repeats-frequency-blocker",
+    "minimal-blowup-already-implicit",
+    "vorticity-geometry-fixed-slice-gap",
+    "no-monotonicity-functional",
+    "singular-set-size-not-amplitude-control",
+    "critical-kinetic-enstrophy-annular-tail",
+    "critical-functional-universal-coercivity-killed",
+    "stress-completed-functional-pressure-time-derivative",
+    "windowed-functional-scale-inverting-energy",
+    "enstrophy-window-derivative-hierarchy",
+    "anisotropic-vorticity-penalty-misses-transverse-flux",
+    "wavelet-flux-quartic-triad-obstruction",
+    "wavelet-expanding-ball-quantifier-gap"
+  ],
+  "resolved_findings": ["triad-uniform-vs-high-only-scaling-mismatch"],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

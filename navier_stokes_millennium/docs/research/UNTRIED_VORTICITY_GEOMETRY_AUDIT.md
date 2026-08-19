@@ -1,6 +1,6 @@
 # Vorticity Filament Geometry Audit
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Disposition:** blocked; no finite-energy bridge to the target was found.
 
 ## First lemma

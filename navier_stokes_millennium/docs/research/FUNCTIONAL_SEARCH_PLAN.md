@@ -1,7 +1,8 @@
 # Polynomial Functional Search Plan
 
-**Date:** 2026-08-19  
-**Status:** active research plan; finite-mode results are not PDE proofs.
+**Date:** 2026-08-19
+**Status:** finite-mode search plan completed; finite-mode results are not PDE
+proofs.
 
 ## Objective
 
@@ -79,6 +80,27 @@ Record one of:
 - `conjectured`: a candidate survives finite-mode tests but lacks a PDE bridge;
 - `proved`: only if a complete internal proof artifact and falsification attempt
   satisfy the repository contract.
+
+## Burn-down result
+
+- **Iteration 1:** specification committed as `444eca3`.
+- **Iteration 2:** generator degree audit and focused tests committed as
+  `3df8ea9`.
+- **Iteration 3:** exact high-high-to-low triad degree audit committed as
+  `fa2f213`.
+- **Iteration 4:** two independent reviewers found a real mismatch between
+  the fixture's high-only amplitude parameter and uniform field scaling. The
+  repair added an exact uniform-scaling regression and was recorded in round
+  049.
+- **Iteration 5:** full validation completed: ledger valid, 58 tests passed,
+  no editor diagnostics, and no whitespace errors.
+
+The finite-degree Galerkin search did not produce a surviving coercive
+functional. It did produce a scoped obstruction: cubic flux completions create
+quartic generator terms, and the exact triad defeats the corresponding
+quadratic-dissipation pattern. The next required bridge is analytic and
+continuum-level: cutoff-uniform coefficient control, pressure handling, and
+fixed-profile-time local coercivity.
 
 ## Stop conditions
 

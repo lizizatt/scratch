@@ -1,6 +1,6 @@
 # Monotonicity and Entropy Audit
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Disposition:** blocked; no candidate Navier--Stokes functional survived the
 first structural check.
 

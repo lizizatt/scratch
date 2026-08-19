@@ -1,6 +1,6 @@
 # Bogovskii Solenoidal Localization Attack
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Status:** blocked; no proof or Navier-Stokes counterexample was obtained.
 
 This is the focused attack requested for `LOCAL-L2-ANTI-CONCENTRATION`: use an

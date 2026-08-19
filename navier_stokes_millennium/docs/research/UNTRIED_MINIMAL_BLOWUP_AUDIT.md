@@ -1,6 +1,6 @@
 # Minimal Blowup and Induction-on-Scales Audit
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Disposition:** blocked; the route is already present implicitly, not a new
 independent path.
 

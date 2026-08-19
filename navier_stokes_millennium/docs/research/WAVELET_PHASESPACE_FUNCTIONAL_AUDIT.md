@@ -1,6 +1,6 @@
 # Wavelet Phase-Space Functional Audit
 
-**Date:** 2026-08-19  
+**Date:** 2026-08-19
 **Status:** blocked; the candidate failed its first audit.
 
 ## Candidate

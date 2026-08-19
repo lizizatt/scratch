@@ -1,6 +1,6 @@
 # Polynomial Degree and Triad No-Go Audit
 
-**Date:** 2026-08-19  
+**Date:** 2026-08-19
 **Status:** finite-mode no-go for a declared subclass; not a PDE regularity
 result.
 
@@ -42,17 +42,26 @@ candidate and must be audited recursively.
 ## Exact triad test
 
 The repository's real divergence-free high-high-to-low fixture has critical
-flux $2$ at unit amplitude. Scaling every Fourier coefficient by $A$ gives
+flux $2$ at unit amplitude. The fixture's public `amplitude` parameter scales
+only its two high modes and keeps the recipient low mode fixed, so that test
+family has
 
 $$
-\Phi_{\mathrm{triad}}(A)=2A^3,
+\Phi_{\mathrm{triad}}^{\mathrm{high\ only}}(A)=2A^2.
 $$
 
-verified exactly for $A=1,2,5$ by the finite-mode evaluator. Thus a functional
-that adds cubic flux to quadratic energy has a nonlinear generator contribution
-of degree four. The corresponding quadratic recipient dissipation remains
-quadratic under amplitude scaling, so no universal large-amplitude estimate can
-absorb the quartic term on this fixture.
+That is the exact high-high-to-low stress test: the transfer grows while the
+recipient low-mode dissipation remains fixed. Under uniform scaling of every
+coefficient by $A$, the same cubic flux obeys
+
+$$
+\Phi_{\mathrm{triad}}^{\mathrm{uniform}}(A)=2A^3,
+$$
+
+verified by the dedicated regression at $A=3$. Thus a functional that adds
+cubic flux to quadratic energy has a nonlinear generator contribution of degree
+four. The corresponding quadratic dissipation cannot dominate that leading
+degree uniformly in amplitude without a matching higher-degree cancellation.
 
 This is the same structural mechanism behind the earlier refutation of
 universal flux absorption, now expressed as a degree audit for polynomial

@@ -1,6 +1,6 @@
 # Besov and Paraproduct Audit
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Disposition:** blocked; no independent closure found.
 
 ## First lemma

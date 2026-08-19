@@ -1,6 +1,6 @@
 # Critical Functional Design Loop
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Status:** blocked; no candidate survived the required first audit.
 
 This loop tested four progressively different candidates against the same

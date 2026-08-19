@@ -1,6 +1,6 @@
 # Critical Kinetic-Enstrophy Functional
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Status:** blocked; structural candidate only.
 
 ## Candidate

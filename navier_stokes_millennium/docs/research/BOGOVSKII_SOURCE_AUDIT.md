@@ -1,6 +1,6 @@
 # Bogovskii Route Source Audit
 
-**Date:** 2026-08-18  
+**Date:** 2026-08-18
 **Status:** blocked; no source-backed bridge to
 `LOCAL-L2-ANTI-CONCENTRATION` was found.
 

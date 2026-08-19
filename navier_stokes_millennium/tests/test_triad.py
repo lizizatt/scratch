@@ -43,6 +43,16 @@ class FourierTriadTests(unittest.TestCase):
         self.assertAlmostEqual(low_h32_dissipation(small, cutoff=1.5), 2.0)
         self.assertAlmostEqual(low_h32_dissipation(large, cutoff=1.5), 2.0)
 
+    def test_critical_flux_is_cubic_under_uniform_field_scaling(self) -> None:
+        base = high_high_to_low_fixture(amplitude=1.0)
+        scaled = {
+            wavevector: tuple(3.0 * component for component in value)
+            for wavevector, value in base.items()
+        }
+
+        self.assertAlmostEqual(critical_flux(base, cutoff=1.5), 2.0)
+        self.assertAlmostEqual(critical_flux(scaled, cutoff=1.5), 54.0)
+
     def test_galerkin_rhs_has_correct_sign_and_preserves_reality(self) -> None:
         modes = high_high_to_low_fixture(amplitude=1.5)
         rhs = galerkin_rhs(modes, viscosity=0.1)
