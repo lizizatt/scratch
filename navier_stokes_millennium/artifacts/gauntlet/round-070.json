@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "round_id": "round-070",
+  "date": "2026-08-19",
+  "target": "shell-route-disposition-synchronization",
+  "target_claim_id": "SHELL-PERSISTENCE-FROM-NS",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-070-claims.json",
+  "claims_snapshot_sha256": "a29f6c86196f8827286f54dd746708a859281acf17270ba01581bff8d3d45919",
+  "previous_round": "artifacts/gauntlet/round-069.json",
+  "previous_round_sha256": "a891a8c83eaca38cf0751a48f0c10962b0d0fc4b2fc2219fd51278e4d65c2801",
+  "post_repair_claims_sha256": "a29f6c86196f8827286f54dd746708a859281acf17270ba01581bff8d3d45919",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "444aa0ffca2c22c07819e1f958878dd80de91ce92bc9abc5a2126eb7ad1caa9f",
+  "reviewers": ["repository synchronization check: shell route disposition"],
+  "capability_failures": [],
+  "findings": [],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json", "python -m unittest discover -s tests -v", "git diff --check", "Blocker map now classifies infinite shell hierarchy as blocked after the production audit; no claim status changed"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy", "frequency-packing-underspecified-occupancy-bridge", "sos-fixed-cutoff-survives-continuum-blocked", "shell-synchronized-criterion-valid-production-blocked", "shell-production-activation-and-persistence-blocked"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

@@ -178,7 +178,7 @@ partial because no cutoff-uniform whole-space continuum bridge exists.
 | Type I rate alone | refuted | Type I rate does not bound local $L^3$ | B1 |
 | Type I plus self-similar tangent | blocked | Type-I-to-self-similar implication is missing and circular | B6 |
 | Strain/eigenvalue invariants | untried | Needs sign-definite stretching depletion | B2, B4, B7 |
-| Infinite shell hierarchy | untried | No one-way transfer or cutoff-uniform bound | B2, B8 |
+| Infinite shell hierarchy | blocked | Conditional synchronized persistence is valid, but activation and cutoff-uniform production are unavailable | B2, B5, B8 |
 | SOS/semidefinite certificates | partial/untried | Galerkin certificate lacks continuum bridge | B2, B8 |
 | Variational extremal | untried | Concentrating minimizing sequences lose compactness | B1, B6 |
 | Monotonicity/entropy | blocked | No candidate sign-definite critical identity | B2, B3, B4 |
