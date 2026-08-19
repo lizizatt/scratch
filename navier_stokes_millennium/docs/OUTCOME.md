@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 52
+three-dimensional incompressible Navier-Stokes Millennium problem. 53
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -189,6 +189,10 @@ original diffuse global bound.
   coordinates remove cubic advection, but pressure traction through material
   boundaries and deformation growth remain uncontrolled; `LAGRANGIAN-
   FLOWMAP-FUNCTIONAL` is `blocked`.
+- Audited the full material pressure-traction budget. It is a valid conditional
+  reduction to local anti-concentration, but near cubic pressure traction and
+  far harmonic tails cannot be produced from finite energy at fixed profile
+  times; `PRESSURE-TRACTION-ANTI-CONCENTRATION` remains `blocked`.
 - Sharpened `FREQ-PACKING`: the combined regularity conjecture was
   underspecified, and a bounded occupancy norm permits one bad event at every
   nested scale. Occupancy-only packing-to-CKN is therefore insufficient;

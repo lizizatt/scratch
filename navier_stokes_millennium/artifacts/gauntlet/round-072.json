@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "round_id": "round-072",
+  "date": "2026-08-19",
+  "target": "pressure-traction-anti-concentration-audit",
+  "target_claim_id": "PRESSURE-TRACTION-ANTI-CONCENTRATION",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-072-claims.json",
+  "claims_snapshot_sha256": "4a20d09ec8d8702611532a4ead96ac901f50fce8750ccace7d1e245f4b5e2796",
+  "previous_round": "artifacts/gauntlet/round-071.json",
+  "previous_round_sha256": "cd94db915547bab24c839a2ba63794ac09e6c9b1d4233ad6b4133fd24c04155d",
+  "post_repair_claims_sha256": "4a20d09ec8d8702611532a4ead96ac901f50fce8750ccace7d1e245f4b5e2796",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "37995cd0e25a0f809ef033c8bc5c6ffae6605396ee15328b71bda0756287aa5e",
+  "reviewers": ["expensive-agent: pressure traction anti-concentration audit"],
+  "capability_failures": [],
+  "findings": [{
+    "id": "R72-001",
+    "fingerprint": "pressure-traction-full-stress-budget-blocked",
+    "disposition": "valid",
+    "finding": "A full material stress-work budget would imply local L2 anti-concentration, but its production fails first at near cubic pressure traction and far harmonic tails; remote packets change traction without changing local data, and traction alone cannot control centered parity-symmetric concentration.",
+    "repair": "Recorded docs/research/PRESSURE_TRACTION_ANTI_CONCENTRATION_AUDIT.md and kept PRESSURE-TRACTION-ANTI-CONCENTRATION blocked."
+  }],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json after advancing manifest", "python -m unittest discover -s tests -v", "git diff --check", "Remote packet, shear, centered concentration, material stress identity, and fixed-profile scaling were audited"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy", "frequency-packing-underspecified-occupancy-bridge", "sos-fixed-cutoff-survives-continuum-blocked", "shell-synchronized-criterion-valid-production-blocked", "shell-production-activation-and-persistence-blocked", "lagrangian-pressure-traction-deformation-growth", "pressure-traction-full-stress-budget-blocked"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
