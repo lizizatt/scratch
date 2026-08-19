@@ -12,6 +12,7 @@ Milestone 0 is implemented as a TypeScript analysis spike. From this directory:
 ```bash
 npm install
 npm run fixtures
+npm run midi:fixtures
 npm test
 npm run evaluate
 npm run build
@@ -21,6 +22,8 @@ npm run test:browser
 The measured feature-library decision is recorded in
 [ADR 0001](docs/adr/0001-select-meyda-chroma.md). Generated WAV fixtures are
 recreated locally; the committed MP3 fixture covers browser decode throughput.
+The known-harmony MIDI library and reference-audio caveats are documented in
+[MIDI_FIXTURES.md](docs/MIDI_FIXTURES.md).
 
 ## Product goal
 
