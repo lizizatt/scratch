@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 43
+three-dimensional incompressible Navier-Stokes Millennium problem. 44
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -161,6 +161,10 @@ original diffuse global bound.
   semigroup parameters miss concentrating packets, while matching the KNSS
   scale sends the parameter to infinity and leaves a nonzero triad commutator;
   `SEMIGROUP-DUHAMEL-FUNCTIONAL` remains `blocked`.
+- Tested a fractional Stokes resolvent/Mellin functional. Its nonlinear
+  pairing is sign-indefinite on the exact triad, and matching the spectral
+  parameter to the KNSS scale causes parameter escape; `RESOLVENT-MELLIN-
+  FUNCTIONAL` remains `blocked`.
 
 ## Candidate Dispositions
 
