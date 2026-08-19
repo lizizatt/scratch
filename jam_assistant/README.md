@@ -112,13 +112,16 @@ type ChordEstimate = {
   chroma: readonly number[];
 } & (
   | { state: "chord"; rootPitchClass: number; quality: ChordQuality }
-  | { state: "no-chord"; reason: "silence" | "unsupported" }
+  | { state: "no-chord"; reason: "silence" }
   | { state: "uncertain"; candidateRootPitchClass?: number }
 );
 ```
 
 The UI derives a display symbol from canonical root and quality fields. It does
-not accept an independently supplied symbol that could contradict them.
+not accept an independently supplied symbol that could contradict them. Source
+states such as waiting for permission, canceled, track muted/ended, and file
+decode failure are modeled outside `ChordEstimate`; no estimate is fabricated
+when PCM is unavailable.
 
 ## Detection approach
 
@@ -150,13 +153,15 @@ Test layers:
 
 - Unit tests cover chord templates, confidence thresholds, smoothing, theory
   mappings, and every fretboard position.
-- Integration tests feed generated triads, recorded guitar fixtures, silence,
-  and chord transitions into the analyzer and compare timestamped outputs.
+- Integration tests feed generated fixtures for every root-quality combination,
+  recorded guitar fixtures, silence, and chord transitions into the analyzer
+  and compare timestamped outputs with per-quality reporting.
 - Adapter tests verify that all 12 single-pitch fixtures peak in the canonical
   C-to-B chroma bin for each candidate feature library.
 - Browser tests verify file decoding, microphone permission/error UI using a
-  synthetic media stream, AudioContext activation/interruption, and fretboard
-  rendering.
+  synthetic media stream, cancellation before delayed permission settlement,
+  track mute/unmute/end events, AudioContext activation/interruption, and
+  fretboard rendering.
 - One headless Chromium benchmark starts from MP3 bytes and includes decoding,
   framing, and analysis in its end-to-end throughput measurement.
 - A small evaluation corpus reports chord-weighted recall, no-chord false
@@ -188,7 +193,7 @@ Recognition on mixed recordings is an evaluation track, not an MVP gate.
   AGPLv3 terms or needs commercial licensing; otherwise exclude it.
 
 Exit criterion: one analyzer API processes microphone-shaped frames and offline
-fixtures with stable labels for clean triads.
+fixtures with stable labels meeting the acceptance target for every MVP quality.
 
 ### Phase 1: vertical slice
 
@@ -199,10 +204,14 @@ fixtures with stable labels for clean triads.
 ### Phase 2: live input
 
 - Add microphone permissions and capture.
+- Invalidate canceled permission requests; if a canceled or superseded request
+  later resolves, immediately stop every track in its returned stream.
 - Request echo cancellation, automatic gain control, and noise suppression off;
   inspect actual track settings and expose when the browser cannot honor them.
 - Create or resume the AudioContext from the Start gesture, require a `running`
   state before analysis, and handle later state changes or interruptions.
+- Observe microphone track `mute`, `unmute`, and `ended` events so temporary loss
+  clears the displayed estimate and permanent loss returns to source selection.
 - Move expensive feature extraction off the UI thread.
 - Tune smoothing and uncertainty behavior with guitar input.
 

@@ -30,7 +30,10 @@ too large for browsers or collaborative/storage features require one.
 access requires user permission and a secure context. `localhost` qualifies for
 development; deployment should use HTTPS. A permission request may remain
 unanswered, so the UI needs a cancellable waiting state rather than assuming the
-promise settles immediately.
+promise settles immediately. `getUserMedia()` has no cancellation parameter:
+the adapter must invalidate canceled or superseded request generations and stop
+all tracks if an obsolete request later resolves. Test this with delayed promise
+settlement so cancellation cannot acquire the microphone behind the UI.
 
 AudioWorklet is widely available in current Chrome, Edge, Firefox, and Safari.
 It runs custom processing on the Web Audio rendering thread and communicates
@@ -48,7 +51,12 @@ The Start user gesture must create or resume the `AudioContext` and wait until
 its state is `running`. Browsers may initially block startup without user
 activation; while suspended, real-time stream data is lost and AudioWorklet
 processors are not invoked. Listen for state changes so suspension,
-interruption, or device failure becomes a recoverable UI state.
+interruption, or audio-system failure becomes a recoverable UI state.
+
+The microphone track has a separate lifecycle from the `AudioContext`. Observe
+`mute` and `unmute` for temporary source loss and `ended` for permanent loss such
+as permission revocation or device removal. Clear stale chord output while muted
+or ended and exercise these events in browser tests.
 
 `BaseAudioContext.decodeAudioData()` decodes complete file data into an
 `AudioBuffer`. Its normalized PCM channels can be sliced and analyzed in a tight
