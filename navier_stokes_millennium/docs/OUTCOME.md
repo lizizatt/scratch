@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 41
+three-dimensional incompressible Navier-Stokes Millennium problem. 42
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -152,6 +152,11 @@ original diffuse global bound.
   vorticity modulation. Every candidate failed at pressure differentiation,
   scaling, transverse flux, or fixed-time transfer; no new functional was
   proved or refuted.
+- Tested a nonlocal wavelet/phase-space coefficient functional. It is formally
+  scale-critical and sees spatial concentration, but flux completion produces
+  a quartic nonlinear term on the high-high-to-low triad, while the expanding
+  ball factor recreates the missing anti-concentration estimate; it remains
+  `blocked` (`WAVELET-PHASESPACE-FUNCTIONAL`).
 
 ## Candidate Dispositions
 
@@ -181,6 +186,7 @@ per round 1's findings.
 | Local energy inequality along record-center trajectory (`LOCAL-L3-FROM-LOCAL-ENERGY`) | `blocked` | Local pressure decomposition is circular at short range and supercritical at long range; missing estimate identified precisely. |
 | Record-scale local $L^2$ anti-concentration (`LOCAL-L2-ANTI-CONCENTRATION`) | `blocked` | The exact estimate needed to convert KNSS pointwise control into the record-center local $L^3$ hypothesis remains unavailable. |
 | Critical localized kinetic-enstrophy tail (`CRITICAL-KINETIC-ENSTROPHY-TAIL`) | `blocked` | Interior stretching can be conditionally absorbed, but pressure and cubic annular tails remain uncontrolled at fixed profile times. |
+| Wavelet phase-space functional (`WAVELET-PHASESPACE-FUNCTIONAL`) | `blocked` | Flux differentiation creates quartic triad terms, and the expanding-ball factor is equivalent to the missing target bound. |
 | Naive $r_Q^{-1}$ cube measure (`FREQ-NAIVE-MEASURE`) | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
 | Local-only harmonic pressure control (`FREQ-PRESSURE-LOCAL`) | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
 | Matched-scale commutator smallness (`FREQ-MATCHED-COMMUTATOR`) | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |

@@ -28,7 +28,7 @@ The current result and stopping condition are recorded in
 
 ## Current status (2026-08-18)
 
-The problem remains open. 41 adversarial gauntlet rounds have attacked
+The problem remains open. 42 adversarial gauntlet rounds have attacked
 frequency-packing, phase-space, and critical-profile routes; several narrow
 sub-claims were refuted with explicit counterexamples, and two conditional
 theorems, `LOCAL-L3-CONTINUATION`
@@ -55,7 +55,10 @@ functional; its interior stretching term is conditionally absorbable, but the
 fixed-time annular tail remains blocked. A four-step functional-design loop
 then tested instantaneous pressure moments, windowed energy, higher-derivative
 enstrophy, and anisotropic vorticity penalties; all failed at pressure
-differentiation, scaling, transverse transport, or fixed-time transfer.
+differentiation, scaling, transverse transport, or fixed-time transfer. The
+next nonlocal wavelet/phase-space candidate also failed: flux completion
+created a quartic triad term, while its expanding-ball normalization recreated
+the missing anti-concentration estimate.
 
 ## Resolution standard
 

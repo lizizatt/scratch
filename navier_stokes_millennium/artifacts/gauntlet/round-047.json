@@ -1,0 +1,71 @@
+{
+  "schema_version": 2,
+  "round_id": "round-047",
+  "date": "2026-08-19",
+  "target": "wavelet-phase-space-functional-audit",
+  "target_claim_id": "WAVELET-PHASESPACE-FUNCTIONAL",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-047-claims.json",
+  "claims_snapshot_sha256": "d20f3fcf6a63e3ee43270252b7c090ee1dc5e2bde7c3b13db50ee6eb696d3bf8",
+  "previous_round": "artifacts/gauntlet/round-046.json",
+  "previous_round_sha256": "9b0b3906f1dbe5c7935f946ab73dd3bc2c26c29ff68f7ec462b88e116608dde5",
+  "post_repair_claims_sha256": "d20f3fcf6a63e3ee43270252b7c090ee1dc5e2bde7c3b13db50ee6eb696d3bf8",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "3e70fc6230588e2f78d00f713f4ca4050bbf2b62d28f50843f6a320c0ea32cc7",
+  "reviewers": [
+    "expensive-agent: wavelet phase-space functional audit"
+  ],
+  "capability_failures": [],
+  "findings": [
+    {
+      "id": "R47-001",
+      "fingerprint": "wavelet-flux-quartic-triad-obstruction",
+      "disposition": "valid",
+      "finding": "A scale-critical divergence-free wavelet coefficient functional with matched packet flux differentiates to a quartic projected-nonlinearity square, while the candidate and dissipation are quadratic; the exact high-high-to-low triad therefore prevents a universal coercive inequality.",
+      "repair": "Recorded docs/research/WAVELET_PHASESPACE_FUNCTIONAL_AUDIT.md and kept WAVELET-PHASESPACE-FUNCTIONAL blocked."
+    },
+    {
+      "id": "R47-002",
+      "fingerprint": "wavelet-expanding-ball-quantifier-gap",
+      "disposition": "valid",
+      "finding": "The ordinary critical Carleson coefficient bound controls local energy divided by the physical radius, while the KNSS target requires the expanding-ball factor rho/ell; inserting that factor makes boundedness equivalent to the missing anti-concentration estimate.",
+      "repair": "Documented the quantifier gap and did not treat the wavelet norm as an independent derivation."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json after advancing the manifest head",
+    "python -m unittest discover -s tests -v",
+    "git diff --check",
+    "The exact high-high-to-low triad and smooth shear were used as stress tests",
+    "No wavelet functional was marked proved and the anti-concentration target remains blocked"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked",
+    "bogovskii-temporal-commutator-restores-pressure",
+    "bogovskii-critical-transport-remainder",
+    "bogovskii-fixed-profile-time-gap",
+    "bogovskii-source-hypothesis-gap",
+    "lin-source-scope-no-anti-concentration",
+    "ess-source-scope-no-local-l2-bridge",
+    "bogovskii-primary-source-gap",
+    "besov-route-repeats-frequency-blocker",
+    "minimal-blowup-already-implicit",
+    "vorticity-geometry-fixed-slice-gap",
+    "no-monotonicity-functional",
+    "singular-set-size-not-amplitude-control",
+    "critical-kinetic-enstrophy-annular-tail",
+    "critical-functional-universal-coercivity-killed",
+    "stress-completed-functional-pressure-time-derivative",
+    "windowed-functional-scale-inverting-energy",
+    "enstrophy-window-derivative-hierarchy",
+    "anisotropic-vorticity-penalty-misses-transverse-flux",
+    "wavelet-flux-quartic-triad-obstruction",
+    "wavelet-expanding-ball-quantifier-gap"
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
