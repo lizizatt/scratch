@@ -61,6 +61,13 @@ def highest_nonlinear_degree(candidate_degrees: Iterable[int]) -> int:
     )
 
 
+def quadratic_generator_output_degree(source_degree: int) -> int:
+    """Return the output degree from differentiating through ``B(z, z)``."""
+    if source_degree <= 0:
+        raise ValueError("source degree must be positive")
+    return source_degree + 1
+
+
 def nonlinear_degree_is_dissipation_supported(
     candidate_degrees: Iterable[int],
     dissipation_degrees: Iterable[int],
