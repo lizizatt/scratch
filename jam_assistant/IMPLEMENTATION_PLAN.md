@@ -8,6 +8,10 @@ risk before committing the application to a feature library.
 **Goal:** select a chroma implementation and prove the source-independent
 analyzer contract.
 
+**Status:** complete. Meyda was selected in
+[ADR 0001](docs/adr/0001-select-meyda-chroma.md); recorded-guitar validation
+remains the first Milestone 1 corpus task.
+
 1. Scaffold a minimal TypeScript package with Vite and Vitest.
 2. Define `PcmChunk`, `ChromaFrame`, and `ChordEstimate` contracts in
    `src/analysis/types.ts`.
@@ -45,6 +49,11 @@ evaluate a learned classifier before building the UI.
    distinct root, chord-tone, and optional scale-tone layers.
 7. Add file progress, scrub, speed, silence, decode-error, and unsupported-file
    states.
+
+**Status:** file-to-fretboard vertical slice complete. The app loads local WAV
+and MP3 files, analyzes decoded PCM in a worker, exposes timeline preview and
+scale selection, and renders the standard-tuning fretboard. Recorded-guitar
+fixtures and live microphone capture remain Milestone 2 work.
 
 **Tests:** unit tests for music and fretboard mappings; integration tests from
 decoded PCM to estimates; Playwright tests for file selection, source changes,
