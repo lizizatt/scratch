@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 44
+three-dimensional incompressible Navier-Stokes Millennium problem. 45
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -165,6 +165,10 @@ original diffuse global bound.
   pairing is sign-indefinite on the exact triad, and matching the spectral
   parameter to the KNSS scale causes parameter escape; `RESOLVENT-MELLIN-
   FUNCTIONAL` remains `blocked`.
+- Tested a critical Gabor/modulation-space functional. Its frame commutator is
+  order one, the high-high-to-low receiver escapes the donor window, and fixed
+  spatial/time suprema recreate the anti-concentration target;
+  `MODULATION-SPACE-FUNCTIONAL` remains `blocked`.
 
 ## Candidate Dispositions
 

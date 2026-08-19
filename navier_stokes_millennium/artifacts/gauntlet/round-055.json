@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "round_id": "round-055",
+  "date": "2026-08-19",
+  "target": "modulation-space-functional-audit",
+  "target_claim_id": "MODULATION-SPACE-FUNCTIONAL",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-055-claims.json",
+  "claims_snapshot_sha256": "b9072117edc9314c445ab529b432214cd8d89cce137c69c9aa6ede362606eb4e",
+  "previous_round": "artifacts/gauntlet/round-054.json",
+  "previous_round_sha256": "5aa13b9b3dddeded6f1a74c6be62ea2f5aa96734630a6237dbd8327778608612",
+  "post_repair_claims_sha256": "b9072117edc9314c445ab529b432214cd8d89cce137c69c9aa6ede362606eb4e",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "22446653cf55af18ca2425629a0f7ba0daba008f214f7ff9a46b97e6997b728f",
+  "reviewers": ["Explore: modulation space functional audit"],
+  "capability_failures": [],
+  "findings": [{
+    "id": "R55-001",
+    "fingerprint": "modulation-window-triad-commutator",
+    "disposition": "valid",
+    "finding": "A critical Gabor/modulation functional has an order-one frame commutator and cannot keep high-frequency donors and their low-frequency triadic receiver in one window; fixed-time spatial suprema reproduce the anti-concentration target.",
+    "repair": "Recorded docs/research/MODULATION_SPACE_FUNCTIONAL_AUDIT.md and kept MODULATION-SPACE-FUNCTIONAL blocked."
+  }],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json after advancing manifest", "python -m unittest discover -s tests -v", "git diff --check", "Gabor localization, shear, concentration, triad, projection, and fixed-time tests were audited"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
