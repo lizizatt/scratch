@@ -234,4 +234,5 @@ fixtures with stable labels meeting the acceptance target for every MVP quality.
 - How aggressively confidence and smoothing should suppress transition noise.
 
 See [TECHNOLOGY_RESEARCH.md](TECHNOLOGY_RESEARCH.md) for the technology comparison
-and primary sources.
+and primary sources. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the
+ordered work packages, tests, and exit gates.
