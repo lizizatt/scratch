@@ -44,7 +44,14 @@ test("loads a file into the chord display and fretboard", async ({ page }) => {
   const playAudio = page.getByLabel("Play audio");
   await playAudio.check();
   await expect(playAudio).toBeChecked();
+  await expect(page.locator("audio")).toHaveJSProperty("muted", false);
+  const playTimeline = page.getByRole("button", { name: "Play timeline" });
+  await playTimeline.click();
   await expect(page.locator("audio")).toHaveJSProperty("paused", false);
+  await page.getByRole("button", { name: "Pause timeline" }).click();
+  await expect(page.locator("audio")).toHaveJSProperty("paused", true);
+  await playAudio.uncheck();
+  await expect(page.locator("audio")).toHaveJSProperty("muted", true);
 });
 
 test("shows chord names and seeks when a marker is clicked", async ({ page }) => {

@@ -32,6 +32,7 @@ export function App() {
   const [fileName, setFileName] = useState<string>();
   const [result, setResult] = useState<FileAnalysisResult>();
   const [selectedTime, setSelectedTime] = useState(0);
+  const [audioMuted, setAudioMuted] = useState(true);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [scaleName, setScaleName] = useState<string>();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -63,11 +64,17 @@ export function App() {
       return;
     }
     const handleTimeUpdate = () => setSelectedTime(audio.currentTime);
+    const handlePlay = () => setAudioPlaying(true);
+    const handlePause = () => setAudioPlaying(false);
     const handleEnded = () => setAudioPlaying(false);
     audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
       audio.pause();
       if (fileUrlRef.current !== undefined) {
@@ -83,6 +90,9 @@ export function App() {
     const currentRequest = ++requestId.current;
     const audio = audioRef.current;
     audio?.pause();
+    if (audio !== null) {
+      audio.muted = audioMuted;
+    }
     setAudioPlaying(false);
     if (fileUrlRef.current !== undefined) {
       URL.revokeObjectURL(fileUrlRef.current);
@@ -127,18 +137,26 @@ export function App() {
     }
   }
 
-  function handleAudioToggle(shouldPlay: boolean) {
+  function handleAudioMuteToggle(shouldPlay: boolean) {
     const audio = audioRef.current;
-    setAudioPlaying(shouldPlay);
+    setAudioMuted(!shouldPlay);
     if (audio === null) {
       return;
     }
-    if (!shouldPlay) {
-      audio.pause();
+    audio.muted = !shouldPlay;
+  }
+
+  function handlePlaybackToggle() {
+    const audio = audioRef.current;
+    if (audio === null) {
       return;
     }
-    audio.currentTime = selectedTime;
-    void audio.play().catch(() => setAudioPlaying(false));
+    if (audio.paused) {
+      audio.currentTime = selectedTime;
+      void audio.play().catch(() => setAudioPlaying(false));
+    } else {
+      audio.pause();
+    }
   }
 
   return (
@@ -195,7 +213,7 @@ export function App() {
         </div>
 
         <div className="timeline-panel panel">
-          <div className="panel-heading"><span>Analysis timeline</span><label className="audio-toggle"><input type="checkbox" aria-label="Play audio" checked={audioPlaying} onChange={(event) => handleAudioToggle(event.target.checked)} /><span>Play audio</span></label></div>
+          <div className="panel-heading"><span>Analysis timeline</span><div className="playback-controls"><button className="playback-button" type="button" onClick={handlePlaybackToggle} aria-label={audioPlaying ? "Pause timeline" : "Play timeline"}>{audioPlaying ? "||" : "▶"}</button><label className="audio-toggle"><input type="checkbox" aria-label="Play audio" checked={!audioMuted} onChange={(event) => handleAudioMuteToggle(event.target.checked)} /><span>Play audio</span></label></div></div>
           <div className="timeline-rail" aria-label="Detected chords">
             <span className="timeline-progress" style={{ width: `${(selectedTime / result.durationSeconds) * 100}%` }} />
             {chordMarkers.map((marker) => <button className="chord-marker" type="button" key={`${marker.timestampSeconds}-${marker.label}`} style={{ left: `${(marker.timestampSeconds / result.durationSeconds) * 100}%` }} onClick={() => seekTo(Math.min(result.durationSeconds, marker.timestampSeconds + MARKER_SETTLE_SECONDS))} aria-label={`Seek to ${marker.label}`}><span>{marker.label}</span></button>)}
