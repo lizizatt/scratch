@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "round_id": "round-064",
+  "date": "2026-08-19",
+  "target": "freq-packing-status-synchronization",
+  "target_claim_id": "FREQ-PACKING",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-064-claims.json",
+  "claims_snapshot_sha256": "af46ed3ce8b2aa100aded7550a8a76c64afe4c2a78fab52333b3827381b488d3",
+  "previous_round": "artifacts/gauntlet/round-063.json",
+  "previous_round_sha256": "e2dfaac68d74593e7913074652c5891b2bbf1400518069c98d773a497549e044",
+  "post_repair_claims_sha256": "af46ed3ce8b2aa100aded7550a8a76c64afe4c2a78fab52333b3827381b488d3",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "ac1bce7c0edf3232ee23d46067cf442d05b6e1669541c505aa03000027dd31f1",
+  "reviewers": ["repository synchronization check: FREQ-PACKING status"],
+  "capability_failures": [],
+  "findings": [],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json", "python -m unittest discover -s tests -v", "git diff --check", "No canonical claim changed after round-063"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy", "frequency-packing-underspecified-occupancy-bridge"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

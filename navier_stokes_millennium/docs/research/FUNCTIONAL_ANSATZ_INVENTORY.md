@@ -87,7 +87,7 @@ operator, time operator, algebraic structure, or proof objective.
 | Besov/paraproduct | blocked | Repeats matched-scale commutator and fixed-time/pressure obstructions. |
 | Wavelet phase-space plus packet flux | blocked | Flux differentiation creates quartic terms; expanding-ball normalization restates the target. |
 | Finite-degree polynomial Galerkin | scoped no-go | Quadratic generator raises degree; exact triad defeats the declared dissipation pattern. |
-| Carleson/frequency packing | conjectured/blocked | Non-overcounting measure and packing-to-epsilon bridge unresolved. |
+| Carleson/frequency packing | blocked | The combined claim is underspecified; occupancy-only packing does not imply a regular scale. |
 | Vorticity direction/filament geometry | refuted/blocked | Geometry does not supply fixed-slice amplitude control. |
 | Singular-set measure/capacity geometry | blocked | Set size does not control velocity amplitude or pressure. |
 | Type I/self-similar rates | refuted/blocked | Type I does not bound local critical mass; self-similar tangent implication is missing. |

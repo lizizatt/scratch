@@ -164,7 +164,7 @@ partial because no cutoff-uniform whole-space continuum bridge exists.
 | Higher derivative enstrophy | blocked | Scaling mismatch or derivative/pressure hierarchy | B1, B3 |
 | Instantaneous pressure moments | blocked | $p_t$ and $|u||p|^2$ are uncontrolled | B3, B4 |
 | Fourier shell/flux absorption | refuted | Exact high-high-to-low triad | B2 |
-| Frequency Carleson/phase-space packing | blocked/conjectured | `FREQ-PACKING` is conjectured; phase-space subbridges are blocked/refuted | B2, B3, B7 |
+| Frequency Carleson/phase-space packing | blocked | `FREQ-PACKING` is underspecified; occupancy-only packing does not imply a regular scale | B2, B3, B7 |
 | Exact finite-Fourier/Galerkin probes | partial: narrow disproofs | Exact triads refute selected inequalities; continuum bridge is absent | B2, B8 |
 | Besov/paraproduct | blocked | Matched commutator and fixed-time high-frequency gap | B2, B5 |
 | Wavelet phase-space | blocked | Quartic flux derivative and $\rho/\ell$ restates target | B2, B5 |

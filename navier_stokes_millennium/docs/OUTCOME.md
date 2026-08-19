@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 47
+three-dimensional incompressible Navier-Stokes Millennium problem. 48
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -80,8 +80,9 @@ original diffuse global bound.
 - Rounds 18-25 produced solid narrow disproofs of naive cube charging,
   local-only harmonic-pressure control, automatic matched-scale commutator
   smallness, the CLMS suitability transfer, finite-probe-to-PDE uniformity,
-  and the occupancy-only packing-to-CKN bridge. `FREQ-PHASESPACE` remains
-  `blocked` and `FREQ-PACKING` remains `conjectured`; neither was upgraded.
+  and the occupancy-only packing-to-CKN bridge. `FREQ-PHASESPACE` and
+  `FREQ-PACKING` remain `blocked`; the combined packing claim was later
+  underspecified and occupancy alone was shown insufficient for regularity.
 - A fresh critical-profile iteration found no proof or admissible counterexample.
   The exact gap is global backward $L^3$ boundedness and pressure/mildness
   control for the ancient profile needed by the Liouville theorem.
@@ -176,6 +177,15 @@ original diffuse global bound.
   retain nonlinear transfer; signed cancellation loses coercivity, while the
   planar triad has zero signed helicity but nonzero absolute transfer.
   `HELICITY-HELICAL-FUNCTIONAL` remains `blocked`.
+- Sharpened `FREQ-PACKING`: the combined conjecture was underspecified, and
+  bounded occupancy permits one bad event at every nested scale. Occupancy-only
+  packing therefore does not imply a regular scale; the claim is now `blocked`
+  pending fixed quantifiers and amplitude/pressure/persistence terms.
+- Sharpened `FREQ-PACKING`: the combined regularity conjecture was
+  underspecified, and a bounded occupancy norm permits one bad event at every
+  nested scale. Occupancy-only packing-to-CKN is therefore insufficient;
+  `FREQ-PACKING` is now `blocked` pending fixed quantifiers and an amplitude/
+  pressure/persistence term.
 
 ## Candidate Dispositions
 

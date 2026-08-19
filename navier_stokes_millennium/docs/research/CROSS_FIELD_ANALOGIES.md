@@ -260,7 +260,7 @@ $$
 The already-checked high-high-to-low triad refutes the stronger dream that no
 bad boxes exist. The working conjecture is weaker:
 
-> **Claim FREQ-PACKING (`conjectured`).** There exists a dimensionless
+> **Historical Claim FREQ-PACKING (now `blocked`).** There exists a dimensionless
 > threshold $\theta>0$ such that every smooth normalized periodic solution has
 > a finite solution-dependent constant $C(u,\theta)$ giving a scale-time
 > Carleson bound strong enough to prevent accumulation along every shrinking

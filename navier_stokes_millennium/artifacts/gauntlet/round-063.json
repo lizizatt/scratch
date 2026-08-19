@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "round_id": "round-063",
+  "date": "2026-08-19",
+  "target": "freq-packing-sharpening-audit",
+  "target_claim_id": "FREQ-PACKING",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-063-claims.json",
+  "claims_snapshot_sha256": "af46ed3ce8b2aa100aded7550a8a76c64afe4c2a78fab52333b3827381b488d3",
+  "previous_round": "artifacts/gauntlet/round-062.json",
+  "previous_round_sha256": "1cb6a6802c4b37ceabedd2f64570db109b1873f0ca3cd8b2113f0337bcf3b7e1",
+  "post_repair_claims_sha256": "af46ed3ce8b2aa100aded7550a8a76c64afe4c2a78fab52333b3827381b488d3",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "c2444c766d424b19998c12aaa22dc64fec640eb8c532077178d13534ad2ee67e",
+  "reviewers": ["Explore: FREQ-PACKING sharpening review"],
+  "capability_failures": [],
+  "findings": [{
+    "id": "R63-001",
+    "fingerprint": "freq-packing-underspecified-occupancy-bridge",
+    "disposition": "valid",
+    "finding": "The combined FREQ-PACKING conjecture conflates pure occupancy, pressure/spatial packing, and the packing-to-regularity bridge. Nested bad intervals have bounded Carleson occupancy at every depth, and zero-flux zero-pressure shear can remain CKN-nonsmall on finite nested scales, so occupancy alone cannot force a regular scale.",
+    "repair": "Downgraded FREQ-PACKING from conjectured to blocked; recorded docs/research/FREQ_PACKING_SHARPENING_AUDIT.md; preserved a future fixed-quantifier occupancy theorem as a separate non-regularity question."
+  }],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json after advancing manifest", "python -m unittest discover -s tests -v", "git diff --check", "Fresh review confirmed the status downgrade, dependency closure, and distinction between occupancy-only and pressure/amplitude-enriched packing"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy", "frequency-packing-underspecified-occupancy-bridge"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

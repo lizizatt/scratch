@@ -1,6 +1,7 @@
 # Frequency-Packing Iteration 001
 
-**Status:** conjectural research note; no regularity theorem claimed.
+**Status:** historical research note; the combined claim is now `blocked` and
+no regularity theorem is claimed.
 
 This iteration refines `FREQ-PACKING` after independent brainstorms. The
 pointwise absorption idea is already refuted by the exact high-high-to-low
