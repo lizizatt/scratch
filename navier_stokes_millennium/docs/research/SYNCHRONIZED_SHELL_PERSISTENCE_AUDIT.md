@@ -78,6 +78,21 @@ $T-t_j\asymp4^{-j}$ while maintaining the leakage inequality through $T$.
 The triad rules out a universal version based only on shell energy; a proof would
 need new phase-locking, persistence, and viscosity-control structure.
 
+## Final production audit
+
+Finite energy does not force activation times $t_j$ with
+$E_j(t_j)\geq\varepsilon2^{-j}$ and $T-t_j\asymp4^{-j}$: critical divergence
+may be diffusely distributed across shells, and moving packets can activate one
+shell at a time. Bernstein applied to the shell identity loses one full cutoff
+power in the relative transfer estimate, so it cannot produce a
+cutoff-independent persistence constant. The exact triad shows that any
+shell-energy-only production estimate would also have an amplitude-dependent
+constant.
+
+The smallest repair is to assume activation plus an integrated logarithmic-loss
+bound as an explicit hypothesis. That weakens the criterion but does not derive
+it from finite-energy data.
+
 ## Disposition
 
 The synchronized shell criterion is **valid as a conditional implication** but

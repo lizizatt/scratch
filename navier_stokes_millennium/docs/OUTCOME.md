@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 50
+three-dimensional incompressible Navier-Stokes Millennium problem. 51
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -181,6 +181,10 @@ original diffuse global bound.
   bounded occupancy permits one bad event at every nested scale. Occupancy-only
   packing therefore does not imply a regular scale; the claim is now `blocked`
   pending fixed quantifiers and amplitude/pressure/persistence terms.
+- Completed the final synchronized-shell production audit. The same-time
+  $\dot H^{1/2}$ criterion is valid conditionally, but finite energy does not
+  force synchronized shell activation and Bernstein loses one cutoff power in
+  the persistence estimate; `SHELL-PERSISTENCE-FROM-NS` remains `blocked`.
 - Sharpened `FREQ-PACKING`: the combined regularity conjecture was
   underspecified, and a bounded occupancy norm permits one bad event at every
   nested scale. Occupancy-only packing-to-CKN is therefore insufficient;

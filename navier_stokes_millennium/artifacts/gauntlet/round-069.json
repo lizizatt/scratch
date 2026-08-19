@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "round_id": "round-069",
+  "date": "2026-08-19",
+  "target": "synchronized-shell-production-final-audit",
+  "target_claim_id": "SHELL-PERSISTENCE-FROM-NS",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-068-claims.json",
+  "claims_snapshot_sha256": "a29f6c86196f8827286f54dd746708a859281acf17270ba01581bff8d3d45919",
+  "previous_round": "artifacts/gauntlet/round-068.json",
+  "previous_round_sha256": "c05b90c4b0cd6740f63b2a0bc2c9c64896a4a77a6e962afd5d11c8328ce9bba5",
+  "post_repair_claims_sha256": "a29f6c86196f8827286f54dd746708a859281acf17270ba01581bff8d3d45919",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "444aa0ffca2c22c07819e1f958878dd80de91ce92bc9abc5a2126eb7ad1caa9f",
+  "reviewers": ["expensive-agent: shell persistence production audit"],
+  "capability_failures": [],
+  "findings": [{
+    "id": "R69-001",
+    "fingerprint": "shell-production-activation-and-persistence-blocked",
+    "disposition": "valid",
+    "finding": "Finite energy does not force synchronized shell activation at T-t_j comparable to 4^-j, and Bernstein shell estimates lose one cutoff power when converted to a cutoff-uniform persistence bound. Moving packets and the exact triad defeat weaker activation/persistence claims.",
+    "repair": "Expanded docs/research/SYNCHRONIZED_SHELL_PERSISTENCE_AUDIT.md with the final production audit; kept SHELL-PERSISTENCE-FROM-NS blocked and retained the conditional criterion."
+  }],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json after advancing the manifest", "python -m unittest discover -s tests -v", "git diff --check", "Fresh adversarial audit distinguished valid conditional same-time H^(1/2) blowup from unavailable PDE production"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy", "frequency-packing-underspecified-occupancy-bridge", "sos-fixed-cutoff-survives-continuum-blocked", "shell-synchronized-criterion-valid-production-blocked", "shell-production-activation-and-persistence-blocked"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

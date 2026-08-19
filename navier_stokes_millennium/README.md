@@ -31,7 +31,7 @@ The cross-route blocker overview is recorded in
 
 ## Current status (2026-08-18)
 
-The problem remains open. 50 adversarial gauntlet rounds have attacked
+The problem remains open. 51 adversarial gauntlet rounds have attacked
 frequency-packing, phase-space, and critical-profile routes; several narrow
 sub-claims were refuted with explicit counterexamples, and two conditional
 theorems, `LOCAL-L3-CONTINUATION`
