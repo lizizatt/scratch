@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 42
+three-dimensional incompressible Navier-Stokes Millennium problem. 43
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -157,6 +157,10 @@ original diffuse global bound.
   a quartic nonlinear term on the high-high-to-low triad, while the expanding
   ball factor recreates the missing anti-concentration estimate; it remains
   `blocked` (`WAVELET-PHASESPACE-FUNCTIONAL`).
+- Tested a critically normalized heat-semigroup/Duhamel functional. Fixed
+  semigroup parameters miss concentrating packets, while matching the KNSS
+  scale sends the parameter to infinity and leaves a nonzero triad commutator;
+  `SEMIGROUP-DUHAMEL-FUNCTIONAL` remains `blocked`.
 
 ## Candidate Dispositions
 
