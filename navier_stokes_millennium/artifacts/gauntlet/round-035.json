@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "round_id": "round-035",
+  "date": "2026-08-18",
+  "target": "local-l3-record-centers-verification",
+  "target_claim_id": "LOCAL-L3-RECORD-CENTERS",
+  "subject_sha256": "80eefa44a50e6c4b5866f8c855785a6b960918ec8d12fcf9e1ae29559ac7899b",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-035-claims.json",
+  "claims_snapshot_sha256": "80eefa44a50e6c4b5866f8c855785a6b960918ec8d12fcf9e1ae29559ac7899b",
+  "previous_round": "artifacts/gauntlet/round-034.json",
+  "previous_round_sha256": "3231de55e97b4db15c6aa308e44639cd437a99d9288396013197b82e4ee68a99",
+  "post_repair_claims_sha256": "80eefa44a50e6c4b5866f8c855785a6b960918ec8d12fcf9e1ae29559ac7899b",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "b911616dc0c5a568d39421a7d11869a32e7a44fdc2298522924954e480f612ae",
+  "reviewers": [
+    "expensive-agent: adversarial verification of LOCAL-L3-RECORD-CENTERS"
+  ],
+  "findings": [
+    {
+      "id": "R35-001",
+      "fingerprint": "record-center-weakening-verified",
+      "disposition": "valid",
+      "finding": "Independent adversarial review reconstructed the record-center proof step by step and confirmed no step (KNSS compactness, nontriviality, mildness, or Albritton-Barker rigidity) requires local L3 control at centers other than the sampled record-center trajectory; mass escaping to rescaled infinity, a second concentration point, and remote pressure effects were all checked and do not create a gap.",
+      "repair": "Upgraded LOCAL-L3-RECORD-CENTERS from conjectured to proved; wrote full proof docs/proofs/LOCAL_L3_RECORD_CENTERS.md; updated CRITICAL_PROFILE_ITERATION_004.md disposition and docs/OUTCOME.md table row."
+    },
+    {
+      "id": "R35-002",
+      "fingerprint": "record-center-no-derivation-gain",
+      "disposition": "valid",
+      "finding": "The reviewer also confirmed the narrowing provides no concrete derivational gain toward LOCAL-L3-BOUND-DERIVATION: energy interpolation only supplies time-integrated (L^4/3_t) local L3 control, and the existing concentrating counterexample already concentrates at the record center itself.",
+      "repair": "No ledger change needed; LOCAL-L3-BOUND-DERIVATION correctly remains blocked, and the proof's Scope section documents this explicitly."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (51 tests)",
+    "git diff --check",
+    "One expensive-agent subagent independently reconstructed the proof and stress-tested it against KNSS compactness, escaping mass, second-concentration, and remote-pressure scenarios"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity"
+  ],
+  "resolved_findings": [
+    "record-center-weakening-found",
+    "record-center-weakening-verified",
+    "record-center-no-derivation-gain"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

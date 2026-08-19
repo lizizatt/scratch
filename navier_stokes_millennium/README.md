@@ -28,13 +28,16 @@ The current result and stopping condition are recorded in
 
 ## Current status (2026-08-17)
 
-The problem remains open. Thirty-four adversarial gauntlet rounds (and
+The problem remains open. Thirty-five adversarial gauntlet rounds (and
 counting) have attacked frequency-packing, phase-space, and critical-profile
 routes; several narrow sub-claims were refuted with explicit counterexamples,
-and one conditional theorem, `LOCAL-L3-CONTINUATION`
-([proof](docs/proofs/LOCAL_L3_CONTINUATION.md)), was proved: a local,
+and two conditional theorems, `LOCAL-L3-CONTINUATION`
+([proof](docs/proofs/LOCAL_L3_CONTINUATION.md)) and its record-center
+weakening `LOCAL-L3-RECORD-CENTERS`
+([proof](docs/proofs/LOCAL_L3_RECORD_CENTERS.md)), were proved: a local,
 fixed-radius uniform $L^3$ bound near a hypothetical singular time already
-rules out that singularity. Deriving that local bound from finite-energy data
+rules out that singularity, even if only assumed along one backward-tracked
+trajectory of centers. Deriving that local bound from finite-energy data
 remains the open step; see [`docs/OUTCOME.md`](docs/OUTCOME.md) for the
 candidate-disposition table and gauntlet history.
 

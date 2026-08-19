@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. Thirty-four
+three-dimensional incompressible Navier-Stokes Millennium problem. Thirty-five
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -96,6 +96,11 @@ original diffuse global bound.
   One genuine narrowing was found: a strictly weaker record-center-only
   hypothesis still suffices for continuation, recorded as `conjectured`
   pending independent adversarial verification.
+- Proved `LOCAL-L3-RECORD-CENTERS` after independent adversarial review: the
+  record-center-only hypothesis is genuinely weaker than $M_R$ and the
+  continuation argument goes through unchanged, but the review also confirmed
+  the narrowing gives no derivational shortcut, so `LOCAL-L3-BOUND-DERIVATION`
+  remains `blocked`.
 
 ## Candidate Dispositions
 
@@ -121,7 +126,7 @@ per round 1's findings.
 | Local $L^3$ bound from vorticity-direction coherence (`LOCAL-L3-FROM-VORTICITY-COHERENCE`) | `refuted` | Genuine Constantin-Fefferman coherence already proves regularity directly, and coherence does not survive record-point rescaling. |
 | Local $L^3$ bound from Carleman/backward-uniqueness adaptation (`LOCAL-L3-FROM-CARLEMAN`) | `blocked` | Requires a terminal zero trace and additional tail control not supplied by finite energy. |
 | Local $L^3$ bound from Type I rate plus self-similar exclusion (`LOCAL-L3-FROM-TYPE-I`) | `refuted` | The Type I rate alone lets local $L^3$ mass diverge, and Type I to self-similar tangent is unproven (`BUP-003`). |
-| Weaker record-center-only local $L^3$ hypothesis (`LOCAL-L3-RECORD-CENTERS`) | `conjectured` | Same KNSS/Albritton-Barker argument applies to a narrower center set, but the narrower bound is not yet independently verified or derived from finite energy. |
+| Weaker record-center-only local $L^3$ hypothesis (`LOCAL-L3-RECORD-CENTERS`) | `proved` | Genuinely weaker than $M_R$ over all centers, verified by independent review, but still not derivable from finite energy alone. |
 | Naive $r_Q^{-1}$ cube measure (`FREQ-NAIVE-MEASURE`) | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
 | Local-only harmonic pressure control (`FREQ-PRESSURE-LOCAL`) | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
 | Matched-scale commutator smallness (`FREQ-MATCHED-COMMUTATOR`) | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |

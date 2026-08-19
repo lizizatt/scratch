@@ -75,14 +75,14 @@ $$
 
 still forces $\int_{B_L}|v(s_j)|^3\le C$ for every fixed $L$, hence
 $\sup_j\|v(s_j)\|_3<\infty$, and Albritton-Barker rigidity applies exactly as
-before. This is recorded as `conjectured` (not `proved`): the derivation
-appears correct but has not yet received an independent adversarial
-verification pass, and finite energy still only controls the restricted local
-mass in $L^{4/3}_t$, not $L^\infty_t$, so the narrower hypothesis remains
-exactly as open to derive from finite-energy data as the original $M_R$. The
-genuine progress is scoping: the target is now a bound along one backward
-parabolic trajectory of record centers, not a uniform bound over all of
-space.
+before. Independent adversarial review confirmed the derivation: it is now
+recorded as `proved` (`docs/proofs/LOCAL_L3_RECORD_CENTERS.md`). Finite energy
+still only controls the restricted local mass in $L^{4/3}_t$, not $L^\infty_t$,
+so the narrower hypothesis remains exactly as open to derive from
+finite-energy data as the original $M_R$; `LOCAL-L3-BOUND-DERIVATION` stays
+`blocked`. The genuine progress is scoping: the target is now a bound along
+one backward parabolic trajectory of record centers, not a uniform bound over
+all of space.
 
 ## Disposition
 
@@ -92,5 +92,5 @@ space.
   missing tail-tightness information as prior attempts.
 - Type I rate plus self-similar exclusion: **refuted** (Type I rate alone
   does not bound local mass; the stationarity bridge remains blocked).
-- Record-center weakening of the hypothesis: **conjectured**, pending
+- Record-center weakening of the hypothesis: **proved**, after independent
   adversarial verification. `LOCAL-L3-BOUND-DERIVATION` remains `blocked`.
