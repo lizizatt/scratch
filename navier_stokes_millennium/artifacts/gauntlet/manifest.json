@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "head": "artifacts/gauntlet/round-039.json",
+  "head": "artifacts/gauntlet/round-040.json",
   "adversarial_round_count": 36,
   "rounds": [
     {
@@ -158,6 +158,10 @@
     {
       "path": "artifacts/gauntlet/round-039.json",
       "sha256": "270265fbcbf428b4bf823b3a34f24c978a1e64bc52b3c06b75ee2e926bb46be7"
+    },
+    {
+      "path": "artifacts/gauntlet/round-040.json",
+      "sha256": "2b3639c2fb58a37b392f8645ce483fd34999eaee9218814282ad5bc6179437cb"
     }
   ]
 }

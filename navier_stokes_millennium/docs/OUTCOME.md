@@ -14,8 +14,9 @@ critical-profile compactness, and a proved conditional continuation
 criterion. No round produced a candidate proof whose dependency closure was
 settled. Subsequent profile and multi-domain fanout iterations are exploratory
 research notes; they are not additional gauntlet rounds and do not add claims
-to the canonical ledger. The manifest also contains two non-mathematical
-synchronization/audit heads, bringing its hash-chain record count to 38.
+to the canonical ledger. The manifest also contains non-mathematical
+synchronization/audit heads that preserve the current research record without
+counting them as mathematical rounds.
 
 The shortest positive route remains
 

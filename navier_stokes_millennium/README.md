@@ -41,7 +41,7 @@ trajectory of centers. Deriving that local bound from finite-energy data
 remains the open step. Later profile and multi-domain fanout iterations are
 recorded as exploratory notes, not additional gauntlet rounds or ledger
 claims; see [`docs/OUTCOME.md`](docs/OUTCOME.md) for the candidate-disposition
-table and gauntlet history. The hash-chain manifest also contains two
+table and gauntlet history. The hash-chain manifest also contains
 non-mathematical synchronization/audit heads for the current research record.
 
 ## Resolution standard

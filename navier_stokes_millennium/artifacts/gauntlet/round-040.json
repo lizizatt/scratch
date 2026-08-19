@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "round_id": "round-040",
+  "date": "2026-08-18",
+  "target": "administrative-head-count-prose-audit",
+  "target_claim_id": "LOCAL-L2-ANTI-CONCENTRATION",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-040-claims.json",
+  "claims_snapshot_sha256": "9d2c49dd3bb3d8db3495ac8092a35e22a13ee3227d6a0ce1a6d9b83dfb5b35d2",
+  "previous_round": "artifacts/gauntlet/round-039.json",
+  "previous_round_sha256": "270265fbcbf428b4bf823b3a34f24c978a1e64bc52b3c06b75ee2e926bb46be7",
+  "post_repair_claims_sha256": "9d2c49dd3bb3d8db3495ac8092a35e22a13ee3227d6a0ce1a6d9b83dfb5b35d2",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "d9cb535d5f453d1acd67c3d8ce583a3180d370f5397e888ffe407b382ff23742",
+  "reviewers": [
+    "repository sanity check: administrative-head count prose"
+  ],
+  "findings": [
+    {
+      "id": "R40-001",
+      "fingerprint": "volatile-administrative-head-count",
+      "disposition": "valid",
+      "finding": "Status prose must not state a fixed total for non-mathematical synchronization heads, because each immutable documentation repair creates another valid hash-chain head.",
+      "repair": "Removed the fixed administrative-head count and total chain-record count from README.md and docs/OUTCOME.md."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v",
+    "Focused documentation consistency regression passed after the prose repair",
+    "git diff --check passed for the prose repair"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked"
+  ],
+  "resolved_findings": [
+    "volatile-administrative-head-count"
+  ],
+  "result": "valid_findings_repaired",
+  "converged": false
+}

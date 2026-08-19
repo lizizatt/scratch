@@ -1,0 +1,1037 @@
+{
+  "schema_version": 1,
+  "targets": ["CLAY-A"],
+  "claims": [
+    {
+      "id": "NS-SCALING",
+      "kind": "lemma",
+      "statement": "Under u_lambda(x,t)=lambda u(lambda x,lambda^2 t), the mixed norm L^s_t L^r_x scales by lambda^(1-2/s-3/r).",
+      "status": "proved",
+      "depends_on": [],
+      "evidence": ["docs/proofs/FOUNDATIONAL_DERIVATIONS.md#mixed-norm-scaling"],
+      "proof_artifact": "docs/proofs/FOUNDATIONAL_DERIVATIONS.md#mixed-norm-scaling",
+      "falsification_attempts": [
+        "At (s,r)=(infinity,3) the exponent is zero, matching the known critical endpoint.",
+        "At (s,r)=(infinity,2) the exponent is -1/2, matching direct change of variables."
+      ]
+    },
+    {
+      "id": "ENERGY-CLASS",
+      "kind": "theorem",
+      "statement": "For each square-integrable divergence-free whole-space datum in Leray's class, there exists a global Leray-Hopf solution in L^infinity(0,infinity;L2) intersect L^2(0,infinity;dot H1).",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#61-what-leray-actually-proved-and-called-it"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "ENERGY-SUPERCRITICAL",
+      "kind": "lemma",
+      "statement": "The energy class does not reach a Ladyzhenskaya-Prodi-Serrin exponent by interpolation alone; in particular L^2_t L^6_x has index 3/2 rather than at most 1.",
+      "status": "proved",
+      "depends_on": ["NS-SCALING", "ENERGY-CLASS"],
+      "evidence": ["docs/proofs/FOUNDATIONAL_DERIVATIONS.md#energy-interpolation-line"],
+      "proof_artifact": "docs/proofs/FOUNDATIONAL_DERIVATIONS.md#energy-interpolation-line",
+      "falsification_attempts": [
+        "Substitution gives 2/2+3/6=3/2.",
+        "A concentrating Navier-Stokes rescaling preserves critical norms while decreasing the L2 norm."
+      ]
+    },
+    {
+      "id": "LOCAL-CLASSICAL",
+      "kind": "theorem",
+      "statement": "Every Fefferman-admissible whole-space datum has a unique smooth unforced solution on a nonzero time interval.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#81-directly-checked-whole-space-theorem"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "SMOOTH-ENERGY",
+      "kind": "lemma",
+      "statement": "A smooth sufficiently decaying unforced solution obeys the kinetic-energy identity and therefore has nonincreasing L2 norm throughout its smooth lifespan.",
+      "status": "proved",
+      "depends_on": [],
+      "evidence": ["docs/proofs/FOUNDATIONAL_DERIVATIONS.md#smooth-energy-identity"],
+      "proof_artifact": "docs/proofs/FOUNDATIONAL_DERIVATIONS.md#smooth-energy-identity",
+      "falsification_attempts": [
+        "The derivation explicitly checks the convection and pressure cancellations.",
+        "Removing decay or periodic boundary conditions exposes boundary terms, so those hypotheses are retained."
+      ]
+    },
+    {
+      "id": "ESS-ENDPOINT",
+      "kind": "theorem",
+      "statement": "For the whole-space solution class and hypotheses in ESS03, bounded L^infinity_t L^3_x up to T rules out a singularity at T.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#7-backward-uniqueness-and-the-endpoint-l3-theorem"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "AB-L3-ANCIENT",
+      "kind": "theorem",
+      "statement": "A mild ancient whole-space solution whose L3 norm is uniformly bounded along a sequence t_k tending to minus infinity is identically zero.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/05_blowup_strategies.md#ancient-solutions-and-liouville-limits"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "KNSS-RECORD-PROFILE",
+      "kind": "theorem",
+      "statement": "A finite-time singularity of a whole-space mild Navier-Stokes solution generates, by record-point rescaling, a nonzero bounded ancient mild solution with a normalized nonzero value at the origin.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/05_blowup_strategies.md#ancient-solutions-and-liouville-limits"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "LOCAL-L3-CONTINUATION",
+      "kind": "theorem",
+      "statement": "If a smooth whole-space mild solution has a finite endpoint T and some fixed R,delta>0 satisfy ess sup over T-delta<t<T and centers a of integral over B_R(a) of |u|^3 finite, then T is not a singular endpoint.",
+      "status": "proved",
+      "depends_on": ["KNSS-RECORD-PROFILE", "AB-L3-ANCIENT"],
+      "evidence": ["docs/proofs/LOCAL_L3_CONTINUATION.md#statement"],
+      "proof_artifact": "docs/proofs/LOCAL_L3_CONTINUATION.md#proof",
+      "falsification_attempts": [
+        "The rescaled fixed-time argument was attacked for moving-time convergence and global tails; fixed profile times are controlled by the local uniform ball bound, while the source-backed KNSS limit supplies mildness and nontriviality."
+      ]
+    },
+    {
+      "id": "LOCAL-L3-FROM-ENERGY",
+      "kind": "lemma",
+      "statement": "The energy inequality and Serrin-type interpolation alone imply the uniform local L3 bound M_R required by LOCAL-L3-CONTINUATION.",
+      "status": "refuted",
+      "depends_on": ["LOCAL-L3-CONTINUATION", "ENERGY-SUPERCRITICAL"],
+      "evidence": ["docs/proofs/COUNTEREXAMPLES.md#energy-interpolation-does-not-give-a-uniform-local-l3-bound"],
+      "counterexample_artifact": "docs/proofs/COUNTEREXAMPLES.md#energy-interpolation-does-not-give-a-uniform-local-l3-bound",
+      "falsification_attempts": [
+        "A self-similar concentrating scalar field with the exact energy identity has m_R in L^4/3 of time but m_R diverging pointwise as t approaches T, so energy plus Serrin interpolation cannot supply the needed L^infinity-in-time bound."
+      ]
+    },
+    {
+      "id": "LOCAL-L3-FROM-CKN",
+      "kind": "lemma",
+      "statement": "Finiteness of the CKN singular-set measure (zero spatial H1 measure at the first blowup time, per PR-07) alone implies the uniform local L3 bound M_R required by LOCAL-L3-CONTINUATION.",
+      "status": "refuted",
+      "depends_on": ["LOCAL-L3-CONTINUATION", "PR-07"],
+      "evidence": ["docs/proofs/COUNTEREXAMPLES.md#ckn-singular-set-smallness-does-not-give-a-uniform-local-l3-bound"],
+      "counterexample_artifact": "docs/proofs/COUNTEREXAMPLES.md#ckn-singular-set-smallness-does-not-give-a-uniform-local-l3-bound",
+      "falsification_attempts": [
+        "A field satisfying only the scalar energy inequality (not the full PR-07 suitable-solution hypotheses) has a single terminal singular point with zero H1 measure, yet its local L3 mass at that point diverges as t approaches T; singular-set-measure-zero geometry alone cannot supply M_R."
+      ]
+    },
+    {
+      "id": "LOCAL-L3-BOUND-DERIVATION",
+      "kind": "lemma",
+      "statement": "There exist R,delta>0 such that the uniform local L3 bound M_R required by LOCAL-L3-CONTINUATION holds for every smooth whole-space solution near a hypothetical finite endpoint T.",
+      "status": "blocked",
+      "depends_on": ["LOCAL-L3-CONTINUATION"],
+      "evidence": ["docs/proofs/LOCAL_L3_CONTINUATION.md#scope"],
+      "falsification_attempts": [
+        "Energy plus Serrin-type interpolation alone does not supply this bound (LOCAL-L3-FROM-ENERGY, refuted).",
+        "CKN singular-set measure-zero geometry alone does not supply this bound (LOCAL-L3-FROM-CKN, refuted).",
+        "Vorticity-direction coherence, Carleman/backward-uniqueness, and Type I plus self-similar exclusion were each attacked and did not supply it either (LOCAL-L3-FROM-VORTICITY-COHERENCE, LOCAL-L3-FROM-CARLEMAN, LOCAL-L3-FROM-TYPE-I).",
+        "The local Scheffer/CKN energy inequality along only the record-center trajectory also does not supply it: the local pressure decomposition is circular at short range and supercritical at long range (LOCAL-L3-FROM-LOCAL-ENERGY).",
+        "No known technique in this project currently derives the bound from finite-energy smooth data; a genuine proof would require new local anti-concentration structure."
+      ]
+    },
+    {
+      "id": "LOCAL-L2-ANTI-CONCENTRATION",
+      "kind": "lemma",
+      "statement": "For every hypothetical finite singular endpoint and KNSS record-point sequence, there are centers a_k and radii rho_k with |a_k-x_k| tending to zero and M_k(rho_k-|a_k-x_k|) tending to infinity such that sup over fixed profile times s_j of limsup as k tends to infinity of M_k times the integral of |u(x,t_k+M_k^-2 s_j)|^2 over B_{rho_k}(a_k) is finite.",
+      "status": "blocked",
+      "depends_on": ["KNSS-RECORD-PROFILE", "ENERGY-CLASS"],
+      "evidence": ["docs/research/LOCAL_L2_ANTI_CONCENTRATION_TARGET.md#canonical-target"],
+      "falsification_attempts": [
+        "Finite energy supplies only an O(M_k) loss at record scale, so the global energy inequality does not establish the target.",
+        "A bounded-energy rescaled divergence-free bump matches the pointwise KNSS normalization while violating the target algebraically; it is not a Navier-Stokes solution and is not a PDE counterexample.",
+        "The local Scheffer/CKN energy inequality attack remains circular in the near pressure term and supercritical in the far tail, with no transfer to fixed profile times."
+      ]
+    },
+    {
+      "id": "LOCAL-L3-FROM-VORTICITY-COHERENCE",
+      "kind": "lemma",
+      "statement": "Constantin-Fefferman vorticity-direction coherence of the KNSS record-point ancient profile supplies the local L3 bound M_R via a route independent of already invoking the full CF regularity theorem directly.",
+      "status": "refuted",
+      "depends_on": ["KNSS-RECORD-PROFILE"],
+      "evidence": ["docs/research/CRITICAL_PROFILE_ITERATION_004.md#vorticity-direction-coherence"],
+      "counterexample_artifact": "docs/research/CRITICAL_PROFILE_ITERATION_004.md#vorticity-direction-coherence",
+      "falsification_attempts": [
+        "A stationary shear field has perfectly coherent vorticity direction but unbounded local L3 mass, so coherence alone does not control M_R without CF's own full finite-energy hypotheses.",
+        "If the genuine CF coherence hypothesis held for u itself, its strong-solution conclusion already implies M_R directly, making it a strictly stronger, non-modular hypothesis rather than an intermediate bridge.",
+        "A concentrating rescaled family shows CF's fixed-radius coherence length does not survive record-point rescaling, so it cannot be assumed at the profile level from KNSS compactness alone."
+      ]
+    },
+    {
+      "id": "LOCAL-L3-FROM-CARLEMAN",
+      "kind": "lemma",
+      "statement": "Adapting ESS's Carleman-based backward-uniqueness theorem directly to the KNSS record-point rescaled profile supplies the local L3 bound M_R from finite-energy data.",
+      "status": "blocked",
+      "depends_on": ["KNSS-RECORD-PROFILE", "ESS-ENDPOINT"],
+      "evidence": ["docs/research/CRITICAL_PROFILE_ITERATION_004.md#carleman-backward-uniqueness-adaptation"],
+      "falsification_attempts": [
+        "Applying backward uniqueness to the rescaled velocity directly requires a zero terminal trace, contradicting the KNSS profile's normalization |v(0,0)|=1.",
+        "Applying it to vorticity instead requires an exterior zero terminal vorticity trace not supplied by finite-energy data, and even granting that trace, a nonzero constant ancient solution has zero vorticity everywhere yet unbounded local L3 mass, so an additional decay or tail hypothesis is still required."
+      ]
+    },
+    {
+      "id": "LOCAL-L3-FROM-TYPE-I",
+      "kind": "lemma",
+      "statement": "A Type I pointwise blowup rate, together with the established NRS96 self-similar L3 exclusion theorem, implies the local L3 bound M_R.",
+      "status": "refuted",
+      "depends_on": ["BUP-001"],
+      "evidence": ["docs/research/CRITICAL_PROFILE_ITERATION_004.md#type-i-rate-plus-self-similar-exclusion"],
+      "counterexample_artifact": "docs/research/CRITICAL_PROFILE_ITERATION_004.md#type-i-rate-plus-self-similar-exclusion",
+      "falsification_attempts": [
+        "A concentrating scalar field obeying the exact Type I pointwise rate has local L3 mass over a fixed ball diverging as t approaches T, so the Type I rate alone does not bound M_R.",
+        "Applying NRS96 requires the KNSS record-point limit to be an exact self-similar profile; that implication is not established and is exactly the content of the still-blocked claim BUP-003, so invoking NRS96 here would be circular."
+      ]
+    },
+    {
+      "id": "LOCAL-L3-RECORD-CENTERS",
+      "kind": "lemma",
+      "statement": "A strictly weaker hypothesis than LOCAL-L3-CONTINUATION's M_R suffices: uniform boundedness of the local L3 mass over expanding balls centered at a KNSS record-point trajectory, rather than over all spatial centers, still forces the record-point ancient profile to vanish via Albritton-Barker rigidity and rules out the finite endpoint.",
+      "status": "proved",
+      "depends_on": ["KNSS-RECORD-PROFILE", "AB-L3-ANCIENT", "NS-SCALING"],
+      "evidence": ["docs/proofs/LOCAL_L3_RECORD_CENTERS.md#statement"],
+      "proof_artifact": "docs/proofs/LOCAL_L3_RECORD_CENTERS.md#proof",
+      "falsification_attempts": [
+        "Independently verified by adversarial review: checked whether KNSS compactness, nontriviality, or Albritton-Barker rigidity secretly require control away from the record-center trajectory (e.g. mass escaping to rescaled infinity, a second concentration point, remote pressure effects); none do, since the bound is only needed and used on each fixed ball before exhaustion.",
+        "Finite energy still only supplies local L3 mass control in L^4/3 of time even restricted to record centers, and the existing concentrating counterexample already concentrates at the record center itself, so deriving this narrower hypothesis from finite-energy data remains exactly as open as the original M_R; LOCAL-L3-BOUND-DERIVATION stays blocked."
+      ]
+    },
+    {
+      "id": "LOCAL-L3-FROM-LOCAL-ENERGY",
+      "kind": "lemma",
+      "statement": "The local Scheffer/CKN energy inequality (PR-02), restricted to a backward parabolic neighborhood of only the KNSS record-center trajectory, together with the KNSS pointwise normalization and finite global energy, implies the record-center-only local L3 bound required by LOCAL-L3-RECORD-CENTERS.",
+      "status": "blocked",
+      "depends_on": ["LOCAL-L3-RECORD-CENTERS", "PR-02", "ENERGY-SUPERCRITICAL"],
+      "evidence": ["docs/research/CRITICAL_PROFILE_ITERATION_005.md#local-energy-inequality-attack"],
+      "falsification_attempts": [
+        "Finite energy gives the scale-invariant local mass A(R)<=E0/R; with L=M_k R the KNSS pointwise bound only yields the record-time cubic mass <= L*A(R) <= E0*M_k, not a bound uniform in k.",
+        "The local pressure decomposition does not close: the near-field Calderon-Zygmund estimate is exactly as strong as the cubic quantity being sought (circular), and the invariant far tail is controlled only at the same supercritical rate E0/R = E0*M_k/L as the velocity term.",
+        "Fixed-radius spacetime averaging over the trajectory only selects k-dependent good times s_k that diverge as k grows; KNSS compactness requires the bound to hold at profile times s_j fixed before taking k to infinity, so the averaged estimate cannot be transferred to the normalized ancient limit.",
+        "The precise sufficient condition would be sup_j limsup_k M_k times the integral over B_{rho_k}(a_k) of |u(.,tau_{k,j})|^2 finite (a genuinely stronger local L2 anti-concentration bound); finite energy alone does not supply it."
+      ]
+    },
+    {
+      "id": "COMPACT-L3-ORBIT",
+      "kind": "lemma",
+      "statement": "A mild ancient whole-space solution whose all-time centered orbit {sqrt(-t) v(sqrt(-t) dot,t): t<0} is precompact in L3 is identically zero.",
+      "status": "proved",
+      "depends_on": ["NS-SCALING", "AB-L3-ANCIENT"],
+      "evidence": ["docs/proofs/FOUNDATIONAL_DERIVATIONS.md#compact-similarity-orbit-corollary"],
+      "proof_artifact": "docs/proofs/FOUNDATIONAL_DERIVATIONS.md#compact-similarity-orbit-corollary",
+      "falsification_attempts": [
+        "Precompactness implies boundedness, and the L3 norm is invariant under centered Navier-Stokes similarity scaling.",
+        "Constant parasitic fields are not in L3; forward self-similar solutions have the opposite time orientation."
+      ]
+    },
+    {
+      "id": "UNIVERSAL-FLUX-ABSORPTION",
+      "kind": "lemma",
+      "statement": "On the three-torus, a universal fraction of low-mode H3/2 dissipation absorbs the instantaneous nonlinear influx into every H1/2 truncation.",
+      "status": "refuted",
+      "depends_on": ["NS-SCALING"],
+      "evidence": [
+        "docs/research/CANDIDATE_ROUTES.md#universal-critical-flux-absorption",
+        "tests/test_triad.py"
+      ],
+      "counterexample_artifact": "tests/test_triad.py",
+      "falsification_attempts": [
+        "An exact real divergence-free high-high-to-low triad gives flux 2 A^2 while low-mode dissipation remains 2."
+      ]
+    },
+    {
+      "id": "CASCADE-DIAGONAL-SUFFICIENCY",
+      "kind": "lemma",
+      "statement": "Divergence of the sum of shell enstrophies evaluated at shell-dependent times, without a synchronization or persistence hypothesis, implies H1 blowup at their limiting time.",
+      "status": "refuted",
+      "depends_on": [],
+      "evidence": ["docs/research/CANDIDATE_ROUTES.md#shell-time-diagonal-inference"],
+      "counterexample_artifact": "docs/research/CANDIDATE_ROUTES.md#shell-time-diagonal-inference",
+      "falsification_attempts": [
+        "A moving shell packet can make the diagonal series diverge while only finitely many shells are active at each fixed time."
+      ]
+    },
+    {
+      "id": "FTDS-PDE-1",
+      "kind": "lemma",
+      "statement": "On the three-torus, a fixed-width shell overlap band absorbs every nonlinear influx across a Fourier cutoff.",
+      "status": "refuted",
+      "depends_on": [],
+      "evidence": ["docs/analogies/fault_tolerant_distributed_systems.md#the-one-candidate-pde-lemma"],
+      "counterexample_artifact": "docs/analogies/fault_tolerant_distributed_systems.md#adversarial-partition-check",
+      "falsification_attempts": [
+        "Flux is cubic under amplitude scaling while band dissipation is quadratic.",
+        "A high-high-to-low triad crosses an arbitrarily wide empty overlap band."
+      ]
+    },
+    {
+      "id": "FND-001",
+      "kind": "theorem",
+      "statement": "Fefferman's equations, decay, periodicity, smoothness, and energy requirements are those recorded in the foundation report.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#3-exact-data-and-solution-hypotheses"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FND-002",
+      "kind": "theorem",
+      "statement": "Fefferman's four alternatives are exactly the alternatives recorded in the foundation report.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#4-feffermans-four-alternatives-literally"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FND-003",
+      "kind": "lemma",
+      "statement": "Smooth solutions obey the kinetic-energy identity under the stated integration hypotheses.",
+      "status": "proved",
+      "depends_on": ["SMOOTH-ENERGY"],
+      "evidence": ["docs/proofs/FOUNDATIONAL_DERIVATIONS.md#smooth-energy-identity"],
+      "proof_artifact": "docs/proofs/FOUNDATIONAL_DERIVATIONS.md#smooth-energy-identity",
+      "falsification_attempts": [
+        "The convection and pressure terms vanish only after using divergence freedom and the stated boundary behavior."
+      ]
+    },
+    {
+      "id": "FND-004",
+      "kind": "definition",
+      "statement": "The modern Leray-Hopf convention includes the energy class, distributional equation, initial trace, and global energy inequality.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#62-what-leray-hopf-means"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FND-005",
+      "kind": "theorem",
+      "statement": "Leray constructed an unforced global turbulent solution for every square-integrable quasi-divergence-free whole-space initial state in his class.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#61-what-leray-actually-proved-and-called-it"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FND-006",
+      "kind": "lemma",
+      "statement": "The equation transformations and homogeneous Sobolev norm laws in the foundation report are the whole-space scaling laws.",
+      "status": "proved",
+      "depends_on": ["NS-SCALING"],
+      "evidence": ["docs/proofs/FOUNDATIONAL_DERIVATIONS.md#whole-space-equation-and-sobolev-scaling"],
+      "proof_artifact": "docs/proofs/FOUNDATIONAL_DERIVATIONS.md#whole-space-equation-and-sobolev-scaling",
+      "falsification_attempts": [
+        "The L2 and H1/2 endpoint exponents agree with direct changes of variables."
+      ]
+    },
+    {
+      "id": "FND-007",
+      "kind": "theorem",
+      "statement": "Smooth rapidly decreasing whole-space data have a unique local regular solution.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#81-directly-checked-whole-space-theorem"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FND-008",
+      "kind": "theorem",
+      "statement": "The exact periodic local theorem and exact Fujita-Kato endpoint attribution have been primary-source verified in this project.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "The periodic theorem is only summarized by Fefferman and the cited original endpoint texts were unavailable."
+      ]
+    },
+    {
+      "id": "FND-009",
+      "kind": "theorem",
+      "statement": "Forced suitable Leray-Hopf solutions can be nonunique under an L1-time L2-space force.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#63-forced-leray-hopf-nonuniqueness-is-not-clay-breakdown"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FND-010",
+      "kind": "lemma",
+      "statement": "The reviewed forced suitable Leray-Hopf nonuniqueness theorem proves Fefferman alternative C.",
+      "status": "refuted",
+      "depends_on": ["FND-009"],
+      "evidence": ["docs/proofs/COUNTEREXAMPLES.md#forced-nonuniqueness-does-not-establish-clay-c"],
+      "counterexample_artifact": "docs/proofs/COUNTEREXAMPLES.md#forced-nonuniqueness-does-not-establish-clay-c",
+      "falsification_attempts": [
+        "The theorem's force is singular at the initial time and its conclusion is nonuniqueness rather than nonexistence."
+      ]
+    },
+    {
+      "id": "FND-011",
+      "kind": "theorem",
+      "statement": "A proof of any one of Fefferman alternatives A through D resolves the official mathematical question.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#91-mathematical-resolution"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FND-012",
+      "kind": "observation",
+      "statement": "The Clay Mathematics Institute lists the problem as unsolved on 2026-08-13.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/01_problem_foundations.md#1-result-of-this-source-check"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "REG-001",
+      "kind": "theorem",
+      "statement": "Serrin's critical line uses 2/s+3/r=1 with r>3 under the original theorem's exact hypotheses.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "The article identity is checked but its theorem body was not inspected in this audit."
+      ]
+    },
+    {
+      "id": "REG-002",
+      "kind": "theorem",
+      "statement": "The L-infinity-time L3-space endpoint on R3 is regular under the ESS03 hypotheses.",
+      "status": "established",
+      "depends_on": ["ESS-ENDPOINT"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#71-correct-meaning-of-l_3infty"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "REG-003",
+      "kind": "theorem",
+      "statement": "Arbitrary divergence-free L3 data have Kato's exact local mild solution, and sufficiently small L3 data are global, under the original theorem's hypotheses.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "The Kato article identity is checked but its theorem body was unavailable in this audit."
+      ]
+    },
+    {
+      "id": "REG-004",
+      "kind": "theorem",
+      "statement": "Small BMO-minus-one data have a global Koch-Tataru solution and the exact local large-data statement uses VMO-minus-one.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "The publication identity is checked but the complete theorem body and norm hypotheses were not inspected in this audit."
+      ]
+    },
+    {
+      "id": "REG-005",
+      "kind": "lemma",
+      "statement": "The energy-space norms alone provide a scale-independent uniform bound in some Serrin regularity norm.",
+      "status": "refuted",
+      "depends_on": ["ENERGY-SUPERCRITICAL"],
+      "evidence": ["docs/proofs/COUNTEREXAMPLES.md#energy-class-does-not-uniformly-control-a-serrin-class"],
+      "counterexample_artifact": "docs/proofs/COUNTEREXAMPLES.md#energy-class-does-not-uniformly-control-a-serrin-class",
+      "falsification_attempts": [
+        "A smooth divergence-free concentrating family has uniformly bounded energy norms and every Serrin mixed norm diverges at least like lambda^(1/2)."
+      ]
+    },
+    {
+      "id": "REG-006",
+      "kind": "lemma",
+      "statement": "Every smooth-data solution obeys a uniform critical norm bound through any finite maximal endpoint.",
+      "status": "blocked",
+      "depends_on": ["LOCAL-CLASSICAL", "SMOOTH-ENERGY"],
+      "evidence": [],
+      "falsification_attempts": [
+        "The energy bounds do not functionally embed into the critical endpoint."
+      ]
+    },
+    {
+      "id": "PR-01",
+      "kind": "theorem",
+      "statement": "Finite-energy divergence-free whole-space data admit a global Leray turbulent solution with regularity on open time intervals whose complement is null.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": [
+        "docs/research/raw/03_partial_regularity.md#21-leray-hopf-is-a-global-finite-energy-notion",
+        "docs/research/raw/03_partial_regularity.md#6-singular-times-two-routes-with-different-starting-points"
+      ],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-02",
+      "kind": "definition",
+      "statement": "Suitability is a local condition on a velocity-pressure pair and includes the local energy inequality.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#22-suitability-is-local-and-includes-an-extra-inequality"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-03",
+      "kind": "theorem",
+      "statement": "Suitable finite-energy weak solutions exist, without implying that every abstract Leray-Hopf solution is suitable.",
+      "status": "established",
+      "depends_on": ["PR-02"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#23-what-is-known-and-what-remains-a-proof-obligation"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-04",
+      "kind": "lemma",
+      "statement": "Every weak solution satisfying only the abstract Leray-Hopf axioms also satisfies the local energy inequality.",
+      "status": "blocked",
+      "depends_on": ["PR-01", "PR-02"],
+      "evidence": [],
+      "falsification_attempts": [
+        "The inspected source constructs a suitable approximation separately and does not prove the abstract implication."
+      ]
+    },
+    {
+      "id": "PR-05",
+      "kind": "theorem",
+      "statement": "At a finite right endpoint of a Leray regularity interval, the spatial singular set is contained in a closed set of finite H1 measure.",
+      "status": "established",
+      "depends_on": ["PR-01"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#31-the-1976-theorem-is-a-spatial-slice-theorem"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-06",
+      "kind": "theorem",
+      "statement": "The exceptional times in Scheffer's formulation have zero H1/2 measure.",
+      "status": "established",
+      "depends_on": ["PR-01"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#31-the-1976-theorem-is-a-spatial-slice-theorem"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-07",
+      "kind": "theorem",
+      "statement": "The singular set of every suitable weak solution has zero one-dimensional parabolic Hausdorff measure.",
+      "status": "established",
+      "depends_on": ["PR-02"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#43-ckn-conclusion"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-08",
+      "kind": "theorem",
+      "statement": "Small scale-invariant L3 velocity plus L3/2 pressure implies interior regularity for the cited suitable solution class.",
+      "status": "established",
+      "depends_on": ["PR-02"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#41-cubic-velocity-pressure-criterion"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-09",
+      "kind": "theorem",
+      "statement": "A sufficiently small limiting scaled enstrophy implies regularity under the cited suitable-solution hypotheses.",
+      "status": "established",
+      "depends_on": ["PR-02", "PR-08"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#42-scaled-gradient-criterion"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-10",
+      "kind": "lemma",
+      "statement": "Zero parabolic P1 measure implies zero H1 measure for every spatial time slice and zero H1/2 measure for the time projection.",
+      "status": "proved",
+      "depends_on": ["PR-07"],
+      "evidence": ["docs/proofs/PARTIAL_REGULARITY_DERIVATIONS.md#projection-consequences-of-zero-parabolic-measure"],
+      "proof_artifact": "docs/proofs/PARTIAL_REGULARITY_DERIVATIONS.md#projection-consequences-of-zero-parabolic-measure",
+      "falsification_attempts": [
+        "The parabolic radius-r cover projects to spatial radius-r balls and temporal length-O(r-squared) intervals."
+      ]
+    },
+    {
+      "id": "PR-11",
+      "kind": "theorem",
+      "statement": "In ESS03, L_(3,infinity) denotes L-infinity-time L3-space, and this bound implies smoothness and uniqueness.",
+      "status": "established",
+      "depends_on": ["PR-01"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#71-correct-meaning-of-l_3infty"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-12",
+      "kind": "theorem",
+      "statement": "The backward-uniqueness theorem used by ESS03 requires its differential inequality, zero terminal trace, Gaussian growth control, and local parabolic L2 regularity.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#72-exact-backward-uniqueness-theorem"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "PR-13",
+      "kind": "lemma",
+      "statement": "Zero parabolic P1 measure does not imply an empty singular set or parabolic dimension strictly below one.",
+      "status": "proved",
+      "depends_on": ["PR-07"],
+      "evidence": ["docs/proofs/PARTIAL_REGULARITY_DERIVATIONS.md#sharp-limits-of-the-ckn-measure-conclusion"],
+      "proof_artifact": "docs/proofs/PARTIAL_REGULARITY_DERIVATIONS.md#sharp-limits-of-the-ckn-measure-conclusion",
+      "falsification_attempts": [
+        "A singleton is nonempty with zero P1 measure, and dimension-one zero-H1 Cantor-type sets exist."
+      ]
+    },
+    {
+      "id": "BUP-001",
+      "kind": "theorem",
+      "statement": "Nontrivial backward self-similar Leray profiles in L3(R3) are excluded.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/05_blowup_strategies.md#backward-self-similar-profiles"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "BUP-002",
+      "kind": "theorem",
+      "statement": "Tsai's exact theorem extends self-similar exclusions under the report's stated local-energy and integrability or decay alternatives.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "The article identity is checked but its complete theorem alternatives were not inspected in this audit."
+      ]
+    },
+    {
+      "id": "BUP-003",
+      "kind": "lemma",
+      "statement": "Every Type I singularity is exactly self-similar.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "The Type I rate definition does not imply profile stationarity, but no Navier-Stokes singularity supplies a counterexample."
+      ]
+    },
+    {
+      "id": "BUP-004",
+      "kind": "lemma",
+      "statement": "Every bounded ancient solution in unrestricted three dimensions is zero.",
+      "status": "refuted",
+      "depends_on": [],
+      "evidence": ["docs/proofs/COUNTEREXAMPLES.md#constant-ancient-solution"],
+      "counterexample_artifact": "docs/proofs/COUNTEREXAMPLES.md#constant-ancient-solution",
+      "falsification_attempts": [
+        "Every nonzero constant velocity with zero pressure is a bounded smooth ancient solution."
+      ]
+    },
+    {
+      "id": "BUP-005",
+      "kind": "theorem",
+      "statement": "A uniform L-infinity(0,T_*;L3) bound prevents blowup at T_* under the ESS03 whole-space hypotheses.",
+      "status": "established",
+      "depends_on": ["ESS-ENDPOINT"],
+      "evidence": ["docs/research/raw/03_partial_regularity.md#71-correct-meaning-of-l_3infty"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "BUP-006",
+      "kind": "lemma",
+      "statement": "Concentration compactness and critical-element extraction work in every critical Banach space.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "Several endpoint spaces lack the required profile decomposition and perturbation theorem."
+      ]
+    },
+    {
+      "id": "BUP-007",
+      "kind": "lemma",
+      "statement": "A rigidity theorem excludes every possible critical ancient object produced by a hypothetical singularity.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "Known Liouville theorems cover only named critical bounds, symmetries, or similarity classes."
+      ]
+    },
+    {
+      "id": "BUP-008",
+      "kind": "theorem",
+      "statement": "A mild ancient solution bounded in L3 along times t_k tending to minus infinity is zero.",
+      "status": "established",
+      "depends_on": ["AB-L3-ANCIENT"],
+      "evidence": ["docs/research/raw/05_blowup_strategies.md#ancient-solutions-and-liouville-limits"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-01",
+      "kind": "theorem",
+      "statement": "The Clay positive target is global and universal in the admissible initial datum.",
+      "status": "established",
+      "depends_on": ["FND-002"],
+      "evidence": ["docs/research/raw/06_computation_formalization.md#the-quantifier-ladder"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-02",
+      "kind": "theorem",
+      "statement": "On a periodic cube, the cited strict residual inequality certifies a true strong solution on a finite interval.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/06_computation_formalization.md#high-regularity-residual-test"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-03",
+      "kind": "theorem",
+      "statement": "The cited residual criterion works at H1 strong-solution regularity on its smooth bounded or periodic domains with explicit viscosity dependence.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/06_computation_formalization.md#minimal-regularity-residual-test"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-04",
+      "kind": "theorem",
+      "statement": "In the cited torus framework, rigorous estimators plus a scalar control inequality bound the exact solution, and a global control function gives a global solution for that datum.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/06_computation_formalization.md#scalar-control-inequality"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-05",
+      "kind": "theorem",
+      "statement": "Galerkin convergence and eventual passage of an a posteriori test are conditional detection results, not independent universal regularity proofs.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/06_computation_formalization.md#directly-computable-criteria"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-06",
+      "kind": "theorem",
+      "statement": "The cited periodic finite verification schemes for H2 and H1 balls have the report's explicit regularity assumptions and are conditional semidecision results.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/06_computation_formalization.md#the-quantifier-ladder"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-07",
+      "kind": "observation",
+      "statement": "The cited finite-time enstrophy maximization is a nonconvex numerical search that does not certify global maximizers.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/06_computation_formalization.md#enstrophy-growth-optimization"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-08",
+      "kind": "observation",
+      "statement": "The inspected formal tools certify named arithmetic and implementation subclaims but do not formalize a three-dimensional Navier-Stokes regularity certificate.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/research/raw/06_computation_formalization.md#formal-proof-support"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CF-09",
+      "kind": "lemma",
+      "statement": "A computation-only finite reduction covering every Clay-admissible datum is available in the inspected sources.",
+      "status": "blocked",
+      "depends_on": [],
+      "evidence": [],
+      "falsification_attempts": [
+        "No inspected source supplies a universal continuation bound and finite certified cover of all admissible data."
+      ]
+    },
+    {
+      "id": "FTDS-1",
+      "kind": "theorem",
+      "statement": "Intersecting crash-fault quorums preserve a chosen value only together with the Paxos proposal invariant.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/analogies/fault_tolerant_distributed_systems.md#primary-source-audit"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FTDS-2",
+      "kind": "theorem",
+      "statement": "Raft replicated-state safety follows from named log and election invariants, not majority overlap alone.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/analogies/fault_tolerant_distributed_systems.md#primary-source-audit"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FTDS-3",
+      "kind": "theorem",
+      "statement": "Agreement thresholds and impossibility conclusions depend on the exact failure and timing model.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/analogies/fault_tolerant_distributed_systems.md#primary-source-audit"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "FTDS-4",
+      "kind": "theorem",
+      "statement": "Self-stabilization requires closure of legitimate states and finite-time convergence under every allowed daemon choice.",
+      "status": "established",
+      "depends_on": [],
+      "evidence": ["docs/analogies/fault_tolerant_distributed_systems.md#primary-source-audit"],
+      "falsification_attempts": []
+    },
+    {
+      "id": "CAS-1",
+      "kind": "lemma",
+      "statement": "Under exact Navier-Stokes scaling, the L2 norm scales by lambda^-1/2 and the homogeneous Hs norm by lambda^(s-1/2).",
+      "status": "proved",
+      "depends_on": ["NS-SCALING"],
+      "evidence": ["docs/proofs/FOUNDATIONAL_DERIVATIONS.md#whole-space-equation-and-sobolev-scaling"],
+      "proof_artifact": "docs/proofs/FOUNDATIONAL_DERIVATIONS.md#whole-space-equation-and-sobolev-scaling",
+      "falsification_attempts": [
+        "At s=0 the homogeneous law reproduces L2 scaling; at s=1/2 it is invariant."
+      ]
+    },
+    {
+      "id": "FREQ-PACKING",
+      "kind": "lemma",
+      "statement": "For a meaningful threshold theta, bad dyadic frequency-time boxes obey a scale-time Carleson packing bound, possibly with spatial localization and pressure-defect terms, strong enough to force a regular scale near every putative singularity.",
+      "status": "conjectured",
+      "depends_on": ["NS-SCALING", "PR-08"],
+      "evidence": ["docs/research/FREQ_PACKING_ITERATION_001.md#corrected-packing-candidate"],
+      "falsification_attempts": [
+        "The exact high-high-to-low triad refutes pointwise absence of bad boxes but does not yet test nested Carleson packing.",
+        "A concentrating dyadic packet family could violate the conjecture if its bad boxes have divergent parabolic packing."
+      ]
+    },
+    {
+      "id": "FREQ-NAIVE-MEASURE",
+      "kind": "lemma",
+      "statement": "Charging every overlapping dyadic cube with unit spatial atom and weight r_Q^-1 yields a scale-invariant Carleson packing bound.",
+      "status": "refuted",
+      "depends_on": ["NS-SCALING"],
+      "evidence": ["docs/research/GAUNTLET_ROUNDS_018_025.md#round-018-naive-measure-geometry"],
+      "counterexample_artifact": "docs/research/GAUNTLET_ROUNDS_018_025.md#round-018-naive-measure-geometry",
+      "falsification_attempts": [
+        "A binary dyadic tree with matched lifetimes contributes one scale-invariant Carleson unit at every generation, giving an unbounded ratio."
+      ]
+    },
+    {
+      "id": "FREQ-PRESSURE-LOCAL",
+      "kind": "lemma",
+      "statement": "Local velocity, local flux, and local dissipation alone control the mean-free harmonic pressure remainder.",
+      "status": "refuted",
+      "depends_on": ["PR-08"],
+      "evidence": ["docs/research/GAUNTLET_ROUNDS_018_025.md#round-019-harmonic-pressure"],
+      "counterexample_artifact": "docs/research/GAUNTLET_ROUNDS_018_025.md#round-019-harmonic-pressure",
+      "falsification_attempts": [
+        "A translated divergence-free packet vanishes in the observation ball while its normalized exterior pressure has a nonzero limiting gradient there."
+      ]
+    },
+    {
+      "id": "FREQ-MATCHED-COMMUTATOR",
+      "kind": "lemma",
+      "statement": "Spatial and frequency localization at matched scale r approximately 2^-j has an automatically absorbably small commutator uniformly in j.",
+      "status": "refuted",
+      "depends_on": ["NS-SCALING"],
+      "evidence": ["docs/research/GAUNTLET_ROUNDS_018_025.md#round-020-matched-scale-commutator"],
+      "counterexample_artifact": "docs/research/GAUNTLET_ROUNDS_018_025.md#round-020-matched-scale-commutator",
+      "falsification_attempts": [
+        "Rescaling a nontrivial commutator test function keeps its Lp operator ratio fixed and nonzero for every matched shell."
+      ]
+    },
+    {
+      "id": "PR-CLMS-TRANSFER",
+      "kind": "lemma",
+      "statement": "Leray-Hopf energy bounds plus a CLMS Hardy-space estimate automatically imply the local energy inequality.",
+      "status": "refuted",
+      "depends_on": [],
+      "evidence": ["docs/research/GAUNTLET_ROUNDS_018_025.md#round-021-clms-suitability-transfer"],
+      "counterexample_artifact": "docs/research/GAUNTLET_ROUNDS_018_025.md#round-021-clms-suitability-transfer",
+      "falsification_attempts": [
+        "A concentrating scaling family keeps the energy norms bounded while the Hardy-BMO pairing required by the proposed transfer grows like lambda^(1/2)."
+      ]
+    },
+    {
+      "id": "FREQ-GALERKIN-UNIFORM",
+      "kind": "lemma",
+      "statement": "A cutoff-uniform zero-flux observation from finite Galerkin probes by itself supplies compactness, suitability, and a CKN conclusion for the limit.",
+      "status": "refuted",
+      "depends_on": [],
+      "evidence": ["docs/research/GAUNTLET_ROUNDS_018_025.md#round-023-galerkin-uniformity"],
+      "counterexample_artifact": "docs/research/GAUNTLET_ROUNDS_018_025.md#round-023-galerkin-uniformity",
+      "falsification_attempts": [
+        "Exact high-frequency shears have zero flux at every cutoff while concentration or lack of compactness prevents the stated limit conclusion."
+      ]
+    },
+    {
+      "id": "FREQ-PACKING-EPSILON-COMPARABLE",
+      "kind": "lemma",
+      "statement": "Small bad-event packing plus bounded local energy and pressure forces a centered or comparable-scale CKN epsilon cylinder.",
+      "status": "refuted",
+      "depends_on": [],
+      "evidence": ["docs/research/GAUNTLET_ROUNDS_018_025.md#round-024-packing-to-ckn-bridge"],
+      "counterexample_artifact": "docs/research/GAUNTLET_ROUNDS_018_025.md#round-024-packing-to-ckn-bridge",
+      "falsification_attempts": [
+        "A matched-scale exact shear has zero flux and pressure defect but arbitrarily large scale-invariant cubic velocity at every comparable subscale."
+      ]
+    },
+    {
+      "id": "ROUND-025-CLOSURE",
+      "kind": "lemma",
+      "statement": "The current dependency graph proves or disproves Clay-A.",
+      "status": "blocked",
+      "depends_on": ["CLAY-A", "CRITICAL-BOUND", "FREQ-PHASESPACE"],
+      "evidence": ["docs/research/GAUNTLET_ROUNDS_018_025.md#round-025-dependency-closure"],
+      "falsification_attempts": [
+        "Independent rounds produced narrow disproofs but neither an admissible whole-space finite-time singular solution nor a proof of the critical L3 bound."
+      ]
+    },
+    {
+      "id": "FREQ-FLUX-CKN",
+      "kind": "lemma",
+      "statement": "If every localized shell has zero nonlinear bad-event flux and zero pressure defect, then the corresponding parabolic cylinder satisfies the CKN epsilon smallness criterion.",
+      "status": "refuted",
+      "depends_on": ["PR-08"],
+      "evidence": ["docs/proofs/COUNTEREXAMPLES.md#zero-nonlinear-flux-does-not-imply-ckn-smallness"],
+      "counterexample_artifact": "docs/proofs/COUNTEREXAMPLES.md#zero-nonlinear-flux-does-not-imply-ckn-smallness",
+      "falsification_attempts": [
+        "A smooth periodic shear solution has identically zero quadratic flux and pressure but arbitrarily large scale-invariant cubic velocity after amplitude scaling."
+      ]
+    },
+    {
+      "id": "FREQ-PHASESPACE",
+      "kind": "lemma",
+      "statement": "There exists a scale-invariant phase-space Carleson packing measure with a pressure-defect term whose small defect forces an epsilon-regular scale inside every sufficiently small suitable Navier-Stokes cylinder.",
+      "status": "blocked",
+      "depends_on": ["FREQ-PHASESPACE-MEASURE", "FREQ-PRESSURE-COMMUTATOR", "FREQ-PACKING-EPSILON", "FREQ-PACKING-UNIFORM"],
+      "evidence": ["docs/research/FREQ_PACKING_ITERATION_002.md#phase-space-candidate"],
+      "falsification_attempts": [
+        "The spatial weight and pressure harmonic remainder are unresolved; a naive fixed cube weight may overcount or have wrong scaling.",
+        "Frequency localization and physical localization create commutators that may defeat a small-defect criterion."
+      ]
+    },
+    {
+      "id": "FREQ-PHASESPACE-MEASURE",
+      "kind": "lemma",
+      "statement": "There is a scale-invariant, non-overcounting phase-space Carleson measure for localized bad shell events on a suitable Navier-Stokes cylinder.",
+      "status": "blocked",
+      "depends_on": ["NS-SCALING"],
+      "evidence": ["docs/research/FREQ_PACKING_ITERATION_002.md#phase-space-candidate"],
+      "falsification_attempts": [
+        "The spatial weight is unresolved and arbitrary overlapping cube families can count one concentration repeatedly."
+      ]
+    },
+    {
+      "id": "FREQ-PRESSURE-COMMUTATOR",
+      "kind": "lemma",
+      "statement": "Localized frequency flux and dissipation admit pressure near/far/harmonic and cutoff-commutator bounds with a defect small enough for an epsilon criterion.",
+      "status": "blocked",
+      "depends_on": ["NS-SCALING", "PR-08"],
+      "evidence": ["docs/research/FREQ_PACKING_ITERATION_002.md#immediate-objections"],
+      "falsification_attempts": [
+        "The harmonic pressure remainder can carry information from outside the cube, and physical/frequency localization creates uncontrolled commutators."
+      ]
+    },
+    {
+      "id": "FREQ-PACKING-EPSILON",
+      "kind": "lemma",
+      "statement": "A sufficiently small phase-space packing defect together with local energy and pressure bounds yields one CKN epsilon-regular parabolic subcylinder.",
+      "status": "blocked",
+      "depends_on": ["FREQ-PHASESPACE-MEASURE", "FREQ-PRESSURE-COMMUTATOR", "PR-08"],
+      "evidence": ["docs/research/FREQ_PACKING_ITERATION_002.md#minimal-next-lemma"],
+      "falsification_attempts": [
+        "Time-frequency packing alone permits spatial concentration and does not imply the local epsilon criterion."
+      ]
+    },
+    {
+      "id": "FREQ-PACKING-UNIFORM",
+      "kind": "lemma",
+      "statement": "A phase-space packing inequality can be formulated with constants uniform in Fourier cutoff and spatial partition, together with a convergence hypothesis linking finite Galerkin probes to a suitable Navier-Stokes solution.",
+      "status": "blocked",
+      "depends_on": ["FREQ-PHASESPACE-MEASURE"],
+      "evidence": ["docs/research/FREQ_PACKING_ITERATION_002.md#cutoff-uniformity-gate"],
+      "falsification_attempts": [
+        "A solution-dependent constant for each finite cutoff gives no cutoff-uniform information and cannot support a universal falsification or regularity bridge."
+      ]
+    },
+    {
+      "id": "CRITICAL-BOUND",
+      "kind": "lemma",
+      "statement": "If the unique maximal smooth whole-space solution from a Fefferman-admissible datum has finite endpoint T_max, then sup over 0<t<T_max of its L3 norm is finite.",
+      "status": "blocked",
+      "depends_on": ["LOCAL-CLASSICAL", "SMOOTH-ENERGY"],
+      "evidence": [],
+      "falsification_attempts": [
+        "Energy interpolation fails the Serrin index test.",
+        "Critical concentrating bumps show that L2 control alone cannot imply this statement."
+      ]
+    },
+    {
+      "id": "CRITICAL-PROFILE-GAP",
+      "kind": "lemma",
+      "statement": "A finite-endpoint Navier-Stokes singularity produces a nonzero mild ancient profile with a globally bounded strong L3 sequence at backward times, sufficient to invoke the recorded Liouville theorem.",
+      "status": "blocked",
+      "depends_on": ["KNSS-RECORD-PROFILE", "AB-L3-ANCIENT", "NS-SCALING"],
+      "evidence": ["docs/research/CRITICAL_PROFILE_ITERATION_001.md#exact-first-gap"],
+      "falsification_attempts": [
+        "Independent profile attacks found local ancient compactness but no global backward L3 bound: fixed original times become moving rescaled times, and critical scaling preserves unbounded L3 norms."
+      ]
+    },
+    {
+      "id": "CRITICAL-TAIL-TRANSFER",
+      "kind": "lemma",
+      "statement": "Finite energy, Schwartz regularity, and standard local pressure estimates imply scale-adapted global L3 tail tightness for blowup-rescaled slices at moving times.",
+      "status": "blocked",
+      "depends_on": ["NS-SCALING", "ENERGY-SUPERCRITICAL"],
+      "evidence": ["docs/research/CRITICAL_PROFILE_ITERATION_002_003.md#modality-a-global-tail-tightness"],
+      "falsification_attempts": [
+        "Fixed nonzero L3 slices become maximally non-tight after critical zooming; a scale-adapted weighted estimate is equivalent to the missing tightness and is not supplied by energy."
+      ]
+    },
+    {
+      "id": "CRITICAL-ORBIT-COMPACT",
+      "kind": "lemma",
+      "statement": "A hypothetical finite-time singularity forces precompactness in global L3 of the ancient profile's dynamically normalized similarity orbit.",
+      "status": "blocked",
+      "depends_on": ["KNSS-RECORD-PROFILE", "NS-SCALING"],
+      "evidence": ["docs/research/CRITICAL_PROFILE_ITERATION_002_003.md#modality-b-similarity-orbit-precompactness"],
+      "falsification_attempts": [
+        "Separated bubbles give bounded locally controlled fields with dichotomy and no global orbit precompactness; excluding this for Navier-Stokes requires a new one-bubble theorem."
+      ]
+    },
+    {
+      "id": "CRITICAL-TIME-SELECT",
+      "kind": "lemma",
+      "statement": "Finite L4-time L3-space control plus standard Navier-Stokes smoothing guarantees fixed rescaled times tending to minus infinity with uniformly bounded global L3 profile slices.",
+      "status": "blocked",
+      "depends_on": ["NS-SCALING", "ENERGY-SUPERCRITICAL"],
+      "evidence": ["docs/research/CRITICAL_PROFILE_ITERATION_002_003.md#modality-c-fixed-backward-time-selection"],
+      "falsification_attempts": [
+        "Rescaled shrinking-window averages contain an r_n^-2 factor; a smooth scalar finite-L4 model has every backward rescaled profile slice unbounded."
+      ]
+    },
+    {
+      "id": "CLAY-A",
+      "kind": "theorem",
+      "statement": "For every smooth divergence-free rapidly decreasing initial velocity on R3, there exist smooth velocity and pressure on R3 times [0,infinity) solving the unforced equations, with uniformly bounded kinetic energy.",
+      "clay_alternative": "A",
+      "target_contract": {
+        "quantifier": "for_every_admissible_datum",
+        "domain": "R3",
+        "force": "zero",
+        "datum": "smooth_divergence_free_rapidly_decreasing",
+        "conclusion": "global_smooth_velocity_pressure_uniform_kinetic_energy"
+      },
+      "status": "blocked",
+      "depends_on": ["LOCAL-CLASSICAL", "CRITICAL-BOUND", "ESS-ENDPOINT", "SMOOTH-ENERGY"],
+      "evidence": [],
+      "falsification_attempts": [
+        "The CRITICAL-BOUND dependency is unsettled and the official problem remains open."
+      ]
+    }
+  ]
+}
