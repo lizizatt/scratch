@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 37
+three-dimensional incompressible Navier-Stokes Millennium problem. 38
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -129,6 +129,11 @@ original diffuse global bound.
   time-dependent correction restores the pressure flux when controlled by the
   equation, while transport and diffusion remain critical-scale remainders;
   the route remains `blocked`.
+- Audited the primary-source closure for the Bogovskii route. Lin's pressure
+  estimates and epsilon criteria, ESS endpoint continuation, and the accessible
+  CKN reproof do not supply the fixed-profile-time local $L^2$ estimate; no
+  matching localized Bogovskii theorem was found, so this route remains
+  `blocked` at source level.
 
 ## Candidate Dispositions
 

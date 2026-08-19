@@ -1,0 +1,71 @@
+{
+  "schema_version": 2,
+  "round_id": "round-042",
+  "date": "2026-08-18",
+  "target": "local-l2-anti-concentration-bogovskii-source-audit",
+  "target_claim_id": "LOCAL-L2-ANTI-CONCENTRATION",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-042-claims.json",
+  "claims_snapshot_sha256": "0744dac24153774c2efb17c9581d92473d86d962944a2cb61fc9dcba563dde39",
+  "previous_round": "artifacts/gauntlet/round-041.json",
+  "previous_round_sha256": "6410a07013afb621c7d2c23db1d3342fb5b33a52f9d8f91cb9312a9c0514325c",
+  "post_repair_claims_sha256": "0744dac24153774c2efb17c9581d92473d86d962944a2cb61fc9dcba563dde39",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "290b52c49a9054d8e1c7757f3371f806962fc32510d348f05f692e4893e267be",
+  "reviewers": [
+    "source audit: Lin 1998 primary reproof",
+    "source audit: Escauriaza-Seregin-Sverak 2003",
+    "source audit: Caffarelli-Kohn-Nirenberg 1982 availability and reproof closure",
+    "source audit: Bogovskii theorem matching KNSS target"
+  ],
+  "capability_failures": [
+    "Lin 1998 scan was not machine-extractable through the webpage fetcher; theorem scopes were verified against the repository's prior full-text source audit.",
+    "CKN 1982 full text remained inaccessible; theorem-level pressure details were not inferred beyond Lin's accessible primary reproof."
+  ],
+  "findings": [
+    {
+      "id": "R42-001",
+      "fingerprint": "lin-source-scope-no-anti-concentration",
+      "disposition": "valid",
+      "finding": "Lin 1998 Lemma 2.3 supplies pressure integrability, while Theorems 3.1 and 3.3 are conditional epsilon-regularity results; none derives the fixed-profile-time M_k-weighted local L2 estimate from finite energy.",
+      "repair": "Recorded the exact theorem scopes and source links in docs/research/BOGOVSKII_SOURCE_AUDIT.md; kept the target blocked."
+    },
+    {
+      "id": "R42-002",
+      "fingerprint": "ess-source-scope-no-local-l2-bridge",
+      "disposition": "valid",
+      "finding": "ESS 2003 supplies the suitable framework, local epsilon criterion, endpoint L-infinity-time L3 continuation, and backward-uniqueness hypotheses, but no Bogovskii reduction or fixed-time local L2 anti-concentration estimate.",
+      "repair": "Recorded the matching ESS theorem locations and the missing hypotheses in the source audit."
+    },
+    {
+      "id": "R42-003",
+      "fingerprint": "bogovskii-primary-source-gap",
+      "disposition": "valid",
+      "finding": "The audited source closure contains no primary theorem simultaneously matching annular divergence correction, suitable-solution pressure handling, KNSS-uniform constants, fixed profile times, and the target estimate.",
+      "repair": "Recorded the source gap explicitly and did not promote an uncited Bogovskii theorem to established status."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json after advancing the manifest head",
+    "python -m unittest discover -s tests -v",
+    "git diff --check",
+    "Direct source-page check reached the ESS official journal record and English PDF link",
+    "Repository source audit matched Lin theorem locations and explicitly preserved CKN full-text uncertainty"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked",
+    "bogovskii-temporal-commutator-restores-pressure",
+    "bogovskii-critical-transport-remainder",
+    "bogovskii-fixed-profile-time-gap",
+    "bogovskii-source-hypothesis-gap",
+    "lin-source-scope-no-anti-concentration",
+    "ess-source-scope-no-local-l2-bridge",
+    "bogovskii-primary-source-gap"
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
