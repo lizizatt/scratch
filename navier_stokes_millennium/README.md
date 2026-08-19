@@ -28,7 +28,7 @@ The current result and stopping condition are recorded in
 
 ## Current status (2026-08-18)
 
-The problem remains open. 40 adversarial gauntlet rounds have attacked
+The problem remains open. 41 adversarial gauntlet rounds have attacked
 frequency-packing, phase-space, and critical-profile routes; several narrow
 sub-claims were refuted with explicit counterexamples, and two conditional
 theorems, `LOCAL-L3-CONTINUATION`
@@ -52,7 +52,10 @@ manifest also contains
 non-mathematical synchronization/audit heads for the current research record.
 The latest round constructed a scale-critical localized kinetic-enstrophy
 functional; its interior stretching term is conditionally absorbable, but the
-fixed-time annular tail remains blocked.
+fixed-time annular tail remains blocked. A four-step functional-design loop
+then tested instantaneous pressure moments, windowed energy, higher-derivative
+enstrophy, and anisotropic vorticity penalties; all failed at pressure
+differentiation, scaling, transverse transport, or fixed-time transfer.
 
 ## Resolution standard
 

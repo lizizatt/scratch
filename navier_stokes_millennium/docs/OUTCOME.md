@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 40
+three-dimensional incompressible Navier-Stokes Millennium problem. 41
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -147,6 +147,11 @@ original diffuse global bound.
   interior vortex-stretching term admits conditional absorption under the KNSS
   pointwise bound, but the required fixed-time annular-tail estimate remains
   `blocked`; see `CRITICAL-KINETIC-ENSTROPHY-FUNCTIONAL`.
+- Ran a four-candidate functional-design loop: instantaneous pressure moments,
+  windowed energy, time-averaged higher-derivative enstrophy, and anisotropic
+  vorticity modulation. Every candidate failed at pressure differentiation,
+  scaling, transverse flux, or fixed-time transfer; no new functional was
+  proved or refuted.
 
 ## Candidate Dispositions
 

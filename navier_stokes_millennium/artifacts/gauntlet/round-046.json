@@ -1,0 +1,84 @@
+{
+  "schema_version": 2,
+  "round_id": "round-046",
+  "date": "2026-08-18",
+  "target": "critical-functional-design-loop",
+  "target_claim_id": "CRITICAL-KINETIC-ENSTROPHY-TAIL",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-046-claims.json",
+  "claims_snapshot_sha256": "e4a1b316a16b6746ac8b2bca3c3b52314f442ec4bf1ff454a0573ad5d057b994",
+  "previous_round": "artifacts/gauntlet/round-045.json",
+  "previous_round_sha256": "0347640d2801a400dc6d69f038c40ae9843825d4e5adc6101e8f793ec3b40b30",
+  "post_repair_claims_sha256": "e4a1b316a16b6746ac8b2bca3c3b52314f442ec4bf1ff454a0573ad5d057b994",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "b887919a990f2b60efef281f66a1bab6dc43597a91ef9090489490ff15a848f4",
+  "reviewers": [
+    "expensive-agent: stress-completed instantaneous functional",
+    "Explore: windowed critical functional",
+    "expensive-agent: enstrophy-window candidate",
+    "Explore: nonquadratic functional"
+  ],
+  "capability_failures": [],
+  "findings": [
+    {
+      "id": "R46-001",
+      "fingerprint": "stress-completed-functional-pressure-time-derivative",
+      "disposition": "valid",
+      "finding": "Instantaneous cubic velocity and pressure moments fail because differentiating the velocity term produces an uncontrolled |u||p|^2 pairing and differentiating the pressure moment requires nonlocal p_t; a smooth shear defeats universal damping.",
+      "repair": "Recorded Candidate 1 in docs/research/CRITICAL_FUNCTIONAL_DESIGN_LOOP.md."
+    },
+    {
+      "id": "R46-002",
+      "fingerprint": "windowed-functional-scale-inverting-energy",
+      "disposition": "valid",
+      "finding": "The windowed essential-supremum functional assigns a 1/ell penalty to ordinary smooth local energy, diverges for constants as ell tends to zero, and its sliding-window edge derivative restores pressure flux.",
+      "repair": "Recorded Candidate 2 and rejected the proposed windowed functional."
+    },
+    {
+      "id": "R46-003",
+      "fingerprint": "enstrophy-window-derivative-hierarchy",
+      "disposition": "valid",
+      "finding": "The time-averaged enstrophy/higher-derivative candidate is not homogeneous as proposed; corrected powers expose localized vortex stretching and an unclosed higher derivative/pressure hierarchy, while fixed-time transfer remains absent.",
+      "repair": "Recorded Candidate 3 and rejected it as a coercive route."
+    },
+    {
+      "id": "R46-004",
+      "fingerprint": "anisotropic-vorticity-penalty-misses-transverse-flux",
+      "disposition": "valid",
+      "finding": "A vorticity-parallel signed-enstrophy penalty does not see transverse high-high-to-low energy transfer; its proposed enstrophy homogeneity is also incorrect. A wavelet/Besov fallback incurs a supercritical logarithmic accumulation.",
+      "repair": "Recorded Candidate 4 and rejected it; no survivor was found."
+    }
+  ],
+  "validation": [
+    "git diff --check passed for the design-loop record and status updates",
+    "No candidate survived the first audit; no claim status was upgraded",
+    "The four testers supplied independent scaling, pressure, shear, triad, and fixed-time checks"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked",
+    "bogovskii-temporal-commutator-restores-pressure",
+    "bogovskii-critical-transport-remainder",
+    "bogovskii-fixed-profile-time-gap",
+    "bogovskii-source-hypothesis-gap",
+    "lin-source-scope-no-anti-concentration",
+    "ess-source-scope-no-local-l2-bridge",
+    "bogovskii-primary-source-gap",
+    "besov-route-repeats-frequency-blocker",
+    "minimal-blowup-already-implicit",
+    "vorticity-geometry-fixed-slice-gap",
+    "no-monotonicity-functional",
+    "singular-set-size-not-amplitude-control",
+    "critical-kinetic-enstrophy-annular-tail",
+    "critical-functional-universal-coercivity-killed",
+    "stress-completed-functional-pressure-time-derivative",
+    "windowed-functional-scale-inverting-energy",
+    "enstrophy-window-derivative-hierarchy",
+    "anisotropic-vorticity-penalty-misses-transverse-flux"
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
