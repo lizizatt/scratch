@@ -8,6 +8,10 @@ risk before committing the application to a feature library.
 **Goal:** select a chroma implementation and prove the source-independent
 analyzer contract.
 
+**Status:** complete. Meyda was selected in
+[ADR 0001](docs/adr/0001-select-meyda-chroma.md); recorded-guitar validation
+remains the first Milestone 1 corpus task.
+
 1. Scaffold a minimal TypeScript package with Vite and Vitest.
 2. Define `PcmChunk`, `ChromaFrame`, and `ChordEstimate` contracts in
    `src/analysis/types.ts`.

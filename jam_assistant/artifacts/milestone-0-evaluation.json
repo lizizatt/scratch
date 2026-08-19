@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-08-19T22:21:54.095Z",
+  "reports": [
+    {
+      "adapter": "essentia.js-0.1.3-hpcp",
+      "accuracy": 1,
+      "accuracyByQuality": {
+        "major": 1,
+        "minor": 1,
+        "dominant7": 1,
+        "major7": 1,
+        "minor7": 1,
+        "diminished": 1,
+        "suspended4": 1
+      },
+      "silenceFalsePositive": false,
+      "transitionLatencyMilliseconds": 256,
+      "initializationMilliseconds": 5.930277999999987,
+      "processingMilliseconds": 252.00491200000002,
+      "audioDurationSeconds": 64.76800000000004,
+      "realtimeFactor": 257.0108633438067
+    },
+    {
+      "adapter": "meyda-5.6.3",
+      "accuracy": 1,
+      "accuracyByQuality": {
+        "major": 1,
+        "minor": 1,
+        "dominant7": 1,
+        "major7": 1,
+        "minor7": 1,
+        "diminished": 1,
+        "suspended4": 1
+      },
+      "silenceFalsePositive": false,
+      "transitionLatencyMilliseconds": 223.99999999999997,
+      "initializationMilliseconds": 0.04720700000001443,
+      "processingMilliseconds": 240.51537100000002,
+      "audioDurationSeconds": 64.76800000000004,
+      "realtimeFactor": 269.28840236161057
+    }
+  ],
+  "candidateBrowserAssetBytes": {
+    "essentia": 2644889,
+    "meyda": 16094
+  }
+}

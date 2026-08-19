@@ -5,6 +5,23 @@ identifies the current chord and root, and highlights compatible notes on a
 guitar fretboard. The same analysis pipeline accepts decoded audio files for
 deterministic, faster-than-real-time testing.
 
+## Development
+
+Milestone 0 is implemented as a TypeScript analysis spike. From this directory:
+
+```bash
+npm install
+npm run fixtures
+npm test
+npm run evaluate
+npm run build
+npm run test:browser
+```
+
+The measured feature-library decision is recorded in
+[ADR 0001](docs/adr/0001-select-meyda-chroma.md). Generated WAV fixtures are
+recreated locally; the committed MP3 fixture covers browser decode throughput.
+
 ## Product goal
 
 Help a guitarist answer three questions at a glance while someone is playing:

@@ -1,0 +1,5 @@
+dist/
+node_modules/
+test-results/
+tests/fixtures/generated/
+tsconfig.tsbuildinfo
