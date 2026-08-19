@@ -1,0 +1,71 @@
+{
+  "schema_version": 2,
+  "round_id": "round-034",
+  "date": "2026-08-18",
+  "target": "local-l3-bound-derivation",
+  "target_claim_id": "LOCAL-L3-BOUND-DERIVATION",
+  "subject_sha256": "7c8baf3d78eb292be2fdab65f2e2b6a93237e54523ca9c2644f7271840f5035b",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-034-claims.json",
+  "claims_snapshot_sha256": "7c8baf3d78eb292be2fdab65f2e2b6a93237e54523ca9c2644f7271840f5035b",
+  "previous_round": "artifacts/gauntlet/round-033.json",
+  "previous_round_sha256": "7011811111b3e5dda859eacda2ff3ada00516fc72e965d20ed039d31321cb234",
+  "post_repair_claims_sha256": "7c8baf3d78eb292be2fdab65f2e2b6a93237e54523ca9c2644f7271840f5035b",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "879f3aa76b62ad2f0d8a55a1c4b937f4ecae03322fa5c5a0d72edffc32000f45",
+  "reviewers": [
+    "expensive-agent: vorticity-direction coherence attack",
+    "expensive-agent: Carleman/backward-uniqueness adaptation attack",
+    "expensive-agent: weaker-hypothesis search",
+    "expensive-agent: Type I / self-similar exclusion attack"
+  ],
+  "findings": [
+    {
+      "id": "R34-001",
+      "fingerprint": "vorticity-coherence-bridge-refuted",
+      "disposition": "valid",
+      "finding": "Constantin-Fefferman vorticity-direction coherence does not supply a useful intermediate bridge to M_R: genuine coherence already proves regularity directly (non-modular), and coherence does not survive KNSS record-point rescaling.",
+      "repair": "Added refuted claim LOCAL-L3-FROM-VORTICITY-COHERENCE with both counterexamples in CRITICAL_PROFILE_ITERATION_004.md."
+    },
+    {
+      "id": "R34-002",
+      "fingerprint": "carleman-adaptation-blocked",
+      "disposition": "valid",
+      "finding": "Adapting ESS's Carleman backward-uniqueness theorem directly to the KNSS profile fails: the velocity route contradicts the profile normalization, and the vorticity route needs an exterior zero terminal trace not supplied by finite energy, with a constant-solution counterexample surviving even that trace.",
+      "repair": "Added blocked claim LOCAL-L3-FROM-CARLEMAN documenting the exact missing hypotheses."
+    },
+    {
+      "id": "R34-003",
+      "fingerprint": "type-i-route-refuted",
+      "disposition": "valid",
+      "finding": "A Type I pointwise blowup rate does not bound local L3 mass, and applying NRS96's self-similar exclusion theorem would require the still-blocked BUP-003 (Type I implies self-similar tangent), making that route circular.",
+      "repair": "Added refuted claim LOCAL-L3-FROM-TYPE-I with an explicit concentrating counterexample."
+    },
+    {
+      "id": "R34-004",
+      "fingerprint": "record-center-weakening-found",
+      "disposition": "valid",
+      "finding": "The KNSS construction only constrains its rescaling centers to be spatial maximizers at record times; the proof of LOCAL-L3-CONTINUATION goes through with a strictly weaker hypothesis bounding local L3 mass only along a backward-tracked record-center trajectory rather than over all of R^3.",
+      "repair": "Added conjectured claim LOCAL-L3-RECORD-CENTERS (not proved, pending independent adversarial verification), narrowing the open target."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (51 tests)",
+    "git diff --check",
+    "Four independent expensive-agent subagents attacked LOCAL-L3-BOUND-DERIVATION from vorticity-direction, Carleman, Type I/self-similar, and hypothesis-weakening angles",
+    "One transient subagent API error (vorticity-direction attempt 1) was retried successfully"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "record-center-weakening-found"
+  ],
+  "resolved_findings": [
+    "vorticity-coherence-bridge-refuted",
+    "carleman-adaptation-blocked",
+    "type-i-route-refuted"
+  ],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

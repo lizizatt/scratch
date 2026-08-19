@@ -1,13 +1,13 @@
 # Research Outcome
 
-**Date:** 2026-08-17
+**Date:** 2026-08-18
 **Mathematical status:** `blocked`
 **Millennium problem status:** unsolved
 
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. Thirty-one
+three-dimensional incompressible Navier-Stokes Millennium problem. Thirty-four
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -89,6 +89,13 @@ original diffuse global bound.
   all spatial centers near a finite endpoint yields a bounded ancient profile
   by KNSS rescaling and contradicts Albritton--Barker rigidity. The new open
   estimate is deriving that local bound from smooth finite-energy data.
+- Attacked `LOCAL-L3-BOUND-DERIVATION` from four independent directions:
+  vorticity-direction coherence and a direct Carleman/backward-uniqueness
+  adaptation were each ruled out or left blocked at the same missing tail
+  information, and a Type I plus self-similar exclusion route was refuted.
+  One genuine narrowing was found: a strictly weaker record-center-only
+  hypothesis still suffices for continuation, recorded as `conjectured`
+  pending independent adversarial verification.
 
 ## Candidate Dispositions
 
@@ -111,6 +118,10 @@ per round 1's findings.
 | Deriving the local $L^3$ bound from finite-energy data (`LOCAL-L3-BOUND-DERIVATION`) | `blocked` | No known technique currently supplies this estimate; see the two refuted routes below. |
 | Local $L^3$ bound from energy/Serrin interpolation (`LOCAL-L3-FROM-ENERGY`) | `refuted` | A self-similar concentrating field has $m_R\in L^{4/3}_t$ but $m_R\to\infty$ pointwise as $t\uparrow T$. |
 | Local $L^3$ bound from CKN singular-set smallness (`LOCAL-L3-FROM-CKN`) | `refuted` | A single-point-singularity field has zero-measure singular set yet unbounded local $L^3$ mass at that point. |
+| Local $L^3$ bound from vorticity-direction coherence (`LOCAL-L3-FROM-VORTICITY-COHERENCE`) | `refuted` | Genuine Constantin-Fefferman coherence already proves regularity directly, and coherence does not survive record-point rescaling. |
+| Local $L^3$ bound from Carleman/backward-uniqueness adaptation (`LOCAL-L3-FROM-CARLEMAN`) | `blocked` | Requires a terminal zero trace and additional tail control not supplied by finite energy. |
+| Local $L^3$ bound from Type I rate plus self-similar exclusion (`LOCAL-L3-FROM-TYPE-I`) | `refuted` | The Type I rate alone lets local $L^3$ mass diverge, and Type I to self-similar tangent is unproven (`BUP-003`). |
+| Weaker record-center-only local $L^3$ hypothesis (`LOCAL-L3-RECORD-CENTERS`) | `conjectured` | Same KNSS/Albritton-Barker argument applies to a narrower center set, but the narrower bound is not yet independently verified or derived from finite energy. |
 | Naive $r_Q^{-1}$ cube measure (`FREQ-NAIVE-MEASURE`) | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
 | Local-only harmonic pressure control (`FREQ-PRESSURE-LOCAL`) | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
 | Matched-scale commutator smallness (`FREQ-MATCHED-COMMUTATOR`) | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |
@@ -127,8 +138,8 @@ python -m ns_millennium.ledger artifacts/claims.json
 python -m unittest discover -s tests -v
 ```
 
-The suite contains 34 ledger regressions plus 15 exact Fourier/Galerkin tests
-(49 total).
+The suite contains 36 ledger regressions plus 15 exact Fourier/Galerkin tests
+(51 total).
 Editor diagnostics report no errors.
 
 The phase-space route is explicitly blocked on four named measure,
