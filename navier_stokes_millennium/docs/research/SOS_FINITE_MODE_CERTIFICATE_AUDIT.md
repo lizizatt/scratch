@@ -1,6 +1,6 @@
 # SOS Finite-Mode Certificate Audit
 
-**Date:** 2026-08-19  
+**Date:** 2026-08-19
 **Disposition:** fixed-cutoff quartic certificates are algebraically feasible;
 cutoff-uniform continuum certification remains blocked.
 
