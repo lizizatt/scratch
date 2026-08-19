@@ -11,7 +11,7 @@
   "previous_round_sha256": "e26aff6bbe3ad344942c7fc3a5270a0616391196fb7e88519d33b1b3d5b276ec",
   "post_repair_claims_sha256": "57daf27e34670ba77b70f36b0a0686356990a764a2632c26345887e5c5146e25",
   "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
-  "reviewed_tree_sha256": "849e93c216997bcc9e31b7d0fbbbb90610f1953e1d097bbbc56a20f1080fd1c7",
+  "reviewed_tree_sha256": "cdfbc8d1f7e4ef057570bb3b225b5e2f0d35b262cd7714083fb86059a7d5e228",
   "reviewers": ["Explore: near pressure closure audit", "Explore: far harmonic tail audit", "expensive-agent: fixed-time transfer audit"],
   "capability_failures": [],
   "findings": [
