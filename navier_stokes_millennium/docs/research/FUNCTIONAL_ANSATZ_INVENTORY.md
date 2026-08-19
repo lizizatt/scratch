@@ -1,6 +1,6 @@
 # Functional Ansatz Inventory
 
-**Date:** 2026-08-19  
+**Date:** 2026-08-19
 **Purpose:** exhaustive search queue for critical/coercive/fixed-time
 Navier--Stokes functionals.
 

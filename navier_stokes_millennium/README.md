@@ -26,6 +26,9 @@ Research notes, proof obligations, and gauntlet prompts will live under
 The current result and stopping condition are recorded in
 [`docs/OUTCOME.md`](docs/OUTCOME.md).
 
+The cross-route blocker overview is recorded in
+[`docs/research/BLOCKER_MAP.md`](docs/research/BLOCKER_MAP.md).
+
 ## Current status (2026-08-18)
 
 The problem remains open. 47 adversarial gauntlet rounds have attacked

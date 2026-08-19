@@ -1,6 +1,6 @@
 # Resolvent and Mellin Functional Audit
 
-**Date:** 2026-08-19  
+**Date:** 2026-08-19
 **Disposition:** blocked; the first candidate failed fixed-time and
 parameter-uniformity tests.
 

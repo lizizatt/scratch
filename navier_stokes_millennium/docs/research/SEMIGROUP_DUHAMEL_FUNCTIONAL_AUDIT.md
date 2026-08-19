@@ -1,6 +1,6 @@
 # Semigroup/Duhamel Functional Audit
 
-**Date:** 2026-08-19  
+**Date:** 2026-08-19
 **Disposition:** blocked; the first candidate failed its audit.
 
 ## Candidate

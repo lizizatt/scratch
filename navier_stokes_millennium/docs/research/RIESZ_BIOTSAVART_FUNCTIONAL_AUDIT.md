@@ -1,6 +1,6 @@
 # Riesz and Biot--Savart Functional Audit
 
-**Date:** 2026-08-19  
+**Date:** 2026-08-19
 **Disposition:** blocked; the candidate is a nonlocal rewriting of the critical
 $L^3$ obstruction.
 
