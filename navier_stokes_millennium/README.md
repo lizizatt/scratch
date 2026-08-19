@@ -28,7 +28,7 @@ The current result and stopping condition are recorded in
 
 ## Current status (2026-08-18)
 
-The problem remains open. 36 adversarial gauntlet rounds have attacked
+The problem remains open. 37 adversarial gauntlet rounds have attacked
 frequency-packing, phase-space, and critical-profile routes; several narrow
 sub-claims were refuted with explicit counterexamples, and two conditional
 theorems, `LOCAL-L3-CONTINUATION`
@@ -41,7 +41,9 @@ trajectory of centers. Deriving that local bound from finite-energy data
 remains the open step. Later profile and multi-domain fanout iterations are
 recorded as exploratory notes, not additional gauntlet rounds or ledger
 claims; see [`docs/OUTCOME.md`](docs/OUTCOME.md) for the candidate-disposition
-table and gauntlet history. The hash-chain manifest also contains
+table and gauntlet history. The latest round attacked pressure-free annular
+Bogovskii localization and remained blocked at the time-dependent correction
+and critical transport terms. The hash-chain manifest also contains
 non-mathematical synchronization/audit heads for the current research record.
 
 ## Resolution standard

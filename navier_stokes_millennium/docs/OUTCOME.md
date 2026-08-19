@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 36
+three-dimensional incompressible Navier-Stokes Millennium problem. 37
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -124,6 +124,11 @@ original diffuse global bound.
 - Formalized the missing record-scale local $L^2$ anti-concentration estimate as
   `LOCAL-L2-ANTI-CONCENTRATION`; it remains `blocked` and is a target for a
   future focused adversarial round.
+- Attacked `LOCAL-L2-ANTI-CONCENTRATION` with annular Bogovskii solenoidal
+  localization. The direct pressure pairing can be removed, but the
+  time-dependent correction restores the pressure flux when controlled by the
+  equation, while transport and diffusion remain critical-scale remainders;
+  the route remains `blocked`.
 
 ## Candidate Dispositions
 

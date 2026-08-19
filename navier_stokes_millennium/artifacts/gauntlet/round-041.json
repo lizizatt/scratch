@@ -1,0 +1,72 @@
+{
+  "schema_version": 2,
+  "round_id": "round-041",
+  "date": "2026-08-18",
+  "target": "local-l2-anti-concentration-bogovskii-localization-attack",
+  "target_claim_id": "LOCAL-L2-ANTI-CONCENTRATION",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-041-claims.json",
+  "claims_snapshot_sha256": "df32651aa24836ef899306bfbdbb44adabc115cd220d4461b8f2f894087f7421",
+  "previous_round": "artifacts/gauntlet/round-040.json",
+  "previous_round_sha256": "2b3639c2fb58a37b392f8645ce483fd34999eaee9218814282ad5bc6179437cb",
+  "post_repair_claims_sha256": "df32651aa24836ef899306bfbdbb44adabc115cd220d4461b8f2f894087f7421",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "a6469add5d78863610068cf9922b17245d8bf5886dd3d3c8a134ca683c4f6b3d",
+  "reviewers": [
+    "Explore: scaling audit solenoidal localization",
+    "expensive-agent: PDE audit pressure-free localization",
+    "Explore: counterexample audit localization route",
+    "Explore: source audit Bogovskii route"
+  ],
+  "capability_failures": [],
+  "findings": [
+    {
+      "id": "R41-001",
+      "fingerprint": "bogovskii-temporal-commutator-restores-pressure",
+      "disposition": "valid",
+      "finding": "An annular Bogovskii correction makes eta^2 u - w divergence-free and removes the direct pressure pairing, but the time derivative leaves -<partial_t u,w>; substituting Navier-Stokes into that term restores the pressure flux.",
+      "repair": "Recorded the obstruction and the annular construction in docs/research/BOGOVSKII_SOLENOIDAL_LOCALIZATION_ATTACK.md; kept LOCAL-L2-ANTI-CONCENTRATION blocked."
+    },
+    {
+      "id": "R41-002",
+      "fingerprint": "bogovskii-critical-transport-remainder",
+      "disposition": "valid",
+      "finding": "The Bogovskii nonlinear correction is bounded by the same critical-scale quantity as the ordinary cutoff transport flux, while diffusion gives only an outer-shell L2 remainder and no M_k^-1 gain.",
+      "repair": "Added the term-by-term scaling audit to the research record; no claim status upgrade."
+    },
+    {
+      "id": "R41-003",
+      "fingerprint": "bogovskii-fixed-profile-time-gap",
+      "disposition": "valid",
+      "finding": "Even a spacetime estimate from the corrected test does not transfer to the fixed profile times required by sup_j limsup_k without a uniform rescaled-time modulus or a direct slice estimate.",
+      "repair": "Recorded fixed-time transfer as an independent unresolved obligation in the research note and target falsification history."
+    },
+    {
+      "id": "R41-004",
+      "fingerprint": "bogovskii-source-hypothesis-gap",
+      "disposition": "valid",
+      "finding": "The project has no primary-source citation for a localized Bogovskii/solenoidal pressure theorem with hypotheses matching the KNSS fixed-profile target; no such theorem can be marked established from the current source closure.",
+      "repair": "Recorded the source gap explicitly; no uncited theorem was added to the ledger."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json after advancing the manifest head",
+    "python -m unittest discover -s tests -v",
+    "git diff --check",
+    "Four independent critics attacked scaling, PDE admissibility, counterexamples, and primary-source hypotheses",
+    "No genuine suitable-solution counterexample to LOCAL-L2-ANTI-CONCENTRATION was found"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked",
+    "bogovskii-temporal-commutator-restores-pressure",
+    "bogovskii-critical-transport-remainder",
+    "bogovskii-fixed-profile-time-gap",
+    "bogovskii-source-hypothesis-gap"
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
