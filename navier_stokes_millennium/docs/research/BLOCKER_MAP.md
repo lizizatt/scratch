@@ -8,7 +8,7 @@ queue items audited after the functional inventory.
 ## Executive summary
 
 The routes are not failing for one literally identical reason, but their first
-failures cluster into seven recurring gates:
+failures cluster into eight recurring gates:
 
 1. **Critical homogeneity:** the available energy is too weak at the record
    scale, or a proposed functional has the wrong scaling.
@@ -23,7 +23,9 @@ failures cluster into seven recurring gates:
    prescribed KNSS slices $t_k+M_k^{-2}s_j$.
 6. **Compactness/tail:** local ancient convergence does not give global
    $L^3$ control, tightness, minimality, or exclusion of separated bubbles.
-7. **Continuum certification:** finite-mode, numerical, or formal certificates
+7. **Geometry does not control amplitude:** set size, vorticity alignment, and
+   filament shape do not by themselves bound local amplitude.
+8. **Continuum certification:** finite-mode, numerical, or formal certificates
    lack cutoff-uniform constants and a passage to the whole-space PDE.
 
 The single central target remains
