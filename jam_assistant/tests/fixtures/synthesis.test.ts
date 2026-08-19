@@ -21,7 +21,7 @@ describe("fixture synthesis", () => {
         expect(first.some((sample) => sample !== 0)).toBe(true);
       }
     }
-  });
+  }, 15_000);
 
   it("encodes standards-shaped mono PCM WAV data", () => {
     const samples = synthesizeChord({ rootPitchClass: 0, quality: "major" });

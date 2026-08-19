@@ -50,6 +50,11 @@ evaluate a learned classifier before building the UI.
 7. Add file progress, scrub, speed, silence, decode-error, and unsupported-file
    states.
 
+**Status:** file-to-fretboard vertical slice complete. The app loads local WAV
+and MP3 files, analyzes decoded PCM in a worker, exposes timeline preview and
+scale selection, and renders the standard-tuning fretboard. Recorded-guitar
+fixtures and live microphone capture remain Milestone 2 work.
+
 **Tests:** unit tests for music and fretboard mappings; integration tests from
 decoded PCM to estimates; Playwright tests for file selection, source changes,
 uncertainty, controls, and desktop/mobile fretboard rendering.
