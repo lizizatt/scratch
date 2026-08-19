@@ -28,7 +28,7 @@ The current result and stopping condition are recorded in
 
 ## Current status (2026-08-18)
 
-The problem remains open. 38 adversarial gauntlet rounds have attacked
+The problem remains open. 39 adversarial gauntlet rounds have attacked
 frequency-packing, phase-space, and critical-profile routes; several narrow
 sub-claims were refuted with explicit counterexamples, and two conditional
 theorems, `LOCAL-L3-CONTINUATION`
@@ -45,7 +45,10 @@ table and gauntlet history. The latest round attacked pressure-free annular
 Bogovskii localization and remained blocked at the time-dependent correction
 and critical transport terms. A primary-source audit found no existing
 Bogovskii, Lin, ESS, or accessible CKN-reproof theorem matching the fixed-time
-local $L^2$ target. The hash-chain manifest also contains
+local $L^2$ target. Five additional technique-family audits (Besov,
+minimal-blowup, vorticity geometry, monotonicity, and singular-set geometry)
+also remained blocked or redundant with existing routes. The hash-chain
+manifest also contains
 non-mathematical synchronization/audit heads for the current research record.
 
 ## Resolution standard

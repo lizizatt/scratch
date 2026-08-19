@@ -1,0 +1,88 @@
+{
+  "schema_version": 2,
+  "round_id": "round-043",
+  "date": "2026-08-18",
+  "target": "five-untried-technique-family-burn-down",
+  "target_claim_id": "LOCAL-L2-ANTI-CONCENTRATION",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-043-claims.json",
+  "claims_snapshot_sha256": "0744dac24153774c2efb17c9581d92473d86d962944a2cb61fc9dcba563dde39",
+  "previous_round": "artifacts/gauntlet/round-042.json",
+  "previous_round_sha256": "e77e50dbf793376309cf21806c0ca1b7e2ff6383ab76d7d233a2af6783ea3a9c",
+  "post_repair_claims_sha256": "0744dac24153774c2efb17c9581d92473d86d962944a2cb61fc9dcba563dde39",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "a48ca095a97ca72a72baa544cc275a8cd051444ebaa02a6fdd8a9705be511b86",
+  "reviewers": [
+    "Explore: Besov/paraproduct audit",
+    "Explore: minimal blowup audit",
+    "expensive-agent: vorticity geometry audit",
+    "Explore: monotonicity/entropy audit",
+    "Explore: quantitative singular-set geometry audit"
+  ],
+  "capability_failures": [],
+  "findings": [
+    {
+      "id": "R43-001",
+      "fingerprint": "besov-route-repeats-frequency-blocker",
+      "disposition": "valid",
+      "finding": "Critical Besov/paraproduct decomposition does not derive the target from finite energy: matched-scale commutators remain order one, low frequencies inherit pressure/transport leakage, and high-frequency dissipation does not transfer to fixed profile times.",
+      "repair": "Recorded docs/research/UNTRIED_BESOV_PARAPRODUCT_AUDIT.md and marked the checklist item complete; no duplicate ledger claim added."
+    },
+    {
+      "id": "R43-002",
+      "fingerprint": "minimal-blowup-already-implicit",
+      "disposition": "valid",
+      "finding": "A Kenig--Merle-style minimal blowup route is already represented by KNSS rescaling and the ancient-profile iterations, but minimality, global critical compactness, separated-bubble exclusion, and critical perturbative stability remain unavailable.",
+      "repair": "Recorded docs/research/UNTRIED_MINIMAL_BLOWUP_AUDIT.md and classified the route as redundant-with-blocker rather than opening a duplicate claim."
+    },
+    {
+      "id": "R43-003",
+      "fingerprint": "vorticity-geometry-fixed-slice-gap",
+      "disposition": "valid",
+      "finding": "Vorticity filament geometry beyond direction coherence does not yield fixed-profile L3 or local L2 control from finite energy; straight concentrated tubes can have benign curvature/helicity/stretching indicators while retaining large transverse concentration.",
+      "repair": "Recorded docs/research/UNTRIED_VORTICITY_GEOMETRY_AUDIT.md and marked the route blocked."
+    },
+    {
+      "id": "R43-004",
+      "fingerprint": "no-monotonicity-functional",
+      "disposition": "valid",
+      "finding": "No scale-critical coercive Navier--Stokes monotonicity or entropy functional was identified; ordinary local energy has cubic pressure/transport flux, while flux-only functionals fail on smooth shears and high-high-to-low interactions.",
+      "repair": "Recorded docs/research/UNTRIED_MONOTONICITY_ENTROPY_AUDIT.md and marked the route blocked at candidate-functional construction."
+    },
+    {
+      "id": "R43-005",
+      "fingerprint": "singular-set-size-not-amplitude-control",
+      "disposition": "valid",
+      "finding": "Capacity, porosity, or Minkowski-size information alone cannot convert CKN singular-set smallness into fixed-time local L2/L3 control; a one-point concentration stress test retains negligible set size and divergent amplitude.",
+      "repair": "Recorded docs/research/UNTRIED_SINGULAR_GEOMETRY_AUDIT.md and marked the route blocked pending a new PDE-specific amplitude theorem."
+    }
+  ],
+  "validation": [
+    "git diff --check passed for the checklist and five research notes",
+    "python -m ns_millennium.ledger artifacts/claims.json after advancing the manifest head",
+    "python -m unittest discover -s tests -v",
+    "Five independent bounded audits covered Besov, minimal blowup, vorticity geometry, monotonicity, and singular-set geometry",
+    "No new canonical claim was promoted to proved or refuted"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked",
+    "bogovskii-temporal-commutator-restores-pressure",
+    "bogovskii-critical-transport-remainder",
+    "bogovskii-fixed-profile-time-gap",
+    "bogovskii-source-hypothesis-gap",
+    "lin-source-scope-no-anti-concentration",
+    "ess-source-scope-no-local-l2-bridge",
+    "bogovskii-primary-source-gap",
+    "besov-route-repeats-frequency-blocker",
+    "minimal-blowup-already-implicit",
+    "vorticity-geometry-fixed-slice-gap",
+    "no-monotonicity-functional",
+    "singular-set-size-not-amplitude-control"
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

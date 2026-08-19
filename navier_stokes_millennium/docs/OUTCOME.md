@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 38
+three-dimensional incompressible Navier-Stokes Millennium problem. 39
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -134,6 +134,11 @@ original diffuse global bound.
   CKN reproof do not supply the fixed-profile-time local $L^2$ estimate; no
   matching localized Bogovskii theorem was found, so this route remains
   `blocked` at source level.
+- Burned down the five untried technique families: Besov/paraproduct analysis
+  and minimal-blowup were already represented by existing blocked routes;
+  vorticity geometry, monotonicity/entropy, and quantitative singular-set
+  geometry each remained blocked at a named first lemma. No new claim was
+  promoted to `proved` or `refuted`.
 
 ## Candidate Dispositions
 
