@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 53
+three-dimensional incompressible Navier-Stokes Millennium problem. 54
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -193,6 +193,10 @@ original diffuse global bound.
   reduction to local anti-concentration, but near cubic pressure traction and
   far harmonic tails cannot be produced from finite energy at fixed profile
   times; `PRESSURE-TRACTION-ANTI-CONCENTRATION` remains `blocked`.
+- Decomposed the central anti-concentration target into near cubic closure,
+  far harmonic-tail control, and fixed-profile transfer. All three are blocked;
+  a weaker expanding-ball spacetime-window target may suffice for rigidity but
+  is not produced by finite energy.
 - Sharpened `FREQ-PACKING`: the combined regularity conjecture was
   underspecified, and a bounded occupancy norm permits one bad event at every
   nested scale. Occupancy-only packing-to-CKN is therefore insufficient;

@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "round_id": "round-073",
+  "date": "2026-08-19",
+  "target": "anti-concentration-sublemma-decomposition",
+  "target_claim_id": "EXPANDING-BALL-SPACETIME-WINDOW",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-073-claims.json",
+  "claims_snapshot_sha256": "57daf27e34670ba77b70f36b0a0686356990a764a2632c26345887e5c5146e25",
+  "previous_round": "artifacts/gauntlet/round-072.json",
+  "previous_round_sha256": "e26aff6bbe3ad344942c7fc3a5270a0616391196fb7e88519d33b1b3d5b276ec",
+  "post_repair_claims_sha256": "57daf27e34670ba77b70f36b0a0686356990a764a2632c26345887e5c5146e25",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "849e93c216997bcc9e31b7d0fbbbb90610f1953e1d097bbbc56a20f1080fd1c7",
+  "reviewers": ["Explore: near pressure closure audit", "Explore: far harmonic tail audit", "expensive-agent: fixed-time transfer audit"],
+  "capability_failures": [],
+  "findings": [
+    {"id":"R73-001","fingerprint":"near-pressure-cubic-circularity","disposition":"valid","finding":"The near pressure term is controlled only by the same critical cubic mass the local argument must derive.","repair":"Recorded the near-field gate as blocked in ANTI_CONCENTRATION_SUBLEMMA_AUDIT.md."},
+    {"id":"R73-002","fingerprint":"far-harmonic-tail-supercritical","disposition":"valid","finding":"Finite energy controls the far harmonic pressure tail only at a supercritical M_k/L rate; remote packets alter traction without changing local velocity data.","repair":"Recorded the far-tail gate as blocked."},
+    {"id":"R73-003","fingerprint":"expanding-window-fixed-time-gap","disposition":"valid","finding":"Averaged or good-time estimates do not transfer to prescribed KNSS slices on expanding balls without a uniform rescaled-time modulus.","repair":"Registered the weaker EXPANDING-BALL-SPACETIME-WINDOW target as blocked; it may suffice for rigidity but is not currently produced by finite energy."}
+  ],
+  "validation":["python -m ns_millennium.ledger artifacts/claims.json after advancing manifest","python -m unittest discover -s tests -v","git diff --check","Three independent sublemma audits covered near pressure, far tail, and fixed-time transfer"],
+  "unresolved_valid_findings":["frequency-packing-hypothesis-added","frequency-packing-iteration-001","phase-space-cutoff-uniformity","local-energy-trajectory-attack-blocked","bogovskii-temporal-commutator-restores-pressure","bogovskii-critical-transport-remainder","bogovskii-fixed-profile-time-gap","bogovskii-source-hypothesis-gap","lin-source-scope-no-anti-concentration","ess-source-scope-no-local-l2-bridge","bogovskii-primary-source-gap","besov-route-repeats-frequency-blocker","minimal-blowup-already-implicit","vorticity-geometry-fixed-slice-gap","no-monotonicity-functional","singular-set-size-not-amplitude-control","critical-kinetic-enstrophy-annular-tail","critical-functional-universal-coercivity-killed","stress-completed-functional-pressure-time-derivative","windowed-functional-scale-inverting-energy","enstrophy-window-derivative-hierarchy","anisotropic-vorticity-penalty-misses-transverse-flux","wavelet-flux-quartic-triad-obstruction","wavelet-expanding-ball-quantifier-gap","semigroup-parameter-escape-and-duhamel-commutator","resolvent-parameter-escape-triad-pairing","modulation-window-triad-commutator","biotsavart-pressure-pairing-and-tail","helical-cancellation-coercivity-dichotomy","frequency-packing-underspecified-occupancy-bridge","sos-fixed-cutoff-survives-continuum-blocked","shell-synchronized-criterion-valid-production-blocked","shell-production-activation-and-persistence-blocked","lagrangian-pressure-traction-deformation-growth","pressure-traction-full-stress-budget-blocked","near-pressure-cubic-circularity","far-harmonic-tail-supercritical","expanding-window-fixed-time-gap"],
+  "resolved_findings":[],
+  "result":"stopped_with_blocker",
+  "converged":false
+}
