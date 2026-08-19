@@ -78,3 +78,13 @@ test("keeps the fretboard surface usable on mobile", async ({ page }) => {
   await expect(page.getByLabel("Guitar fretboard visualization")).toBeVisible({ timeout: 10_000 });
   await expect(page.getByLabel("Analysis timeline")).toBeEnabled();
 });
+
+test("starts and stops microphone mode without a playback timeline", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Microphone" }).click();
+  await expect(page.getByText("Listening")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Analysis timeline")).toHaveCount(0);
+  await expect(page.getByLabel("Guitar fretboard visualization")).toBeVisible();
+  await page.getByRole("button", { name: "Stop" }).click();
+  await expect(page.getByText("Microphone stopped")).toBeVisible();
+});

@@ -29,6 +29,9 @@ h1 { font-size: 17px; line-height: 1; letter-spacing: 0; }
 .label, .panel-heading, .live-status, .speed-control, .legend, .fret-labels, .string-label { font: 500 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
 .status-dot { display: inline-block; width: 6px; height: 6px; background: var(--mint); border-radius: 50%; margin-right: 7px; box-shadow: 0 0 0 4px rgba(142, 226, 194, .1); }
 .control-strip { display: flex; justify-content: space-between; gap: 20px; border-block: 1px solid var(--line); padding: 18px 0; }
+.input-mode { display: flex; gap: 4px; }
+.input-mode button { color: var(--muted); background: transparent; border: 1px solid transparent; padding: 8px 10px; font: 500 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+.input-mode button:hover, .input-mode button.mode-active { color: var(--ink); border-color: var(--line); }
 .file-drop { display: flex; align-items: center; gap: 13px; cursor: pointer; }
 .file-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .upload-icon { display: grid; place-items: center; width: 34px; height: 34px; color: #101719; background: var(--mint); font-size: 24px; line-height: 1; }
@@ -36,6 +39,11 @@ h1 { font-size: 17px; line-height: 1; letter-spacing: 0; }
 .file-drop strong { font-size: 14px; font-weight: 500; }
 .file-drop small { color: var(--muted); font: 10px var(--mono); margin-top: 4px; }
 .source-meta { gap: 22px; color: var(--muted); font: 10px var(--mono); }
+.microphone-status { gap: 10px; }
+.microphone-status button { color: var(--ink); background: transparent; border: 1px solid var(--line); padding: 6px 9px; font: 500 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+.microphone-running .status-dot { background: var(--mint); }
+.microphone-starting .status-dot, .microphone-muted .status-dot { background: var(--yellow); }
+.microphone-error .status-dot, .microphone-ended .status-dot { background: var(--coral); }
 .live-status { color: var(--mint); }
 .status-analyzing .status-dot { background: var(--yellow); }
 .status-error { color: var(--coral); }
