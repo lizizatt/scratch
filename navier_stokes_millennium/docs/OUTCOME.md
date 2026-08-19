@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 39
+three-dimensional incompressible Navier-Stokes Millennium problem. 40
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -139,6 +139,14 @@ original diffuse global bound.
   vorticity geometry, monotonicity/entropy, and quantitative singular-set
   geometry each remained blocked at a named first lemma. No new claim was
   promoted to `proved` or `refuted`.
+- Constructed a scale-critical localized kinetic-enstrophy functional whose
+  interior vortex-stretching term is conditionally absorbable under the KNSS
+  pointwise bound. Its fixed-time annular pressure/transport tail remains
+  `blocked` (`CRITICAL-KINETIC-ENSTROPHY-TAIL`).
+- Constructed a scale-critical localized kinetic-enstrophy functional. Its
+  interior vortex-stretching term admits conditional absorption under the KNSS
+  pointwise bound, but the required fixed-time annular-tail estimate remains
+  `blocked`; see `CRITICAL-KINETIC-ENSTROPHY-FUNCTIONAL`.
 
 ## Candidate Dispositions
 
@@ -167,6 +175,7 @@ per round 1's findings.
 | Weaker record-center-only local $L^3$ hypothesis (`LOCAL-L3-RECORD-CENTERS`) | `proved` | Genuinely weaker than $M_R$ over all centers, verified by independent review, but still not derivable from finite energy alone. |
 | Local energy inequality along record-center trajectory (`LOCAL-L3-FROM-LOCAL-ENERGY`) | `blocked` | Local pressure decomposition is circular at short range and supercritical at long range; missing estimate identified precisely. |
 | Record-scale local $L^2$ anti-concentration (`LOCAL-L2-ANTI-CONCENTRATION`) | `blocked` | The exact estimate needed to convert KNSS pointwise control into the record-center local $L^3$ hypothesis remains unavailable. |
+| Critical localized kinetic-enstrophy tail (`CRITICAL-KINETIC-ENSTROPHY-TAIL`) | `blocked` | Interior stretching can be conditionally absorbed, but pressure and cubic annular tails remain uncontrolled at fixed profile times. |
 | Naive $r_Q^{-1}$ cube measure (`FREQ-NAIVE-MEASURE`) | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
 | Local-only harmonic pressure control (`FREQ-PRESSURE-LOCAL`) | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
 | Matched-scale commutator smallness (`FREQ-MATCHED-COMMUTATOR`) | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |

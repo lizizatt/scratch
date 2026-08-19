@@ -28,7 +28,7 @@ The current result and stopping condition are recorded in
 
 ## Current status (2026-08-18)
 
-The problem remains open. 39 adversarial gauntlet rounds have attacked
+The problem remains open. 40 adversarial gauntlet rounds have attacked
 frequency-packing, phase-space, and critical-profile routes; several narrow
 sub-claims were refuted with explicit counterexamples, and two conditional
 theorems, `LOCAL-L3-CONTINUATION`
@@ -50,6 +50,9 @@ minimal-blowup, vorticity geometry, monotonicity, and singular-set geometry)
 also remained blocked or redundant with existing routes. The hash-chain
 manifest also contains
 non-mathematical synchronization/audit heads for the current research record.
+The latest round constructed a scale-critical localized kinetic-enstrophy
+functional; its interior stretching term is conditionally absorbable, but the
+fixed-time annular tail remains blocked.
 
 ## Resolution standard
 

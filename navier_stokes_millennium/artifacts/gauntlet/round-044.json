@@ -1,0 +1,74 @@
+{
+  "schema_version": 2,
+  "round_id": "round-044",
+  "date": "2026-08-18",
+  "target": "critical-kinetic-enstrophy-functional-construction",
+  "target_claim_id": "CRITICAL-KINETIC-ENSTROPHY-TAIL",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-044-claims.json",
+  "claims_snapshot_sha256": "e4a1b316a16b6746ac8b2bca3c3b52314f442ec4bf1ff454a0573ad5d057b994",
+  "previous_round": "artifacts/gauntlet/round-043.json",
+  "previous_round_sha256": "a0e50be0a3ad41f13e9aaf038eb6ed144bd447a586907de1fd74cfa9b4301e97",
+  "post_repair_claims_sha256": "e4a1b316a16b6746ac8b2bca3c3b52314f442ec4bf1ff454a0573ad5d057b994",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "d56bfcf4be107d31b702ca91af7d08182e9e40da421a9936fed2c88f60425a8f",
+  "reviewers": [
+    "Explore: backward-heat functional design",
+    "expensive-agent: kinetic-enstrophy functional design",
+    "Explore: flux-corrected functional design"
+  ],
+  "capability_failures": [],
+  "findings": [
+    {
+      "id": "R44-001",
+      "fingerprint": "critical-kinetic-enstrophy-interior-absorption",
+      "disposition": "valid",
+      "finding": "The kinetic-plus-enstrophy functional is exactly scale-critical and its interior vortex-stretching term can be conditionally absorbed under the KNSS pointwise bound with a sufficiently small enstrophy coefficient, modulo localization remainders.",
+      "repair": "Recorded the candidate and formal identity in docs/research/CRITICAL_KINETIC_ENSTROPHY_FUNCTIONAL.md; registered only the unresolved tail lemma."
+    },
+    {
+      "id": "R44-002",
+      "fingerprint": "critical-kinetic-enstrophy-annular-tail",
+      "disposition": "valid",
+      "finding": "The annular pressure, cubic transport, cutoff diffusion, and vorticity boundary terms remain at critical scale and are not uniformly controlled at fixed KNSS profile times by finite energy.",
+      "repair": "Marked CRITICAL-KINETIC-ENSTROPHY-TAIL blocked and retained the existing LOCAL-L2-ANTI-CONCENTRATION blocker."
+    },
+    {
+      "id": "R44-003",
+      "fingerprint": "critical-functional-universal-coercivity-killed",
+      "disposition": "valid",
+      "finding": "An exact periodic shear with zero pressure, convection, and vortex stretching defeats any universal damping inequality for this functional based only on local flux and dissipation over expanding rescaled balls.",
+      "repair": "Recorded the shear as an overstrong-coercivity stress test, explicitly not as a finite-energy singular-solution counterexample."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json after advancing the manifest head",
+    "python -m unittest discover -s tests -v",
+    "git diff --check",
+    "Three independent design critics compared backward-heat, kinetic-enstrophy, and flux-corrected functionals",
+    "No functional was marked proved and no genuine suitable-solution counterexample was found"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked",
+    "bogovskii-temporal-commutator-restores-pressure",
+    "bogovskii-critical-transport-remainder",
+    "bogovskii-fixed-profile-time-gap",
+    "bogovskii-source-hypothesis-gap",
+    "lin-source-scope-no-anti-concentration",
+    "ess-source-scope-no-local-l2-bridge",
+    "bogovskii-primary-source-gap",
+    "besov-route-repeats-frequency-blocker",
+    "minimal-blowup-already-implicit",
+    "vorticity-geometry-fixed-slice-gap",
+    "no-monotonicity-functional",
+    "singular-set-size-not-amplitude-control",
+    "critical-kinetic-enstrophy-annular-tail",
+    "critical-functional-universal-coercivity-killed"
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
