@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 46
+three-dimensional incompressible Navier-Stokes Millennium problem. 47
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -172,6 +172,10 @@ original diffuse global bound.
 - Tested a localized Biot--Savart/Riesz functional. It is critical $L^3$ mass
   written nonlocally; a sign-indefinite Riesz-pressure pairing and remote
   kernel tails remain, so `RIESZ-BIOTSAVART-FUNCTIONAL` is `blocked`.
+- Tested positive helical energies and signed helicity. Positive combinations
+  retain nonlinear transfer; signed cancellation loses coercivity, while the
+  planar triad has zero signed helicity but nonzero absolute transfer.
+  `HELICITY-HELICAL-FUNCTIONAL` remains `blocked`.
 
 ## Candidate Dispositions
 

@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "round_id": "round-060",
+  "date": "2026-08-19",
+  "target": "helicity-status-synchronization",
+  "target_claim_id": "HELICITY-HELICAL-FUNCTIONAL",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-060-claims.json",
+  "claims_snapshot_sha256": "4c7c3476a9c16a534f7b1d048da16e9102bdc0b268efdc4aecef4730795635af",
+  "previous_round": "artifacts/gauntlet/round-059.json",
+  "previous_round_sha256": "f36685e1ee8df2a9afd51de30a62e04c2d76ca6d67f6a9eebad3821f02677f0b",
+  "post_repair_claims_sha256": "4c7c3476a9c16a534f7b1d048da16e9102bdc0b268efdc4aecef4730795635af",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "61158dc5e4311a028f71f727f4fb8e4788163c645671d10de43412ebf78c818f",
+  "reviewers": ["repository synchronization check: helicity status"],
+  "capability_failures": [],
+  "findings": [],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json", "python -m unittest discover -s tests -v", "git diff --check", "No canonical mathematical status changed after round-059"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "round_id": "round-059",
+  "date": "2026-08-19",
+  "target": "helicity-helical-functional-audit",
+  "target_claim_id": "HELICITY-HELICAL-FUNCTIONAL",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-059-claims.json",
+  "claims_snapshot_sha256": "4c7c3476a9c16a534f7b1d048da16e9102bdc0b268efdc4aecef4730795635af",
+  "previous_round": "artifacts/gauntlet/round-058.json",
+  "previous_round_sha256": "4b6cc202043b5b01a7a2d1753a9af045ba02412b02e54fa85a6de35d4436584b",
+  "post_repair_claims_sha256": "4c7c3476a9c16a534f7b1d048da16e9102bdc0b268efdc4aecef4730795635af",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "6aa3e990c64fdf8483676e6e3bf6894876605abb9d68130329d1759e765e422a",
+  "reviewers": ["expensive-agent: helicity helical functional audit"],
+  "capability_failures": [],
+  "findings": [{
+    "id": "R59-001",
+    "fingerprint": "helical-cancellation-coercivity-dichotomy",
+    "disposition": "valid",
+    "finding": "Positive helical-energy combinations retain nonlinear transfer, while cancelling it requires signed helicity and loses coercivity; the planar triad has zero signed helicity but nonzero absolute helical transfer, and local helicity exposes pressure flux.",
+    "repair": "Recorded docs/research/HELICITY_HELICAL_FUNCTIONAL_AUDIT.md and kept HELICITY-HELICAL-FUNCTIONAL blocked."
+  }],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json after advancing manifest", "python -m unittest discover -s tests -v", "git diff --check", "Shear, Beltrami, triad, vortex-tube, pressure, and fixed-profile tests were audited"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}
