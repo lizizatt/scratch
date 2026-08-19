@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "round_id": "round-036",
+  "date": "2026-08-18",
+  "target": "local-l3-bound-derivation-local-energy-attack",
+  "target_claim_id": "LOCAL-L3-BOUND-DERIVATION",
+  "subject_sha256": "6ae5de23d1f354965f27c406a087291d9d9a3f47cdfe0034558dbc55f29a1d50",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-036-claims.json",
+  "claims_snapshot_sha256": "6ae5de23d1f354965f27c406a087291d9d9a3f47cdfe0034558dbc55f29a1d50",
+  "previous_round": "artifacts/gauntlet/round-035.json",
+  "previous_round_sha256": "d587a0eb3ab0574e75d60ffd851c1e502af2cd3f3e8a28ed072ee96ee6866b1c",
+  "post_repair_claims_sha256": "6ae5de23d1f354965f27c406a087291d9d9a3f47cdfe0034558dbc55f29a1d50",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "32bb10fd5cec4308788b7b23140d7097d739d285243cd178c226852a442e0002",
+  "reviewers": [
+    "expensive-agent: local Scheffer/CKN energy inequality attack along the record-center trajectory"
+  ],
+  "findings": [
+    {
+      "id": "R36-001",
+      "fingerprint": "local-energy-trajectory-attack-blocked",
+      "disposition": "valid",
+      "finding": "Restricting the local Scheffer/CKN energy inequality to a backward parabolic neighborhood of only the KNSS record-center trajectory does not derive the local L3 bound: the local pressure decomposition is circular at short range (near-field Calderon-Zygmund term equals the sought cubic quantity) and supercritical at long range (far-field tail controlled only at rate E0*M_k/L, same as the velocity term), and fixed-radius time averaging only selects k-dependent good times that cannot be transferred to the fixed profile times KNSS compactness requires.",
+      "repair": "Added blocked claim LOCAL-L3-FROM-LOCAL-ENERGY documenting the precise missing estimate (a local L2 anti-concentration bound sup_j limsup_k M_k * local L2 mass finite); wrote docs/research/CRITICAL_PROFILE_ITERATION_005.md; updated LOCAL-L3-BOUND-DERIVATION falsification_attempts and docs/OUTCOME.md."
+    }
+  ],
+  "validation": [
+    "python -m ns_millennium.ledger artifacts/claims.json",
+    "python -m unittest discover -s tests -v (51 tests)",
+    "git diff --check",
+    "One expensive-agent subagent independently derived the local energy inequality, performed a full scale-invariant scaling audit, and stress-tested the KNSS pointwise normalization against a non-solution rescaled bump to confirm the algebraic obstruction is genuine"
+  ],
+  "unresolved_valid_findings": [
+    "frequency-packing-hypothesis-added",
+    "frequency-packing-iteration-001",
+    "phase-space-cutoff-uniformity",
+    "local-energy-trajectory-attack-blocked"
+  ],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

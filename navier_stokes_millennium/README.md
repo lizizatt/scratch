@@ -28,7 +28,7 @@ The current result and stopping condition are recorded in
 
 ## Current status (2026-08-17)
 
-The problem remains open. Thirty-five adversarial gauntlet rounds (and
+The problem remains open. Thirty-six adversarial gauntlet rounds (and
 counting) have attacked frequency-packing, phase-space, and critical-profile
 routes; several narrow sub-claims were refuted with explicit counterexamples,
 and two conditional theorems, `LOCAL-L3-CONTINUATION`

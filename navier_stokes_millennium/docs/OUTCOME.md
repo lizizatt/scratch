@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. Thirty-five
+three-dimensional incompressible Navier-Stokes Millennium problem. Thirty-six
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -101,6 +101,12 @@ original diffuse global bound.
   continuation argument goes through unchanged, but the review also confirmed
   the narrowing gives no derivational shortcut, so `LOCAL-L3-BOUND-DERIVATION`
   remains `blocked`.
+- Attacked `LOCAL-L3-BOUND-DERIVATION` with the local Scheffer/CKN energy
+  inequality along only the record-center trajectory: identified the precise
+  missing estimate (a local $L^2$ anti-concentration bound stronger than
+  finite energy alone supplies) and showed the local pressure decomposition
+  is circular at short range and supercritical at long range, so this remains
+  `blocked` rather than refuted.
 
 ## Candidate Dispositions
 
@@ -127,6 +133,7 @@ per round 1's findings.
 | Local $L^3$ bound from Carleman/backward-uniqueness adaptation (`LOCAL-L3-FROM-CARLEMAN`) | `blocked` | Requires a terminal zero trace and additional tail control not supplied by finite energy. |
 | Local $L^3$ bound from Type I rate plus self-similar exclusion (`LOCAL-L3-FROM-TYPE-I`) | `refuted` | The Type I rate alone lets local $L^3$ mass diverge, and Type I to self-similar tangent is unproven (`BUP-003`). |
 | Weaker record-center-only local $L^3$ hypothesis (`LOCAL-L3-RECORD-CENTERS`) | `proved` | Genuinely weaker than $M_R$ over all centers, verified by independent review, but still not derivable from finite energy alone. |
+| Local energy inequality along record-center trajectory (`LOCAL-L3-FROM-LOCAL-ENERGY`) | `blocked` | Local pressure decomposition is circular at short range and supercritical at long range; missing estimate identified precisely. |
 | Naive $r_Q^{-1}$ cube measure (`FREQ-NAIVE-MEASURE`) | `refuted` | A matched binary stopping tree charges one scale-invariant unit per generation. |
 | Local-only harmonic pressure control (`FREQ-PRESSURE-LOCAL`) | `refuted` | A remote divergence-free packet creates a nonzero harmonic pressure tail locally. |
 | Matched-scale commutator smallness (`FREQ-MATCHED-COMMUTATOR`) | `refuted` | Rescaling keeps the commutator ratio fixed and nonzero. |
