@@ -1,0 +1,29 @@
+{
+  "schema_version": 2,
+  "round_id": "round-066",
+  "date": "2026-08-19",
+  "target": "sos-finite-mode-certificate-audit",
+  "target_claim_id": "SOS-CUTOFF-UNIFORM-CERTIFICATE",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-066-claims.json",
+  "claims_snapshot_sha256": "1f97a7c4cb16f3222c8a8edeb208ded021259181bcd29356e5e4bcfaaf077bb6",
+  "previous_round": "artifacts/gauntlet/round-065.json",
+  "previous_round_sha256": "af14e18ed03ee70068155e9b9a69a16bc29ff7329f967cf5c9d0b5ecbe9006f2",
+  "post_repair_claims_sha256": "1f97a7c4cb16f3222c8a8edeb208ded021259181bcd29356e5e4bcfaaf077bb6",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "4422be71926f8b1b507b6485e823cac1e4fea2dcf0aee2598b805dd0fa932afc",
+  "reviewers": ["expensive-agent: SOS finite-mode certificate audit"],
+  "capability_failures": [],
+  "findings": [{
+    "id": "R66-001",
+    "fingerprint": "sos-fixed-cutoff-survives-continuum-blocked",
+    "disposition": "valid",
+    "finding": "Quadratic SOS certificates are killed by the triad's odd leading generator term, while a quartic completion is feasible at fixed cutoff but requires coefficients growing with resolved concentration scale, so the cutoff-uniform continuum certificate remains blocked.",
+    "repair": "Recorded docs/research/SOS_FINITE_MODE_CERTIFICATE_AUDIT.md and registered SOS-CUTOFF-UNIFORM-CERTIFICATE as blocked rather than refuted."
+  }],
+  "validation": ["python -m ns_millennium.ledger artifacts/claims.json after advancing manifest", "python -m unittest discover -s tests -v", "git diff --check", "Fixed-cutoff quartic algebra, exact triad scaling, coefficient growth, and continuum scope were independently audited"],
+  "unresolved_valid_findings": ["frequency-packing-hypothesis-added", "frequency-packing-iteration-001", "phase-space-cutoff-uniformity", "local-energy-trajectory-attack-blocked", "bogovskii-temporal-commutator-restores-pressure", "bogovskii-critical-transport-remainder", "bogovskii-fixed-profile-time-gap", "bogovskii-source-hypothesis-gap", "lin-source-scope-no-anti-concentration", "ess-source-scope-no-local-l2-bridge", "bogovskii-primary-source-gap", "besov-route-repeats-frequency-blocker", "minimal-blowup-already-implicit", "vorticity-geometry-fixed-slice-gap", "no-monotonicity-functional", "singular-set-size-not-amplitude-control", "critical-kinetic-enstrophy-annular-tail", "critical-functional-universal-coercivity-killed", "stress-completed-functional-pressure-time-derivative", "windowed-functional-scale-inverting-energy", "enstrophy-window-derivative-hierarchy", "anisotropic-vorticity-penalty-misses-transverse-flux", "wavelet-flux-quartic-triad-obstruction", "wavelet-expanding-ball-quantifier-gap", "semigroup-parameter-escape-and-duhamel-commutator", "resolvent-parameter-escape-triad-pairing", "modulation-window-triad-commutator", "biotsavart-pressure-pairing-and-tail", "helical-cancellation-coercivity-dichotomy", "frequency-packing-underspecified-occupancy-bridge", "sos-fixed-cutoff-survives-continuum-blocked"],
+  "resolved_findings": [],
+  "result": "stopped_with_blocker",
+  "converged": false
+}

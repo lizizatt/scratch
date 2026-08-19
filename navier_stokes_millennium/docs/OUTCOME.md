@@ -7,7 +7,7 @@
 ## Result
 
 This project does not contain a proof or counterexample resolving the
-three-dimensional incompressible Navier-Stokes Millennium problem. 48
+three-dimensional incompressible Navier-Stokes Millennium problem. 49
 adversarial gauntlet rounds have been recorded, spanning literature
 synthesis, exact finite-mode computation, frequency/phase-space packing,
 critical-profile compactness, and a proved conditional continuation
@@ -186,6 +186,10 @@ original diffuse global bound.
   nested scale. Occupancy-only packing-to-CKN is therefore insufficient;
   `FREQ-PACKING` is now `blocked` pending fixed quantifiers and an amplitude/
   pressure/persistence term.
+- Audited SOS/semidefinite Galerkin certificates. Quadratic certificates are
+  killed by the triad; quartic completions survive at fixed cutoff but require
+  coefficients growing with resolved scale, so
+  `SOS-CUTOFF-UNIFORM-CERTIFICATE` remains `blocked` at the continuum bridge.
 
 ## Candidate Dispositions
 
