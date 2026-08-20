@@ -4,6 +4,10 @@ import {
   type FileAnalysisProgress,
   type FileAnalysisResult,
 } from "./audio/file-analysis";
+import {
+  MicrophoneAnalysisSession,
+  type MicrophoneAnalysisSnapshot,
+} from "./audio/microphone-analysis";
 import { ROOT_NAMES, buildFretboard, type FretNote } from "./music/fretboard";
 import { chordLabel, detectedChordMarkers } from "./music/timeline";
 import type { ChordEstimate, ChordQuality } from "./analysis/types";
@@ -27,21 +31,31 @@ type AppStatus =
   | { readonly kind: "ready" }
   | { readonly kind: "error"; readonly message: string };
 
+type InputMode = "file" | "microphone";
+
 export function App() {
   const [status, setStatus] = useState<AppStatus>({ kind: "idle" });
+  const [inputMode, setInputMode] = useState<InputMode>("file");
+  const [microphoneSnapshot, setMicrophoneSnapshot] = useState<MicrophoneAnalysisSnapshot>({ status: "stopped" });
+  const [microphoneEstimate, setMicrophoneEstimate] = useState<ChordEstimate>();
   const [fileName, setFileName] = useState<string>();
   const [result, setResult] = useState<FileAnalysisResult>();
   const [selectedTime, setSelectedTime] = useState(0);
+  const [audioMuted, setAudioMuted] = useState(true);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const [scaleName, setScaleName] = useState<string>();
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileUrlRef = useRef<string | undefined>(undefined);
+  const microphoneRef = useRef<MicrophoneAnalysisSession | undefined>(undefined);
   const requestId = useRef(0);
 
-  const currentEstimate = useMemo(
+  const fileEstimate = useMemo(
     () => estimateAtTime(result?.estimates ?? [], selectedTime),
     [result, selectedTime],
   );
+  const currentEstimate = inputMode === "microphone"
+    ? microphoneEstimate
+    : fileEstimate;
   const fretboard = useMemo(() => {
     if (currentEstimate?.state !== "chord") {
       return [];
@@ -63,17 +77,27 @@ export function App() {
       return;
     }
     const handleTimeUpdate = () => setSelectedTime(audio.currentTime);
+    const handlePlay = () => setAudioPlaying(true);
+    const handlePause = () => setAudioPlaying(false);
     const handleEnded = () => setAudioPlaying(false);
     audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
       audio.pause();
       if (fileUrlRef.current !== undefined) {
         URL.revokeObjectURL(fileUrlRef.current);
       }
     };
+  }, []);
+
+  useEffect(() => () => {
+    void microphoneRef.current?.stop();
   }, []);
 
   async function handleFile(file: File | undefined) {
@@ -83,6 +107,9 @@ export function App() {
     const currentRequest = ++requestId.current;
     const audio = audioRef.current;
     audio?.pause();
+    if (audio !== null) {
+      audio.muted = audioMuted;
+    }
     setAudioPlaying(false);
     if (fileUrlRef.current !== undefined) {
       URL.revokeObjectURL(fileUrlRef.current);
@@ -120,6 +147,36 @@ export function App() {
     }
   }
 
+  async function enterMode(nextMode: InputMode) {
+    if (nextMode === inputMode) {
+      return;
+    }
+    await microphoneRef.current?.stop();
+    microphoneRef.current = undefined;
+    setInputMode(nextMode);
+    setMicrophoneEstimate(undefined);
+    if (nextMode === "file") {
+      setMicrophoneSnapshot({ status: "stopped" });
+      return;
+    }
+    setResult(undefined);
+    setFileName(undefined);
+    setStatus({ kind: "idle" });
+    const session = new MicrophoneAnalysisSession((snapshot) => {
+      setMicrophoneSnapshot(snapshot);
+      if (snapshot.estimate !== undefined) {
+        setMicrophoneEstimate(snapshot.estimate);
+        setSelectedTime(snapshot.estimate.timestampSeconds);
+      }
+    });
+    microphoneRef.current = session;
+    try {
+      await session.start();
+    } catch {
+      // The session publishes a user-facing error snapshot.
+    }
+  }
+
   function seekTo(time: number) {
     setSelectedTime(time);
     if (audioRef.current !== null) {
@@ -127,18 +184,26 @@ export function App() {
     }
   }
 
-  function handleAudioToggle(shouldPlay: boolean) {
+  function handleAudioMuteToggle(shouldPlay: boolean) {
     const audio = audioRef.current;
-    setAudioPlaying(shouldPlay);
+    setAudioMuted(!shouldPlay);
     if (audio === null) {
       return;
     }
-    if (!shouldPlay) {
-      audio.pause();
+    audio.muted = !shouldPlay;
+  }
+
+  function handlePlaybackToggle() {
+    const audio = audioRef.current;
+    if (audio === null) {
       return;
     }
-    audio.currentTime = selectedTime;
-    void audio.play().catch(() => setAudioPlaying(false));
+    if (audio.paused) {
+      audio.currentTime = selectedTime;
+      void audio.play().catch(() => setAudioPlaying(false));
+    } else {
+      audio.pause();
+    }
   }
 
   return (
@@ -150,7 +215,11 @@ export function App() {
       </header>
 
       <section className="control-strip" aria-label="Audio source controls">
-        <label className="file-drop">
+        <div className="input-mode" role="group" aria-label="Audio input mode">
+          <button type="button" className={inputMode === "file" ? "mode-active" : ""} onClick={() => void enterMode("file")}>File</button>
+          <button type="button" className={inputMode === "microphone" ? "mode-active" : ""} onClick={() => void enterMode("microphone")}>Microphone</button>
+        </div>
+        {inputMode === "file" && <label className="file-drop">
           <input
             type="file"
             accept="audio/mpeg,audio/wav,audio/wave,audio/x-wav"
@@ -158,13 +227,19 @@ export function App() {
           />
           <span className="upload-icon" aria-hidden="true">+</span>
           <span><strong>{fileName ?? "Load an audio file"}</strong><small>MP3/WAV</small></span>
-        </label>
-        {status.kind === "analyzing" && <div className="source-meta">
+        </label>}
+        {inputMode === "file" && status.kind === "analyzing" && <div className="source-meta">
           <span className={`live-status status-${status.kind}`}>
             <span className="status-dot" />
             {status.progress.phase}...
           </span>
           <span>{Math.round(status.progress.fraction * 100)}%</span>
+        </div>}
+        {inputMode === "microphone" && <div className={`source-meta microphone-status microphone-${microphoneSnapshot.status}`}>
+          <span className="status-dot" />
+          <span>{microphoneSnapshot.status === "running" ? "Listening" : microphoneSnapshot.status === "starting" ? "Starting microphone" : microphoneSnapshot.status === "muted" ? "Microphone muted" : microphoneSnapshot.status === "ended" ? "Microphone ended" : microphoneSnapshot.status === "error" ? microphoneSnapshot.message : "Microphone stopped"}</span>
+          {(microphoneSnapshot.status === "running" || microphoneSnapshot.status === "starting") && <button type="button" onClick={() => void microphoneRef.current?.stop()}>Stop</button>}
+          {(microphoneSnapshot.status === "stopped" || microphoneSnapshot.status === "ended" || microphoneSnapshot.status === "error") && <button type="button" onClick={() => void microphoneRef.current?.start()}>Start</button>}
         </div>}
       </section>
 
@@ -172,7 +247,7 @@ export function App() {
 
       {status.kind === "error" && <div className="error-banner" role="alert">{status.message}</div>}
 
-      {result !== undefined && <>
+      {(result !== undefined || inputMode === "microphone") && <>
       <section className="analysis-grid" aria-live="polite">
         <div className="chord-panel panel">
           <div className="panel-heading"><span>Current chord</span><span className="timestamp">{formatTime(selectedTime)}</span></div>
@@ -189,20 +264,20 @@ export function App() {
             <div className="empty-harmony">
               <span className="pulse-ring" aria-hidden="true" />
               <strong>{currentEstimate?.state === "uncertain" ? "Uncertain" : "No chord"}</strong>
-              <span>{result === undefined ? "Load a recording to begin" : "Move along the timeline to inspect harmony"}</span>
+              <span>{inputMode === "microphone" ? "Play a chord near the microphone" : result === undefined ? "Load a recording to begin" : "Move along the timeline to inspect harmony"}</span>
             </div>
           )}
         </div>
 
-        <div className="timeline-panel panel">
-          <div className="panel-heading"><span>Analysis timeline</span><label className="audio-toggle"><input type="checkbox" aria-label="Play audio" checked={audioPlaying} onChange={(event) => handleAudioToggle(event.target.checked)} /><span>Play audio</span></label></div>
+        {inputMode === "file" && result !== undefined && <div className="timeline-panel panel">
+          <div className="panel-heading"><span>Analysis timeline</span><div className="playback-controls"><button className="playback-button" type="button" onClick={handlePlaybackToggle} aria-label={audioPlaying ? "Pause timeline" : "Play timeline"}>{audioPlaying ? "||" : "▶"}</button><label className="audio-toggle"><input type="checkbox" aria-label="Play audio" checked={!audioMuted} onChange={(event) => handleAudioMuteToggle(event.target.checked)} /><span>Play audio</span></label></div></div>
           <div className="timeline-rail" aria-label="Detected chords">
             <span className="timeline-progress" style={{ width: `${(selectedTime / result.durationSeconds) * 100}%` }} />
             {chordMarkers.map((marker) => <button className="chord-marker" type="button" key={`${marker.timestampSeconds}-${marker.label}`} style={{ left: `${(marker.timestampSeconds / result.durationSeconds) * 100}%` }} onClick={() => seekTo(Math.min(result.durationSeconds, marker.timestampSeconds + MARKER_SETTLE_SECONDS))} aria-label={`Seek to ${marker.label}`}><span>{marker.label}</span></button>)}
           </div>
           <input className="scrubber" type="range" min="0" max={result.durationSeconds} step="0.01" value={selectedTime} onChange={(event) => seekTo(Number(event.target.value))} aria-label="Analysis timeline" />
           <div className="timeline-controls"><span>{formatTime(selectedTime)}</span><span className="timeline-duration">{formatTime(result.durationSeconds)}</span></div>
-        </div>
+        </div>}
       </section>
 
       <section className="fretboard-panel panel" aria-labelledby="fretboard-title">

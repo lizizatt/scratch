@@ -44,7 +44,14 @@ test("loads a file into the chord display and fretboard", async ({ page }) => {
   const playAudio = page.getByLabel("Play audio");
   await playAudio.check();
   await expect(playAudio).toBeChecked();
+  await expect(page.locator("audio")).toHaveJSProperty("muted", false);
+  const playTimeline = page.getByRole("button", { name: "Play timeline" });
+  await playTimeline.click();
   await expect(page.locator("audio")).toHaveJSProperty("paused", false);
+  await page.getByRole("button", { name: "Pause timeline" }).click();
+  await expect(page.locator("audio")).toHaveJSProperty("paused", true);
+  await playAudio.uncheck();
+  await expect(page.locator("audio")).toHaveJSProperty("muted", true);
 });
 
 test("shows chord names and seeks when a marker is clicked", async ({ page }) => {
@@ -70,4 +77,14 @@ test("keeps the fretboard surface usable on mobile", async ({ page }) => {
   await page.locator('input[type="file"]').setInputFiles(fileURLToPath(new URL("../fixtures/c-major.wav", import.meta.url)));
   await expect(page.getByLabel("Guitar fretboard visualization")).toBeVisible({ timeout: 10_000 });
   await expect(page.getByLabel("Analysis timeline")).toBeEnabled();
+});
+
+test("starts and stops microphone mode without a playback timeline", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Microphone" }).click();
+  await expect(page.getByText("Listening")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Analysis timeline")).toHaveCount(0);
+  await expect(page.getByLabel("Guitar fretboard visualization")).toBeVisible();
+  await page.getByRole("button", { name: "Stop" }).click();
+  await expect(page.getByText("Microphone stopped")).toBeVisible();
 });
