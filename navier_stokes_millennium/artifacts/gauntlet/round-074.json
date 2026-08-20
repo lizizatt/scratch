@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "round_id": "round-074",
+  "date": "2026-08-19",
+  "target": "expanding-window-rigidity-refinement",
+  "target_claim_id": "EXPANDING-BALL-SPACETIME-WINDOW",
+  "subject_sha256": "46f1350277e8b4a88e2cb10f0ea5b8bfc5852f30d326ab9e157bad9d74278393",
+  "claims_snapshot": "artifacts/gauntlet/snapshots/round-074-claims.json",
+  "claims_snapshot_sha256": "615694d31cb6391f685db387cd3e6b83f7f16ae3f9a1786e28bd97c594c3284c",
+  "previous_round": "artifacts/gauntlet/round-073.json",
+  "previous_round_sha256": "0edf065863d3263c66d7b47f28df406fa83306596aae162e26150e06a027544a",
+  "post_repair_claims_sha256": "615694d31cb6391f685db387cd3e6b83f7f16ae3f9a1786e28bd97c594c3284c",
+  "reviewed_roots": ["README.md", "AGENTS.md", "docs", "ns_millennium", "tests", "artifacts/claims.json"],
+  "reviewed_tree_sha256": "dcbf74cc60d830dc3daddae0eb5b13963aceeee1161786e6890ff96bf64b8b34",
+  "reviewers": ["Explore: windowed rigidity bridge audit", "expensive-agent: windowed estimate production audit"],
+  "capability_failures": [],
+  "findings": [{"id":"R74-001","fingerprint":"windowed-rigidity-profile-bridge-incomplete","disposition":"valid","finding":"The expanding-ball window bound may supply good profile times, but lower semicontinuity, profile-space L2-to-L3 propagation, and AB hypothesis closure require an explicit bridge not yet proved.","repair":"Recorded EXPANDING_WINDOW_RIGIDITY_AUDIT.md and kept the target blocked."},{"id":"R74-002","fingerprint":"windowed-production-global-energy-loss","disposition":"valid","finding":"Finite energy plus local energy gives only min(M_k E_0,L_k^3) on expanding rescaled balls; near pressure remains circular and far tails remain supercritical, so the weaker window estimate is not produced.","repair":"Recorded the production obstruction and retained the weaker target as blocked."}],
+  "validation":["python -m ns_millennium.ledger artifacts/claims.json after advancing manifest","python -m unittest discover -s tests -v","git diff --check","Two independent audits separated conditional rigidity sufficiency from finite-energy production"],
+  "unresolved_valid_findings":["frequency-packing-hypothesis-added","frequency-packing-iteration-001","phase-space-cutoff-uniformity","local-energy-trajectory-attack-blocked","bogovskii-temporal-commutator-restores-pressure","bogovskii-critical-transport-remainder","bogovskii-fixed-profile-time-gap","bogovskii-source-hypothesis-gap","lin-source-scope-no-anti-concentration","ess-source-scope-no-local-l2-bridge","bogovskii-primary-source-gap","besov-route-repeats-frequency-blocker","minimal-blowup-already-implicit","vorticity-geometry-fixed-slice-gap","no-monotonicity-functional","singular-set-size-not-amplitude-control","critical-kinetic-enstrophy-annular-tail","critical-functional-universal-coercivity-killed","stress-completed-functional-pressure-time-derivative","windowed-functional-scale-inverting-energy","enstrophy-window-derivative-hierarchy","anisotropic-vorticity-penalty-misses-transverse-flux","wavelet-flux-quartic-triad-obstruction","wavelet-expanding-ball-quantifier-gap","semigroup-parameter-escape-and-duhamel-commutator","resolvent-parameter-escape-triad-pairing","modulation-window-triad-commutator","biotsavart-pressure-pairing-and-tail","helical-cancellation-coercivity-dichotomy","frequency-packing-underspecified-occupancy-bridge","sos-fixed-cutoff-survives-continuum-blocked","shell-synchronized-criterion-valid-production-blocked","shell-production-activation-and-persistence-blocked","lagrangian-pressure-traction-deformation-growth","pressure-traction-full-stress-budget-blocked","near-pressure-cubic-circularity","far-harmonic-tail-supercritical","expanding-window-fixed-time-gap","windowed-rigidity-profile-bridge-incomplete","windowed-production-global-energy-loss"],
+  "resolved_findings":[],
+  "result":"stopped_with_blocker",
+  "converged":false
+}
