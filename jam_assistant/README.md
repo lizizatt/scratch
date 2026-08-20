@@ -25,6 +25,19 @@ recreated locally; the committed MP3 fixture covers browser decode throughput.
 The known-harmony MIDI library and reference-audio caveats are documented in
 [MIDI_FIXTURES.md](docs/MIDI_FIXTURES.md).
 
+## Jarvis deployment contract
+
+When supervised by Jarvis, Jam Assistant runs from this checkout with Vite on
+`127.0.0.1:4173` and must honor the requested port (`--strictPort`); it must
+not silently move to another port. The Jarvis systemd launcher supplies the
+host and port and waits for the root page to respond before configuring access.
+
+Jarvis owns the Tailscale Serve mapping for the private tailnet URL on HTTPS
+port `4173`. Jam Assistant must not configure Tailscale, enable Funnel, or bind
+to a public/LAN interface. Jarvis's separate HTTPS mapping on port `443` serves
+the Jarvis API/PWA and is outside this application's contract. Vite requires
+Node.js `20.19+` (or `22.12+`) in the supervised environment.
+
 ## Product goal
 
 Help a guitarist answer three questions at a glance while someone is playing:
