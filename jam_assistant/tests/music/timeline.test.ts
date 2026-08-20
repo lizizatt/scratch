@@ -1,6 +1,6 @@
 import { chordTemplate } from "../../src/analysis/chord-templates";
 import type { ChordEstimate, ChordQuality, PitchClass } from "../../src/analysis/types";
-import { detectedChordMarkers } from "../../src/music/timeline";
+import { detectedChordMarkers, retainLastChord } from "../../src/music/timeline";
 
 describe("detectedChordMarkers", () => {
   it("collapses repeated estimates into named chord changes", () => {
@@ -24,6 +24,33 @@ describe("detectedChordMarkers", () => {
       estimate(1, 0, "major"),
     ]);
     expect(markers.map((marker) => marker.timestampSeconds)).toEqual([0, 1]);
+  });
+});
+
+describe("retainLastChord", () => {
+  it("keeps the last chord through uncertain and no-chord estimates", () => {
+    const cMajor = estimate(0, 0, "major");
+    const uncertain: ChordEstimate = {
+      timestampSeconds: 0.1,
+      state: "uncertain",
+      confidence: 0.2,
+      chroma: new Array(12).fill(0),
+    };
+    const noChord: ChordEstimate = {
+      timestampSeconds: 0.2,
+      state: "no-chord",
+      reason: "silence",
+      confidence: 1,
+      chroma: new Array(12).fill(0),
+    };
+
+    expect(retainLastChord(cMajor, uncertain)).toBe(cMajor);
+    expect(retainLastChord(cMajor, noChord)).toBe(cMajor);
+  });
+
+  it("replaces the sticky chord with the next detected chord", () => {
+    const dMinor = estimate(0.5, 2, "minor");
+    expect(retainLastChord(estimate(0, 0, "major"), dMinor)).toBe(dMinor);
   });
 });
 

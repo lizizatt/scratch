@@ -11,13 +11,22 @@ export type MicrophoneAnalysisStatus =
 export type MicrophoneAnalysisSnapshot = {
   readonly status: MicrophoneAnalysisStatus;
   readonly estimate?: ChordEstimate;
+  readonly heatmapFrame?: MicrophoneHeatmapFrame;
   readonly settings?: MediaTrackSettings;
   readonly message?: string;
+};
+
+export type MicrophoneHeatmapFrame = {
+  readonly timestampSeconds: number;
+  readonly chroma: readonly number[];
+  readonly intervalSeconds: number;
+  readonly lowestNote?: string;
 };
 
 type WorkerMessage = {
   readonly type: "estimate";
   readonly estimate: ChordEstimate;
+  readonly heatmapFrame: MicrophoneHeatmapFrame;
 };
 
 export class MicrophoneAnalysisSession {
@@ -27,6 +36,7 @@ export class MicrophoneAnalysisSession {
   #source: MediaStreamAudioSourceNode | undefined;
   #worklet: AudioWorkletNode | undefined;
   #worker: Worker | undefined;
+  #fftWindowMilliseconds = 85;
   #onSnapshot: (snapshot: MicrophoneAnalysisSnapshot) => void;
 
   constructor(onSnapshot: (snapshot: MicrophoneAnalysisSnapshot) => void) {
@@ -66,10 +76,18 @@ export class MicrophoneAnalysisSession {
       );
       this.#worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
         if (event.data.type === "estimate") {
-          this.#onSnapshot({ status: "running", estimate: event.data.estimate });
+          this.#onSnapshot({
+            status: "running",
+            estimate: event.data.estimate,
+            heatmapFrame: event.data.heatmapFrame,
+          });
         }
       };
-      this.#worker.postMessage({ type: "start", sampleRate: this.#context.sampleRate });
+      this.#worker.postMessage({
+        type: "start",
+        sampleRate: this.#context.sampleRate,
+        fftWindowMilliseconds: this.#fftWindowMilliseconds,
+      });
       this.#worklet.port.onmessage = (event: MessageEvent<Float32Array>) => {
         const samples = event.data;
         this.#worker?.postMessage({ type: "samples", samples }, [samples.buffer]);
@@ -88,6 +106,14 @@ export class MicrophoneAnalysisSession {
       });
       throw error;
     }
+  }
+
+  setFftWindowMilliseconds(milliseconds: number): void {
+    this.#fftWindowMilliseconds = milliseconds;
+    this.#worker?.postMessage({
+      type: "configure",
+      fftWindowMilliseconds: milliseconds,
+    });
   }
 
   async stop(): Promise<void> {

@@ -11,6 +11,13 @@ const QUALITY_SUFFIXES: Readonly<Record<ChordQuality, string>> = {
   suspended4: "sus4",
 };
 
+export function retainLastChord(
+  current: ChordEstimate | undefined,
+  next: ChordEstimate | undefined,
+): ChordEstimate | undefined {
+  return next?.state === "chord" ? next : current;
+}
+
 export type DetectedChordMarker = {
   readonly timestampSeconds: number;
   readonly rootPitchClass: PitchClass;

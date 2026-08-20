@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   analyzeAudioFile,
   type FileAnalysisProgress,
@@ -8,9 +8,18 @@ import {
   MicrophoneAnalysisSession,
   type MicrophoneAnalysisSnapshot,
 } from "./audio/microphone-analysis";
-import { ROOT_NAMES, buildFretboard, type FretNote } from "./music/fretboard";
-import { chordLabel, detectedChordMarkers } from "./music/timeline";
+import {
+  MAX_FRET_COUNT,
+  ROOT_NAMES,
+  buildFretboard,
+  clampFretStart,
+  fretWidthRatios,
+  stepFretStart,
+  type FretNote,
+} from "./music/fretboard";
+import { chordLabel, detectedChordMarkers, retainLastChord } from "./music/timeline";
 import type { ChordEstimate, ChordQuality } from "./analysis/types";
+import { emptyHeatmap, logarithmicOpacity, updateHeatmap } from "./analysis/heatmap";
 
 const QUALITY_LABELS: Readonly<Record<ChordQuality, string>> = {
   major: "Major",
@@ -24,6 +33,8 @@ const QUALITY_LABELS: Readonly<Record<ChordQuality, string>> = {
 
 const STRING_NAMES = ["E", "A", "D", "G", "B", "E"];
 const MARKER_SETTLE_SECONDS = 0.05;
+const FFT_WINDOWS_MILLISECONDS = [21, 43, 85, 171] as const;
+const VISIBLE_FRET_COUNTS = [6, 8, 12, 16, 24] as const;
 
 type AppStatus =
   | { readonly kind: "idle" }
@@ -43,11 +54,25 @@ export function App() {
   const [selectedTime, setSelectedTime] = useState(0);
   const [audioMuted, setAudioMuted] = useState(true);
   const [audioPlaying, setAudioPlaying] = useState(false);
-  const [scaleName, setScaleName] = useState<string>();
+  const [latchedEstimate, setLatchedEstimate] = useState<ChordEstimate>();
+  const [fftWindowIndex, setFftWindowIndex] = useState(2);
+  const [accumulationSeconds, setAccumulationSeconds] = useState(0.2);
+  const [fadeSeconds, setFadeSeconds] = useState(0.2);
+  const [logResponse, setLogResponse] = useState(0.1);
+  const [heatmapStrengths, setHeatmapStrengths] = useState(emptyHeatmap);
+  const [lowestNote, setLowestNote] = useState<string>();
+  const [fretStart, setFretStart] = useState(1);
+  const [zoomIndex, setZoomIndex] = useState(4);
+  const [compactLandscape, setCompactLandscape] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileUrlRef = useRef<string | undefined>(undefined);
   const microphoneRef = useRef<MicrophoneAnalysisSession | undefined>(undefined);
   const requestId = useRef(0);
+  const heatmapTimestampRef = useRef<number | undefined>(undefined);
+  const accumulationSecondsRef = useRef(accumulationSeconds);
+  const fadeSecondsRef = useRef(fadeSeconds);
+  accumulationSecondsRef.current = accumulationSeconds;
+  fadeSecondsRef.current = fadeSeconds;
 
   const fileEstimate = useMemo(
     () => estimateAtTime(result?.estimates ?? [], selectedTime),
@@ -56,16 +81,23 @@ export function App() {
   const currentEstimate = inputMode === "microphone"
     ? microphoneEstimate
     : fileEstimate;
+  const fretboardEstimate = latchedEstimate ?? currentEstimate;
+  const visibleFretCount = VISIBLE_FRET_COUNTS[zoomIndex] ?? VISIBLE_FRET_COUNTS[2];
+  const fretEnd = fretStart + visibleFretCount - 1;
+  const displayedFretStart = compactLandscape ? 1 : fretStart;
+  const displayedFretCount = compactLandscape ? MAX_FRET_COUNT : visibleFretCount;
   const fretboard = useMemo(() => {
-    if (currentEstimate?.state !== "chord") {
-      return [];
-    }
-    return buildFretboard(
-      currentEstimate.rootPitchClass,
-      currentEstimate.quality,
-      scaleName,
-    );
-  }, [currentEstimate, scaleName]);
+    const rootPitchClass = fretboardEstimate?.state === "chord"
+      ? fretboardEstimate.rootPitchClass
+      : 0;
+    const quality = fretboardEstimate?.state === "chord"
+      ? fretboardEstimate.quality
+      : "major";
+    return buildFretboard(rootPitchClass, quality, undefined, MAX_FRET_COUNT);
+  }, [fretboardEstimate]);
+  const displayedStrengths = inputMode === "microphone"
+    ? heatmapStrengths
+    : currentEstimate?.chroma ?? emptyHeatmap();
   const chordMarkers = useMemo(
     () => detectedChordMarkers(result?.estimates ?? []),
     [result],
@@ -100,6 +132,16 @@ export function App() {
     void microphoneRef.current?.stop();
   }, []);
 
+  useEffect(() => {
+    const media = window.matchMedia(
+      "(orientation: landscape) and (max-width: 950px) and (max-height: 500px)",
+    );
+    const update = () => setCompactLandscape(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
   async function handleFile(file: File | undefined) {
     if (file === undefined) {
       return;
@@ -122,7 +164,7 @@ export function App() {
     setFileName(file.name);
     setResult(undefined);
     setSelectedTime(0);
-    setScaleName(undefined);
+    setLatchedEstimate(undefined);
     setStatus({ kind: "analyzing", progress: { phase: "decoding", fraction: 0 } });
     try {
       const nextResult = await analyzeAudioFile(file, (progress) => {
@@ -155,6 +197,10 @@ export function App() {
     microphoneRef.current = undefined;
     setInputMode(nextMode);
     setMicrophoneEstimate(undefined);
+    setLatchedEstimate(undefined);
+    setHeatmapStrengths(emptyHeatmap());
+    setLowestNote(undefined);
+    heatmapTimestampRef.current = undefined;
     if (nextMode === "file") {
       setMicrophoneSnapshot({ status: "stopped" });
       return;
@@ -164,17 +210,74 @@ export function App() {
     setStatus({ kind: "idle" });
     const session = new MicrophoneAnalysisSession((snapshot) => {
       setMicrophoneSnapshot(snapshot);
+      if (snapshot.status === "starting") {
+        setHeatmapStrengths(emptyHeatmap());
+        setLowestNote(undefined);
+        heatmapTimestampRef.current = undefined;
+      }
+      if (
+        snapshot.status === "muted" ||
+        snapshot.status === "ended" ||
+        snapshot.status === "stopped" ||
+        snapshot.status === "error"
+      ) {
+        setLowestNote(undefined);
+      }
+      if (snapshot.heatmapFrame !== undefined) {
+        const frame = snapshot.heatmapFrame;
+        setLowestNote(frame.lowestNote);
+        const previousTimestamp = heatmapTimestampRef.current;
+        const elapsedSeconds = previousTimestamp === undefined
+          ? frame.intervalSeconds
+          : Math.max(frame.intervalSeconds, frame.timestampSeconds - previousTimestamp);
+        heatmapTimestampRef.current = frame.timestampSeconds;
+        setHeatmapStrengths((current) => updateHeatmap(
+          current,
+          frame.chroma,
+          elapsedSeconds,
+          accumulationSecondsRef.current,
+          fadeSecondsRef.current,
+        ));
+      }
       if (snapshot.estimate !== undefined) {
-        setMicrophoneEstimate(snapshot.estimate);
+        setMicrophoneEstimate((current) => retainLastChord(current, snapshot.estimate));
         setSelectedTime(snapshot.estimate.timestampSeconds);
       }
     });
+    session.setFftWindowMilliseconds(
+      FFT_WINDOWS_MILLISECONDS[fftWindowIndex] ?? FFT_WINDOWS_MILLISECONDS[2],
+    );
     microphoneRef.current = session;
     try {
       await session.start();
     } catch {
       // The session publishes a user-facing error snapshot.
     }
+  }
+
+  function handleFftWindowChange(index: number) {
+    setFftWindowIndex(index);
+    microphoneRef.current?.setFftWindowMilliseconds(
+      FFT_WINDOWS_MILLISECONDS[index] ?? FFT_WINDOWS_MILLISECONDS[2],
+    );
+  }
+
+  function handleFretStep(direction: -1 | 1) {
+    setFretStart((current) => stepFretStart(
+      current,
+      visibleFretCount,
+      direction,
+    ));
+  }
+
+  function handleZoom(direction: -1 | 1) {
+    const nextZoomIndex = Math.max(
+      0,
+      Math.min(VISIBLE_FRET_COUNTS.length - 1, zoomIndex + direction),
+    );
+    const nextVisibleFretCount = VISIBLE_FRET_COUNTS[nextZoomIndex] ?? visibleFretCount;
+    setZoomIndex(nextZoomIndex);
+    setFretStart((current) => clampFretStart(current, nextVisibleFretCount));
   }
 
   function seekTo(time: number) {
@@ -207,13 +310,7 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div className="brand-lockup">
-          <h1>Jam Assistant</h1>
-        </div>
-      </header>
-
+    <main className={compactLandscape ? "app-shell landscape-view" : "app-shell"}>
       <section className="control-strip" aria-label="Audio source controls">
         <div className="input-mode" role="group" aria-label="Audio input mode">
           <button type="button" className={inputMode === "file" ? "mode-active" : ""} onClick={() => void enterMode("file")}>File</button>
@@ -281,24 +378,86 @@ export function App() {
       </section>
 
       <section className="fretboard-panel panel" aria-labelledby="fretboard-title">
-        <div className="fretboard-header">
-          <h2 id="fretboard-title">Fretboard · standard tuning · 12 frets</h2>
-          <div className="scale-picker"><label htmlFor="scale">Scale</label><select id="scale" value={scaleName ?? ""} onChange={(event) => setScaleName(event.target.value || undefined)} disabled={currentEstimate?.state !== "chord"}><option value="">Chord tones only</option><option value="major">Major</option><option value="minor">Minor</option><option value="major pentatonic">Major pentatonic</option><option value="minor pentatonic">Minor pentatonic</option></select></div>
+        <div className="landscape-status" aria-label="Current harmony">
+          <strong>{currentEstimate?.state === "chord" ? chordLabel(currentEstimate.rootPitchClass, currentEstimate.quality) : "--"} / {lowestNote ?? "--"}</strong>
         </div>
-        <div className="legend"><span><i className="legend-root" /> Root</span><span><i className="legend-chord" /> Chord tone</span><span><i className="legend-scale" /> Scale tone</span></div>
-        <div className="fretboard-scroll"><Fretboard notes={fretboard} /></div>
+        <div className="fretboard-header">
+          <h2 id="fretboard-title">Fretboard · standard tuning · frets {fretStart}–{fretEnd}</h2>
+          <div className="fretboard-controls">
+            <button
+              type="button"
+              className={latchedEstimate === undefined ? "latch-button" : "latch-button latch-active"}
+              aria-pressed={latchedEstimate !== undefined}
+              disabled={latchedEstimate === undefined && currentEstimate?.state !== "chord"}
+              onClick={() => setLatchedEstimate((latched) => latched === undefined && currentEstimate?.state === "chord" ? currentEstimate : undefined)}
+            >{latchedEstimate === undefined ? "Latch" : "Latched"}</button>
+            <details className="options-menu">
+              <summary>Options</summary>
+              <div className="heatmap-controls">
+                <label><span>FFT <output>{FFT_WINDOWS_MILLISECONDS[fftWindowIndex]} ms</output></span><input aria-label="FFT window" type="range" min="0" max="3" step="1" value={fftWindowIndex} onChange={(event) => handleFftWindowChange(Number(event.target.value))} /></label>
+                <label><span>Accumulation <output>{accumulationSeconds.toFixed(1)} s</output></span><input aria-label="Accumulation time" type="range" min="0.1" max="5" step="0.1" value={accumulationSeconds} onChange={(event) => setAccumulationSeconds(Number(event.target.value))} /></label>
+                <label><span>Fade <output>{fadeSeconds.toFixed(1)} s</output></span><input aria-label="Fade time" type="range" min="0.1" max="10" step="0.1" value={fadeSeconds} onChange={(event) => setFadeSeconds(Number(event.target.value))} /></label>
+                <label><span>Log response <output>{logResponse.toFixed(1)}</output></span><input aria-label="Log response" type="range" min="0.1" max="1" step="0.1" value={logResponse} onChange={(event) => setLogResponse(Number(event.target.value))} /></label>
+              </div>
+            </details>
+          </div>
+        </div>
+        <div className="fretboard-subbar">
+          <div className="legend"><span><i className="legend-heat" /> FFT energy</span><span><i className="legend-root" /> Root outline</span><span><i className="legend-chord" /> Chord outline</span></div>
+          <div className="fretboard-navigation">
+            <div role="group" aria-label="Fretboard segment controls">
+              <button type="button" aria-label="Previous fret" disabled={fretStart === 1} onClick={() => handleFretStep(-1)}>←</button>
+              <output>{fretStart}–{fretEnd} / {MAX_FRET_COUNT}</output>
+              <button type="button" aria-label="Next fret" disabled={fretEnd === MAX_FRET_COUNT} onClick={() => handleFretStep(1)}>→</button>
+            </div>
+            <div role="group" aria-label="Fretboard zoom controls">
+              <button type="button" aria-label="Zoom out" disabled={zoomIndex === VISIBLE_FRET_COUNTS.length - 1} onClick={() => handleZoom(1)}>−</button>
+              <button type="button" aria-label="Zoom in" disabled={zoomIndex === 0} onClick={() => handleZoom(-1)}>+</button>
+            </div>
+          </div>
+        </div>
+        <div className="fretboard-scroll"><Fretboard notes={fretboard} hasChord={fretboardEstimate?.state === "chord"} heatmapStrengths={displayedStrengths} logResponse={logResponse} startFret={displayedFretStart} visibleFretCount={displayedFretCount} /></div>
       </section>
       </>}
     </main>
   );
 }
 
-function Fretboard({ notes }: { notes: readonly FretNote[] }) {
-  return <div className="fretboard" aria-label="Guitar fretboard visualization">
-    <div className="fret-labels"><span className="string-label">STRING</span>{Array.from({ length: 13 }, (_, fret) => <span key={fret}>{fret === 0 ? "OPEN" : fret}</span>)}</div>
-    {Array.from({ length: 6 }, (_, stringIndex) => <div className="fret-row" key={stringIndex}>
+function Fretboard({
+  notes,
+  hasChord,
+  heatmapStrengths,
+  logResponse,
+  startFret,
+  visibleFretCount,
+}: {
+  notes: readonly FretNote[];
+  hasChord: boolean;
+  heatmapStrengths: readonly number[];
+  logResponse: number;
+  startFret: number;
+  visibleFretCount: number;
+}) {
+  const stringIndexes = Array.from({ length: 6 }, (_, index) => 5 - index);
+  const endFret = startFret + visibleFretCount - 1;
+  const fretColumns = fretWidthRatios(startFret, visibleFretCount)
+    .map((width) => `${width}fr`)
+    .join(" ");
+  const boardStyle = {
+    "--visible-frets": visibleFretCount,
+    "--fret-columns": fretColumns,
+  } as CSSProperties;
+  return <div className="fretboard" style={boardStyle} aria-label="Guitar fretboard visualization">
+    <div className="fret-labels"><span className="string-label">STRING</span>{Array.from({ length: visibleFretCount }, (_, index) => <span key={startFret + index}>{startFret + index}</span>)}</div>
+    {stringIndexes.map((stringIndex) => <div className="fret-row" data-string-index={stringIndex} key={stringIndex}>
       <span className="string-label">{STRING_NAMES[stringIndex]}</span>
-      {notes.filter((note) => note.stringIndex === stringIndex).map((note) => <span className={`fret-cell role-${note.role}`} key={`${note.stringIndex}-${note.fret}`} title={`${note.noteName} · ${note.role}`}><span>{note.role === "none" ? "" : note.noteName.replace(/[0-9]/g, "")}</span></span>)}
+      {notes.filter((note) => note.stringIndex === stringIndex && note.fret >= startFret && note.fret <= endFret).map((note) => {
+        const strength = heatmapStrengths[note.pitchClass] ?? 0;
+        const opacity = logarithmicOpacity(strength, logResponse);
+        const style = { "--heat-strength": opacity } as CSSProperties;
+        const role = hasChord ? note.role : "none";
+        return <span className={`fret-cell role-${role}`} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} title={`${note.noteName} · ${role}`}><span style={style}>{note.noteName.replace(/[0-9]/g, "")}</span></span>;
+      })}
     </div>)}
   </div>;
 }
@@ -322,3 +481,4 @@ function formatTime(seconds: number): string {
   const remainder = Math.floor(seconds % 60).toString().padStart(2, "0");
   return `${minutes}:${remainder}`;
 }
+

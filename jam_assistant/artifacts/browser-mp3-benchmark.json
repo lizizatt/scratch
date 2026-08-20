@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-08-19T22:30:39.257Z",
+  "generatedAt": "2026-08-20T02:46:22.571Z",
   "durationSeconds": 3.072,
-  "decodeMilliseconds": 25.099999994039536,
-  "analysisMilliseconds": 236.69999998807907,
-  "realtimeFactor": 11.734148205537902,
+  "decodeMilliseconds": 5,
+  "analysisMilliseconds": 47.5,
+  "realtimeFactor": 58.51428571428572,
   "chordVotes": {
     "0:major": 28,
     "0:major7": 8
