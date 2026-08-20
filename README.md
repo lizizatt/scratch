@@ -13,7 +13,7 @@ Personal experiments — terminal games, RL sims, 3D-print tooling, and small ut
 | `invisalign` | Dental mesh fetch and CTM→OBJ export from Invisalign share links |
 | [sigil_demo](sigil_demo/README.md) | Self-contained procedural sigil generator demo with static SVG samples |
 | [navier_stokes_millennium](navier_stokes_millennium/README.md) | Auditable Navier-Stokes Millennium research program with claims, proofs, and gauntlet reviews |
-| [jam_assistant](jam_assistant/README.md) | Browser chord detector and guitar fretboard jamming companion |
+| [jam_assistant](jam_assistant/README.md) ([live app](https://alexandria.taildc7398.ts.net:4173/)) | Browser chord detector and guitar fretboard jamming companion |
 
 ## Terminal toys
 
