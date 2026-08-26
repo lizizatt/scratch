@@ -26,6 +26,98 @@ test("decodes and analyzes MP3 faster than real time", async ({ page }) => {
   );
 });
 
+test("recognizes the primary labels in a generated MP3 progression", async ({ page }) => {
+  const mp3 = await readFile(
+    fileURLToPath(new URL("../fixtures/midi/four-chord-cycle.mp3", import.meta.url)),
+  );
+  await page.goto("/");
+  const result = await page.evaluate(
+    async (bytes) => window.runMp3Benchmark(Uint8Array.from(bytes)),
+    [...mp3],
+  );
+
+  expect(Object.keys(result.chordVotes)).toEqual(
+    expect.arrayContaining([
+      "9:minor",
+      "5:major",
+      "0:major",
+      "7:major",
+    ]),
+  );
+});
+
+test("recognizes every supported quality in the quality-tour MP3", async ({ page }) => {
+  const mp3 = await readFile(
+    fileURLToPath(new URL("../fixtures/midi/quality-tour.mp3", import.meta.url)),
+  );
+  await page.goto("/");
+  const result = await page.evaluate(
+    async (bytes) => window.runMp3Benchmark(Uint8Array.from(bytes)),
+    [...mp3],
+  );
+
+  expect(Object.keys(result.chordVotes)).toEqual(
+    expect.arrayContaining([
+      "0:major",
+      "0:minor",
+      "0:dominant7",
+      "0:major7",
+      "0:minor7",
+      "0:diminished",
+      "0:suspended4",
+    ]),
+  );
+});
+
+test("shows every quality from the quality-tour MP3 in the file timeline", async ({ page }) => {
+  const fixturePath = fileURLToPath(
+    new URL("../fixtures/midi/quality-tour.mp3", import.meta.url),
+  );
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles(fixturePath);
+
+  for (const label of ["C", "Cm", "C7", "Cmaj7", "Cm7", "Cdim", "Csus4"]) {
+    await expect(
+      page.getByRole("button", { name: `Seek to ${label}`, exact: true }),
+    ).not.toHaveCount(0, { timeout: 20_000 });
+  }
+});
+
+test("decodes an externally annotated progression recording", async ({ page }) => {
+  const mp3 = await readFile(
+    fileURLToPath(
+      new URL(
+        "../fixtures/external/jonah-dempcy-david-levin-improv-jam.mp3",
+        import.meta.url,
+      ),
+    ),
+  );
+  await page.goto("/");
+  const result = await page.evaluate(
+    async (bytes) => window.runMp3Benchmark(Uint8Array.from(bytes)),
+    [...mp3],
+  );
+
+  expect(result.durationSeconds).toBeGreaterThan(100);
+  expect(Object.keys(result.chordVotes)).toEqual(
+    expect.arrayContaining(["0:minor7", "8:major", "7:dominant7"]),
+  );
+});
+
+test("loads a generated MP3 progression through file analysis", async ({ page }) => {
+  const fixturePath = fileURLToPath(
+    new URL("../fixtures/midi/four-chord-cycle.mp3", import.meta.url),
+  );
+  await page.goto("/");
+  await page.locator('input[type="file"]').setInputFiles(fixturePath);
+
+  for (const label of ["Am", "F", "C", "G"]) {
+    await expect(
+      page.getByRole("button", { name: `Seek to ${label}`, exact: true }),
+    ).not.toHaveCount(0, { timeout: 20_000 });
+  }
+});
+
 test("loads a file into the chord display and fretboard", async ({ page }) => {
   const fixturePath = fileURLToPath(
     new URL("../fixtures/c-major.wav", import.meta.url),

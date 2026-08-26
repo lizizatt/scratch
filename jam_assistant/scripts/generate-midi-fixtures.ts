@@ -33,10 +33,15 @@ const manifest = [];
 for (const fixture of MIDI_FIXTURES) {
   const midiPath = join(outputDirectory, `${fixture.id}.mid`);
   const wavPath = join(outputDirectory, `${fixture.id}.wav`);
+  const mp3Path = join(outputDirectory, `${fixture.id}.mp3`);
   await writeFile(midiPath, Buffer.from(writeMidi(toMidiFile(fixture))));
   try {
     await execFileAsync("fluidsynth", [
       "-ni",
+      "-R",
+      "0",
+      "-C",
+      "0",
       soundFontPath,
       midiPath,
       "-F",
@@ -46,6 +51,25 @@ for (const fixture of MIDI_FIXTURES) {
     ]);
   } catch (error) {
     console.warn(`Could not render ${fixture.id}: ${String(error)}`);
+  }
+  try {
+    await execFileAsync("ffmpeg", [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      wavPath,
+      "-map_metadata",
+      "-1",
+      "-codec:a",
+      "libmp3lame",
+      "-b:a",
+      "128k",
+      mp3Path,
+    ]);
+  } catch (error) {
+    console.warn(`Could not encode ${fixture.id} as MP3: ${String(error)}`);
   }
   manifest.push({
     ...fixture,
@@ -58,6 +82,7 @@ for (const fixture of MIDI_FIXTURES) {
     })),
     midiFile: `${fixture.id}.mid`,
     wavFile: `${fixture.id}.wav`,
+    mp3File: `${fixture.id}.mp3`,
   });
 }
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

@@ -87,7 +87,8 @@
       }
     ],
     "midiFile": "quality-tour.mid",
-    "wavFile": "quality-tour.wav"
+    "wavFile": "quality-tour.wav",
+    "mp3File": "quality-tour.mp3"
   },
   {
     "id": "four-chord-cycle",
@@ -144,7 +145,8 @@
       }
     ],
     "midiFile": "four-chord-cycle.mid",
-    "wavFile": "four-chord-cycle.wav"
+    "wavFile": "four-chord-cycle.wav",
+    "mp3File": "four-chord-cycle.mp3"
   },
   {
     "id": "seventh-resolution",
@@ -190,7 +192,8 @@
       }
     ],
     "midiFile": "seventh-resolution.mid",
-    "wavFile": "seventh-resolution.wav"
+    "wavFile": "seventh-resolution.wav",
+    "mp3File": "seventh-resolution.mp3"
   },
   {
     "id": "irregular-durations",
@@ -258,6 +261,7 @@
       }
     ],
     "midiFile": "irregular-durations.mid",
-    "wavFile": "irregular-durations.wav"
+    "wavFile": "irregular-durations.wav",
+    "mp3File": "irregular-durations.mp3"
   }
 ]

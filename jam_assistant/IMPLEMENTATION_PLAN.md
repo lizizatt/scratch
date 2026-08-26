@@ -12,6 +12,17 @@ risk before committing the application to a feature library.
 - [x] Add a cello display mode limited to one octave per string.
 - [x] Adversarially verify desktop and mobile instrument displays with Playwright screenshots.
 
+## Chord detection test expansion
+
+- [x] Add an independent detector oracle instead of deriving every expected input from production templates.
+- [x] Exercise `analyzePcm` end to end, including framing, timestamps, progress, smoothing, silence, and transitions.
+- [x] Generate reproducible known-content WAV and MP3 fixtures from the MIDI progression library.
+- [x] Analyze a rendered progression fixture and assert its chord sequence through the browser file path.
+- [x] Expand detector boundary tests for energy, similarity, margin, confidence, options, ambiguity, and malformed chroma.
+- [x] Complete smoother state-machine tests for resets, interruptions, rapid changes, and constructor boundaries.
+- [x] Source one externally licensed or public-domain MP3 with a documented progression annotation; keep it exploratory until independently verified.
+- [ ] Add robustness fixtures for partial voicings, inversions, detuning, noise, and recorded guitar in the Milestone 1/2 corpus.
+
 ## Milestone 0: analysis spike
 
 **Goal:** select a chroma implementation and prove the source-independent
