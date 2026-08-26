@@ -53,7 +53,7 @@ export const INSTRUMENT_DEFINITIONS: Readonly<Record<InstrumentMode, InstrumentD
     label: "Guitar",
     stringNames: ["E", "A", "D", "G", "B", "E"],
     tuningMidi: STANDARD_TUNING_MIDI,
-    minPosition: 1,
+    minPosition: 0,
     maxFretCount: MAX_FRET_COUNT,
     visibleFretCounts: [6, 8, 12, 16, 24],
   },

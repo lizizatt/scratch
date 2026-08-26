@@ -63,7 +63,7 @@ export function App() {
   const [logResponse, setLogResponse] = useState(0.1);
   const [heatmapStrengths, setHeatmapStrengths] = useState(emptyHeatmap);
   const [lowestNote, setLowestNote] = useState<string>();
-  const [fretStart, setFretStart] = useState(1);
+  const [fretStart, setFretStart] = useState(INSTRUMENT_DEFINITIONS.guitar.minPosition);
   const [instrumentMode, setInstrumentMode] = useState<InstrumentMode>("guitar");
   const [zoomIndex, setZoomIndex] = useState(
     INSTRUMENT_DEFINITIONS.guitar.visibleFretCounts.length - 1,
@@ -482,7 +482,7 @@ function Fretboard({
   } as CSSProperties;
   const ariaLabel = `${instrument.label} fretboard visualization`;
 
-  return <div className="fretboard" style={boardStyle} aria-label={ariaLabel}>
+  return <div className={startFret === 0 ? "fretboard open-string-board" : "fretboard"} style={boardStyle} aria-label={ariaLabel}>
     <div className="fret-labels"><span className="string-label">STRING</span>{Array.from({ length: visibleFretCount }, (_, index) => <span key={startFret + index}>{startFret + index}</span>)}</div>
     {stringIndexes.map((stringIndex) => <div className="fret-row" data-string-index={stringIndex} key={stringIndex}>
       <span className="string-label">{instrument.stringNames[stringIndex]}</span>

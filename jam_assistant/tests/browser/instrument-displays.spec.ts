@@ -7,6 +7,7 @@ type InstrumentExpectation = {
   readonly ariaLabel: string;
   readonly rowCount: number;
   readonly visibleCells: number;
+  readonly openNote?: string;
 };
 
 const FIXTURE_PATH = fileURLToPath(
@@ -20,6 +21,7 @@ const INSTRUMENTS: readonly InstrumentExpectation[] = [
     ariaLabel: "Guitar fretboard visualization",
     rowCount: 6,
     visibleCells: 24,
+    openNote: "E4",
   },
   {
     label: "piano",
@@ -34,6 +36,7 @@ const INSTRUMENTS: readonly InstrumentExpectation[] = [
     ariaLabel: "Bass guitar fretboard visualization",
     rowCount: 4,
     visibleCells: 13,
+    openNote: "G2",
   },
   {
     label: "ukulele",
@@ -41,6 +44,7 @@ const INSTRUMENTS: readonly InstrumentExpectation[] = [
     ariaLabel: "Ukulele fretboard visualization",
     rowCount: 4,
     visibleCells: 13,
+    openNote: "A4",
   },
   {
     label: "cello",
@@ -48,6 +52,7 @@ const INSTRUMENTS: readonly InstrumentExpectation[] = [
     ariaLabel: "Cello fretboard visualization",
     rowCount: 4,
     visibleCells: 13,
+    openNote: "A3",
   },
 ];
 
@@ -67,6 +72,10 @@ async function verifyInstrumentMode(page: Page, instrument: InstrumentExpectatio
   await expect(page.getByLabel(instrument.ariaLabel)).toBeVisible();
   await expect(page.locator(".fret-row")).toHaveCount(instrument.rowCount);
   await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(instrument.visibleCells);
+  if (instrument.openNote !== undefined) {
+    await expect(page.locator(".fret-labels span").nth(1)).toHaveText("0");
+    await expect(page.locator(".fret-row").first().locator(".fret-cell").first()).toHaveAttribute("title", expect.stringContaining(instrument.openNote));
+  }
   await expect(page.locator(".fretboard-scroll")).toHaveScreenshot(screenshotName, {
     animations: "disabled",
     caret: "hide",
