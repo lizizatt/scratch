@@ -5,6 +5,7 @@ import {
   FRET_POSITION_RATIOS,
   fretWidthRatios,
   INSTRUMENT_DEFINITIONS,
+  MAX_FRET_COUNT,
   scalePitchClasses,
   stepFretStart,
 } from "../../src/music/fretboard";
@@ -37,20 +38,29 @@ describe("fretboard model", () => {
     expect(piano[24]).toMatchObject({ stringIndex: 0, fret: 24, noteName: "C5" });
 
     const bass = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.bass.maxFretCount, INSTRUMENT_DEFINITIONS.bass.tuningMidi);
-    expect(bass).toHaveLength(4 * 13);
+    expect(bass).toHaveLength(4 * 25);
     expect(bass[0]).toMatchObject({ stringIndex: 0, fret: 0, noteName: "E1" });
-    expect(bass[51]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "G3" });
+    expect(bass[87]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "G3" });
 
     const ukulele = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.ukulele.maxFretCount, INSTRUMENT_DEFINITIONS.ukulele.tuningMidi);
-    expect(ukulele).toHaveLength(4 * 13);
+    expect(ukulele).toHaveLength(4 * 25);
     expect(ukulele[0]).toMatchObject({ stringIndex: 0, fret: 0, noteName: "G4" });
-    expect(ukulele[51]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "A5" });
+    expect(ukulele[87]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "A5" });
 
     const cello = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.cello.maxFretCount, INSTRUMENT_DEFINITIONS.cello.tuningMidi);
-    expect(cello).toHaveLength(4 * 13);
+    expect(cello).toHaveLength(4 * 25);
     expect(cello[0]).toMatchObject({ stringIndex: 0, fret: 0, noteName: "C2" });
-    expect(cello[39]).toMatchObject({ stringIndex: 3, fret: 0, noteName: "A3" });
-    expect(cello[51]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "A4" });
+    expect(cello[75]).toMatchObject({ stringIndex: 3, fret: 0, noteName: "A3" });
+    expect(cello[87]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "A4" });
+  });
+
+  it("gives every fretted instrument the shared full-range display profile", () => {
+    for (const mode of ["guitar", "bass", "ukulele", "cello"] as const) {
+      const instrument = INSTRUMENT_DEFINITIONS[mode];
+      expect(instrument.minPosition).toBe(0);
+      expect(instrument.maxFretCount).toBe(MAX_FRET_COUNT);
+      expect(instrument.visibleFretCounts).toEqual([6, 8, 12, 16, MAX_FRET_COUNT + 1]);
+    }
   });
 
   it("builds and navigates bounded fretboard segments", () => {

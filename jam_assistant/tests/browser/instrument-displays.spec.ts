@@ -8,6 +8,8 @@ type InstrumentExpectation = {
   readonly rowCount: number;
   readonly visibleCells: number;
   readonly openNote?: string;
+  readonly fullRange?: string;
+  readonly walkedNote?: string;
 };
 
 const FIXTURE_PATH = fileURLToPath(
@@ -20,8 +22,10 @@ const INSTRUMENTS: readonly InstrumentExpectation[] = [
     modeLabel: "Guitar",
     ariaLabel: "Guitar fretboard visualization",
     rowCount: 6,
-    visibleCells: 24,
+    visibleCells: 25,
     openNote: "E4",
+    fullRange: "0–24 / 24",
+    walkedNote: "F4",
   },
   {
     label: "piano",
@@ -35,24 +39,30 @@ const INSTRUMENTS: readonly InstrumentExpectation[] = [
     modeLabel: "Bass guitar",
     ariaLabel: "Bass guitar fretboard visualization",
     rowCount: 4,
-    visibleCells: 13,
+    visibleCells: 25,
     openNote: "G2",
+    fullRange: "0–24 / 24",
+    walkedNote: "G#2",
   },
   {
     label: "ukulele",
     modeLabel: "Ukulele",
     ariaLabel: "Ukulele fretboard visualization",
     rowCount: 4,
-    visibleCells: 13,
+    visibleCells: 25,
     openNote: "A4",
+    fullRange: "0–24 / 24",
+    walkedNote: "A#4",
   },
   {
     label: "cello",
     modeLabel: "Cello",
     ariaLabel: "Cello fretboard visualization",
     rowCount: 4,
-    visibleCells: 13,
+    visibleCells: 25,
     openNote: "A3",
+    fullRange: "0–24 / 24",
+    walkedNote: "A#3",
   },
 ];
 
@@ -73,8 +83,24 @@ async function verifyInstrumentMode(page: Page, instrument: InstrumentExpectatio
   await expect(page.locator(".fret-row")).toHaveCount(instrument.rowCount);
   await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(instrument.visibleCells);
   if (instrument.openNote !== undefined) {
+    await expect(page.locator(".fretboard-navigation output")).toHaveText(instrument.fullRange ?? "");
+    await expect(page.getByLabel("Previous fret")).toBeDisabled();
+    await expect(page.getByLabel("Next fret")).toBeDisabled();
+    await expect(page.getByLabel("Zoom in")).toBeEnabled();
     await expect(page.locator(".fret-labels span").nth(1)).toHaveText("0");
     await expect(page.locator(".fret-row").first().locator(".fret-cell").first()).toHaveAttribute("title", expect.stringContaining(instrument.openNote));
+    await page.getByLabel("Zoom in").click();
+    await expect(page.locator(".fretboard-navigation output")).toHaveText("0–15 / 24");
+    await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(16);
+    await expect(page.getByLabel("Next fret")).toBeEnabled();
+    await page.getByLabel("Next fret").click();
+    await expect(page.locator(".fretboard-navigation output")).toHaveText("1–16 / 24");
+    await expect(page.locator(".fret-row").first().locator(".fret-cell").first()).toHaveAttribute("title", expect.stringContaining(instrument.walkedNote ?? ""));
+    await page.getByLabel("Previous fret").click();
+    await expect(page.locator(".fretboard-navigation output")).toHaveText("0–15 / 24");
+    await page.getByLabel("Zoom out").click();
+    await expect(page.locator(".fretboard-navigation output")).toHaveText(instrument.fullRange ?? "");
+    await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(instrument.visibleCells);
   }
   await expect(page.locator(".fretboard-scroll")).toHaveScreenshot(screenshotName, {
     animations: "disabled",

@@ -47,16 +47,25 @@ export type InstrumentDefinition = {
   readonly visibleFretCounts: readonly number[];
 };
 
+const FRETTED_DISPLAY_DEFAULTS = {
+  minPosition: 0,
+  maxFretCount: MAX_FRET_COUNT,
+  visibleFretCounts: [6, 8, 12, 16, MAX_FRET_COUNT + 1],
+} as const satisfies Pick<InstrumentDefinition, "minPosition" | "maxFretCount" | "visibleFretCounts">;
+
+function frettedInstrument(
+  definition: Pick<InstrumentDefinition, "mode" | "label" | "stringNames" | "tuningMidi">,
+): InstrumentDefinition {
+  return { ...definition, ...FRETTED_DISPLAY_DEFAULTS };
+}
+
 export const INSTRUMENT_DEFINITIONS: Readonly<Record<InstrumentMode, InstrumentDefinition>> = {
-  guitar: {
+  guitar: frettedInstrument({
     mode: "guitar",
     label: "Guitar",
     stringNames: ["E", "A", "D", "G", "B", "E"],
     tuningMidi: STANDARD_TUNING_MIDI,
-    minPosition: 0,
-    maxFretCount: MAX_FRET_COUNT,
-    visibleFretCounts: [6, 8, 12, 16, 24],
-  },
+  }),
   piano: {
     mode: "piano",
     label: "Piano",
@@ -66,33 +75,24 @@ export const INSTRUMENT_DEFINITIONS: Readonly<Record<InstrumentMode, InstrumentD
     maxFretCount: 24,
     visibleFretCounts: [25],
   },
-  bass: {
+  bass: frettedInstrument({
     mode: "bass",
     label: "Bass guitar",
     stringNames: ["E", "A", "D", "G"],
     tuningMidi: [28, 33, 38, 43],
-    minPosition: 0,
-    maxFretCount: 12,
-    visibleFretCounts: [13],
-  },
-  ukulele: {
+  }),
+  ukulele: frettedInstrument({
     mode: "ukulele",
     label: "Ukulele",
     stringNames: ["G", "C", "E", "A"],
     tuningMidi: [67, 60, 64, 69],
-    minPosition: 0,
-    maxFretCount: 12,
-    visibleFretCounts: [13],
-  },
-  cello: {
+  }),
+  cello: frettedInstrument({
     mode: "cello",
     label: "Cello",
     stringNames: ["C", "G", "D", "A"],
     tuningMidi: [36, 43, 50, 57],
-    minPosition: 0,
-    maxFretCount: 12,
-    visibleFretCounts: [13],
-  },
+  }),
 };
 
 export type FretRole = "root" | "chord-tone" | "scale-tone" | "none";
