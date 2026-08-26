@@ -61,12 +61,13 @@ export function App() {
   const [accumulationSeconds, setAccumulationSeconds] = useState(0.2);
   const [fadeSeconds, setFadeSeconds] = useState(0.2);
   const [logResponse, setLogResponse] = useState(0.1);
+  const [noteFontSize, setNoteFontSize] = useState(7);
   const [heatmapStrengths, setHeatmapStrengths] = useState(emptyHeatmap);
   const [lowestNote, setLowestNote] = useState<string>();
   const [fretStart, setFretStart] = useState(INSTRUMENT_DEFINITIONS.guitar.minPosition);
   const [instrumentMode, setInstrumentMode] = useState<InstrumentMode>("guitar");
   const [zoomIndex, setZoomIndex] = useState(
-    INSTRUMENT_DEFINITIONS.guitar.visibleFretCounts.length - 1,
+    INSTRUMENT_DEFINITIONS.guitar.defaultZoomIndex,
   );
   const [compactLandscape, setCompactLandscape] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -321,7 +322,7 @@ export function App() {
   }
 
   useEffect(() => {
-    setZoomIndex(Math.max(0, INSTRUMENT_DEFINITIONS[instrumentMode].visibleFretCounts.length - 1));
+    setZoomIndex(INSTRUMENT_DEFINITIONS[instrumentMode].defaultZoomIndex);
     setFretStart(INSTRUMENT_DEFINITIONS[instrumentMode].minPosition);
   }, [instrumentMode]);
 
@@ -415,6 +416,7 @@ export function App() {
                 <label><span>Accumulation <output>{accumulationSeconds.toFixed(1)} s</output></span><input aria-label="Accumulation time" type="range" min="0.1" max="5" step="0.1" value={accumulationSeconds} onChange={(event) => setAccumulationSeconds(Number(event.target.value))} /></label>
                 <label><span>Fade <output>{fadeSeconds.toFixed(1)} s</output></span><input aria-label="Fade time" type="range" min="0.1" max="10" step="0.1" value={fadeSeconds} onChange={(event) => setFadeSeconds(Number(event.target.value))} /></label>
                 <label><span>Log response <output>{logResponse.toFixed(1)}</output></span><input aria-label="Log response" type="range" min="0.1" max="1" step="0.1" value={logResponse} onChange={(event) => setLogResponse(Number(event.target.value))} /></label>
+                <label><span>Note font size <output>{noteFontSize}px</output></span><input aria-label="Note font size" type="range" min="5" max="16" step="1" value={noteFontSize} onChange={(event) => setNoteFontSize(Number(event.target.value))} /></label>
               </div>
             </details>
           </div>
@@ -433,7 +435,7 @@ export function App() {
             </div>
           </div>
         </div>
-        <div className="fretboard-scroll"><Fretboard instrument={instrument} notes={fretboard} hasChord={fretboardEstimate?.state === "chord"} heatmapStrengths={displayedStrengths} logResponse={logResponse} startFret={displayedFretStart} visibleFretCount={displayedFretCount} /></div>
+        <div className="fretboard-scroll"><Fretboard instrument={instrument} notes={fretboard} hasChord={fretboardEstimate?.state === "chord"} heatmapStrengths={displayedStrengths} logResponse={logResponse} noteFontSize={noteFontSize} startFret={displayedFretStart} visibleFretCount={displayedFretCount} /></div>
       </section>
       </>}
     </main>
@@ -446,6 +448,7 @@ function Fretboard({
   hasChord,
   heatmapStrengths,
   logResponse,
+  noteFontSize,
   startFret,
   visibleFretCount,
 }: {
@@ -454,6 +457,7 @@ function Fretboard({
   hasChord: boolean;
   heatmapStrengths: readonly number[];
   logResponse: number;
+  noteFontSize: number;
   startFret: number;
   visibleFretCount: number;
 }) {
@@ -465,6 +469,7 @@ function Fretboard({
         hasChord={hasChord}
         heatmapStrengths={heatmapStrengths}
         logResponse={logResponse}
+        noteFontSize={noteFontSize}
         startFret={startFret}
         visibleFretCount={visibleFretCount}
       />
@@ -479,6 +484,7 @@ function Fretboard({
   const boardStyle = {
     "--visible-frets": visibleFretCount,
     "--fret-columns": fretColumns,
+    "--note-font-size": `${noteFontSize}px`,
   } as CSSProperties;
   const ariaLabel = `${instrument.label} fretboard visualization`;
 
@@ -503,6 +509,7 @@ function PianoKeyboard({
   hasChord,
   heatmapStrengths,
   logResponse,
+  noteFontSize,
   startFret,
   visibleFretCount,
 }: {
@@ -511,31 +518,37 @@ function PianoKeyboard({
   hasChord: boolean;
   heatmapStrengths: readonly number[];
   logResponse: number;
+  noteFontSize: number;
   startFret: number;
   visibleFretCount: number;
 }) {
   const endFret = startFret + visibleFretCount - 1;
+  const visibleNotes = notes.filter((note) => note.stringIndex === 0 && note.fret >= startFret && note.fret <= endFret);
   const fretColumns = Array.from({ length: visibleFretCount }, () => "1fr").join(" ");
+  const whiteNotes = visibleNotes.filter((note) => !PIANO_BLACK_KEYS.has(note.pitchClass));
+  const pianoKeyStyle = { "--piano-key-count": whiteNotes.length } as CSSProperties;
   const boardStyle = {
     "--visible-frets": visibleFretCount,
     "--fret-columns": fretColumns,
+    "--note-font-size": `${noteFontSize}px`,
+    ...pianoKeyStyle,
   } as CSSProperties;
-  const visibleNotes = notes.filter((note) => note.stringIndex === 0 && note.fret >= startFret && note.fret <= endFret);
 
   return <div className="fretboard piano-board" style={boardStyle} aria-label={`${instrument.label} keyboard visualization`}>
-    <div className="fret-labels"><span className="string-label">KEY</span>{visibleNotes.map((note) => <span key={note.fret}>{note.noteName}</span>)}</div>
     <div className="fret-row piano-row" data-string-index="0">
-      <span className="string-label">{instrument.stringNames[0]}</span>
-      {visibleNotes.map((note) => {
+      <div className="piano-keys">
+        {visibleNotes.map((note) => {
         const strength = heatmapStrengths[note.pitchClass] ?? 0;
         const opacity = logarithmicOpacity(strength, logResponse);
-        const style = { "--heat-strength": opacity } as CSSProperties;
         const role = hasChord ? note.role : "none";
         const keyClass = PIANO_BLACK_KEYS.has(note.pitchClass)
           ? "piano-black"
           : "piano-white";
-        return <span className={`fret-cell piano-key ${keyClass} role-${role}`} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} title={`${note.noteName} · ${role}`}><span style={style}>{note.noteName}</span></span>;
-      })}
+        const style = { "--heat-strength": opacity } as CSSProperties;
+        const keyPosition = whiteNotes.filter((whiteNote) => whiteNote.fret < note.fret).length;
+        return <span className={`fret-cell piano-key ${keyClass} role-${role}`} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} style={{ ...style, "--piano-key-position": keyPosition } as CSSProperties} title={`${note.noteName} · ${role}`}><span>{note.noteName}</span></span>;
+        })}
+      </div>
     </div>
   </div>;
 }

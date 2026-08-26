@@ -33,9 +33,9 @@ describe("fretboard model", () => {
 
   it("supports every instrument tuning and requested octave range", () => {
     const piano = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.piano.maxFretCount, INSTRUMENT_DEFINITIONS.piano.tuningMidi);
-    expect(piano).toHaveLength(25);
+    expect(piano).toHaveLength(37);
     expect(piano[0]).toMatchObject({ stringIndex: 0, fret: 0, noteName: "C3" });
-    expect(piano[24]).toMatchObject({ stringIndex: 0, fret: 24, noteName: "C5" });
+    expect(piano[36]).toMatchObject({ stringIndex: 0, fret: 36, noteName: "C6" });
 
     const bass = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.bass.maxFretCount, INSTRUMENT_DEFINITIONS.bass.tuningMidi);
     expect(bass).toHaveLength(4 * 25);
@@ -61,6 +61,14 @@ describe("fretboard model", () => {
       expect(instrument.maxFretCount).toBe(MAX_FRET_COUNT);
       expect(instrument.visibleFretCounts).toEqual([6, 8, 12, 16, MAX_FRET_COUNT + 1]);
     }
+  });
+
+  it("gives piano one, two, and three octave views with a two-octave default", () => {
+    const piano = INSTRUMENT_DEFINITIONS.piano;
+    expect(piano.minPosition).toBe(0);
+    expect(piano.maxFretCount).toBe(36);
+    expect(piano.visibleFretCounts).toEqual([13, 25, 37]);
+    expect(piano.defaultZoomIndex).toBe(1);
   });
 
   it("builds and navigates bounded fretboard segments", () => {

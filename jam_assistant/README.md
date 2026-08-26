@@ -194,7 +194,8 @@ Test layers:
 - Browser tests verify file decoding, microphone permission/error UI using a
   synthetic media stream, cancellation before delayed permission settlement,
   track mute/unmute/end events, AudioContext activation/interruption, and
-  fretboard rendering.
+  fretboard rendering. The instrument display tests capture desktop and mobile
+  screenshots for the guitar, bass, ukulele, cello, and piano views.
 - One headless Chromium benchmark starts from MP3 bytes and includes decoding,
   framing, and analysis in its end-to-end throughput measurement.
 - A small evaluation corpus reports chord-weighted recall, no-chord false

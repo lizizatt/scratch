@@ -39,32 +39,37 @@ test("loads a file into the chord display and fretboard", async ({ page }) => {
   await expect(page.locator(".fret-row")).toHaveCount(6);
   await expect(page.locator(".fret-row").first()).toHaveAttribute("data-string-index", "5");
   await expect(page.locator(".fret-row").last()).toHaveAttribute("data-string-index", "0");
-  await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(24);
+  await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(25);
   await expect(page.locator(".fret-labels")).not.toContainText("OPEN");
-  await expect(page.locator(".fret-cell > span")).toHaveCount(144);
-  await expect(page.locator(".fret-cell > span").filter({ hasText: /.+/ })).toHaveCount(144);
+  await expect(page.locator(".fret-cell > span")).toHaveCount(150);
+  await expect(page.locator(".fret-cell > span").filter({ hasText: /.+/ })).toHaveCount(150);
   await expect(page.locator(".role-root").first()).toBeVisible();
   await expect(page.locator(".role-chord-tone").first()).toBeVisible();
-  await expect(page.locator(".role-root span").first()).toHaveCSS("border-color", "rgb(255, 138, 61)");
-  await expect(page.locator(".role-chord-tone span").first()).toHaveCSS("border-color", "rgb(255, 228, 92)");
+  await expect(page.locator(".role-root span").first()).toHaveCSS("border", /4px solid rgb\(255, 138, 61\)/);
+  await expect(page.locator(".role-chord-tone span").first()).toHaveCSS("border", /4px solid rgb\(255, 228, 92\)/);
+  await expect(page.locator(".role-root span").first()).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(page.locator(".role-root span").first()).toHaveCSS("text-shadow", /rgb\(0, 0, 0\)/);
   await expect(page.locator("#scale")).toHaveCount(0);
 
   const firstFretX = (await page.locator(".fret-row").first().locator(".fret-cell").first().boundingBox())?.x;
   const firstFretWidth = (await page.locator(".fret-row").first().locator(".fret-cell").first().boundingBox())?.width ?? 0;
   const lastFretWidth = (await page.locator(".fret-row").first().locator(".fret-cell").last().boundingBox())?.width ?? 0;
-  expect(firstFretWidth).toBeGreaterThan(lastFretWidth * 2);
-  expect(firstFretWidth).toBeLessThan(lastFretWidth * 2.6);
+  expect(firstFretWidth).toBeCloseTo(lastFretWidth, 0);
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(16);
   expect((await page.locator(".fret-row").first().locator(".fret-cell").first().boundingBox())?.x).toBeCloseTo(firstFretX ?? 0, 0);
   await page.getByRole("button", { name: "Next fret", exact: true }).click();
   await expect(page.locator(".fret-labels span:not(.string-label)")).toHaveText(
-    Array.from({ length: 16 }, (_, index) => String(index + 2)),
+    Array.from({ length: 16 }, (_, index) => String(index + 1)),
   );
-  await expect(page.getByText("2–17 / 24")).toBeVisible();
+  await expect(page.getByText("1–16 / 24")).toBeVisible();
+  const zoomedFirstFretWidth = (await page.locator(".fret-row").first().locator(".fret-cell").first().boundingBox())?.width ?? 0;
+  const zoomedLastFretWidth = (await page.locator(".fret-row").first().locator(".fret-cell").last().boundingBox())?.width ?? 0;
+  expect(zoomedFirstFretWidth).toBeGreaterThan(zoomedLastFretWidth * 1.5);
+  expect(zoomedFirstFretWidth).toBeLessThan(zoomedLastFretWidth * 2);
   await page.getByRole("button", { name: "Previous fret", exact: true }).click();
   await page.getByRole("button", { name: "Zoom out" }).click();
-  await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(24);
+  await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(25);
 
   const playAudio = page.getByLabel("Play audio");
   await playAudio.check();
@@ -151,7 +156,7 @@ test("fills a mobile landscape viewport with the fretboard and compact status", 
   await expect(page.locator(".landscape-status")).toBeVisible();
   await expect(page.locator(".landscape-status strong")).toHaveText("C / --");
   await expect(page.locator(".fret-row")).toHaveCount(6);
-  await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(24);
+  await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(25);
   await expect.poll(async () => {
     const box = await panel.boundingBox();
     return box === null ? null : [Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)];
@@ -189,7 +194,7 @@ test("merges live microphone heat with chord outlines", async ({ page }) => {
   await expect(page.getByText("0.1 s")).toBeVisible();
   await expect(page.getByText("10.0 s")).toBeVisible();
   await expect(page.getByText("1.0", { exact: true })).toBeVisible();
-  await expect(page.locator(".fretboard .fret-cell")).toHaveCount(144);
+  await expect(page.locator(".fretboard .fret-cell")).toHaveCount(150);
   await expect.poll(async () => {
     const strengths = await page.locator(".fretboard .fret-cell").evaluateAll(
       (cells) => cells.map((cell) => Number((cell as HTMLElement).dataset.strength ?? 0)),

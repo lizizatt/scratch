@@ -45,13 +45,15 @@ export type InstrumentDefinition = {
   readonly minPosition: number;
   readonly maxFretCount: number;
   readonly visibleFretCounts: readonly number[];
+  readonly defaultZoomIndex: number;
 };
 
 const FRETTED_DISPLAY_DEFAULTS = {
   minPosition: 0,
   maxFretCount: MAX_FRET_COUNT,
   visibleFretCounts: [6, 8, 12, 16, MAX_FRET_COUNT + 1],
-} as const satisfies Pick<InstrumentDefinition, "minPosition" | "maxFretCount" | "visibleFretCounts">;
+  defaultZoomIndex: 4,
+} as const satisfies Pick<InstrumentDefinition, "minPosition" | "maxFretCount" | "visibleFretCounts" | "defaultZoomIndex">;
 
 function frettedInstrument(
   definition: Pick<InstrumentDefinition, "mode" | "label" | "stringNames" | "tuningMidi">,
@@ -72,8 +74,9 @@ export const INSTRUMENT_DEFINITIONS: Readonly<Record<InstrumentMode, InstrumentD
     stringNames: ["Keys"],
     tuningMidi: [48],
     minPosition: 0,
-    maxFretCount: 24,
-    visibleFretCounts: [25],
+    maxFretCount: 36,
+    visibleFretCounts: [13, 25, 37],
+    defaultZoomIndex: 1,
   },
   bass: frettedInstrument({
     mode: "bass",
