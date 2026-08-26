@@ -4,6 +4,7 @@ import {
   chordPitchClasses,
   FRET_POSITION_RATIOS,
   fretWidthRatios,
+  INSTRUMENT_DEFINITIONS,
   scalePitchClasses,
   stepFretStart,
 } from "../../src/music/fretboard";
@@ -29,12 +30,37 @@ describe("fretboard model", () => {
     expect(buildFretboard(0, "major", "major").some((note) => note.role === "scale-tone")).toBe(true);
   });
 
+  it("supports every instrument tuning and requested octave range", () => {
+    const piano = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.piano.maxFretCount, INSTRUMENT_DEFINITIONS.piano.tuningMidi);
+    expect(piano).toHaveLength(25);
+    expect(piano[0]).toMatchObject({ stringIndex: 0, fret: 0, noteName: "C3" });
+    expect(piano[24]).toMatchObject({ stringIndex: 0, fret: 24, noteName: "C5" });
+
+    const bass = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.bass.maxFretCount, INSTRUMENT_DEFINITIONS.bass.tuningMidi);
+    expect(bass).toHaveLength(4 * 13);
+    expect(bass[0]).toMatchObject({ stringIndex: 0, fret: 0, noteName: "E1" });
+    expect(bass[51]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "G3" });
+
+    const ukulele = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.ukulele.maxFretCount, INSTRUMENT_DEFINITIONS.ukulele.tuningMidi);
+    expect(ukulele).toHaveLength(4 * 13);
+    expect(ukulele[0]).toMatchObject({ stringIndex: 0, fret: 0, noteName: "G4" });
+    expect(ukulele[51]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "A5" });
+
+    const cello = buildFretboard(0, "major", undefined, INSTRUMENT_DEFINITIONS.cello.maxFretCount, INSTRUMENT_DEFINITIONS.cello.tuningMidi);
+    expect(cello).toHaveLength(4 * 13);
+    expect(cello[0]).toMatchObject({ stringIndex: 0, fret: 0, noteName: "C2" });
+    expect(cello[39]).toMatchObject({ stringIndex: 3, fret: 0, noteName: "A3" });
+    expect(cello[51]).toMatchObject({ stringIndex: 3, fret: 12, noteName: "A4" });
+  });
+
   it("builds and navigates bounded fretboard segments", () => {
     expect(buildFretboard(0, "major", undefined, 24)).toHaveLength(6 * 25);
     expect(stepFretStart(1, 12, 1)).toBe(2);
     expect(stepFretStart(13, 12, -1)).toBe(12);
     expect(stepFretStart(13, 12, 1)).toBe(13);
     expect(clampFretStart(20, 8)).toBe(17);
+    expect(clampFretStart(4, 13, 12, 0)).toBe(0);
+    expect(stepFretStart(0, 13, 1, 12, 0)).toBe(0);
   });
 
   it("spaces frets by equal-tempered scale-length positions", () => {

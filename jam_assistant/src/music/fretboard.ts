@@ -35,6 +35,66 @@ const CHORD_SYMBOLS: Readonly<Record<ChordQuality, string>> = {
   suspended4: "sus4",
 };
 
+export type InstrumentMode = "guitar" | "piano" | "bass" | "ukulele" | "cello";
+
+export type InstrumentDefinition = {
+  readonly mode: InstrumentMode;
+  readonly label: string;
+  readonly stringNames: readonly string[];
+  readonly tuningMidi: readonly number[];
+  readonly minPosition: number;
+  readonly maxFretCount: number;
+  readonly visibleFretCounts: readonly number[];
+};
+
+export const INSTRUMENT_DEFINITIONS: Readonly<Record<InstrumentMode, InstrumentDefinition>> = {
+  guitar: {
+    mode: "guitar",
+    label: "Guitar",
+    stringNames: ["E", "A", "D", "G", "B", "E"],
+    tuningMidi: STANDARD_TUNING_MIDI,
+    minPosition: 1,
+    maxFretCount: MAX_FRET_COUNT,
+    visibleFretCounts: [6, 8, 12, 16, 24],
+  },
+  piano: {
+    mode: "piano",
+    label: "Piano",
+    stringNames: ["Keys"],
+    tuningMidi: [48],
+    minPosition: 0,
+    maxFretCount: 24,
+    visibleFretCounts: [25],
+  },
+  bass: {
+    mode: "bass",
+    label: "Bass guitar",
+    stringNames: ["E", "A", "D", "G"],
+    tuningMidi: [28, 33, 38, 43],
+    minPosition: 0,
+    maxFretCount: 12,
+    visibleFretCounts: [13],
+  },
+  ukulele: {
+    mode: "ukulele",
+    label: "Ukulele",
+    stringNames: ["G", "C", "E", "A"],
+    tuningMidi: [67, 60, 64, 69],
+    minPosition: 0,
+    maxFretCount: 12,
+    visibleFretCounts: [13],
+  },
+  cello: {
+    mode: "cello",
+    label: "Cello",
+    stringNames: ["C", "G", "D", "A"],
+    tuningMidi: [36, 43, 50, 57],
+    minPosition: 0,
+    maxFretCount: 12,
+    visibleFretCounts: [13],
+  },
+};
+
 export type FretRole = "root" | "chord-tone" | "scale-tone" | "none";
 
 export type FretNote = {
@@ -75,13 +135,14 @@ export function buildFretboard(
   quality: ChordQuality,
   scaleName?: string,
   fretCount = FRET_COUNT,
+  tuningMidi: readonly number[] = STANDARD_TUNING_MIDI,
 ): readonly FretNote[] {
   const chordNotes = chordPitchClasses(rootPitchClass, quality);
   const scaleNotes = scalePitchClasses(rootPitchClass, scaleName, chordNotes);
   const notes: FretNote[] = [];
-  for (let stringIndex = 0; stringIndex < STANDARD_TUNING_MIDI.length; stringIndex += 1) {
+  for (let stringIndex = 0; stringIndex < tuningMidi.length; stringIndex += 1) {
     for (let fret = 0; fret <= fretCount; fret += 1) {
-      const openMidi = STANDARD_TUNING_MIDI[stringIndex];
+      const openMidi = tuningMidi[stringIndex];
       if (openMidi === undefined) {
         throw new Error(`Missing tuning for string ${stringIndex}`);
       }
@@ -111,8 +172,9 @@ export function clampFretStart(
   startFret: number,
   visibleFretCount: number,
   totalFretCount = MAX_FRET_COUNT,
+  minStartFret = 1,
 ): number {
-  return Math.max(1, Math.min(startFret, totalFretCount - visibleFretCount + 1));
+  return Math.max(minStartFret, Math.min(startFret, totalFretCount - visibleFretCount + 1));
 }
 
 export function stepFretStart(
@@ -120,11 +182,13 @@ export function stepFretStart(
   visibleFretCount: number,
   direction: -1 | 1,
   totalFretCount = MAX_FRET_COUNT,
+  minStartFret = 1,
 ): number {
   return clampFretStart(
     startFret + direction,
     visibleFretCount,
     totalFretCount,
+    minStartFret,
   );
 }
 
@@ -132,6 +196,9 @@ export function fretWidthRatios(
   startFret: number,
   visibleFretCount: number,
 ): readonly number[] {
+  if (startFret === 0) {
+    return Array.from({ length: visibleFretCount }, () => 1 / visibleFretCount);
+  }
   const endFret = startFret + visibleFretCount - 1;
   const segmentStart = FRET_POSITION_RATIOS[startFret - 1];
   const segmentEnd = FRET_POSITION_RATIOS[endFret];

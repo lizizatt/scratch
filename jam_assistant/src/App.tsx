@@ -9,13 +9,15 @@ import {
   type MicrophoneAnalysisSnapshot,
 } from "./audio/microphone-analysis";
 import {
-  MAX_FRET_COUNT,
+  INSTRUMENT_DEFINITIONS,
   ROOT_NAMES,
   buildFretboard,
   clampFretStart,
   fretWidthRatios,
   stepFretStart,
   type FretNote,
+  type InstrumentDefinition,
+  type InstrumentMode,
 } from "./music/fretboard";
 import { chordLabel, detectedChordMarkers, retainLastChord } from "./music/timeline";
 import type { ChordEstimate, ChordQuality } from "./analysis/types";
@@ -31,10 +33,10 @@ const QUALITY_LABELS: Readonly<Record<ChordQuality, string>> = {
   suspended4: "Suspended 4",
 };
 
-const STRING_NAMES = ["E", "A", "D", "G", "B", "E"];
 const MARKER_SETTLE_SECONDS = 0.05;
 const FFT_WINDOWS_MILLISECONDS = [21, 43, 85, 171] as const;
-const VISIBLE_FRET_COUNTS = [6, 8, 12, 16, 24] as const;
+const INSTRUMENT_MODE_ORDER: readonly InstrumentMode[] = ["guitar", "piano", "bass", "ukulele", "cello"];
+const PIANO_BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
 
 type AppStatus =
   | { readonly kind: "idle" }
@@ -62,7 +64,10 @@ export function App() {
   const [heatmapStrengths, setHeatmapStrengths] = useState(emptyHeatmap);
   const [lowestNote, setLowestNote] = useState<string>();
   const [fretStart, setFretStart] = useState(1);
-  const [zoomIndex, setZoomIndex] = useState(4);
+  const [instrumentMode, setInstrumentMode] = useState<InstrumentMode>("guitar");
+  const [zoomIndex, setZoomIndex] = useState(
+    INSTRUMENT_DEFINITIONS.guitar.visibleFretCounts.length - 1,
+  );
   const [compactLandscape, setCompactLandscape] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileUrlRef = useRef<string | undefined>(undefined);
@@ -82,10 +87,14 @@ export function App() {
     ? microphoneEstimate
     : fileEstimate;
   const fretboardEstimate = latchedEstimate ?? currentEstimate;
-  const visibleFretCount = VISIBLE_FRET_COUNTS[zoomIndex] ?? VISIBLE_FRET_COUNTS[2];
+  const instrument = INSTRUMENT_DEFINITIONS[instrumentMode];
+  const visibleFretCounts = instrument.visibleFretCounts;
+  const maxFretCount = instrument.maxFretCount;
+  const minPosition = instrument.minPosition;
+  const visibleFretCount = visibleFretCounts[zoomIndex] ?? visibleFretCounts[visibleFretCounts.length - 1] ?? 12;
   const fretEnd = fretStart + visibleFretCount - 1;
-  const displayedFretStart = compactLandscape ? 1 : fretStart;
-  const displayedFretCount = compactLandscape ? MAX_FRET_COUNT : visibleFretCount;
+  const displayedFretStart = compactLandscape ? minPosition : fretStart;
+  const displayedFretCount = compactLandscape ? maxFretCount - minPosition + 1 : visibleFretCount;
   const fretboard = useMemo(() => {
     const rootPitchClass = fretboardEstimate?.state === "chord"
       ? fretboardEstimate.rootPitchClass
@@ -93,8 +102,8 @@ export function App() {
     const quality = fretboardEstimate?.state === "chord"
       ? fretboardEstimate.quality
       : "major";
-    return buildFretboard(rootPitchClass, quality, undefined, MAX_FRET_COUNT);
-  }, [fretboardEstimate]);
+    return buildFretboard(rootPitchClass, quality, undefined, maxFretCount, instrument.tuningMidi);
+  }, [fretboardEstimate, instrument, maxFretCount]);
   const displayedStrengths = inputMode === "microphone"
     ? heatmapStrengths
     : currentEstimate?.chroma ?? emptyHeatmap();
@@ -267,17 +276,19 @@ export function App() {
       current,
       visibleFretCount,
       direction,
+      maxFretCount,
+      minPosition,
     ));
   }
 
   function handleZoom(direction: -1 | 1) {
     const nextZoomIndex = Math.max(
       0,
-      Math.min(VISIBLE_FRET_COUNTS.length - 1, zoomIndex + direction),
+      Math.min(visibleFretCounts.length - 1, zoomIndex + direction),
     );
-    const nextVisibleFretCount = VISIBLE_FRET_COUNTS[nextZoomIndex] ?? visibleFretCount;
+    const nextVisibleFretCount = visibleFretCounts[nextZoomIndex] ?? visibleFretCount;
     setZoomIndex(nextZoomIndex);
-    setFretStart((current) => clampFretStart(current, nextVisibleFretCount));
+    setFretStart((current) => clampFretStart(current, nextVisibleFretCount, maxFretCount, minPosition));
   }
 
   function seekTo(time: number) {
@@ -308,6 +319,11 @@ export function App() {
       audio.pause();
     }
   }
+
+  useEffect(() => {
+    setZoomIndex(Math.max(0, INSTRUMENT_DEFINITIONS[instrumentMode].visibleFretCounts.length - 1));
+    setFretStart(INSTRUMENT_DEFINITIONS[instrumentMode].minPosition);
+  }, [instrumentMode]);
 
   return (
     <main className={compactLandscape ? "app-shell landscape-view" : "app-shell"}>
@@ -382,8 +398,9 @@ export function App() {
           <strong>{currentEstimate?.state === "chord" ? chordLabel(currentEstimate.rootPitchClass, currentEstimate.quality) : "--"} / {lowestNote ?? "--"}</strong>
         </div>
         <div className="fretboard-header">
-          <h2 id="fretboard-title">Fretboard · standard tuning · frets {fretStart}–{fretEnd}</h2>
+          <h2 id="fretboard-title">{instrument.label} · {instrument.mode === "piano" ? "keys" : "frets"} {fretStart}–{fretEnd}</h2>
           <div className="fretboard-controls">
+            <label className="instrument-picker"><span>Display</span><select aria-label="Instrument display mode" value={instrumentMode} onChange={(event) => setInstrumentMode(event.target.value as InstrumentMode)}>{INSTRUMENT_MODE_ORDER.map((mode) => <option key={mode} value={mode}>{INSTRUMENT_DEFINITIONS[mode].label}</option>)}</select></label>
             <button
               type="button"
               className={latchedEstimate === undefined ? "latch-button" : "latch-button latch-active"}
@@ -406,17 +423,17 @@ export function App() {
           <div className="legend"><span><i className="legend-heat" /> FFT energy</span><span><i className="legend-root" /> Root outline</span><span><i className="legend-chord" /> Chord outline</span></div>
           <div className="fretboard-navigation">
             <div role="group" aria-label="Fretboard segment controls">
-              <button type="button" aria-label="Previous fret" disabled={fretStart === 1} onClick={() => handleFretStep(-1)}>←</button>
-              <output>{fretStart}–{fretEnd} / {MAX_FRET_COUNT}</output>
-              <button type="button" aria-label="Next fret" disabled={fretEnd === MAX_FRET_COUNT} onClick={() => handleFretStep(1)}>→</button>
+              <button type="button" aria-label="Previous fret" disabled={fretStart === minPosition} onClick={() => handleFretStep(-1)}>←</button>
+              <output>{fretStart}–{fretEnd} / {maxFretCount}</output>
+              <button type="button" aria-label="Next fret" disabled={fretEnd === maxFretCount} onClick={() => handleFretStep(1)}>→</button>
             </div>
             <div role="group" aria-label="Fretboard zoom controls">
-              <button type="button" aria-label="Zoom out" disabled={zoomIndex === VISIBLE_FRET_COUNTS.length - 1} onClick={() => handleZoom(1)}>−</button>
+              <button type="button" aria-label="Zoom out" disabled={zoomIndex === visibleFretCounts.length - 1} onClick={() => handleZoom(1)}>−</button>
               <button type="button" aria-label="Zoom in" disabled={zoomIndex === 0} onClick={() => handleZoom(-1)}>+</button>
             </div>
           </div>
         </div>
-        <div className="fretboard-scroll"><Fretboard notes={fretboard} hasChord={fretboardEstimate?.state === "chord"} heatmapStrengths={displayedStrengths} logResponse={logResponse} startFret={displayedFretStart} visibleFretCount={displayedFretCount} /></div>
+        <div className="fretboard-scroll"><Fretboard instrument={instrument} notes={fretboard} hasChord={fretboardEstimate?.state === "chord"} heatmapStrengths={displayedStrengths} logResponse={logResponse} startFret={displayedFretStart} visibleFretCount={displayedFretCount} /></div>
       </section>
       </>}
     </main>
@@ -424,6 +441,7 @@ export function App() {
 }
 
 function Fretboard({
+  instrument,
   notes,
   hasChord,
   heatmapStrengths,
@@ -431,6 +449,7 @@ function Fretboard({
   startFret,
   visibleFretCount,
 }: {
+  instrument: InstrumentDefinition;
   notes: readonly FretNote[];
   hasChord: boolean;
   heatmapStrengths: readonly number[];
@@ -438,7 +457,21 @@ function Fretboard({
   startFret: number;
   visibleFretCount: number;
 }) {
-  const stringIndexes = Array.from({ length: 6 }, (_, index) => 5 - index);
+  if (instrument.mode === "piano") {
+    return (
+      <PianoKeyboard
+        instrument={instrument}
+        notes={notes}
+        hasChord={hasChord}
+        heatmapStrengths={heatmapStrengths}
+        logResponse={logResponse}
+        startFret={startFret}
+        visibleFretCount={visibleFretCount}
+      />
+    );
+  }
+
+  const stringIndexes = Array.from({ length: instrument.stringNames.length }, (_, index) => instrument.stringNames.length - 1 - index);
   const endFret = startFret + visibleFretCount - 1;
   const fretColumns = fretWidthRatios(startFret, visibleFretCount)
     .map((width) => `${width}fr`)
@@ -447,10 +480,12 @@ function Fretboard({
     "--visible-frets": visibleFretCount,
     "--fret-columns": fretColumns,
   } as CSSProperties;
-  return <div className="fretboard" style={boardStyle} aria-label="Guitar fretboard visualization">
+  const ariaLabel = `${instrument.label} fretboard visualization`;
+
+  return <div className="fretboard" style={boardStyle} aria-label={ariaLabel}>
     <div className="fret-labels"><span className="string-label">STRING</span>{Array.from({ length: visibleFretCount }, (_, index) => <span key={startFret + index}>{startFret + index}</span>)}</div>
     {stringIndexes.map((stringIndex) => <div className="fret-row" data-string-index={stringIndex} key={stringIndex}>
-      <span className="string-label">{STRING_NAMES[stringIndex]}</span>
+      <span className="string-label">{instrument.stringNames[stringIndex]}</span>
       {notes.filter((note) => note.stringIndex === stringIndex && note.fret >= startFret && note.fret <= endFret).map((note) => {
         const strength = heatmapStrengths[note.pitchClass] ?? 0;
         const opacity = logarithmicOpacity(strength, logResponse);
@@ -459,6 +494,49 @@ function Fretboard({
         return <span className={`fret-cell role-${role}`} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} title={`${note.noteName} · ${role}`}><span style={style}>{note.noteName.replace(/[0-9]/g, "")}</span></span>;
       })}
     </div>)}
+  </div>;
+}
+
+function PianoKeyboard({
+  instrument,
+  notes,
+  hasChord,
+  heatmapStrengths,
+  logResponse,
+  startFret,
+  visibleFretCount,
+}: {
+  instrument: InstrumentDefinition;
+  notes: readonly FretNote[];
+  hasChord: boolean;
+  heatmapStrengths: readonly number[];
+  logResponse: number;
+  startFret: number;
+  visibleFretCount: number;
+}) {
+  const endFret = startFret + visibleFretCount - 1;
+  const fretColumns = Array.from({ length: visibleFretCount }, () => "1fr").join(" ");
+  const boardStyle = {
+    "--visible-frets": visibleFretCount,
+    "--fret-columns": fretColumns,
+  } as CSSProperties;
+  const visibleNotes = notes.filter((note) => note.stringIndex === 0 && note.fret >= startFret && note.fret <= endFret);
+
+  return <div className="fretboard piano-board" style={boardStyle} aria-label={`${instrument.label} keyboard visualization`}>
+    <div className="fret-labels"><span className="string-label">KEY</span>{visibleNotes.map((note) => <span key={note.fret}>{note.noteName}</span>)}</div>
+    <div className="fret-row piano-row" data-string-index="0">
+      <span className="string-label">{instrument.stringNames[0]}</span>
+      {visibleNotes.map((note) => {
+        const strength = heatmapStrengths[note.pitchClass] ?? 0;
+        const opacity = logarithmicOpacity(strength, logResponse);
+        const style = { "--heat-strength": opacity } as CSSProperties;
+        const role = hasChord ? note.role : "none";
+        const keyClass = PIANO_BLACK_KEYS.has(note.pitchClass)
+          ? "piano-black"
+          : "piano-white";
+        return <span className={`fret-cell piano-key ${keyClass} role-${role}`} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} title={`${note.noteName} · ${role}`}><span style={style}>{note.noteName}</span></span>;
+      })}
+    </div>
   </div>;
 }
 
@@ -481,4 +559,3 @@ function formatTime(seconds: number): string {
   const remainder = Math.floor(seconds % 60).toString().padStart(2, "0");
   return `${minutes}:${remainder}`;
 }
-

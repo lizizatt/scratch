@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 4173",
+    command: "npm run dev -- --host 127.0.0.1 --port 4173 --strictPort",
     port: 4173,
     reuseExistingServer: false,
   },

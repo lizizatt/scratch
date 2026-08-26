@@ -3,6 +3,15 @@
 This plan delivers the smallest useful product while resolving chord-analysis
 risk before committing the application to a feature library.
 
+## Current task burn-down
+
+- [x] Add a dropdown to switch the instrument display mode.
+- [x] Add a two-octave piano display mode.
+- [x] Add a bass guitar display mode limited to one octave per string.
+- [x] Add a ukulele display mode limited to one octave per string.
+- [x] Add a cello display mode limited to one octave per string.
+- [x] Adversarially verify desktop and mobile instrument displays with Playwright screenshots.
+
 ## Milestone 0: analysis spike
 
 **Goal:** select a chroma implementation and prove the source-independent
