@@ -1,4 +1,5 @@
 import type { ChordEstimate } from "../analysis/types";
+import type { PianoFrame } from "../analysis/piano";
 
 export type FileAnalysisProgress = {
   readonly phase: "decoding" | "analyzing";
@@ -9,11 +10,12 @@ export type FileAnalysisResult = {
   readonly durationSeconds: number;
   readonly sampleRate: number;
   readonly estimates: readonly ChordEstimate[];
+  readonly pianoFrames: readonly PianoFrame[];
 };
 
 type WorkerMessage =
   | { readonly type: "progress"; readonly fraction: number }
-  | { readonly type: "complete"; readonly estimates: readonly ChordEstimate[] }
+  | { readonly type: "complete"; readonly estimates: readonly ChordEstimate[]; readonly pianoFrames: readonly PianoFrame[] }
   | { readonly type: "error"; readonly message: string };
 
 export async function analyzeAudioFile(
@@ -27,7 +29,7 @@ export async function analyzeAudioFile(
     const audioBuffer = await context.decodeAudioData(encoded);
     const samples = downmix(audioBuffer);
     onProgress?.({ phase: "decoding", fraction: 1 });
-    const estimates = await analyzeInWorker(
+    const analysis = await analyzeInWorker(
       samples,
       audioBuffer.sampleRate,
       (fraction) => onProgress?.({ phase: "analyzing", fraction }),
@@ -35,7 +37,8 @@ export async function analyzeAudioFile(
     return {
       durationSeconds: audioBuffer.duration,
       sampleRate: audioBuffer.sampleRate,
-      estimates,
+      estimates: analysis.estimates,
+      pianoFrames: analysis.pianoFrames,
     };
   } finally {
     await context.close();
@@ -46,7 +49,7 @@ function analyzeInWorker(
   samples: Float32Array,
   sampleRate: number,
   onProgress: (fraction: number) => void,
-): Promise<readonly ChordEstimate[]> {
+): Promise<Extract<WorkerMessage, { readonly type: "complete" }>> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(
       new URL("../analysis/analysis-worker.ts", import.meta.url),
@@ -57,7 +60,7 @@ function analyzeInWorker(
         onProgress(event.data.fraction);
       } else if (event.data.type === "complete") {
         worker.terminate();
-        resolve(event.data.estimates);
+        resolve(event.data);
       } else {
         worker.terminate();
         reject(new Error(event.data.message));

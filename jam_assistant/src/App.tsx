@@ -22,6 +22,7 @@ import {
 import { chordLabel, detectedChordMarkers, retainLastChord } from "./music/timeline";
 import type { ChordEstimate, ChordQuality } from "./analysis/types";
 import { emptyHeatmap, logarithmicOpacity, updateHeatmap } from "./analysis/heatmap";
+import { PIANO_MAX_MIDI, PIANO_MIN_MIDI, type PianoFrame } from "./analysis/piano";
 
 const QUALITY_LABELS: Readonly<Record<ChordQuality, string>> = {
   major: "Major",
@@ -34,6 +35,9 @@ const QUALITY_LABELS: Readonly<Record<ChordQuality, string>> = {
 };
 
 const MARKER_SETTLE_SECONDS = 0.05;
+const PIANO_HISTORY_SECONDS = 10;
+const PIANO_CURSOR_RATIO = 0.8;
+const PIANO_VIEW_SECONDS = PIANO_HISTORY_SECONDS / PIANO_CURSOR_RATIO;
 const FFT_WINDOWS_MILLISECONDS = [21, 43, 85, 171] as const;
 const INSTRUMENT_MODE_ORDER: readonly InstrumentMode[] = ["guitar", "piano", "bass", "ukulele", "cello"];
 const PIANO_BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
@@ -45,6 +49,7 @@ type AppStatus =
   | { readonly kind: "error"; readonly message: string };
 
 type InputMode = "file" | "microphone";
+type PianoViewMode = "keyboard" | "sheet";
 
 export function App() {
   const [status, setStatus] = useState<AppStatus>({ kind: "idle" });
@@ -63,6 +68,8 @@ export function App() {
   const [logResponse, setLogResponse] = useState(0.1);
   const [noteFontSize, setNoteFontSize] = useState(7);
   const [heatmapStrengths, setHeatmapStrengths] = useState(emptyHeatmap);
+  const [pianoFrames, setPianoFrames] = useState<readonly PianoFrame[]>([]);
+  const [pianoViewMode, setPianoViewMode] = useState<PianoViewMode>("keyboard");
   const [lowestNote, setLowestNote] = useState<string>();
   const [fretStart, setFretStart] = useState(INSTRUMENT_DEFINITIONS.guitar.minPosition);
   const [instrumentMode, setInstrumentMode] = useState<InstrumentMode>("guitar");
@@ -111,6 +118,14 @@ export function App() {
   const chordMarkers = useMemo(
     () => detectedChordMarkers(result?.estimates ?? []),
     [result],
+  );
+  const currentPianoFrame = useMemo(
+    () => pianoFrameAtTime(pianoFrames, selectedTime),
+    [pianoFrames, selectedTime],
+  );
+  const visiblePianoFrames = useMemo(
+    () => pianoFrames.filter((frame) => frame.timestampSeconds >= (currentPianoFrame?.timestampSeconds ?? selectedTime) - 10),
+    [currentPianoFrame, pianoFrames, selectedTime],
   );
 
   useEffect(() => {
@@ -173,6 +188,7 @@ export function App() {
     }
     setFileName(file.name);
     setResult(undefined);
+    setPianoFrames([]);
     setSelectedTime(0);
     setLatchedEstimate(undefined);
     setStatus({ kind: "analyzing", progress: { phase: "decoding", fraction: 0 } });
@@ -186,6 +202,7 @@ export function App() {
         return;
       }
       setResult(nextResult);
+      setPianoFrames(nextResult.pianoFrames);
       setSelectedTime(detectedChordMarkers(nextResult.estimates)[0]?.timestampSeconds ?? 0);
       setStatus({ kind: "ready" });
     } catch (error) {
@@ -209,6 +226,7 @@ export function App() {
     setMicrophoneEstimate(undefined);
     setLatchedEstimate(undefined);
     setHeatmapStrengths(emptyHeatmap());
+    setPianoFrames([]);
     setLowestNote(undefined);
     heatmapTimestampRef.current = undefined;
     if (nextMode === "file") {
@@ -235,6 +253,10 @@ export function App() {
       }
       if (snapshot.heatmapFrame !== undefined) {
         const frame = snapshot.heatmapFrame;
+        setPianoFrames((current) => [
+          ...current.filter((item) => item.timestampSeconds >= frame.timestampSeconds - PIANO_HISTORY_SECONDS),
+          { timestampSeconds: frame.timestampSeconds, notes: frame.pianoNotes },
+        ]);
         setLowestNote(frame.lowestNote);
         const previousTimestamp = heatmapTimestampRef.current;
         const elapsedSeconds = previousTimestamp === undefined
@@ -435,7 +457,7 @@ export function App() {
             </div>
           </div>
         </div>
-        <div className="fretboard-scroll"><Fretboard instrument={instrument} notes={fretboard} hasChord={fretboardEstimate?.state === "chord"} heatmapStrengths={displayedStrengths} logResponse={logResponse} noteFontSize={noteFontSize} startFret={displayedFretStart} visibleFretCount={displayedFretCount} /></div>
+        {compactLandscape && instrument.mode === "piano" ? <PianoLandscape frames={visiblePianoFrames} currentFrame={currentPianoFrame} viewMode={pianoViewMode} onViewModeChange={setPianoViewMode} /> : <div className="fretboard-scroll"><Fretboard instrument={instrument} notes={fretboard} hasChord={fretboardEstimate?.state === "chord"} heatmapStrengths={displayedStrengths} logResponse={logResponse} noteFontSize={noteFontSize} startFret={displayedFretStart} visibleFretCount={displayedFretCount} /></div>}
       </section>
       </>}
     </main>
@@ -576,6 +598,118 @@ function estimateAtTime(estimates: readonly ChordEstimate[], time: number): Chor
     }
   }
   return selected;
+}
+
+function pianoFrameAtTime(frames: readonly PianoFrame[], time: number): PianoFrame | undefined {
+  let selected: PianoFrame | undefined;
+  for (const frame of frames) {
+    if (frame.timestampSeconds > time) {
+      break;
+    }
+    selected = frame;
+  }
+  return selected ?? frames[0];
+}
+
+function PianoLandscape({
+  frames,
+  currentFrame,
+  viewMode,
+  onViewModeChange,
+}: {
+  frames: readonly PianoFrame[];
+  currentFrame: PianoFrame | undefined;
+  viewMode: PianoViewMode;
+  onViewModeChange: (mode: PianoViewMode) => void;
+}) {
+  return <div className="piano-landscape" aria-label="Six octave piano visualization">
+    <div className="piano-mode-switch" role="group" aria-label="Piano visualization mode">
+      <button type="button" className={viewMode === "keyboard" ? "mode-active" : ""} aria-pressed={viewMode === "keyboard"} onClick={() => onViewModeChange("keyboard")}>Keyboard</button>
+      <button type="button" className={viewMode === "sheet" ? "mode-active" : ""} aria-pressed={viewMode === "sheet"} onClick={() => onViewModeChange("sheet")}>Sheet music</button>
+    </div>
+    {viewMode === "keyboard"
+      ? <PianoLandscapeKeyboard currentFrame={currentFrame} frames={frames} />
+      : <PianoSheetMusic currentFrame={currentFrame} frames={frames} />}
+  </div>;
+}
+
+function PianoLandscapeKeyboard({
+  currentFrame,
+  frames,
+}: {
+  currentFrame: PianoFrame | undefined;
+  frames: readonly PianoFrame[];
+}) {
+  const currentStrengths = new Map((currentFrame?.notes ?? []).map((note) => [note.midi, note.strength]));
+  const whiteKeys = Array.from({ length: PIANO_MAX_MIDI - PIANO_MIN_MIDI + 1 }, (_, index) => PIANO_MIN_MIDI + index)
+    .filter((midi) => !isPianoBlackKey(midi));
+  return <div className="piano-landscape-content">
+    <div className="piano-landscape-keyboard" style={{ "--piano-key-count": whiteKeys.length } as CSSProperties} aria-label="Six octave keyboard from C2 to B7">
+      {Array.from({ length: PIANO_MAX_MIDI - PIANO_MIN_MIDI + 1 }, (_, index) => PIANO_MIN_MIDI + index).map((midi) => {
+        const strength = currentStrengths.get(midi) ?? 0;
+        const black = isPianoBlackKey(midi);
+        const position = whiteKeys.filter((whiteMidi) => whiteMidi < midi).length;
+        return <span className={`landscape-piano-key ${black ? "black" : "white"}`} data-midi={midi} data-strength={strength.toFixed(3)} key={midi} style={{ "--piano-key-position": position, "--piano-strength": strength } as CSSProperties}><span>{midi % 12 === 0 ? `C${Math.floor(midi / 12) - 1}` : ""}</span></span>;
+      })}
+    </div>
+    <PianoRoll frames={frames} currentTime={currentFrame?.timestampSeconds ?? 0} />
+  </div>;
+}
+
+function PianoRoll({ frames, currentTime }: { frames: readonly PianoFrame[]; currentTime: number }) {
+  const windowStart = currentTime - PIANO_HISTORY_SECONDS;
+  return <div className="piano-roll" aria-label="Ten second piano spectrum history">
+    <svg viewBox="0 0 1000 320" preserveAspectRatio="none" role="img" aria-label="Piano spectrum history">
+      <line className="piano-roll-cursor" x1="800" x2="800" y1="0" y2="320" />
+      {frames.map((frame) => {
+        const x = ((frame.timestampSeconds - windowStart) / PIANO_VIEW_SECONDS) * 1000;
+        if (x < 0 || x > 1000) {
+          return null;
+        }
+        return frame.notes.filter((note) => note.strength >= 0.14).map((note) => <rect className="piano-roll-note" height="3" width="3" x={x - 1.5} y={310 - (note.midi - PIANO_MIN_MIDI) * 4.25} opacity={Math.min(1, note.strength)} key={`${frame.timestampSeconds}-${note.midi}`} />);
+      })}
+    </svg>
+    <div className="piano-roll-labels"><span>C2</span><span>B7</span><span>10 second history</span></div>
+  </div>;
+}
+
+function PianoSheetMusic({ frames, currentFrame }: { frames: readonly PianoFrame[]; currentFrame: PianoFrame | undefined }) {
+  const currentTime = currentFrame?.timestampSeconds ?? 0;
+  const windowStart = currentTime - PIANO_HISTORY_SECONDS;
+  return <div className="piano-sheet" aria-label="Real-time piano sheet music">
+    <svg viewBox="0 0 1000 360" preserveAspectRatio="none" role="img" aria-label="Unquantized ten second piano sheet music">
+      <text className="staff-label" x="12" y="104">TREBLE</text>
+      <text className="staff-label" x="12" y="264">BASS</text>
+      {[88, 100, 112, 124, 136, 248, 260, 272, 284, 296].map((y) => <line className="staff-line" x1="80" x2="1000" y1={y} y2={y} key={y} />)}
+      <line className="sheet-cursor" x1="800" x2="800" y1="50" y2="330" />
+      {frames.map((frame) => {
+        const x = ((frame.timestampSeconds - windowStart) / PIANO_VIEW_SECONDS) * 1000;
+        if (x < 80 || x > 1000) {
+          return null;
+        }
+        return frame.notes.filter((note) => note.strength >= 0.28).map((note) => {
+          const y = midiToStaffY(note.midi);
+          return <ellipse className="sheet-note" cx={x} cy={y} rx="6" ry="4" opacity={Math.min(1, note.strength)} key={`${frame.timestampSeconds}-${note.midi}`} />;
+        });
+      })}
+    </svg>
+    <div className="piano-sheet-label">10 second window · live timing</div>
+  </div>;
+}
+
+function isPianoBlackKey(midi: number): boolean {
+  return PIANO_BLACK_KEYS.has(midi % 12);
+}
+
+function midiToStaffY(midi: number): number {
+  const pitchClass = ((midi % 12) + 12) % 12;
+  const letter = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][pitchClass] ?? 0;
+  const diatonicPosition = (Math.floor(midi / 12) - 1) * 7 + letter;
+  const trebleBase = 4 * 7 + 2;
+  const bassBase = 2 * 7 + 4;
+  return midi >= 60
+    ? 136 - (diatonicPosition - trebleBase) * 6
+    : 296 - (diatonicPosition - bassBase) * 6;
 }
 
 function formatTime(seconds: number): string {

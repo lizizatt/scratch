@@ -1,4 +1,4 @@
-import { analyzePcm } from "../../src/analysis/analysis-worker";
+import { analyzePcm, analyzePcmDetailed } from "../../src/analysis/analysis-worker";
 import { applyChorus, applySoftClip } from "../../src/fixtures/effects";
 import {
   FIXTURE_DURATION_SECONDS,
@@ -12,6 +12,17 @@ import {
 } from "../../src/analysis/types";
 
 describe("analyzePcm", () => {
+  it("emits octave-aware piano frames alongside chord estimates", () => {
+    const analysis = analyzePcmDetailed(
+      synthesizeChord({ rootPitchClass: 0, quality: "major" }),
+      FIXTURE_SAMPLE_RATE,
+    );
+
+    expect(analysis.pianoFrames).toHaveLength(analysis.estimates.length);
+    expect(analysis.pianoFrames[0]?.notes).toHaveLength(72);
+    expect(analysis.pianoFrames[0]?.timestampSeconds).toBe(0);
+  });
+
   it("stabilizes a generated held chord through framing and smoothing", () => {
     const progress: number[] = [];
     const estimates = analyzePcm(

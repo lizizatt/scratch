@@ -1,4 +1,5 @@
 import type { ChordEstimate } from "../analysis/types";
+import type { PianoNote } from "../analysis/piano";
 
 export type MicrophoneAnalysisStatus =
   | "starting"
@@ -21,6 +22,7 @@ export type MicrophoneHeatmapFrame = {
   readonly chroma: readonly number[];
   readonly intervalSeconds: number;
   readonly lowestNote?: string;
+  readonly pianoNotes: readonly PianoNote[];
 };
 
 type WorkerMessage = {

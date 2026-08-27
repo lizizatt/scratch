@@ -2,6 +2,7 @@ import { ANALYSIS_FRAME_SIZE, ANALYSIS_HOP_SIZE, fftFrameSizeForMilliseconds } f
 import { MeydaChromaExtractor } from "./adapters/meyda";
 import { detectChord } from "./detector";
 import { detectLowestNote } from "./lowest-note";
+import { detectPianoNotes } from "./piano";
 import { ChordSmoother } from "./smoother";
 import type { ChordEstimate, PcmChunk } from "./types";
 
@@ -67,6 +68,7 @@ self.onmessage = (event: MessageEvent<WorkerInput>) => {
         chroma: estimate.state === "no-chord" ? new Array(12).fill(0) : frame.values,
         intervalSeconds: hopSize / sampleRate,
         lowestNote,
+        pianoNotes: detectPianoNotes(frame.amplitudeSpectrum, sampleRate, frameSize),
       },
     });
     buffer = buffer.slice(hopSize);
