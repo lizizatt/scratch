@@ -481,6 +481,16 @@ function Fretboard({
   const fretColumns = fretWidthRatios(startFret, visibleFretCount)
     .map((width) => `${width}fr`)
     .join(" ");
+  const fretMarkerFrets = instrument.mode === "guitar" || instrument.mode === "bass" || instrument.mode === "ukulele"
+    ? [3, 5, 7, 9, 12, 15, 17, 19, 21]
+    : [];
+  const fretMarkers = fretMarkerFrets.flatMap((fret) => {
+    const column = fret - startFret + 1;
+    if (column < 1 || column > visibleFretCount) {
+      return [];
+    }
+    return [{ fret, column }];
+  });
   const boardStyle = {
     "--visible-frets": visibleFretCount,
     "--fret-columns": fretColumns,
@@ -490,6 +500,7 @@ function Fretboard({
 
   return <div className={startFret === 0 ? "fretboard open-string-board" : "fretboard"} style={boardStyle} aria-label={ariaLabel}>
     <div className="fret-labels"><span className="string-label">STRING</span>{Array.from({ length: visibleFretCount }, (_, index) => <span key={startFret + index}>{startFret + index}</span>)}</div>
+    <div className="fret-markers" aria-hidden="true">{fretMarkers.map(({ fret, column }) => <span className={fret === 12 ? "fret-marker fret-marker-double" : "fret-marker"} data-fret-marker={fret} key={fret} style={{ gridColumn: column }} />)}</div>
     {stringIndexes.map((stringIndex) => <div className="fret-row" data-string-index={stringIndex} key={stringIndex}>
       <span className="string-label">{instrument.stringNames[stringIndex]}</span>
       {notes.filter((note) => note.stringIndex === stringIndex && note.fret >= startFret && note.fret <= endFret).map((note) => {
@@ -497,7 +508,7 @@ function Fretboard({
         const opacity = logarithmicOpacity(strength, logResponse);
         const style = { "--heat-strength": opacity } as CSSProperties;
         const role = hasChord ? note.role : "none";
-        return <span className={`fret-cell role-${role}`} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} title={`${note.noteName} · ${role}`}><span style={style}>{note.noteName.replace(/[0-9]/g, "")}</span></span>;
+        return <span className={`fret-cell role-${role}`} data-fret={note.fret} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} title={`${note.noteName} · ${role}`}><span style={style}>{note.noteName.replace(/[0-9]/g, "")}</span></span>;
       })}
     </div>)}
   </div>;
@@ -546,7 +557,7 @@ function PianoKeyboard({
           : "piano-white";
         const style = { "--heat-strength": opacity } as CSSProperties;
         const keyPosition = whiteNotes.filter((whiteNote) => whiteNote.fret < note.fret).length;
-        return <span className={`fret-cell piano-key ${keyClass} role-${role}`} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} style={{ ...style, "--piano-key-position": keyPosition } as CSSProperties} title={`${note.noteName} · ${role}`}><span>{note.noteName}</span></span>;
+        return <span className={`fret-cell piano-key ${keyClass} role-${role}`} data-fret={note.fret} data-strength={strength.toFixed(3)} data-opacity={opacity.toFixed(3)} key={`${note.stringIndex}-${note.fret}`} style={{ ...style, "--piano-key-position": keyPosition } as CSSProperties} title={`${note.noteName} · ${role}`}><span>{note.noteName}</span></span>;
         })}
       </div>
     </div>

@@ -77,6 +77,28 @@ async function loadAnalyzedFixture(page: Page) {
   });
 }
 
+async function verifyFretMarkerCentering(page: Page) {
+  const firstRow = page.locator(".fretboard:not(.piano-board) .fret-row").first();
+  const markers = page.locator(".fretboard:not(.piano-board) .fret-marker");
+  const markerCount = await markers.count();
+  if (markerCount === 0) {
+    return;
+  }
+  for (let index = 0; index < markerCount; index += 1) {
+    const marker = markers.nth(index);
+    const fret = await marker.getAttribute("data-fret-marker");
+    const markerFret = Number(fret);
+    const cell = firstRow.locator(`.fret-cell[data-fret="${markerFret}"]`).first();
+    const cellBox = await cell.boundingBox();
+    const markerBox = await marker.boundingBox();
+    expect(cellBox).not.toBeNull();
+    expect(markerBox).not.toBeNull();
+    const cellCenter = (cellBox?.x ?? 0) + (cellBox?.width ?? 0) / 2;
+    const markerCenter = (markerBox?.x ?? 0) + (markerBox?.width ?? 0) / 2;
+    expect(Math.abs(markerCenter - cellCenter)).toBeLessThanOrEqual(1.5);
+  }
+}
+
 async function verifyInstrumentMode(page: Page, instrument: InstrumentExpectation, screenshotName: string) {
   await page.getByLabel("Instrument display mode").selectOption({ label: instrument.modeLabel });
   await expect(page.getByLabel("Instrument display mode")).toHaveValue(instrument.label);
@@ -84,6 +106,9 @@ async function verifyInstrumentMode(page: Page, instrument: InstrumentExpectatio
   await expect(page.getByLabel(instrument.ariaLabel)).toBeVisible();
   await expect(page.locator(".fret-row")).toHaveCount(instrument.rowCount);
   await expect(page.locator(".fret-row").first().locator(".fret-cell")).toHaveCount(instrument.visibleCells);
+  if (instrument.mode !== "piano") {
+    await verifyFretMarkerCentering(page);
+  }
   if (instrument.mode === "piano") {
     await expect(page.locator(".fretboard-navigation output")).toHaveText("0–24 / 36");
     await expect(page.getByLabel("Zoom out")).toBeEnabled();
