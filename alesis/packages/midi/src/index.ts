@@ -16,8 +16,7 @@ export interface MidiSource {
 type ControlIndex = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type SoftwareControl = "touch-strip" | "accelerometer" | "sustain" | `fader-${ControlIndex}` | `pad-${ControlIndex}`;
 
-// Development assignments only. The Vortex editor can remap these, so physical-device
-// capture will replace this profile rather than changing normalized engine events.
+// Vortex presets are remappable; keep preset-specific assignments outside normalized events.
 export const SOFTWARE_VORTEX_PROFILE: Readonly<Record<SoftwareControl, number>> = {
   "touch-strip": 5,
   "accelerometer": 1,
