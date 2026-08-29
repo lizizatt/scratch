@@ -38,6 +38,8 @@ Open `http://127.0.0.1:8787`. The server automatically uses a connected Vortex W
 
 When PulseAudio/PipeWire and at least one SoundFont are available, the server starts FluidSynth on the default host sink and selects SoundFont Player. It discovers `.sf2` and `.sf3` files in `~/Downloads`, `/usr/share/sounds/sf2`, and `/usr/share/sounds/sf3`; the SoundFont Player selector loads them by host-owned ID. Its refresh button rescans those directories without restarting the host. HS Synthetic Electronic is preferred by default, followed by Sonic/STH, FluidR3, and then the first discovered file. Bank, program, gain, chorus, and reverb controls are applied directly to FluidSynth and retained when changing SoundFonts. Set `AUDIO_MODE=simulated` to disable physical audio output.
 
+The SoundFont Player presents each file's named presets instead of raw bank/program combinations. Its main controls are Volume, Chorus Send, and Reverb Send; advanced chorus and reverb settings are grouped separately. A host-timed arpeggiator and three synchronized drum patterns are available for either synth. Tonal handles note transposition while the authoritative host transport owns scheduling.
+
 Rendered-audio tests feed the same deterministic MIDI phrase through both synth engines. They verify that opposite valid preset extremes and every continuous dial extreme produce measurably different PCM, and that switching from SoundFont Player to Neon Pressure changes the rendered result.
 
 Force the deterministic software source and demo notes with:

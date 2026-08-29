@@ -35,7 +35,9 @@ When count-in is enabled, every Play from Stop counts in before transport and ca
 - A synth selector appears at the top.
 - Neon Pressure renders on the host and exposes cutoff, resonance, attack, release, LFO rate, and drive controls.
 - SoundFont Player adds a second selector populated from `.sf2` and `.sf3` files discovered on the host. A refresh icon rescans the host directories for files added after startup. HS Synthetic Electronic is selected by default when present, followed by Sonic/STH as fallback.
-- Bank, program, gain, chorus, and reverb controls update the active FluidSynth instance and persist across SoundFont changes.
+- SoundFont presets are selected by name. Volume plus bounded chorus/reverb sends remain in the main panel; advanced effect settings are expandable and persist across SoundFont changes.
+- Arpeggiator and drum-pattern controls are shared host-timed MIDI modules beneath the selected instrument.
+- Drum patterns use an isolated FluidR3 percussion layer; selected-instrument chorus and reverb do not color the drum bus.
 - The selected synth owns the controls inside a faint rectangular outline.
 - The per-synth control surface is an isolated module driven by a parameter schema. It must be independently renderable and testable so control layouts can evolve without changing navigation, transport, or loop state.
 - Knobs and labels may vary by synth; the surrounding pane remains stable.

@@ -3,8 +3,9 @@ import {
   engineSnapshotSchema,
   type EngineCommand,
   type EngineSnapshot,
+  type InstrumentDescriptor,
   type SoundFont,
-  type SynthParameter,
+  type SoundFontPreset,
   type Take,
 } from "@alesis/protocol";
 
@@ -32,27 +33,31 @@ export interface HostEngine {
   dispose(): Promise<void>;
 }
 
-const subtractiveParameters: SynthParameter[] = [
-  { id: "cutoff", label: "Cutoff", value: 6_300, minimum: 40, maximum: 18_000, unit: "Hz" },
-  { id: "resonance", label: "Resonance", value: 0.42, minimum: 0, maximum: 1, unit: "%" },
-  { id: "attack", label: "Attack", value: 0.024, minimum: 0.001, maximum: 3, unit: "s" },
-  { id: "release", label: "Release", value: 1.8, minimum: 0.01, maximum: 8, unit: "s" },
-  { id: "lfo-rate", label: "LFO Rate", value: 3.2, minimum: 0.05, maximum: 20, unit: "Hz" },
-  { id: "drive", label: "Drive", value: 0.18, minimum: 0, maximum: 1, unit: "%" },
+const instruments: InstrumentDescriptor[] = [
+  {
+    id: "subtractive", name: "Neon Pressure", engine: "neon", controls: [
+      { id: "cutoff", label: "Cutoff", kind: "range", group: "tone", advanced: false, defaultValue: 6_300, minimum: 40, maximum: 18_000, step: 89.8, unit: "Hz" },
+      { id: "resonance", label: "Resonance", kind: "range", group: "tone", advanced: false, defaultValue: 0.42, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
+      { id: "attack", label: "Attack", kind: "range", group: "envelope", advanced: false, defaultValue: 0.024, minimum: 0.001, maximum: 3, step: 0.015, unit: "s" },
+      { id: "release", label: "Release", kind: "range", group: "envelope", advanced: false, defaultValue: 1.8, minimum: 0.01, maximum: 8, step: 0.04, unit: "s" },
+      { id: "lfo-rate", label: "LFO Rate", kind: "range", group: "modulation", advanced: false, defaultValue: 3.2, minimum: 0.05, maximum: 20, step: 0.1, unit: "Hz" },
+      { id: "drive", label: "Drive", kind: "range", group: "tone", advanced: false, defaultValue: 0.18, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
+    ],
+  },
+  {
+    id: "soundfont", name: "SoundFont Player", engine: "fluidsynth", controls: [
+      { id: "gain", label: "Volume", kind: "range", group: "output", advanced: false, defaultValue: 0.72, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
+      { id: "chorus-send", label: "Chorus Send", kind: "range", group: "effects", advanced: false, defaultValue: 0.12, minimum: 0, maximum: 0.5, step: 0.005, unit: "%" },
+      { id: "reverb-send", label: "Reverb Send", kind: "range", group: "effects", advanced: false, defaultValue: 0.24, minimum: 0, maximum: 0.5, step: 0.005, unit: "%" },
+      { id: "chorus-rate", label: "Chorus Rate", kind: "range", group: "effects", advanced: true, defaultValue: 0.3, minimum: 0.2, maximum: 2, step: 0.01, unit: "Hz" },
+      { id: "chorus-depth", label: "Chorus Depth", kind: "range", group: "effects", advanced: true, defaultValue: 8, minimum: 0, maximum: 20, step: 0.1, unit: "ms" },
+      { id: "chorus-voices", label: "Chorus Voices", kind: "range", group: "effects", advanced: true, defaultValue: 3, minimum: 0, maximum: 8, step: 1, unit: "" },
+      { id: "reverb-room", label: "Room Size", kind: "range", group: "effects", advanced: true, defaultValue: 0.2, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
+      { id: "reverb-damping", label: "Damping", kind: "range", group: "effects", advanced: true, defaultValue: 0, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
+      { id: "reverb-width", label: "Stereo Width", kind: "range", group: "effects", advanced: true, defaultValue: 0.5, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
+    ],
+  },
 ];
-
-const soundfontParameters: SynthParameter[] = [
-  { id: "bank", label: "Bank", value: 0, minimum: 0, maximum: 127, unit: "" },
-  { id: "program", label: "Program", value: 0, minimum: 0, maximum: 127, unit: "" },
-  { id: "gain", label: "Gain", value: 0.72, minimum: 0, maximum: 1, unit: "%" },
-  { id: "chorus", label: "Chorus", value: 0.12, minimum: 0, maximum: 1, unit: "%" },
-  { id: "reverb", label: "Reverb", value: 0.36, minimum: 0, maximum: 1, unit: "%" },
-];
-
-const synthParameters = new Map([
-  ["subtractive", subtractiveParameters],
-  ["soundfont", soundfontParameters],
-]);
 
 const waveformBucketCount = 96;
 
@@ -64,6 +69,8 @@ interface DeletedTake {
 export interface SimulatedHostEngineOptions {
   soundFonts?: SoundFont[];
   selectedSoundFontId?: string | null;
+  soundFontPresets?: SoundFontPreset[];
+  selectedSoundFontPresetId?: string | null;
 }
 
 export class SimulatedHostEngine implements HostEngine {
@@ -79,6 +86,8 @@ export class SimulatedHostEngine implements HostEngine {
   constructor(options: SimulatedHostEngineOptions = {}) {
     const soundFonts = options.soundFonts ?? [];
     const selectedSoundFontId = options.selectedSoundFontId ?? soundFonts[0]?.id ?? null;
+    const soundFontPresets = options.soundFontPresets ?? [];
+    const selectedSoundFontPresetId = options.selectedSoundFontPresetId ?? soundFontPresets[0]?.id ?? null;
     this.state = engineSnapshotSchema.parse({
       protocolVersion: PROTOCOL_VERSION,
       revision: 0,
@@ -97,14 +106,15 @@ export class SimulatedHostEngine implements HostEngine {
       monitorOnly: false,
       synth: {
         selectedId: "subtractive",
-        available: [
-          { id: "subtractive", name: "Neon Pressure" },
-          { id: "soundfont", name: "SoundFont Player" },
-        ],
+        instruments,
         soundFonts,
         selectedSoundFontId,
-        parameters: subtractiveParameters,
+        soundFontPresets,
+        selectedSoundFontPresetId,
+        parameterValues: defaultParameterValues(instruments[0]!),
       },
+      arpeggiator: { enabled: false, mode: "up", rate: "1/8", octaves: 1, gate: 0.5, latch: false, swing: 0 },
+      drums: { enabled: false, pattern: "four-on-floor", volume: 0.7 },
       capture: { currentWaveform: [], staged: null, stagedAudible: true },
       promoted: [],
       canUndoDelete: false,
@@ -148,6 +158,48 @@ export class SimulatedHostEngine implements HostEngine {
     }
     this.state.synth.soundFonts = structuredClone(soundFonts);
     this.state.synth.selectedSoundFontId = selectedSoundFontId;
+    this.state.revision += 1;
+    this.publish(false);
+    return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
+  }
+
+  replaceSoundFontPresets(presets: SoundFontPreset[], selectedPresetId: string | null): EngineResult {
+    if (selectedPresetId !== null && !presets.some(({ id }) => id === selectedPresetId)) {
+      return { accepted: false, revision: this.state.revision, appliedCycle: this.state.transport.cycle, error: `Unknown SoundFont preset: ${selectedPresetId}` };
+    }
+    this.state.synth.soundFontPresets = structuredClone(presets);
+    this.state.synth.selectedSoundFontPresetId = selectedPresetId;
+    this.state.revision += 1;
+    this.publish(false);
+    return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
+  }
+
+  replaceSoundFontSelection(soundFontId: string, presets: SoundFontPreset[], selectedPresetId: string | null): EngineResult {
+    if (!this.state.synth.soundFonts.some(({ id }) => id === soundFontId)) {
+      return { accepted: false, revision: this.state.revision, appliedCycle: this.state.transport.cycle, error: `Unknown SoundFont: ${soundFontId}` };
+    }
+    if (selectedPresetId !== null && !presets.some(({ id }) => id === selectedPresetId)) {
+      return { accepted: false, revision: this.state.revision, appliedCycle: this.state.transport.cycle, error: `Unknown SoundFont preset: ${selectedPresetId}` };
+    }
+    this.state.synth.selectedSoundFontId = soundFontId;
+    this.state.synth.soundFontPresets = structuredClone(presets);
+    this.state.synth.selectedSoundFontPresetId = selectedPresetId;
+    this.state.revision += 1;
+    this.publish(false);
+    return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
+  }
+
+  replaceSoundFontCatalog(soundFonts: SoundFont[], soundFontId: string | null, presets: SoundFontPreset[], selectedPresetId: string | null): EngineResult {
+    if (soundFontId !== null && !soundFonts.some(({ id }) => id === soundFontId)) {
+      return { accepted: false, revision: this.state.revision, appliedCycle: this.state.transport.cycle, error: `Unknown SoundFont: ${soundFontId}` };
+    }
+    if (selectedPresetId !== null && !presets.some(({ id }) => id === selectedPresetId)) {
+      return { accepted: false, revision: this.state.revision, appliedCycle: this.state.transport.cycle, error: `Unknown SoundFont preset: ${selectedPresetId}` };
+    }
+    this.state.synth.soundFonts = structuredClone(soundFonts);
+    this.state.synth.selectedSoundFontId = soundFontId;
+    this.state.synth.soundFontPresets = structuredClone(presets);
+    this.state.synth.selectedSoundFontPresetId = selectedPresetId;
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
@@ -245,25 +297,47 @@ export class SimulatedHostEngine implements HostEngine {
         break;
       }
       case "select-synth": {
-        const parameters = synthParameters.get(command.synthId);
-        if (!parameters) return reject(`Unknown synth: ${command.synthId}`);
+        const instrument = this.state.synth.instruments.find(({ id }) => id === command.synthId);
+        if (!instrument) return reject(`Unknown synth: ${command.synthId}`);
         this.state.synth.selectedId = command.synthId;
-        this.state.synth.parameters = structuredClone(parameters);
+        this.state.synth.parameterValues = defaultParameterValues(instrument);
         break;
       }
       case "select-soundfont":
         if (!this.state.synth.soundFonts.some(({ id }) => id === command.soundFontId)) return reject(`Unknown SoundFont: ${command.soundFontId}`);
         this.state.synth.selectedSoundFontId = command.soundFontId;
         break;
+      case "select-soundfont-preset":
+        if (!this.state.synth.soundFontPresets.some(({ id }) => id === command.presetId)) return reject(`Unknown SoundFont preset: ${command.presetId}`);
+        this.state.synth.selectedSoundFontPresetId = command.presetId;
+        break;
       case "refresh-soundfonts":
         return reject("SoundFont refresh requires the host catalog");
       case "set-synth-parameter": {
-        const parameter = this.state.synth.parameters.find(({ id }) => id === command.parameterId);
-        if (!parameter) return reject(`Unknown parameter: ${command.parameterId}`);
-        if (command.value < parameter.minimum || command.value > parameter.maximum) return reject(`Parameter out of range: ${command.parameterId}`);
-        parameter.value = command.value;
+        const instrument = this.state.synth.instruments.find(({ id }) => id === this.state.synth.selectedId);
+        const control = instrument?.controls.find(({ id }) => id === command.parameterId);
+        if (!control) return reject(`Unknown parameter: ${command.parameterId}`);
+        if (command.value < control.minimum || command.value > control.maximum) return reject(`Parameter out of range: ${command.parameterId}`);
+        this.state.synth.parameterValues[command.parameterId] = command.value;
         break;
       }
+      case "configure-arpeggiator":
+        if (command.settings.enabled !== undefined) this.state.arpeggiator.enabled = command.settings.enabled;
+        if (command.settings.mode !== undefined) this.state.arpeggiator.mode = command.settings.mode;
+        if (command.settings.rate !== undefined) this.state.arpeggiator.rate = command.settings.rate;
+        if (command.settings.octaves !== undefined) this.state.arpeggiator.octaves = command.settings.octaves;
+        if (command.settings.gate !== undefined) this.state.arpeggiator.gate = command.settings.gate;
+        if (command.settings.latch !== undefined) this.state.arpeggiator.latch = command.settings.latch;
+        if (command.settings.swing !== undefined) this.state.arpeggiator.swing = command.settings.swing;
+        break;
+      case "configure-drums":
+        if (command.settings.enabled !== undefined) this.state.drums.enabled = command.settings.enabled;
+        if (command.settings.pattern !== undefined) this.state.drums.pattern = command.settings.pattern;
+        if (command.settings.volume !== undefined) {
+          if (command.settings.volume < 0 || command.settings.volume > 1) return reject("Drum volume must be between 0 and 1");
+          this.state.drums.volume = command.settings.volume;
+        }
+        break;
       case "set-staged-audible":
         this.state.capture.stagedAudible = command.audible;
         if (this.state.capture.staged) this.state.capture.staged.muted = !command.audible;
@@ -360,6 +434,10 @@ export class SimulatedHostEngine implements HostEngine {
     const snapshot = this.snapshot();
     this.listeners.forEach((listener) => listener(snapshot));
   }
+}
+
+function defaultParameterValues(instrument: InstrumentDescriptor): Record<string, number> {
+  return Object.fromEntries(instrument.controls.map(({ id, defaultValue }) => [id, defaultValue]));
 }
 
 function emptyWaveform(): number[] {

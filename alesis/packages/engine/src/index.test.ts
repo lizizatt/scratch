@@ -9,6 +9,32 @@ async function captureOneCycle(engine: SimulatedHostEngine): Promise<void> {
 }
 
 describe("SimulatedHostEngine", () => {
+  it("owns validated arpeggiator configuration", async () => {
+    const engine = new SimulatedHostEngine();
+    const result = await engine.execute({ type: "configure-arpeggiator", settings: { enabled: true, mode: "up-down", rate: "1/16", octaves: 3, gate: 0.7, latch: true, swing: 0.2 } });
+
+    expect(result.accepted).toBe(true);
+    expect(engine.snapshot().arpeggiator).toEqual({ enabled: true, mode: "up-down", rate: "1/16", octaves: 3, gate: 0.7, latch: true, swing: 0.2 });
+  });
+
+  it("rejects drum volume outside the MIDI-safe range", async () => {
+    const engine = new SimulatedHostEngine();
+    expect((await engine.execute({ type: "configure-drums", settings: { volume: 1.1 } })).accepted).toBe(false);
+    expect(engine.snapshot().drums.volume).toBe(0.7);
+  });
+
+  it("populates exactly the selected instrument controls with defaults", async () => {
+    const engine = new SimulatedHostEngine();
+    await engine.execute({ type: "set-synth-parameter", parameterId: "cutoff", value: 12_000 });
+    await engine.execute({ type: "select-synth", synthId: "soundfont" });
+
+    const snapshot = engine.snapshot();
+    const instrument = snapshot.synth.instruments.find(({ id }) => id === snapshot.synth.selectedId)!;
+    expect(Object.keys(snapshot.synth.parameterValues).sort()).toEqual(instrument.controls.map(({ id }) => id).sort());
+    expect(snapshot.synth.parameterValues.gain).toBe(0.72);
+    expect(snapshot.synth.parameterValues.cutoff).toBeUndefined();
+  });
+
   it("selects only SoundFonts from the host catalog", async () => {
     const engine = new SimulatedHostEngine({
       soundFonts: [{ id: "sonic", name: "Sonic" }, { id: "fluid", name: "FluidR3" }],
@@ -34,6 +60,16 @@ describe("SimulatedHostEngine", () => {
       selectedSoundFontId: "sonic",
       soundFonts: [{ id: "sonic", name: "Sonic" }, { id: "new-bank", name: "New Bank" }],
     });
+  });
+
+  it("atomically replaces SoundFont and named preset selection", async () => {
+    const engine = new SimulatedHostEngine({ soundFonts: [{ id: "one", name: "One" }, { id: "two", name: "Two" }] });
+    const presets = [{ id: "0:3", bank: 0, program: 3, name: "Lead" }];
+
+    expect(engine.replaceSoundFontSelection("two", presets, "0:3").accepted).toBe(true);
+    expect(engine.snapshot().synth).toMatchObject({ selectedSoundFontId: "two", soundFontPresets: presets, selectedSoundFontPresetId: "0:3" });
+    expect((await engine.execute({ type: "select-soundfont-preset", presetId: "missing" })).accepted).toBe(false);
+    expect((await engine.execute({ type: "select-soundfont-preset", presetId: "0:3" })).accepted).toBe(true);
   });
 
   it("starts with the metronome enabled at 25 percent", () => {

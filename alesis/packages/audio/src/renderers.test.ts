@@ -27,18 +27,35 @@ describe.skipIf(!existsSync(sonicPath))("deterministic synth renderers", () => {
   }, 20_000);
 
   it("SoundFont chorus changes rendered PCM", async () => {
-    const dry = await renderSoundFontFixture(sonicPath, { chorus: 0, reverb: 0 });
-    const wet = await renderSoundFontFixture(sonicPath, { chorus: 1, reverb: 0 });
+    const dry = await renderSoundFontFixture(sonicPath, { chorusSend: 0, reverbSend: 0 });
+    const wet = await renderSoundFontFixture(sonicPath, { chorusSend: 0.5, reverbSend: 0 });
 
     expect(sampleDifference(dry, wet)).toBeGreaterThan(0.01);
   }, 20_000);
 
   it("SoundFont reverb changes rendered PCM", async () => {
-    const dry = await renderSoundFontFixture(sonicPath, { chorus: 0, reverb: 0 });
-    const wet = await renderSoundFontFixture(sonicPath, { chorus: 0, reverb: 1 });
+    const dry = await renderSoundFontFixture(sonicPath, { chorusSend: 0, reverbSend: 0 });
+    const wet = await renderSoundFontFixture(sonicPath, { chorusSend: 0, reverbSend: 0.5 });
 
     expect(sampleDifference(dry, wet)).toBeGreaterThan(0.01);
   }, 20_000);
+
+  for (const [name, minimum, maximum] of [
+    ["chorusRate", 0.2, 2],
+    ["chorusDepth", 0, 20],
+    ["chorusVoices", 0, 8],
+    ["reverbRoom", 0, 1],
+    ["reverbDamping", 0, 1],
+    ["reverbWidth", 0, 1],
+  ] as const) {
+    it(`SoundFont ${name} changes rendered PCM`, async () => {
+      const base = { chorusSend: 0.5, reverbSend: 0.5 };
+      const low = await renderSoundFontFixture(sonicPath, { ...base, [name]: minimum });
+      const high = await renderSoundFontFixture(sonicPath, { ...base, [name]: maximum });
+
+      expect(sampleDifference(low, high)).toBeGreaterThan(0.001);
+    }, 20_000);
+  }
 });
 
 describe("Neon Pressure renderer", () => {

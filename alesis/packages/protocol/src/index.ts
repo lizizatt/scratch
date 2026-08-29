@@ -24,18 +24,52 @@ export const takeSchema = z.object({
   waveform: waveformSchema,
 });
 
-export const synthParameterSchema = z.object({
+export const instrumentControlSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
-  value: z.number(),
+  kind: z.literal("range"),
+  group: z.enum(["tone", "envelope", "modulation", "output", "effects"]),
+  advanced: z.boolean(),
+  defaultValue: z.number(),
   minimum: z.number(),
   maximum: z.number(),
+  step: z.number().positive(),
   unit: z.string(),
+});
+
+export const instrumentDescriptorSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  engine: z.enum(["neon", "fluidsynth"]),
+  controls: z.array(instrumentControlSchema),
 });
 
 export const soundFontSchema = z.object({
   id: z.string().min(1).max(128),
   name: z.string().min(1).max(256),
+});
+
+export const soundFontPresetSchema = z.object({
+  id: z.string().min(1).max(128),
+  bank: z.number().int().min(0).max(16_383),
+  program: z.number().int().min(0).max(127),
+  name: z.string().min(1).max(256),
+});
+
+export const arpeggiatorSchema = z.object({
+  enabled: z.boolean(),
+  mode: z.enum(["up", "down", "up-down", "played", "random"]),
+  rate: z.enum(["1/4", "1/8", "1/16", "1/8T", "1/16T"]),
+  octaves: z.number().int().min(1).max(4),
+  gate: z.number().min(0.1).max(1),
+  latch: z.boolean(),
+  swing: z.number().min(0).max(0.5),
+});
+
+export const drumSettingsSchema = z.object({
+  enabled: z.boolean(),
+  pattern: z.enum(["four-on-floor", "backbeat", "breakbeat"]),
+  volume: z.number().min(0).max(1),
 });
 
 export const engineSnapshotSchema = z.object({
@@ -57,11 +91,15 @@ export const engineSnapshotSchema = z.object({
   monitorOnly: z.boolean(),
   synth: z.object({
     selectedId: z.string(),
-    available: z.array(z.object({ id: z.string(), name: z.string() })),
+    instruments: z.array(instrumentDescriptorSchema),
     soundFonts: z.array(soundFontSchema),
     selectedSoundFontId: z.string().nullable(),
-    parameters: z.array(synthParameterSchema),
+    soundFontPresets: z.array(soundFontPresetSchema),
+    selectedSoundFontPresetId: z.string().nullable(),
+    parameterValues: z.record(z.number()),
   }),
+  arpeggiator: arpeggiatorSchema,
+  drums: drumSettingsSchema,
   capture: z.object({
     currentWaveform: waveformSchema,
     staged: takeSchema.nullable(),
@@ -78,8 +116,11 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("configure"), settings: settingsSchema.partial(), clearAudio: z.boolean().optional() }),
   z.object({ type: z.literal("select-synth"), synthId: z.string().min(1) }),
   z.object({ type: z.literal("select-soundfont"), soundFontId: z.string().min(1).max(128) }),
+  z.object({ type: z.literal("select-soundfont-preset"), presetId: z.string().min(1).max(128) }),
   z.object({ type: z.literal("refresh-soundfonts") }),
   z.object({ type: z.literal("set-synth-parameter"), parameterId: z.string().min(1), value: z.number() }),
+  z.object({ type: z.literal("configure-arpeggiator"), settings: arpeggiatorSchema.partial() }),
+  z.object({ type: z.literal("configure-drums"), settings: drumSettingsSchema.partial() }),
   z.object({ type: z.literal("set-staged-audible"), audible: z.boolean() }),
   z.object({ type: z.literal("promote-staged") }),
   z.object({ type: z.literal("set-take-level"), takeId: takeIdSchema, level: z.number().min(0).max(1) }),
@@ -109,8 +150,12 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 
 export type Settings = z.infer<typeof settingsSchema>;
 export type Take = z.infer<typeof takeSchema>;
-export type SynthParameter = z.infer<typeof synthParameterSchema>;
+export type InstrumentControl = z.infer<typeof instrumentControlSchema>;
+export type InstrumentDescriptor = z.infer<typeof instrumentDescriptorSchema>;
 export type SoundFont = z.infer<typeof soundFontSchema>;
+export type SoundFontPreset = z.infer<typeof soundFontPresetSchema>;
+export type ArpeggiatorSettings = z.infer<typeof arpeggiatorSchema>;
+export type DrumSettings = z.infer<typeof drumSettingsSchema>;
 export type EngineSnapshot = z.infer<typeof engineSnapshotSchema>;
 export type EngineCommand = z.infer<typeof commandSchema>;
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;

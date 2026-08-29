@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PassThrough } from "node:stream";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { discoverSoundFonts, drainFluidSynthStdout, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, preferredSoundFont, soundFontParameterCommands, waitForFluidSynthShell } from "./index.js";
+import { discoverSoundFonts, drainFluidSynthStdout, drumCommands, FluidSynthOutput, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, parseSoundFontPresets, percussionSelectionCommand, preferredSoundFont, soundFontInitializationCommands, soundFontParameterCommands, waitForFluidSynthShell } from "./index.js";
 
 describe("FluidSynth output", () => {
   it("maps normalized MIDI events to FluidSynth commands", () => {
@@ -94,15 +94,68 @@ describe("FluidSynth output", () => {
   });
 
   it("maps every SoundFont control to real-time FluidSynth commands", () => {
-    expect(soundFontParameterCommands("bank", 2, { bank: 0, program: 7 })).toContain("select 0 1 2 7");
-    expect(soundFontParameterCommands("program", 7, { bank: 2, program: 0 })).toContain("select 14 1 2 7");
     expect(soundFontParameterCommands("gain", 0.72)).toEqual(["gain 0.72"]);
-    expect(soundFontParameterCommands("chorus", 0.4)).toContain("cho_set_level 4");
-    expect(soundFontParameterCommands("chorus", 0.4)).toContain("cc 0 93 51");
-    expect(soundFontParameterCommands("chorus", 0)).toContain("chorus 0");
-    expect(soundFontParameterCommands("reverb", 0.6)).toContain("rev_setlevel 0.6");
-    expect(soundFontParameterCommands("reverb", 0.6)).toContain("cc 14 91 76");
-    expect(soundFontParameterCommands("reverb", 0)).toContain("reverb 0");
+    expect(soundFontParameterCommands("chorus-send", 0.5)).toContain("cc 0 93 64");
+    expect(soundFontParameterCommands("chorus-rate", 1.2)).toEqual(["cho_set_speed 1.2"]);
+    expect(soundFontParameterCommands("chorus-depth", 12)).toEqual(["cho_set_depth 12"]);
+    expect(soundFontParameterCommands("chorus-voices", 4)).toEqual(["cho_set_nr 4"]);
+    expect(soundFontParameterCommands("reverb-send", 0.5)).toContain("cc 14 91 64");
+    expect(soundFontParameterCommands("reverb-room", 0.7)).toEqual(["rev_setroomsize 0.7"]);
+    expect(soundFontParameterCommands("reverb-damping", 0.4)).toEqual(["rev_setdamp 0.4"]);
+    expect(soundFontParameterCommands("reverb-width", 0.6)).toEqual(["rev_setwidth 60"]);
+    expect(soundFontParameterCommands("chorus-send", 0)).toContain("chorus 0");
+    expect(soundFontParameterCommands("reverb-send", 0)).toContain("reverb 0");
+    expect(() => soundFontParameterCommands("chorus-send", 0.6)).toThrow(/out of range/);
+    expect(() => soundFontParameterCommands("reverb-width", 2)).toThrow(/out of range/);
+  });
+
+  it("initializes every performance channel and all semantic effects", () => {
+    const commands = soundFontInitializationCommands({
+      bank: 0, program: 0, gain: 0.72,
+      "chorus-send": 0.12, "reverb-send": 0.24,
+      "chorus-rate": 0.3, "chorus-depth": 8, "chorus-voices": 3,
+      "reverb-room": 0.2, "reverb-damping": 0, "reverb-width": 0.5,
+    });
+    const channels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
+    expect(commands.filter((command) => command.startsWith("select "))).toHaveLength(15);
+    expect(commands).toContain("select 15 1 0 0");
+    for (const channel of channels) {
+      expect(commands).toContain(`cc ${channel} 93 15`);
+      expect(commands).toContain(`cc ${channel} 91 30`);
+    }
+    expect(commands.some((command) => command.startsWith("cc 9 "))).toBe(false);
+    expect(commands.indexOf("gain 0.72")).toBeLessThan(commands.indexOf("cho_set_speed 0.3"));
+    expect(percussionSelectionCommand(true)).toBe("select 9 2 128 0");
+    expect(percussionSelectionCommand(false)).toBe("select 9 1 128 0");
+  });
+
+  it("releases each public drum hit after 80 milliseconds", () => {
+    vi.useFakeTimers();
+    try {
+      const commands: string[] = [];
+      const output = new FluidSynthOutput({ device: { id: "test", name: "Test" }, commandObserver: (command) => commands.push(command) });
+      output.playDrum(36, 100);
+      expect(commands).toEqual(["noteon 9 36 100"]);
+      vi.advanceTimersByTime(79);
+      expect(commands).toHaveLength(1);
+      vi.advanceTimersByTime(1);
+      expect(commands).toEqual(["noteon 9 36 100", "noteoff 9 36"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clamps public drum notes and velocities to the MIDI domain", () => {
+    expect(drumCommands(200, 300)).toEqual({ noteOn: "noteon 9 127 127", noteOff: "noteoff 9 127" });
+    expect(drumCommands(-1, 0)).toEqual({ noteOn: "noteon 9 0 1", noteOff: "noteoff 9 0" });
+  });
+
+  it("parses named bank/program presets from FluidSynth output", () => {
+    expect(parseSoundFontPresets("000-000 Solar Winds (Pad)\n0-035 Computer Game Piano\n1200-056 S3 BPZ2P Trumpet\n20000-001 Invalid Bank\n000-128 Invalid Program\n> quit\n")).toEqual([
+      { id: "0:0", bank: 0, program: 0, name: "Solar Winds (Pad)" },
+      { id: "0:35", bank: 0, program: 35, name: "Computer Game Piano" },
+      { id: "1200:56", bank: 1200, program: 56, name: "S3 BPZ2P Trumpet" },
+    ]);
   });
 
 });

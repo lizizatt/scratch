@@ -113,11 +113,21 @@ function SettingsPane({ snapshot, send }: PaneProps) {
 }
 
 function SynthPane({ snapshot, send }: PaneProps) {
+  const instrument = snapshot.synth.instruments.find(({ id }) => id === snapshot.synth.selectedId)!;
+  const primaryControls = instrument.controls.filter(({ advanced }) => !advanced);
+  const advancedEffects = instrument.controls.filter(({ advanced, group }) => advanced && group === "effects");
+  const renderControl = (control: typeof instrument.controls[number]) => (
+    <label className={`parameter parameter-${control.group}`} key={control.id}>
+      <span>{control.label}</span>
+      <input type="range" min={control.minimum} max={control.maximum} step={control.step} value={snapshot.synth.parameterValues[control.id]!} onChange={(event) => send({ type: "set-synth-parameter", parameterId: control.id, value: Number(event.target.value) })} />
+      <output>{formatParameter(snapshot.synth.parameterValues[control.id]!, control.unit)}</output>
+    </label>
+  );
   return (
     <section className="pane synth-pane" aria-label="Synth controls">
       <div className="synth-selectors">
         <select className="synth-select" aria-label="Synthesizer" value={snapshot.synth.selectedId} onChange={(event) => send({ type: "select-synth", synthId: event.target.value })}>
-          {snapshot.synth.available.map((synth) => <option key={synth.id} value={synth.id}>{synth.name}</option>)}
+          {snapshot.synth.instruments.map((synth) => <option key={synth.id} value={synth.id}>{synth.name}</option>)}
         </select>
         {snapshot.synth.selectedId === "soundfont" && <div className="soundfont-picker">
           <select className="soundfont-select" aria-label="SoundFont" value={snapshot.synth.selectedSoundFontId ?? ""} disabled={snapshot.synth.soundFonts.length === 0} onChange={(event) => send({ type: "select-soundfont", soundFontId: event.target.value })}>
@@ -126,16 +136,38 @@ function SynthPane({ snapshot, send }: PaneProps) {
           </select>
           <IconButton label="Refresh SoundFonts" onClick={() => send({ type: "refresh-soundfonts" })}><RefreshCw /></IconButton>
         </div>}
+        {snapshot.synth.selectedId === "soundfont" && <select className="soundfont-preset-select" aria-label="SoundFont preset" value={snapshot.synth.selectedSoundFontPresetId ?? ""} disabled={snapshot.synth.soundFontPresets.length === 0} onChange={(event) => send({ type: "select-soundfont-preset", presetId: event.target.value })}>
+          {snapshot.synth.soundFontPresets.length === 0 && <option value="">No presets found</option>}
+          {snapshot.synth.soundFontPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}
+        </select>}
       </div>
       <section className="synth-module" aria-label="Synth parameter module">
-        {snapshot.synth.parameters.map((parameter) => (
-          <label className="parameter" key={parameter.id}>
-            <span>{parameter.label}</span>
-            <input type="range" min={parameter.minimum} max={parameter.maximum} step={parameter.id === "bank" || parameter.id === "program" ? 1 : (parameter.maximum - parameter.minimum) / 200} value={parameter.value} onChange={(event) => send({ type: "set-synth-parameter", parameterId: parameter.id, value: Number(event.target.value) })} />
-            <output>{formatParameter(parameter.value, parameter.unit)}</output>
-          </label>
-        ))}
+        {primaryControls.map(renderControl)}
+        {advancedEffects.length > 0 && <details className="effects-advanced">
+          <summary>Advanced Effects</summary>
+          <div className="effects-controls">{advancedEffects.map(renderControl)}</div>
+        </details>}
       </section>
+      <details className="midi-effect arpeggiator-controls">
+        <summary>Arpeggiator</summary>
+        <div className="midi-effect-grid">
+          <label>Enabled<input aria-label="Arpeggiator enabled" type="checkbox" checked={snapshot.arpeggiator.enabled} onChange={(event) => send({ type: "configure-arpeggiator", settings: { enabled: event.target.checked } })} /></label>
+          <label>Mode<select aria-label="Arpeggiator mode" value={snapshot.arpeggiator.mode} onChange={(event) => send({ type: "configure-arpeggiator", settings: { mode: event.target.value as EngineSnapshot["arpeggiator"]["mode"] } })}>{["up", "down", "up-down", "played", "random"].map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label>
+          <label>Rate<select aria-label="Arpeggiator rate" value={snapshot.arpeggiator.rate} onChange={(event) => send({ type: "configure-arpeggiator", settings: { rate: event.target.value as EngineSnapshot["arpeggiator"]["rate"] } })}>{["1/4", "1/8", "1/16", "1/8T", "1/16T"].map((rate) => <option key={rate} value={rate}>{rate}</option>)}</select></label>
+          <label>Octaves<input aria-label="Arpeggiator octaves" type="number" min="1" max="4" value={snapshot.arpeggiator.octaves} onChange={(event) => send({ type: "configure-arpeggiator", settings: { octaves: Number(event.target.value) } })} /></label>
+          <label>Gate<input aria-label="Arpeggiator gate" type="range" min="10" max="100" value={snapshot.arpeggiator.gate * 100} onChange={(event) => send({ type: "configure-arpeggiator", settings: { gate: Number(event.target.value) / 100 } })} /></label>
+          <label>Swing<input aria-label="Arpeggiator swing" type="range" min="0" max="50" value={snapshot.arpeggiator.swing * 100} onChange={(event) => send({ type: "configure-arpeggiator", settings: { swing: Number(event.target.value) / 100 } })} /></label>
+          <label>Latch<input aria-label="Arpeggiator latch" type="checkbox" checked={snapshot.arpeggiator.latch} onChange={(event) => send({ type: "configure-arpeggiator", settings: { latch: event.target.checked } })} /></label>
+        </div>
+      </details>
+      <details className="midi-effect drum-controls">
+        <summary>Drums</summary>
+        <div className="midi-effect-grid drum-effect-grid">
+          <label>Enabled<input aria-label="Drums enabled" type="checkbox" checked={snapshot.drums.enabled} onChange={(event) => send({ type: "configure-drums", settings: { enabled: event.target.checked } })} /></label>
+          <label>Pattern<select aria-label="Drum pattern" value={snapshot.drums.pattern} onChange={(event) => send({ type: "configure-drums", settings: { pattern: event.target.value as EngineSnapshot["drums"]["pattern"] } })}>{["four-on-floor", "backbeat", "breakbeat"].map((pattern) => <option key={pattern} value={pattern}>{pattern}</option>)}</select></label>
+          <label>Volume<input aria-label="Drum volume" type="range" min="0" max="100" value={snapshot.drums.volume * 100} onChange={(event) => send({ type: "configure-drums", settings: { volume: Number(event.target.value) / 100 } })} /></label>
+        </div>
+      </details>
     </section>
   );
 }

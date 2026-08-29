@@ -1,18 +1,23 @@
-import { SimulatedHostEngine } from "@alesis/engine";
-import { discoverDefaultPulseAudioDevice, discoverSoundFonts, FluidSynthOutput, preferredSoundFont, SilentAudioOutput } from "@alesis/audio";
+import { SimulatedHostEngine, type MidiEvent } from "@alesis/engine";
+import { discoverDefaultPulseAudioDevice, discoverSoundFontPresets, discoverSoundFonts, FluidSynthOutput, preferredSoundFont, SilentAudioOutput } from "@alesis/audio";
 import { AlsaSequencerMidiSource, discoverVortexSequencerPort, SoftwareVortex } from "@alesis/midi";
 import type { EngineCommand } from "@alesis/protocol";
 import { fileURLToPath } from "node:url";
 import { createControlServer } from "./control-server.js";
+import { MidiArpeggiator } from "./arpeggiator.js";
+import { DrumPatternScheduler } from "./drum-patterns.js";
 import { MidiLoopScheduler } from "./loop-playback.js";
 import { MetronomeScheduler } from "./metronome.js";
 
 let soundFonts = discoverSoundFonts();
 const defaultSoundFont = preferredSoundFont(soundFonts);
+const defaultPresets = defaultSoundFont ? discoverSoundFontPresets(defaultSoundFont.path) : [];
 let soundFontsById = new Map(soundFonts.map((soundFont) => [soundFont.id, soundFont]));
 const engine = new SimulatedHostEngine({
   soundFonts: soundFonts.map(({ id, name }) => ({ id, name })),
   ...(defaultSoundFont ? { selectedSoundFontId: defaultSoundFont.id } : {}),
+  soundFontPresets: defaultPresets,
+  ...(defaultPresets[0] ? { selectedSoundFontPresetId: defaultPresets[0].id } : {}),
 });
 const hardware = process.env.MIDI_MODE === "software" ? null : discoverVortexSequencerPort();
 const midi = hardware ? new AlsaSequencerMidiSource(hardware) : new SoftwareVortex();
@@ -21,33 +26,73 @@ const audio = pulseDevice
   ? new FluidSynthOutput({ device: pulseDevice, ...(defaultSoundFont ? { soundFontPath: defaultSoundFont.path } : {}) })
   : new SilentAudioOutput();
 const loops = new MidiLoopScheduler(audio);
-const disconnectMidi = midi.subscribe((event) => {
+const arpeggiator = new MidiArpeggiator(engine.snapshot().arpeggiator);
+const drums = new DrumPatternScheduler();
+const dispatchPerformance = (event: MidiEvent): void => {
   loops.record(event, engine.snapshot());
-  engine.dispatchMidi(event);
   audio.dispatchMidi(event);
+};
+const disconnectMidi = midi.subscribe((event) => {
+  engine.dispatchMidi(event);
+  for (const outputEvent of arpeggiator.handle(event)) dispatchPerformance(outputEvent);
 });
-await midi.start();
 await audio.start();
 await engine.execute({ type: "configure", settings: { midiInputId: midi.id, audioOutputId: audio.id } });
 if (audio instanceof FluidSynthOutput) {
-  await engine.execute({ type: "select-synth", synthId: "soundfont" });
-  for (const parameter of engine.snapshot().synth.parameters) audio.setSynthParameter("soundfont", parameter.id, parameter.value);
+  try {
+    await engine.execute({ type: "select-synth", synthId: "soundfont" });
+    for (const [parameterId, value] of Object.entries(engine.snapshot().synth.parameterValues)) audio.setSynthParameter("soundfont", parameterId, value);
+    if (defaultPresets[0]) audio.selectSoundFontPreset(defaultPresets[0].bank, defaultPresets[0].program);
+  } catch (error) {
+    throw new Error(`Unable to initialize SoundFont controls: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
+await midi.start();
 const webDirectory = fileURLToPath(new URL("../../web/dist", import.meta.url));
+const restoreAudioSelection = async (snapshot: ReturnType<typeof engine.snapshot>): Promise<void> => {
+  try {
+    const soundFont = snapshot.synth.selectedSoundFontId ? soundFontsById.get(snapshot.synth.selectedSoundFontId) : null;
+    if (soundFont) await audio.loadSoundFont(soundFont.path);
+    const preset = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
+    if (preset) audio.selectSoundFontPreset(preset.bank, preset.program);
+  } catch (error) {
+    console.error(`Unable to roll back SoundFont selection: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
 const executeCommand = async (command: EngineCommand) => {
+  if (command.type === "configure-arpeggiator") {
+    const result = await engine.execute(command);
+    if (!result.accepted) return result;
+    const settings = engine.snapshot().arpeggiator;
+    for (const event of arpeggiator.configure(settings)) dispatchPerformance(event);
+    return result;
+  }
   if (command.type === "select-synth") {
-    if (!engine.snapshot().synth.available.some(({ id }) => id === command.synthId)) return engine.execute(command);
+    const before = engine.snapshot();
+    const target = before.synth.instruments.find(({ id }) => id === command.synthId);
+    if (!target) return engine.execute(command);
     try {
       await audio.selectSynth(command.synthId);
+      for (const control of target.controls) audio.setSynthParameter(command.synthId, control.id, control.defaultValue);
     } catch (error) {
-      const snapshot = engine.snapshot();
-      return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: `Unable to select synth: ${error instanceof Error ? error.message : String(error)}` };
+      try {
+        await audio.selectSynth(before.synth.selectedId);
+        for (const [parameterId, value] of Object.entries(before.synth.parameterValues)) audio.setSynthParameter(before.synth.selectedId, parameterId, value);
+      } catch (rollbackError) {
+        console.error(`Unable to roll back synth selection: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+      }
+      return { accepted: false, revision: before.revision, appliedCycle: before.transport.cycle, error: `Unable to select synth: ${error instanceof Error ? error.message : String(error)}` };
     }
+    return engine.execute(command);
   }
   if (command.type === "refresh-soundfonts") {
+    const before = engine.snapshot();
     const refreshed = discoverSoundFonts();
-    const currentId = engine.snapshot().synth.selectedSoundFontId;
+    const currentId = before.synth.selectedSoundFontId;
     const selected = refreshed.find(({ id }) => id === currentId) ?? preferredSoundFont(refreshed);
+    const presets = selected ? discoverSoundFontPresets(selected.path) : [];
+    const currentPresetId = before.synth.selectedSoundFontPresetId;
+    const preset = presets.find(({ id }) => id === currentPresetId) ?? presets[0] ?? null;
     if (selected && selected.id !== currentId) {
       try {
         await audio.loadSoundFont(selected.path);
@@ -61,15 +106,25 @@ const executeCommand = async (command: EngineCommand) => {
         };
       }
     }
+    if (preset) audio.selectSoundFontPreset(preset.bank, preset.program);
+    const result = engine.replaceSoundFontCatalog(refreshed.map(({ id, name }) => ({ id, name })), selected?.id ?? null, presets, preset?.id ?? null);
+    if (!result.accepted) {
+      await restoreAudioSelection(before);
+      return result;
+    }
     soundFonts = refreshed;
     soundFontsById = new Map(soundFonts.map((soundFont) => [soundFont.id, soundFont]));
-    return engine.replaceSoundFonts(soundFonts.map(({ id, name }) => ({ id, name })), selected?.id ?? null);
+    return result;
   }
   if (command.type === "select-soundfont") {
+    const before = engine.snapshot();
     const soundFont = soundFontsById.get(command.soundFontId);
     if (!soundFont) return engine.execute(command);
+    const presets = discoverSoundFontPresets(soundFont.path);
+    const preset = presets[0] ?? null;
     try {
       await audio.loadSoundFont(soundFont.path);
+      if (preset) audio.selectSoundFontPreset(preset.bank, preset.program);
     } catch (error) {
       const snapshot = engine.snapshot();
       return {
@@ -79,10 +134,27 @@ const executeCommand = async (command: EngineCommand) => {
         error: `Unable to load SoundFont: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
+    const result = engine.replaceSoundFontSelection(soundFont.id, presets, preset?.id ?? null);
+    if (!result.accepted) await restoreAudioSelection(before);
+    return result;
+  }
+  if (command.type === "select-soundfont-preset") {
+    const before = engine.snapshot();
+    const preset = before.synth.soundFontPresets.find(({ id }) => id === command.presetId);
+    if (!preset) return engine.execute(command);
+    try {
+      audio.selectSoundFontPreset(preset.bank, preset.program);
+      const result = await engine.execute(command);
+      if (!result.accepted) await restoreAudioSelection(before);
+      return result;
+    } catch (error) {
+      const snapshot = engine.snapshot();
+      return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: `Unable to select SoundFont preset: ${error instanceof Error ? error.message : String(error)}` };
+    }
   }
   if (command.type === "set-synth-parameter" && engine.snapshot().synth.selectedId === "soundfont") {
-    const parameter = engine.snapshot().synth.parameters.find(({ id }) => id === command.parameterId);
-    if (!parameter || command.value < parameter.minimum || command.value > parameter.maximum) return engine.execute(command);
+    const control = engine.snapshot().synth.instruments.find(({ id }) => id === "soundfont")?.controls.find(({ id }) => id === command.parameterId);
+    if (!control || command.value < control.minimum || command.value > control.maximum) return engine.execute(command);
     try {
       audio.setSynthParameter("soundfont", command.parameterId, command.value);
     } catch (error) {
@@ -96,9 +168,19 @@ const executeCommand = async (command: EngineCommand) => {
     }
   }
   if (command.type === "set-synth-parameter" && engine.snapshot().synth.selectedId === "subtractive") {
-    const parameter = engine.snapshot().synth.parameters.find(({ id }) => id === command.parameterId);
-    if (!parameter || command.value < parameter.minimum || command.value > parameter.maximum) return engine.execute(command);
-    audio.setSynthParameter("subtractive", command.parameterId, command.value);
+    const control = engine.snapshot().synth.instruments.find(({ id }) => id === "subtractive")?.controls.find(({ id }) => id === command.parameterId);
+    if (!control || command.value < control.minimum || command.value > control.maximum) return engine.execute(command);
+    try {
+      audio.setSynthParameter("subtractive", command.parameterId, command.value);
+    } catch (error) {
+      const snapshot = engine.snapshot();
+      return {
+        accepted: false,
+        revision: snapshot.revision,
+        appliedCycle: snapshot.transport.cycle,
+        error: `Unable to set Neon Pressure parameter: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
   return engine.execute(command);
 };
@@ -107,6 +189,8 @@ const metronome = new MetronomeScheduler(audio);
 const timer = setInterval(() => {
   engine.advance(0.05);
   const snapshot = engine.snapshot();
+  for (const event of arpeggiator.advance(0.05, snapshot.settings.bpm)) dispatchPerformance(event);
+  for (const hit of drums.update(snapshot)) audio.playDrum(hit.note, hit.velocity);
   loops.update(snapshot);
   metronome.update(snapshot);
 }, 50);

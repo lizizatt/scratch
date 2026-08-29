@@ -8,8 +8,14 @@ export interface SoundFontRenderParameters {
   bank?: number;
   program?: number;
   gain?: number;
-  chorus?: number;
-  reverb?: number;
+  chorusSend?: number;
+  reverbSend?: number;
+  chorusRate?: number;
+  chorusDepth?: number;
+  chorusVoices?: number;
+  reverbRoom?: number;
+  reverbDamping?: number;
+  reverbWidth?: number;
 }
 
 export interface NeonPressureParameters {
@@ -129,22 +135,34 @@ export async function renderSoundFontFixture(soundFontPath: string, parameters: 
     bank: parameters.bank ?? 0,
     program: parameters.program ?? 0,
     gain: parameters.gain ?? 0.72,
-    chorus: parameters.chorus ?? 0.12,
-    reverb: parameters.reverb ?? 0.36,
+    chorusSend: parameters.chorusSend ?? 0.12,
+    reverbSend: parameters.reverbSend ?? 0.24,
+    chorusRate: parameters.chorusRate ?? 0.3,
+    chorusDepth: parameters.chorusDepth ?? 8,
+    chorusVoices: parameters.chorusVoices ?? 3,
+    reverbRoom: parameters.reverbRoom ?? 0.2,
+    reverbDamping: parameters.reverbDamping ?? 0,
+    reverbWidth: parameters.reverbWidth ?? 0.5,
   };
   const directory = await mkdtemp(join(tmpdir(), "alesis-render-"));
   const midiPath = join(directory, "fixture.mid");
   const wavPath = join(directory, "render.wav");
   try {
-    await writeFile(midiPath, midiFixture(values.bank, values.program, values.chorus, values.reverb));
+    await writeFile(midiPath, midiFixture(values.bank, values.program, values.chorusSend, values.reverbSend));
     await run("fluidsynth", [
       "-ni", "-F", wavPath, "-r", "48000",
       "-o", "audio.file.format=s16",
       "-o", `synth.gain=${values.gain}`,
-      "-o", `synth.chorus.active=${values.chorus > 0 ? 1 : 0}`,
-      "-o", `synth.chorus.level=${values.chorus * 10}`,
-      "-o", `synth.reverb.active=${values.reverb > 0 ? 1 : 0}`,
-      "-o", `synth.reverb.level=${values.reverb}`,
+      "-o", `synth.chorus.active=${values.chorusSend > 0 ? 1 : 0}`,
+      "-o", "synth.chorus.level=0.3",
+      "-o", `synth.chorus.speed=${values.chorusRate}`,
+      "-o", `synth.chorus.depth=${values.chorusDepth}`,
+      "-o", `synth.chorus.nr=${Math.round(values.chorusVoices)}`,
+      "-o", `synth.reverb.active=${values.reverbSend > 0 ? 1 : 0}`,
+      "-o", "synth.reverb.level=0.3",
+      "-o", `synth.reverb.room-size=${values.reverbRoom}`,
+      "-o", `synth.reverb.damp=${values.reverbDamping}`,
+      "-o", `synth.reverb.width=${values.reverbWidth * 100}`,
       soundFontPath,
       midiPath,
     ]);

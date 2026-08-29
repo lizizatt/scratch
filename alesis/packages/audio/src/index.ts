@@ -1,4 +1,4 @@
-import { spawn, execFileSync, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, execFileSync, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
@@ -13,7 +13,9 @@ export interface AudioOutput {
   start(): Promise<void>;
   dispatchMidi(event: MidiEvent): void;
   playMetronome(accent: boolean, volume: number): void;
+  playDrum(note: number, velocity: number): void;
   loadSoundFont(path: string): Promise<void>;
+  selectSoundFontPreset(bank: number, program: number): void;
   selectSynth(synthId: string): Promise<void>;
   setSynthParameter(synthId: string, parameterId: string, value: number): void;
   close(): Promise<void>;
@@ -30,13 +32,40 @@ export interface SoundFontFile {
   path: string;
 }
 
+export interface SoundFontPreset {
+  id: string;
+  bank: number;
+  program: number;
+  name: string;
+}
+
 interface SoundFontParameterValues {
   bank: number;
   program: number;
   gain: number;
-  chorus: number;
-  reverb: number;
+  "chorus-send": number;
+  "reverb-send": number;
+  "chorus-rate": number;
+  "chorus-depth": number;
+  "chorus-voices": number;
+  "reverb-room": number;
+  "reverb-damping": number;
+  "reverb-width": number;
 }
+
+const soundFontParameterRanges: Record<keyof SoundFontParameterValues, readonly [number, number]> = {
+  bank: [0, 16_383],
+  program: [0, 127],
+  gain: [0, 1],
+  "chorus-send": [0, 0.5],
+  "reverb-send": [0, 0.5],
+  "chorus-rate": [0.2, 2],
+  "chorus-depth": [0, 20],
+  "chorus-voices": [0, 8],
+  "reverb-room": [0, 1],
+  "reverb-damping": [0, 1],
+  "reverb-width": [0, 1],
+};
 
 const performanceChannels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
 
@@ -44,6 +73,8 @@ export interface FluidSynthOptions {
   device: PulseAudioDevice;
   soundFontPath?: string;
   gain?: number;
+  percussionSoundFontPath?: string;
+  commandObserver?: (command: string) => void;
 }
 
 export const fluidSynthStdio: ["pipe", "pipe", "pipe"] = ["pipe", "pipe", "pipe"];
@@ -83,7 +114,9 @@ export class SilentAudioOutput implements AudioOutput {
   async start(): Promise<void> {}
   dispatchMidi(): void {}
   playMetronome(): void {}
+  playDrum(): void {}
   async loadSoundFont(): Promise<void> {}
+  selectSoundFontPreset(): void {}
   async selectSynth(): Promise<void> {}
   setSynthParameter(): void {}
   async close(): Promise<void> {}
@@ -146,6 +179,7 @@ export class FluidSynthOutput implements AudioOutput {
   private process: ChildProcessWithoutNullStreams | null = null;
   private soundFontPath: string;
   private readonly gain: number;
+  private readonly percussionSoundFontPath: string | null;
   private clickTimers = new Set<ReturnType<typeof setTimeout>>();
   private recovery: Promise<void> | null = null;
   private closing = false;
@@ -158,7 +192,9 @@ export class FluidSynthOutput implements AudioOutput {
     this.name = options.device.name;
     this.soundFontPath = options.soundFontPath ?? "/usr/share/sounds/sf2/FluidR3_GM.sf2";
     this.gain = options.gain ?? 0.6;
-    this.soundFontParameters = { bank: 0, program: 0, gain: this.gain, chorus: 0.12, reverb: 0.36 };
+    const defaultPercussion = "/usr/share/sounds/sf2/FluidR3_GM.sf2";
+    this.percussionSoundFontPath = options.percussionSoundFontPath ?? (existsSync(defaultPercussion) ? defaultPercussion : null);
+    this.soundFontParameters = { bank: 0, program: 0, gain: this.gain, "chorus-send": 0.12, "reverb-send": 0.24, "chorus-rate": 0.3, "chorus-depth": 8, "chorus-voices": 3, "reverb-room": 0.2, "reverb-damping": 0, "reverb-width": 0.5 };
     this.neonOutput = new NeonPressureOutput(options.device.id);
   }
 
@@ -170,7 +206,7 @@ export class FluidSynthOutput implements AudioOutput {
 
   private async launch(): Promise<void> {
     if (!existsSync(this.soundFontPath)) throw new Error(`SoundFont not found: ${this.soundFontPath}`);
-    const child = spawn("fluidsynth", fluidSynthArguments(this.options.device.id, this.soundFontPath, this.gain), {
+    const child = spawn("fluidsynth", fluidSynthArguments(this.options.device.id, this.soundFontPath, this.gain, this.percussionSoundFontPath), {
       stdio: fluidSynthStdio,
     });
     await new Promise<void>((resolve, reject) => {
@@ -215,6 +251,16 @@ export class FluidSynthOutput implements AudioOutput {
     this.clickTimers.add(timer);
   }
 
+  playDrum(note: number, velocity: number): void {
+    const commands = drumCommands(note, velocity);
+    this.writeCommand(commands.noteOn);
+    const timer = setTimeout(() => {
+      this.clickTimers.delete(timer);
+      this.writeCommand(commands.noteOff);
+    }, 80);
+    this.clickTimers.add(timer);
+  }
+
   async loadSoundFont(path: string): Promise<void> {
     if (path === this.soundFontPath) return;
     if (!existsSync(path)) throw new Error(`SoundFont not found: ${path}`);
@@ -230,6 +276,12 @@ export class FluidSynthOutput implements AudioOutput {
       await this.launch();
       throw error;
     }
+  }
+
+  selectSoundFontPreset(bank: number, program: number): void {
+    this.soundFontParameters.bank = bank;
+    this.soundFontParameters.program = program;
+    for (const command of soundFontSelectionCommands(bank, program)) this.writeCommand(command);
   }
 
   async selectSynth(synthId: string): Promise<void> {
@@ -268,15 +320,13 @@ export class FluidSynthOutput implements AudioOutput {
   }
 
   private writeCommand(command: string): void {
+    this.options.commandObserver?.(command);
     if (this.process?.stdin.writable) this.process.stdin.write(`${command}\n`);
   }
 
   private applySoundFontParameters(): void {
-    for (const command of soundFontSelectionCommands(this.soundFontParameters.bank, this.soundFontParameters.program)) this.writeCommand(command);
-    this.writeCommand("select 15 1 0 0");
-    for (const parameterId of ["gain", "chorus", "reverb"] as const) {
-      for (const command of soundFontParameterCommands(parameterId, this.soundFontParameters[parameterId], this.soundFontParameters)) this.writeCommand(command);
-    }
+    for (const command of soundFontInitializationCommands(this.soundFontParameters)) this.writeCommand(command);
+    this.writeCommand(percussionSelectionCommand(this.percussionSoundFontPath !== null));
   }
 
   private recover(child: ChildProcessWithoutNullStreams): void {
@@ -368,37 +418,79 @@ export function preferredSoundFont(soundFonts: SoundFontFile[]): SoundFontFile |
     ?? null;
 }
 
+export function discoverSoundFontPresets(path: string): SoundFontPreset[] {
+  const result = spawnSync("fluidsynth", ["-a", "file", "-o", "audio.file.name=/dev/null", path], {
+    input: "inst 1\nquit\n",
+    encoding: "utf8",
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`Unable to inspect SoundFont: ${result.stderr.trim()}`);
+  return parseSoundFontPresets(`${result.stdout}\n${result.stderr}`);
+}
+
+export function parseSoundFontPresets(output: string): SoundFontPreset[] {
+  return output.split("\n").flatMap((line) => {
+    const match = line.match(/^(\d+)-(\d+)\s+(.+?)\s*$/);
+    if (!match) return [];
+    const bank = Number(match[1]);
+    const program = Number(match[2]);
+    if (bank > 16_383 || program > 127) return [];
+    return [{ id: `${bank}:${program}`, bank, program, name: match[3]! }];
+  });
+}
+
 export function soundFontParameterCommands(parameterId: string, value: number, selection = { bank: 0, program: 0 }): string[] {
+  const range = soundFontParameterRanges[parameterId as keyof SoundFontParameterValues];
+  if (!range) throw new Error(`Unknown SoundFont parameter: ${parameterId}`);
+  if (!Number.isFinite(value) || value < range[0] || value > range[1]) throw new Error(`SoundFont parameter out of range: ${parameterId}=${value}`);
   switch (parameterId) {
     case "bank": return soundFontSelectionCommands(Math.round(value), selection.program);
     case "program": return soundFontSelectionCommands(selection.bank, Math.round(value));
     case "gain": return [`gain ${value}`];
-    case "chorus": return [
+    case "chorus-send": return [
       `chorus ${value > 0 ? 1 : 0}`,
-      `cho_set_level ${value * 10}`,
+      "cho_set_level 0.3",
       ...performanceChannels.map((channel) => `cc ${channel} 93 ${Math.round(value * 127)}`),
     ];
-    case "reverb": return [
+    case "reverb-send": return [
       `reverb ${value > 0 ? 1 : 0}`,
-      `rev_setlevel ${value}`,
+      "rev_setlevel 0.3",
       ...performanceChannels.map((channel) => `cc ${channel} 91 ${Math.round(value * 127)}`),
     ];
+    case "chorus-rate": return [`cho_set_speed ${value}`];
+    case "chorus-depth": return [`cho_set_depth ${value}`];
+    case "chorus-voices": return [`cho_set_nr ${Math.round(value)}`];
+    case "reverb-room": return [`rev_setroomsize ${value}`];
+    case "reverb-damping": return [`rev_setdamp ${value}`];
+    case "reverb-width": return [`rev_setwidth ${value * 100}`];
     default: throw new Error(`Unknown SoundFont parameter: ${parameterId}`);
   }
+}
+
+export function soundFontInitializationCommands(parameters: SoundFontParameterValues): string[] {
+  return [
+    ...soundFontSelectionCommands(parameters.bank, parameters.program),
+    "select 15 1 0 0",
+    ...["gain", "chorus-rate", "chorus-depth", "chorus-voices", "reverb-room", "reverb-damping", "reverb-width", "chorus-send", "reverb-send"].flatMap((parameterId) =>
+      soundFontParameterCommands(parameterId, parameters[parameterId as keyof SoundFontParameterValues], parameters)),
+  ];
 }
 
 function soundFontSelectionCommands(bank: number, program: number): string[] {
   return performanceChannels.map((channel) => `select ${channel} 1 ${Math.round(bank)} ${Math.round(program)}`);
 }
 
-export function fluidSynthArguments(deviceId: string, soundFontPath: string, gain: number): string[] {
-  return [
+export function fluidSynthArguments(deviceId: string, soundFontPath: string, gain: number, percussionSoundFontPath?: string | null): string[] {
+  const args = [
     "-q",
     "-a", "pulseaudio",
     "-o", `audio.pulseaudio.device=${deviceId}`,
     "-o", `synth.gain=${gain}`,
     soundFontPath,
   ];
+  if (percussionSoundFontPath) args.push(percussionSoundFontPath);
+  return args;
 }
 
 export function midiEventToFluidCommand(event: MidiEvent): string | null {
@@ -419,4 +511,15 @@ export function metronomeCommands(accent: boolean, volume: number): { noteOn: st
   const note = accent ? 96 : 84;
   const velocity = Math.max(1, Math.min(127, Math.round(volume * 127)));
   return { noteOn: `noteon 15 ${note} ${velocity}`, noteOff: `noteoff 15 ${note}` };
+}
+
+export function drumCommands(note: number, velocity: number): { noteOn: string; noteOff: string } {
+  const safeNote = Math.max(0, Math.min(127, Math.round(note)));
+  const safeVelocity = Math.max(1, Math.min(127, Math.round(velocity)));
+  return { noteOn: `noteon 9 ${safeNote} ${safeVelocity}`, noteOff: `noteoff 9 ${safeNote}` };
+}
+
+export function percussionSelectionCommand(hasAuxiliarySoundFont: boolean): string {
+  // FluidSynth uses SoundFont bank 128 for General MIDI percussion presets.
+  return `select 9 ${hasAuxiliarySoundFont ? 2 : 1} 128 0`;
 }
