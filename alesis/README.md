@@ -18,3 +18,40 @@ Open `mockups/index.html` directly in a browser. The layout selector switches am
 ## Current recommendation
 
 Run MIDI, synthesis, transport, loop capture/playback, persistence, MP3 export, and physical audio output on the host. Serve the landscape PWA over Tailscale HTTPS and connect it to the host engine through WebSocket commands and state updates. Network traffic never carries performance MIDI or audio, so browser latency cannot affect note-to-sound timing. Develop against software MIDI and audio-engine mocks until the physical Vortex is available.
+
+## Current implementation
+
+The first vertical slice is runnable with a deterministic host engine and software Vortex. It includes the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
+
+Native audio output, ALSA Vortex input, durable host persistence, and MP3 encoding are not implemented yet. The simulated engine rejects MP3 export rather than pretending a file was produced.
+
+## Run locally
+
+```bash
+npm install
+npm run build
+SOFTWARE_VORTEX_DEMO=1 npm run start --workspace @alesis/server
+```
+
+Open `http://127.0.0.1:8787`. The software Vortex alternates notes while the transport runs.
+
+Validation:
+
+```bash
+npm test
+npm run typecheck
+npm run test:e2e
+```
+
+## Serve privately to an iPad
+
+With the app running on port 8787 and Tailscale connected on both devices:
+
+```bash
+tailscale serve --bg localhost:8787
+tailscale serve status
+```
+
+Open the reported `https://<host>.<tailnet>.ts.net` URL in Safari. Use Share, **Add to Home Screen**, and **Open as Web App**. The host and iPad must remain connected to the tailnet. Tailscale HTTPS and MagicDNS must be enabled for the tailnet; certificate transparency publishes the host and tailnet DNS names.
+
+The receiver and audio interface connect to the host, not the iPad. Browser/WebSocket delay affects control acknowledgement only; MIDI-to-audio timing stays entirely on the host.

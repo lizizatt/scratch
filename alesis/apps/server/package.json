@@ -1,0 +1,23 @@
+{
+  "name": "@alesis/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@alesis/engine": "0.1.0",
+    "@alesis/midi": "0.1.0",
+    "@alesis/protocol": "0.1.0",
+    "sirv": "^3.0.1",
+    "ws": "^8.18.2"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.4"
+  }
+}
