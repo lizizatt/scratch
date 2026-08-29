@@ -4,6 +4,7 @@ export const PROTOCOL_VERSION = 1 as const;
 
 const waveformSchema = z.array(z.number().min(-1).max(1)).max(256);
 const takeIdSchema = z.string().min(1).max(128);
+export const quantizationModeSchema = z.enum(["off", "1/4", "1/8", "1/16", "1/32"]);
 
 export const settingsSchema = z.object({
   bpm: z.number().int().min(30).max(300),
@@ -103,7 +104,9 @@ export const engineSnapshotSchema = z.object({
   capture: z.object({
     currentWaveform: waveformSchema,
     staged: takeSchema.nullable(),
+    previousStaged: takeSchema.nullable(),
     stagedAudible: z.boolean(),
+    quantization: quantizationModeSchema,
   }),
   promoted: z.array(takeSchema),
   canUndoDelete: z.boolean(),
@@ -122,7 +125,9 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("configure-arpeggiator"), settings: arpeggiatorSchema.partial() }),
   z.object({ type: z.literal("configure-drums"), settings: drumSettingsSchema.partial() }),
   z.object({ type: z.literal("set-staged-audible"), audible: z.boolean() }),
+  z.object({ type: z.literal("set-quantization"), mode: quantizationModeSchema }),
   z.object({ type: z.literal("promote-staged") }),
+  z.object({ type: z.literal("promote-previous-staged") }),
   z.object({ type: z.literal("set-take-level"), takeId: takeIdSchema, level: z.number().min(0).max(1) }),
   z.object({ type: z.literal("set-take-muted"), takeId: takeIdSchema, muted: z.boolean() }),
   z.object({ type: z.literal("delete-take"), takeId: takeIdSchema }),
@@ -156,6 +161,7 @@ export type SoundFont = z.infer<typeof soundFontSchema>;
 export type SoundFontPreset = z.infer<typeof soundFontPresetSchema>;
 export type ArpeggiatorSettings = z.infer<typeof arpeggiatorSchema>;
 export type DrumSettings = z.infer<typeof drumSettingsSchema>;
+export type QuantizationMode = z.infer<typeof quantizationModeSchema>;
 export type EngineSnapshot = z.infer<typeof engineSnapshotSchema>;
 export type EngineCommand = z.infer<typeof commandSchema>;
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;

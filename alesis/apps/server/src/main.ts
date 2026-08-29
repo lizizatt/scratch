@@ -182,7 +182,11 @@ const executeCommand = async (command: EngineCommand) => {
       };
     }
   }
-  return engine.execute(command);
+  const result = await engine.execute(command);
+  if (result.accepted && command.type === "configure" && command.clearAudio) loops.clearRecordings();
+  if (result.accepted && command.type === "delete-take") loops.markDeleted(command.takeId);
+  if (result.accepted && command.type === "undo-delete") loops.restoreDeleted();
+  return result;
 };
 const server = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeCommand);
 const metronome = new MetronomeScheduler(audio);

@@ -75,7 +75,7 @@ function SettingsPane({ snapshot, send }: PaneProps) {
     }
     if (value === snapshot.settings[field]) return;
     const timingChange = field === "bpm" || field === "beatsPerMeasure" || field === "loopMeasures";
-    const hasAudio = snapshot.promoted.length > 0 || snapshot.capture.staged !== null;
+    const hasAudio = snapshot.promoted.length > 0 || snapshot.capture.staged !== null || snapshot.capture.previousStaged !== null;
     if (timingChange && hasAudio && !confirm("Changing timing clears all recorded audio. Continue?")) {
       setDraft(snapshot.settings);
       return;
@@ -194,10 +194,29 @@ function LoopPane({ snapshot, send }: PaneProps) {
           <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} live progress={snapshot.transport.progress} />
         </section>
         <section className="staged-capture">
-          <Waveform samples={snapshot.capture.staged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} emptyLabel="Waiting for rollover" />
+          <div className="staging-lane">
+            <span className="lane-label">Staged // {snapshot.capture.quantization === "off" ? "raw timing" : `quantized ${snapshot.capture.quantization}`}</span>
+            <Waveform samples={snapshot.capture.staged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} emptyLabel="Waiting for rollover" />
+          </div>
           <div className="take-actions">
+            <select className="quantization-select" aria-label="Staged quantization" value={snapshot.capture.quantization} onChange={(event) => send({ type: "set-quantization", mode: event.target.value as EngineSnapshot["capture"]["quantization"] })}>
+              <option value="off">Quantize off</option>
+              <option value="1/4">1/4</option>
+              <option value="1/8">1/8</option>
+              <option value="1/16">1/16</option>
+              <option value="1/32">1/32</option>
+            </select>
             <IconButton label="Promote staged take" disabled={!snapshot.capture.staged} onClick={() => send({ type: "promote-staged" })}><Plus /></IconButton>
             <IconButton label={snapshot.capture.stagedAudible ? "Mute staged take" : "Unmute staged take"} active={snapshot.capture.stagedAudible} pressed={snapshot.capture.stagedAudible} onClick={() => send({ type: "set-staged-audible", audible: !snapshot.capture.stagedAudible })}>{snapshot.capture.stagedAudible ? <Volume2 /> : <VolumeX />}</IconButton>
+          </div>
+        </section>
+        <section className="previous-staged-capture">
+          <div className="staging-lane">
+            <span className="lane-label">Previous staged // expires at rollover</span>
+            <Waveform samples={snapshot.capture.previousStaged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} emptyLabel="No displaced take" />
+          </div>
+          <div className="take-actions">
+            <IconButton label="Promote previous staged take" disabled={!snapshot.capture.previousStaged} onClick={() => send({ type: "promote-previous-staged" })}><Plus /></IconButton>
           </div>
         </section>
         <div className="divider" />

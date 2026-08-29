@@ -53,7 +53,7 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .icon-button { width: 40px; height: 36px; display: grid; place-items: center; padding: 0; border-color: transparent; background: transparent; }
 .icon-button.active { color: #000; border-color: var(--cyan); background: var(--cyan); }
 .icon-button.danger:hover { color: var(--danger); border-color: var(--danger); }
-.signal-stack { height: calc(100% - 46px); min-height: 0; display: grid; grid-template-rows: minmax(72px,1.05fr) minmax(56px,.78fr) 1px minmax(74px,1.5fr); gap: 8px; }
+.signal-stack { height: calc(100% - 46px); min-height: 0; display: grid; grid-template-rows: minmax(72px,1.05fr) minmax(56px,.78fr) minmax(46px,.62fr) 1px minmax(62px,1.25fr); gap: 7px; }
 .current-capture { display: grid; grid-template-rows: auto 1fr; gap: 3px; }
 .lane-label { color: var(--dim); font-size: 10px; text-transform: uppercase; }
 .waveform { min-width: 0; height: 100%; position: relative; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; color: var(--deep); font-size: 10px; text-transform: uppercase; }
@@ -65,8 +65,13 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .beat-grid i.measure { background: rgba(140,236,255,.22); }
 .waveform svg, .waveform > span { position: relative; z-index: 1; }
 .playhead { width: 1px; z-index: 2; position: absolute; inset-block: 0; background: var(--ice); box-shadow: 0 0 10px var(--cyan); }
-.staged-capture { width: 91%; margin-left: 5%; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }
+.staged-capture { width: 91%; min-height: 0; margin-left: 5%; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }
+.previous-staged-capture { width: 84%; min-height: 0; margin-left: 9%; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; opacity: .72; }
+.staging-lane { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0,1fr); gap: 2px; }
+.staging-lane .waveform { height: auto; min-height: 0; }
+.staging-lane .waveform svg { display: block; min-height: 0; }
 .take-actions { display: flex; align-items: center; gap: 4px; }
+.quantization-select { width: 112px; height: 31px; min-width: 0; color: var(--cyan); border: 1px solid var(--line); background: #000; font-size: 10px; }
 .divider { background: linear-gradient(90deg,transparent,var(--blue) 8%,var(--blue) 92%,transparent); opacity: .6; }
 .promoted-list { min-height: 0; padding: 0 5%; overflow-y: auto; scrollbar-color: var(--blue) #000; }
 .empty-list { padding: 24px; color: var(--deep); text-align: center; }
@@ -82,7 +87,7 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
   .pane { inset-bottom: 50px; }
   .loop-pane { padding-top: 5px; }
   .loop-toolbar { height: 37px; }
-  .signal-stack { height: calc(100% - 39px); gap: 5px; grid-template-rows:minmax(66px,1.05fr) minmax(50px,.72fr) 1px minmax(62px,1.4fr); }
+  .signal-stack { height: calc(100% - 39px); gap: 4px; grid-template-rows:minmax(61px,1fr) minmax(47px,.72fr) minmax(39px,.55fr) 1px minmax(48px,1fr); }
   .icon-button { width: 35px; height: 31px; }
   .app-nav button { width: 37px; height: 37px; }
   .settings-pane { padding: 10px 0; }
@@ -98,6 +103,7 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
   .midi-effect-grid { grid-template-columns:repeat(7,1fr); gap:5px; }
   .take-row { min-height: 42px; }
   .take-row .waveform { height: 32px; }
+  .quantization-select { width: 94px; height: 28px; font-size: 9px; }
 }
 @media (max-width:700px) and (orientation:landscape) {
   .setting { grid-template-columns:1fr 1fr; gap:14px; }

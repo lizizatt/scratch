@@ -326,7 +326,7 @@ export class FluidSynthOutput implements AudioOutput {
 
   private applySoundFontParameters(): void {
     for (const command of soundFontInitializationCommands(this.soundFontParameters)) this.writeCommand(command);
-    this.writeCommand(percussionSelectionCommand(this.percussionSoundFontPath !== null));
+    for (const command of auxiliaryPercussionSelectionCommands(this.percussionSoundFontPath !== null)) this.writeCommand(command);
   }
 
   private recover(child: ChildProcessWithoutNullStreams): void {
@@ -471,7 +471,6 @@ export function soundFontParameterCommands(parameterId: string, value: number, s
 export function soundFontInitializationCommands(parameters: SoundFontParameterValues): string[] {
   return [
     ...soundFontSelectionCommands(parameters.bank, parameters.program),
-    "select 15 1 0 0",
     ...["gain", "chorus-rate", "chorus-depth", "chorus-voices", "reverb-room", "reverb-damping", "reverb-width", "chorus-send", "reverb-send"].flatMap((parameterId) =>
       soundFontParameterCommands(parameterId, parameters[parameterId as keyof SoundFontParameterValues], parameters)),
   ];
@@ -508,8 +507,8 @@ export function midiEventToFluidCommand(event: MidiEvent): string | null {
 
 export function metronomeCommands(accent: boolean, volume: number): { noteOn: string; noteOff: string } | null {
   if (volume <= 0) return null;
-  const note = accent ? 96 : 84;
-  const velocity = Math.max(1, Math.min(127, Math.round(volume * 127)));
+  const note = accent ? 76 : 77;
+  const velocity = Math.max(1, Math.min(127, Math.round(Math.sqrt(volume) * 127)));
   return { noteOn: `noteon 15 ${note} ${velocity}`, noteOff: `noteoff 15 ${note}` };
 }
 
@@ -519,7 +518,8 @@ export function drumCommands(note: number, velocity: number): { noteOn: string; 
   return { noteOn: `noteon 9 ${safeNote} ${safeVelocity}`, noteOff: `noteoff 9 ${safeNote}` };
 }
 
-export function percussionSelectionCommand(hasAuxiliarySoundFont: boolean): string {
+export function auxiliaryPercussionSelectionCommands(hasAuxiliarySoundFont: boolean): string[] {
   // FluidSynth uses SoundFont bank 128 for General MIDI percussion presets.
-  return `select 9 ${hasAuxiliarySoundFont ? 2 : 1} 128 0`;
+  const soundFontId = hasAuxiliarySoundFont ? 2 : 1;
+  return [`select 9 ${soundFontId} 128 0`, `select 15 ${soundFontId} 128 0`];
 }

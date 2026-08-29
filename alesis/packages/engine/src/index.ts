@@ -115,7 +115,7 @@ export class SimulatedHostEngine implements HostEngine {
       },
       arpeggiator: { enabled: false, mode: "up", rate: "1/8", octaves: 1, gate: 0.5, latch: false, swing: 0 },
       drums: { enabled: false, pattern: "four-on-floor", volume: 0.7 },
-      capture: { currentWaveform: [], staged: null, stagedAudible: true },
+      capture: { currentWaveform: [], staged: null, previousStaged: null, stagedAudible: true, quantization: "off" },
       promoted: [],
       canUndoDelete: false,
     });
@@ -282,7 +282,7 @@ export class SimulatedHostEngine implements HostEngine {
         const timingChanged = command.settings.bpm !== undefined && command.settings.bpm !== this.state.settings.bpm
           || command.settings.beatsPerMeasure !== undefined && command.settings.beatsPerMeasure !== this.state.settings.beatsPerMeasure
           || command.settings.loopMeasures !== undefined && command.settings.loopMeasures !== this.state.settings.loopMeasures;
-        const hasAudio = this.state.capture.staged !== null || this.state.promoted.length > 0;
+        const hasAudio = this.state.capture.staged !== null || this.state.capture.previousStaged !== null || this.state.promoted.length > 0;
         if (timingChanged && hasAudio && !command.clearAudio) return reject("Timing changes require clearAudio while takes exist");
         if (timingChanged && command.clearAudio) this.clearAudio();
         const settings = command.settings;
@@ -342,10 +342,18 @@ export class SimulatedHostEngine implements HostEngine {
         this.state.capture.stagedAudible = command.audible;
         if (this.state.capture.staged) this.state.capture.staged.muted = !command.audible;
         break;
+      case "set-quantization":
+        this.state.capture.quantization = command.mode;
+        break;
       case "promote-staged":
         if (!this.state.capture.staged) return reject("No staged take to promote");
         this.state.promoted.push(this.state.capture.staged);
         this.state.capture.staged = null;
+        break;
+      case "promote-previous-staged":
+        if (!this.state.capture.previousStaged) return reject("No previous staged take to promote");
+        this.state.promoted.push({ ...this.state.capture.previousStaged, muted: false });
+        this.state.capture.previousStaged = null;
         break;
       case "set-take-level": {
         const take = this.findTake(command.takeId);
@@ -384,6 +392,7 @@ export class SimulatedHostEngine implements HostEngine {
 
   private rollover(): void {
     const completedCycle = this.state.transport.cycle;
+    this.state.capture.previousStaged = this.state.capture.staged;
     this.state.capture.staged = {
       id: `take-${this.nextTakeId++}`,
       cycle: completedCycle,
@@ -399,6 +408,7 @@ export class SimulatedHostEngine implements HostEngine {
   private clearAudio(): void {
     this.state.capture.currentWaveform = [];
     this.state.capture.staged = null;
+    this.state.capture.previousStaged = null;
     this.state.promoted = [];
     this.deletedTake = null;
     this.state.canUndoDelete = false;

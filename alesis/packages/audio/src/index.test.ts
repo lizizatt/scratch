@@ -3,7 +3,7 @@ import { PassThrough } from "node:stream";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { discoverSoundFonts, drainFluidSynthStdout, drumCommands, FluidSynthOutput, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, parseSoundFontPresets, percussionSelectionCommand, preferredSoundFont, soundFontInitializationCommands, soundFontParameterCommands, waitForFluidSynthShell } from "./index.js";
+import { auxiliaryPercussionSelectionCommands, discoverSoundFonts, drainFluidSynthStdout, drumCommands, FluidSynthOutput, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, parseSoundFontPresets, preferredSoundFont, soundFontInitializationCommands, soundFontParameterCommands, waitForFluidSynthShell } from "./index.js";
 
 describe("FluidSynth output", () => {
   it("maps normalized MIDI events to FluidSynth commands", () => {
@@ -56,8 +56,8 @@ describe("FluidSynth output", () => {
   });
 
   it("maps metronome accents and level to short bank-agnostic notes", () => {
-    expect(metronomeCommands(true, 1)).toEqual({ noteOn: "noteon 15 96 127", noteOff: "noteoff 15 96" });
-    expect(metronomeCommands(false, 0.4)).toEqual({ noteOn: "noteon 15 84 51", noteOff: "noteoff 15 84" });
+    expect(metronomeCommands(true, 1)).toEqual({ noteOn: "noteon 15 76 127", noteOff: "noteoff 15 76" });
+    expect(metronomeCommands(false, 0.25)).toEqual({ noteOn: "noteon 15 77 64", noteOff: "noteoff 15 77" });
     expect(metronomeCommands(false, 0)).toBeNull();
   });
 
@@ -117,16 +117,15 @@ describe("FluidSynth output", () => {
       "reverb-room": 0.2, "reverb-damping": 0, "reverb-width": 0.5,
     });
     const channels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
-    expect(commands.filter((command) => command.startsWith("select "))).toHaveLength(15);
-    expect(commands).toContain("select 15 1 0 0");
+    expect(commands.filter((command) => command.startsWith("select "))).toHaveLength(14);
     for (const channel of channels) {
       expect(commands).toContain(`cc ${channel} 93 15`);
       expect(commands).toContain(`cc ${channel} 91 30`);
     }
     expect(commands.some((command) => command.startsWith("cc 9 "))).toBe(false);
     expect(commands.indexOf("gain 0.72")).toBeLessThan(commands.indexOf("cho_set_speed 0.3"));
-    expect(percussionSelectionCommand(true)).toBe("select 9 2 128 0");
-    expect(percussionSelectionCommand(false)).toBe("select 9 1 128 0");
+    expect(auxiliaryPercussionSelectionCommands(true)).toEqual(["select 9 2 128 0", "select 15 2 128 0"]);
+    expect(auxiliaryPercussionSelectionCommands(false)).toEqual(["select 9 1 128 0", "select 15 1 128 0"]);
   });
 
   it("releases each public drum hit after 80 milliseconds", () => {

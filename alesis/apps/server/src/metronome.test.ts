@@ -53,4 +53,19 @@ describe("MetronomeScheduler", () => {
     scheduler.update(engine.snapshot());
     expect(output.playMetronome).toHaveBeenCalledOnce();
   });
+
+  it("clicks once per beat rather than once per sixteenth note", async () => {
+    const engine = new SimulatedHostEngine();
+    const output = fakeOutput();
+    const scheduler = new MetronomeScheduler(output);
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+
+    for (let sixteenth = 0; sixteenth < 16; sixteenth += 1) {
+      scheduler.update(engine.snapshot());
+      engine.advance(0.125);
+    }
+
+    expect(output.playMetronome).toHaveBeenCalledTimes(4);
+  });
 });

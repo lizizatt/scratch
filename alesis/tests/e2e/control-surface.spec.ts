@@ -61,10 +61,15 @@ test("connects every selected pane to the host without viewport overflow", async
 
   await page.getByRole("button", { name: "Loops" }).click();
   await expect(page.getByRole("region", { name: "Looper" })).toBeVisible();
+  const quantization = page.getByLabel("Staged quantization");
+  await expect(quantization.locator("option")).toHaveCount(5);
+  await quantization.selectOption("1/16");
+  await expect(quantization).toHaveValue("1/16");
   const waveforms = page.locator(".waveform");
-  await expect(waveforms).toHaveCount(2);
+  await expect(waveforms).toHaveCount(3);
   await expect(waveforms.first().locator(".beat-grid i")).toHaveCount(Math.max(0, beatCount - 1));
   await expect(waveforms.nth(1).locator(".beat-grid i")).toHaveCount(Math.max(0, beatCount - 1));
+  await expect(waveforms.nth(2).locator(".beat-grid i")).toHaveCount(Math.max(0, beatCount - 1));
   const unmuteMetronome = page.getByRole("button", { name: "Unmute metronome" });
   if (await unmuteMetronome.isVisible()) await unmuteMetronome.click();
   const muteMetronome = page.getByRole("button", { name: "Mute metronome" });
@@ -105,8 +110,13 @@ test("edits BPM locally and confirms only on commit", async ({ page }) => {
   }
 
   await page.getByRole("button", { name: "Loops" }).click();
+  await page.getByLabel("Staged quantization").selectOption("1/8");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "Promote staged take" })).toBeEnabled({ timeout: 3_000 });
+  await expect(page.getByRole("button", { name: "Promote previous staged take" })).toBeEnabled({ timeout: 3_000 });
+  await page.getByRole("button", { name: "Promote previous staged take" }).click();
+  await expect(page.getByRole("button", { name: "Promote previous staged take" })).toBeDisabled();
+  await expect(page.locator(".take-row")).toHaveCount(1);
   await expect(page.locator(".current-capture svg .intensity-sample")).toHaveCount(96);
   await page.getByRole("button", { name: "Options" }).click();
 

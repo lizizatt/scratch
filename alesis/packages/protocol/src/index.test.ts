@@ -50,7 +50,7 @@ describe("control protocol", () => {
       synth: { selectedId: "subtractive", instruments: [], soundFonts: [], selectedSoundFontId: null, soundFontPresets: [], selectedSoundFontPresetId: null, parameterValues: {} },
       arpeggiator: { enabled: false, mode: "up", rate: "1/8", octaves: 1, gate: 0.5, latch: false, swing: 0 },
       drums: { enabled: false, pattern: "four-on-floor", volume: 0.7 },
-      capture: { currentWaveform: Array.from({ length: 257 }, () => 0), staged: null, stagedAudible: true },
+      capture: { currentWaveform: Array.from({ length: 257 }, () => 0), staged: null, previousStaged: null, stagedAudible: true, quantization: "off" },
       promoted: [],
       canUndoDelete: false,
     };

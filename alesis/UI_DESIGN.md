@@ -66,12 +66,20 @@ The loop pane follows a vertical signal stack.
 ### Staged capture
 
 - At cycle rollover, the completed current capture replaces the staged capture.
+- A quantization dropdown applies disabled, quarter-, eighth-, sixteenth-, or thirty-second-note timing to the staged MIDI performance only. Live monitoring remains unquantized. Events snap to the nearest circular loop grid, duplicate controller/note events in a bin collapse to the latest value, and short notes retain at least one grid step.
 - The staged waveform is slightly narrower and indented beneath the current lane.
 - A plus button promotes the staged take into persistent loop playback.
 - Promotion moves the take into the promoted list and clears the staged lane immediately.
 - A mute/unmute button controls whether the staged take is auditioned with current playback.
 - Each new staged take inherits the previous staged take's audition state.
 - An unpromoted staged take is replaced at the next rollover.
+
+### Previous staged capture
+
+- When rollover replaces an unpromoted staged take, the displaced take moves to a second, narrower recovery row for the duration of the new loop cycle.
+- Previous staged capture is never auditioned automatically. Its only action promotes it into persistent loop playback.
+- Its captured timing is frozen when displaced; changing the quantization dropdown only reprocesses the current staged take.
+- If it is not promoted before the next rollover, it expires and is replaced by the next displaced staged take.
 
 ### Promoted takes
 

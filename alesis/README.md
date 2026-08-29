@@ -26,6 +26,8 @@ The first vertical slice is runnable with the real ALSA Vortex input and native 
 
 The host now captures normalized MIDI performances into cycle-aligned staged takes and replays staged and promoted takes with mute, level, monitor-only, and held-note cleanup. Neon Pressure is a host-rendered polyphonic subtractive synth with cutoff, resonance, attack, release, LFO rate, and drive controls. PCM loop capture/playback, durable host persistence, and MP3 encoding are not implemented yet. The simulated loop engine rejects MP3 export rather than pretending a file was produced.
 
+Staged MIDI can be quantized to quarter, eighth, sixteenth, or thirty-second notes. Quantization snaps arrival positions to the nearest circular loop grid and deduplicates equivalent events per bin; disabled mode preserves captured timing. An overwritten staged take remains in a silent recovery row for one additional loop cycle and can still be promoted before it expires.
+
 ## Run locally
 
 ```bash

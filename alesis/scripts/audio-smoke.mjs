@@ -8,7 +8,7 @@ const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 await settleAudioServer();
 const { synthPeak, arpeggiatorPeak, drumPeak, neonPeak, metronomePeak } = await runProbe(8791, async (port) => {
   await sendCommands(port, [
-    { type: "configure", settings: { bpm: 240, beatsPerMeasure: 4, loopMeasures: 1, countInEnabled: false, metronomeEnabled: true, metronomeVolume: 1 } },
+    { type: "configure", settings: { bpm: 240, beatsPerMeasure: 4, loopMeasures: 1, countInEnabled: false, metronomeEnabled: true, metronomeVolume: 0.25 } },
     { type: "play" },
   ]);
   await waitForSnapshot(port, (snapshot) => snapshot.transport.state === "playing" && snapshot.transport.progress >= 0.25);

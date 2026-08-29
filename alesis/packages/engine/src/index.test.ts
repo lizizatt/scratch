@@ -98,7 +98,39 @@ describe("SimulatedHostEngine", () => {
     engine.advance(2);
 
     expect(engine.snapshot().capture.staged).toMatchObject({ cycle: 0, muted: false });
+    expect(engine.snapshot().capture.previousStaged).toBeNull();
     expect(engine.snapshot().transport.cycle).toBe(1);
+  });
+
+  it("owns the selected quantization mode", async () => {
+    const engine = new SimulatedHostEngine();
+    expect(engine.snapshot().capture.quantization).toBe("off");
+    expect((await engine.execute({ type: "set-quantization", mode: "1/16" })).accepted).toBe(true);
+    expect(engine.snapshot().capture.quantization).toBe("1/16");
+  });
+
+  it("keeps an overwritten staged take for one cycle and allows recovery promotion", async () => {
+    const engine = new SimulatedHostEngine();
+    await captureOneCycle(engine);
+    const firstId = engine.snapshot().capture.staged!.id;
+    engine.advance(2);
+    expect(engine.snapshot().capture.previousStaged).toMatchObject({ id: firstId, cycle: 0 });
+
+    expect((await engine.execute({ type: "promote-previous-staged" })).accepted).toBe(true);
+    expect(engine.snapshot().promoted[0]).toMatchObject({ id: firstId, muted: false });
+    expect(engine.snapshot().capture.previousStaged).toBeNull();
+  });
+
+  it("expires the previous staged take at the next rollover", async () => {
+    const engine = new SimulatedHostEngine();
+    await captureOneCycle(engine);
+    engine.advance(2);
+    const recoverableId = engine.snapshot().capture.previousStaged!.id;
+    const currentStagedId = engine.snapshot().capture.staged!.id;
+    engine.advance(2);
+
+    expect(engine.snapshot().capture.previousStaged?.id).toBe(currentStagedId);
+    expect(engine.snapshot().capture.previousStaged?.id).not.toBe(recoverableId);
   });
 
   it("records note intensity into time buckets instead of generating a carrier wave", async () => {
