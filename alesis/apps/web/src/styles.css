@@ -46,9 +46,13 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .lane-label { color: var(--dim); font-size: 10px; text-transform: uppercase; }
 .waveform { min-width: 0; height: 100%; position: relative; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; color: var(--deep); font-size: 10px; text-transform: uppercase; }
 .waveform svg { width: 100%; height: 100%; }
-.waveform polyline { fill: none; stroke: var(--blue); vector-effect: non-scaling-stroke; }
-.waveform.live polyline { stroke: var(--cyan); filter: drop-shadow(0 0 4px var(--cyan)); }
-.playhead { width: 1px; position: absolute; inset-block: 0; background: var(--ice); box-shadow: 0 0 10px var(--cyan); }
+.waveform .intensity-sample { stroke: rgba(7,93,255,.72); stroke-width: 1.05; vector-effect: non-scaling-stroke; }
+.waveform.live .intensity-sample { stroke: var(--cyan); filter: drop-shadow(0 0 3px var(--cyan)); }
+.beat-grid { position: absolute; z-index: 0; inset: 0; pointer-events: none; }
+.beat-grid i { width: 1px; position: absolute; inset-block: 0; background: rgba(140,236,255,.12); }
+.beat-grid i.measure { background: rgba(140,236,255,.22); }
+.waveform svg, .waveform > span { position: relative; z-index: 1; }
+.playhead { width: 1px; z-index: 2; position: absolute; inset-block: 0; background: var(--ice); box-shadow: 0 0 10px var(--cyan); }
 .staged-capture { width: 91%; margin-left: 5%; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }
 .take-actions { display: flex; align-items: center; gap: 4px; }
 .divider { background: linear-gradient(90deg,transparent,var(--blue) 8%,var(--blue) 92%,transparent); opacity: .6; }

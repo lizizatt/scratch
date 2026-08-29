@@ -53,6 +53,8 @@ const synthParameters = new Map([
   ["soundfont", soundfontParameters],
 ]);
 
+const waveformBucketCount = 96;
+
 interface DeletedTake {
   take: Take;
   index: number;
@@ -61,7 +63,8 @@ interface DeletedTake {
 export class SimulatedHostEngine implements HostEngine {
   private state: EngineSnapshot;
   private listeners = new Set<EngineListener>();
-  private activeNotes = new Set<number>();
+  private activeNotes = new Map<string, number>();
+  private currentWaveform = emptyWaveform();
   private elapsedSeconds = 0;
   private countInSecondsRemaining = 0;
   private deletedTake: DeletedTake | null = null;
@@ -79,7 +82,7 @@ export class SimulatedHostEngine implements HostEngine {
         midiInputId: "software-vortex",
         audioOutputId: "simulated-output",
         metronomeEnabled: true,
-        metronomeVolume: 0.65,
+        metronomeVolume: 0.25,
         countInEnabled: true,
       },
       transport: { state: "stopped", cycle: 0, progress: 0 },
@@ -109,8 +112,10 @@ export class SimulatedHostEngine implements HostEngine {
   }
 
   dispatchMidi(event: MidiEvent): void {
-    if (event.type === "note-on" && event.velocity > 0) this.activeNotes.add(event.note);
-    if (event.type === "note-off" || (event.type === "note-on" && event.velocity === 0)) this.activeNotes.delete(event.note);
+    const noteKey = "note" in event ? `${event.channel}:${event.note}` : null;
+    if (event.type === "note-on" && event.velocity > 0) this.activeNotes.set(noteKey!, event.velocity);
+    if (noteKey && (event.type === "note-off" || (event.type === "note-on" && event.velocity === 0))) this.activeNotes.delete(noteKey);
+    if (this.state.transport.state === "playing") this.writeIntensity(this.state.transport.progress, this.state.transport.progress);
     this.state.engine.midiEventsReceived += 1;
     this.state.engine.lastMidiEvent = event.type;
     this.publish();
@@ -141,13 +146,20 @@ export class SimulatedHostEngine implements HostEngine {
     }
 
     const duration = this.cycleDurationSeconds();
-    this.elapsedSeconds += seconds;
-    while (this.elapsedSeconds >= duration) {
-      this.elapsedSeconds -= duration;
-      this.rollover();
+    while (seconds > 0) {
+      const remaining = duration - this.elapsedSeconds;
+      const consumed = Math.min(seconds, remaining);
+      const start = this.elapsedSeconds / duration;
+      this.elapsedSeconds += consumed;
+      this.writeIntensity(start, this.elapsedSeconds / duration);
+      seconds -= consumed;
+      if (this.elapsedSeconds >= duration) {
+        this.elapsedSeconds = 0;
+        this.rollover();
+      }
     }
     this.state.transport.progress = this.elapsedSeconds / duration;
-    this.state.capture.currentWaveform = this.createWaveform(this.state.transport.cycle, this.state.transport.progress);
+    this.state.capture.currentWaveform = [...this.currentWaveform];
     this.publish(false);
   }
 
@@ -181,6 +193,7 @@ export class SimulatedHostEngine implements HostEngine {
         this.state.transport.state = "stopped";
         this.state.transport.progress = 0;
         this.state.capture.currentWaveform = [];
+        this.currentWaveform = emptyWaveform();
         this.elapsedSeconds = 0;
         this.countInSecondsRemaining = 0;
         break;
@@ -270,8 +283,9 @@ export class SimulatedHostEngine implements HostEngine {
       cycle: completedCycle,
       level: 0.8,
       muted: !this.state.capture.stagedAudible,
-      waveform: this.createWaveform(completedCycle, 1),
+      waveform: [...this.currentWaveform],
     };
+    this.currentWaveform = emptyWaveform();
     this.state.transport.cycle += 1;
     this.state.revision += 1;
   }
@@ -285,6 +299,7 @@ export class SimulatedHostEngine implements HostEngine {
     this.state.transport.cycle = 0;
     this.state.transport.progress = 0;
     this.elapsedSeconds = 0;
+    this.currentWaveform = emptyWaveform();
   }
 
   private findTake(id: string): Take | undefined {
@@ -299,12 +314,13 @@ export class SimulatedHostEngine implements HostEngine {
     return this.measureDurationSeconds() * this.state.settings.loopMeasures;
   }
 
-  private createWaveform(cycle: number, progress: number): number[] {
-    const amplitude = this.activeNotes.size > 0 ? 0.82 : 0.28;
-    return Array.from({ length: 96 }, (_, index) => {
-      const envelope = Math.min(1, progress * 6 + 0.15);
-      return Math.max(-1, Math.min(1, Math.sin(index * 0.31 + cycle * 0.7) * amplitude * envelope));
-    });
+  private writeIntensity(start: number, end: number): void {
+    const intensity = Math.min(1, Math.sqrt([...this.activeNotes.values()].reduce((sum, velocity) => sum + (velocity / 127) ** 2, 0)));
+    const first = Math.min(waveformBucketCount - 1, Math.floor(start * waveformBucketCount));
+    const last = Math.min(waveformBucketCount - 1, Math.floor(end * waveformBucketCount));
+    for (let index = first; index <= last; index += 1) {
+      this.currentWaveform[index] = Math.max(this.currentWaveform[index] ?? 0, intensity);
+    }
   }
 
   private publish(incrementRevision = true): void {
@@ -312,4 +328,8 @@ export class SimulatedHostEngine implements HostEngine {
     const snapshot = this.snapshot();
     this.listeners.forEach((listener) => listener(snapshot));
   }
+}
+
+function emptyWaveform(): number[] {
+  return Array.from({ length: waveformBucketCount }, () => 0);
 }

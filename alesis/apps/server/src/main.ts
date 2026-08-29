@@ -31,14 +31,19 @@ const timer = setInterval(() => {
   metronome.update(snapshot);
 }, 50);
 let demoNoteOn = false;
+let demoNote = 60;
 let midiDemo: ReturnType<typeof setInterval> | undefined;
 const softwareMidi = midi instanceof SoftwareVortex ? midi : null;
 const startMidiDemo = (): void => {
   if (!softwareMidi) return;
   midiDemo = setInterval(() => {
       demoNoteOn = !demoNoteOn;
-      if (demoNoteOn) softwareMidi.keyDown(60 + engine.snapshot().transport.cycle % 12, 104);
-      else softwareMidi.keyUp(60 + engine.snapshot().transport.cycle % 12);
+      if (demoNoteOn) {
+        demoNote = 60 + engine.snapshot().transport.cycle % 12;
+        softwareMidi.keyDown(demoNote, 104);
+      } else {
+        softwareMidi.keyUp(demoNote);
+      }
     }, 500);
 };
 const midiDemoStart = softwareMidi && process.env.SOFTWARE_VORTEX_DEMO === "1"

@@ -47,13 +47,15 @@ The loop pane follows a vertical signal stack.
 - Stop discards a partial current capture and resets transport to the start of the cycle. Staged and promoted takes remain unchanged.
 - Monitor-only means promoted and staged playback are muted while direct synth output remains audible.
 - Metronome mute toggles the same host setting shown in Options and takes effect on the next scheduled beat.
+- New host sessions start with the metronome enabled at 25% volume.
 - Save sits at the upper right and exports the current audible promoted mix as an MP3 download. Muted promoted takes, staged audio, direct synth, and metronome are excluded.
 
 ### Current capture
 
 - While transport is playing, the current loop cycle is continuously captured.
 - Capture contains direct synth output only. Promoted takes, staged audition, and metronome never feed the record bus.
-- Its waveform is drawn live in the widest lane, directly beneath the toolbar.
+- Its waveform is drawn live in the widest lane, directly beneath the toolbar. Until PCM capture is implemented, the waveform plots normalized MIDI note intensity in fixed time buckets rather than a synthetic carrier wave.
+- Every waveform lane shows a faint vertical guide at each beat boundary, with measure boundaries slightly stronger.
 - A playhead communicates progress through the current cycle.
 
 ### Staged capture

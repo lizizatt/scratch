@@ -9,6 +9,12 @@ async function captureOneCycle(engine: SimulatedHostEngine): Promise<void> {
 }
 
 describe("SimulatedHostEngine", () => {
+  it("starts with the metronome enabled at 25 percent", () => {
+    const engine = new SimulatedHostEngine();
+
+    expect(engine.snapshot().settings).toMatchObject({ metronomeEnabled: true, metronomeVolume: 0.25 });
+  });
+
   it("publishes observable normalized MIDI activity", () => {
     const engine = new SimulatedHostEngine();
     engine.dispatchMidi({ type: "pitch-bend", channel: 0, value: 0.5 });
@@ -30,6 +36,22 @@ describe("SimulatedHostEngine", () => {
 
     expect(engine.snapshot().capture.staged).toMatchObject({ cycle: 0, muted: false });
     expect(engine.snapshot().transport.cycle).toBe(1);
+  });
+
+  it("records note intensity into time buckets instead of generating a carrier wave", async () => {
+    const engine = new SimulatedHostEngine();
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+    engine.advance(0.5);
+    engine.dispatchMidi({ type: "note-on", channel: 0, note: 60, velocity: 127 });
+    engine.advance(0.5);
+    engine.dispatchMidi({ type: "note-off", channel: 0, note: 60 });
+    engine.advance(1);
+
+    const waveform = engine.snapshot().capture.staged?.waveform ?? [];
+    expect(waveform.slice(0, 20)).toEqual(Array(20).fill(0));
+    expect(waveform.slice(25, 48).every((sample) => sample === 1)).toBe(true);
+    expect(waveform.slice(50).every((sample) => sample === 0)).toBe(true);
   });
 
   it("promotes a staged take and clears staging", async () => {

@@ -132,6 +132,7 @@ function SynthPane({ snapshot, send }: PaneProps) {
 
 function LoopPane({ snapshot, send }: PaneProps) {
   const isPlaying = snapshot.transport.state !== "stopped";
+  const beatCount = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
   return (
     <section className="pane loop-pane" aria-label="Looper">
       <header className="loop-toolbar">
@@ -148,10 +149,10 @@ function LoopPane({ snapshot, send }: PaneProps) {
       <div className="signal-stack">
         <section className="current-capture">
           <span className="lane-label">Current capture // live</span>
-          <Waveform samples={snapshot.capture.currentWaveform} live progress={snapshot.transport.progress} />
+          <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} live progress={snapshot.transport.progress} />
         </section>
         <section className="staged-capture">
-          <Waveform samples={snapshot.capture.staged?.waveform ?? []} emptyLabel="Waiting for rollover" />
+          <Waveform samples={snapshot.capture.staged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} emptyLabel="Waiting for rollover" />
           <div className="take-actions">
             <IconButton label="Promote staged take" disabled={!snapshot.capture.staged} onClick={() => send({ type: "promote-staged" })}><Plus /></IconButton>
             <IconButton label={snapshot.capture.stagedAudible ? "Mute staged take" : "Unmute staged take"} active={snapshot.capture.stagedAudible} pressed={snapshot.capture.stagedAudible} onClick={() => send({ type: "set-staged-audible", audible: !snapshot.capture.stagedAudible })}>{snapshot.capture.stagedAudible ? <Volume2 /> : <VolumeX />}</IconButton>
@@ -160,7 +161,7 @@ function LoopPane({ snapshot, send }: PaneProps) {
         <div className="divider" />
         <section className="promoted-list" aria-label="Promoted takes">
           {snapshot.promoted.length === 0 && <div className="empty-list">PROMOTED TAKES APPEAR HERE</div>}
-          {snapshot.promoted.map((take, index) => <TakeRow key={take.id} take={take} index={index} send={send} />)}
+          {snapshot.promoted.map((take, index) => <TakeRow key={take.id} take={take} index={index} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} send={send} />)}
         </section>
       </div>
       {snapshot.canUndoDelete && <button className="undo-button" type="button" onClick={() => send({ type: "undo-delete" })}><RotateCcw /> Undo delete</button>}
@@ -168,11 +169,11 @@ function LoopPane({ snapshot, send }: PaneProps) {
   );
 }
 
-function TakeRow({ take, index, send }: { take: Take; index: number; send: SendCommand }) {
+function TakeRow({ take, index, beatCount, beatsPerMeasure, send }: { take: Take; index: number; beatCount: number; beatsPerMeasure: number; send: SendCommand }) {
   return (
     <article className="take-row">
       <span className="take-number">{String(index + 1).padStart(2, "0")}</span>
-      <Waveform samples={take.waveform} />
+      <Waveform samples={take.waveform} beatCount={beatCount} beatsPerMeasure={beatsPerMeasure} />
       <label className="level-control">LEVEL<input aria-label={`Level take ${index + 1}`} type="range" min="0" max="100" value={take.level * 100} onChange={(event) => send({ type: "set-take-level", takeId: take.id, level: Number(event.target.value) / 100 })} /></label>
       <IconButton label={take.muted ? `Unmute take ${index + 1}` : `Mute take ${index + 1}`} active={!take.muted} pressed={!take.muted} onClick={() => send({ type: "set-take-muted", takeId: take.id, muted: !take.muted })}>{take.muted ? <VolumeX /> : <Volume2 />}</IconButton>
       <IconButton label={`Delete take ${index + 1}`} danger onClick={() => send({ type: "delete-take", takeId: take.id })}><Trash2 /></IconButton>
@@ -180,11 +181,17 @@ function TakeRow({ take, index, send }: { take: Take; index: number; send: SendC
   );
 }
 
-function Waveform({ samples, live = false, progress, emptyLabel }: { samples: number[]; live?: boolean; progress?: number; emptyLabel?: string }) {
-  const points = samples.map((sample, index) => `${samples.length === 1 ? 0 : index / (samples.length - 1) * 100},${50 - sample * 42}`).join(" ");
+function Waveform({ samples, beatCount, beatsPerMeasure, live = false, progress, emptyLabel }: { samples: number[]; beatCount: number; beatsPerMeasure: number; live?: boolean; progress?: number; emptyLabel?: string }) {
+  const amplitudes = samples.map((sample) => Math.abs(sample));
   return (
     <div className={`waveform ${live ? "live" : ""}`}>
-      {samples.length > 0 ? <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points={points} /></svg> : <span>{emptyLabel}</span>}
+      <div className="beat-grid" aria-hidden="true">
+        {Array.from({ length: Math.max(0, beatCount - 1) }, (_, index) => <i key={index} className={(index + 1) % beatsPerMeasure === 0 ? "measure" : ""} style={{ left: `${(index + 1) / beatCount * 100}%` }} />)}
+      </div>
+      {samples.length > 0 ? <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{amplitudes.map((sample, index) => {
+        const x = amplitudes.length === 1 ? 50 : index / (amplitudes.length - 1) * 100;
+        return <line className="intensity-sample" key={index} x1={x} x2={x} y1={50 - sample * 44} y2={50 + sample * 44} />;
+      })}</svg> : <span>{emptyLabel}</span>}
       {progress !== undefined && <i className="playhead" style={{ left: `${progress * 100}%` }} />}
     </div>
   );

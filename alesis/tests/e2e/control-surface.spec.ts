@@ -18,6 +18,7 @@ test("connects every selected pane to the host without viewport overflow", async
   await page.getByRole("button", { name: "Options" }).click();
   await expect(page.getByRole("region", { name: "Options" })).toBeVisible();
   await expect(page.getByLabel("Input device")).toHaveValue("software-vortex");
+  const beatCount = Number(await page.getByLabel("Beats per measure").inputValue()) * Number(await page.getByLabel("Loop measures").inputValue());
 
   await page.getByRole("button", { name: "Synth" }).click();
   await page.getByLabel("Synthesizer").selectOption("soundfont");
@@ -25,6 +26,10 @@ test("connects every selected pane to the host without viewport overflow", async
 
   await page.getByRole("button", { name: "Loops" }).click();
   await expect(page.getByRole("region", { name: "Looper" })).toBeVisible();
+  const waveforms = page.locator(".waveform");
+  await expect(waveforms).toHaveCount(2);
+  await expect(waveforms.first().locator(".beat-grid i")).toHaveCount(Math.max(0, beatCount - 1));
+  await expect(waveforms.nth(1).locator(".beat-grid i")).toHaveCount(Math.max(0, beatCount - 1));
   const unmuteMetronome = page.getByRole("button", { name: "Unmute metronome" });
   if (await unmuteMetronome.isVisible()) await unmuteMetronome.click();
   const muteMetronome = page.getByRole("button", { name: "Mute metronome" });
@@ -67,6 +72,7 @@ test("edits BPM locally and confirms only on commit", async ({ page }) => {
   await page.getByRole("button", { name: "Loops" }).click();
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "Promote staged take" })).toBeEnabled({ timeout: 3_000 });
+  await expect(page.locator(".current-capture svg .intensity-sample")).toHaveCount(96);
   await page.getByRole("button", { name: "Options" }).click();
 
   const bpm = page.getByLabel("BPM");
