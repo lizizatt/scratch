@@ -42,6 +42,15 @@ describe("SimulatedHostEngine", () => {
     expect(engine.snapshot().promoted).toHaveLength(1);
   });
 
+  it("preserves the staged audition state when promoting", async () => {
+    const engine = new SimulatedHostEngine();
+    await captureOneCycle(engine);
+    await engine.execute({ type: "set-staged-audible", audible: false });
+    await engine.execute({ type: "promote-staged" });
+
+    expect(engine.snapshot().promoted[0]?.muted).toBe(true);
+  });
+
   it("requires explicit clearing for timing changes with audio", async () => {
     const engine = new SimulatedHostEngine();
     await captureOneCycle(engine);

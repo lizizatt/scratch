@@ -24,7 +24,7 @@ Run MIDI, synthesis, transport, loop capture/playback, persistence, MP3 export, 
 
 The first vertical slice is runnable with the real ALSA Vortex input and native FluidSynth output to the host's default system speakers, with software MIDI and silent-audio fallbacks for tests. It includes USB-ID-based hardware discovery, raw MIDI stream decoding, observable MIDI activity, PulseAudio/PipeWire sink discovery, SoundFont synthesis, audible count-in/metronome clicks, the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
 
-The built-in subtractive synth, real PCM loop capture/playback, durable host persistence, and MP3 encoding are not implemented yet. The simulated loop engine rejects MP3 export rather than pretending a file was produced.
+The host now captures normalized MIDI performances into cycle-aligned staged takes and replays staged and promoted takes through FluidSynth with mute, level, monitor-only, and held-note cleanup. The built-in subtractive synth, PCM loop capture/playback, durable host persistence, and MP3 encoding are not implemented yet. The simulated loop engine rejects MP3 export rather than pretending a file was produced.
 
 ## Run locally
 

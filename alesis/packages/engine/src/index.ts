@@ -221,6 +221,7 @@ export class SimulatedHostEngine implements HostEngine {
       }
       case "set-staged-audible":
         this.state.capture.stagedAudible = command.audible;
+        if (this.state.capture.staged) this.state.capture.staged.muted = !command.audible;
         break;
       case "promote-staged":
         if (!this.state.capture.staged) return reject("No staged take to promote");
