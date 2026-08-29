@@ -21,4 +21,4 @@ The raw stream decoder supports MIDI 1.0 channel note on/off, Control Change, ch
 5. Confirm the MIDI count increments and the final event class changes among `note-on`, `note-off`, `pitch-bend`, `control-change`, and `channel-pressure`.
 6. Capture the emitted controller numbers for every remappable control and replace provisional profile values with a recorded fixture.
 
-Opening and ownership of the physical receiver are verified. Actual message capture remains pending until the controls are exercised while the host is running.
+Opening, ownership, and physical note delivery are verified. During acceptance, ALSA received 132 bytes with zero overruns and the host normalized 92 MIDI events; the UI reported `note-off` as the final event and produced live capture plus a staged take. Full pitch, pressure, pad, fader, touch-strip, accelerometer, and sustain mapping remains pending a systematic control-by-control capture.
