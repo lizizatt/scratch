@@ -47,4 +47,4 @@ A later connected-but-silent incident was not exclusive device ownership: `fuser
 
 FluidSynth now detects its `Ringbuffer full` and `Failed to allocate a synthesis process` signatures, terminates the stale child with a bounded shutdown, and reconnects a fresh renderer to the selected sink. If PipeWire itself is in the persistent ALSA broken-pipe state, stop the host and run `systemctl --user restart pipewire pipewire-pulse wireplumber` before restarting it.
 
-The metronome uses short GM percussion clicks on channel 10, follows authoritative count-in and transport beats, accents each measure start, and remains outside the take capture path. Audible host output has been confirmed by the user. A systematic control-by-control keytar acceptance pass remains pending.
+The metronome uses short preset-0 notes on reserved channel 16 so it remains audible with non-GM SoundFonts, follows authoritative count-in and transport beats, accents each measure start, and remains outside the take capture path. Audible host output has been confirmed by the user. A systematic control-by-control keytar acceptance pass remains pending.

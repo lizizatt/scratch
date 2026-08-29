@@ -4,6 +4,7 @@ import type { EngineResult, HostEngine } from "@alesis/engine";
 import {
   commandEnvelopeSchema,
   type CommandEnvelope,
+  type EngineCommand,
   type ServerMessage,
 } from "@alesis/protocol";
 import { WebSocket, WebSocketServer } from "ws";
@@ -14,7 +15,12 @@ export interface ControlServer {
   close(): Promise<void>;
 }
 
-export async function createControlServer(engine: HostEngine, port = 0, staticDirectory?: string): Promise<ControlServer> {
+export async function createControlServer(
+  engine: HostEngine,
+  port = 0,
+  staticDirectory?: string,
+  executeCommand: (command: EngineCommand) => Promise<EngineResult> = (command) => engine.execute(command),
+): Promise<ControlServer> {
   const httpServer = createHttpServer(staticDirectory);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control" });
   const results = new Map<string, ServerMessage>();
@@ -42,7 +48,7 @@ export async function createControlServer(engine: HostEngine, port = 0, staticDi
         return;
       }
 
-      const result = await engine.execute(envelope.command);
+      const result = await executeCommand(envelope.command);
       const message = commandResult(envelope, result);
       results.set(envelope.commandId, message);
       if (results.size > 512) results.delete(results.keys().next().value!);

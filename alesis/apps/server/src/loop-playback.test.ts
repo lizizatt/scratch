@@ -10,6 +10,9 @@ function fakeOutput(): AudioOutput & { dispatchMidi: ReturnType<typeof vi.fn> } 
     start: async () => {},
     dispatchMidi: vi.fn(),
     playMetronome: () => {},
+    loadSoundFont: async () => {},
+    selectSynth: async () => {},
+    setSynthParameter: () => {},
     close: async () => {},
   };
 }

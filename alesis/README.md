@@ -24,7 +24,7 @@ Run MIDI, synthesis, transport, loop capture/playback, persistence, MP3 export, 
 
 The first vertical slice is runnable with the real ALSA Vortex input and native FluidSynth output to the host's default system speakers, with software MIDI and silent-audio fallbacks for tests. It includes USB-ID-based hardware discovery, raw MIDI stream decoding, observable MIDI activity, PulseAudio/PipeWire sink discovery, SoundFont synthesis, audible count-in/metronome clicks, the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
 
-The host now captures normalized MIDI performances into cycle-aligned staged takes and replays staged and promoted takes through FluidSynth with mute, level, monitor-only, and held-note cleanup. The built-in subtractive synth, PCM loop capture/playback, durable host persistence, and MP3 encoding are not implemented yet. The simulated loop engine rejects MP3 export rather than pretending a file was produced.
+The host now captures normalized MIDI performances into cycle-aligned staged takes and replays staged and promoted takes with mute, level, monitor-only, and held-note cleanup. Neon Pressure is a host-rendered polyphonic subtractive synth with cutoff, resonance, attack, release, LFO rate, and drive controls. PCM loop capture/playback, durable host persistence, and MP3 encoding are not implemented yet. The simulated loop engine rejects MP3 export rather than pretending a file was produced.
 
 ## Run locally
 
@@ -36,7 +36,9 @@ npm run start --workspace @alesis/server
 
 Open `http://127.0.0.1:8787`. The server automatically uses a connected Vortex Wireless 2 and otherwise falls back to the software source. The upper-right status displays the normalized MIDI event count.
 
-When PulseAudio/PipeWire and `/usr/share/sounds/sf2/FluidR3_GM.sf2` are available, the server starts FluidSynth on the default host sink and selects SoundFont Player. Set `AUDIO_MODE=simulated` to disable physical audio output.
+When PulseAudio/PipeWire and at least one SoundFont are available, the server starts FluidSynth on the default host sink and selects SoundFont Player. It discovers `.sf2` and `.sf3` files in `~/Downloads`, `/usr/share/sounds/sf2`, and `/usr/share/sounds/sf3`; the SoundFont Player selector loads them by host-owned ID. Its refresh button rescans those directories without restarting the host. HS Synthetic Electronic is preferred by default, followed by Sonic/STH, FluidR3, and then the first discovered file. Bank, program, gain, chorus, and reverb controls are applied directly to FluidSynth and retained when changing SoundFonts. Set `AUDIO_MODE=simulated` to disable physical audio output.
+
+Rendered-audio tests feed the same deterministic MIDI phrase through both synth engines. They verify that opposite valid preset extremes and every continuous dial extreme produce measurably different PCM, and that switching from SoundFont Player to Neon Pressure changes the rendered result.
 
 Force the deterministic software source and demo notes with:
 

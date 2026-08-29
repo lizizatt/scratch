@@ -9,6 +9,33 @@ async function captureOneCycle(engine: SimulatedHostEngine): Promise<void> {
 }
 
 describe("SimulatedHostEngine", () => {
+  it("selects only SoundFonts from the host catalog", async () => {
+    const engine = new SimulatedHostEngine({
+      soundFonts: [{ id: "sonic", name: "Sonic" }, { id: "fluid", name: "FluidR3" }],
+      selectedSoundFontId: "sonic",
+    });
+
+    expect(engine.snapshot().synth.selectedSoundFontId).toBe("sonic");
+    expect((await engine.execute({ type: "select-soundfont", soundFontId: "fluid" })).accepted).toBe(true);
+    expect(engine.snapshot().synth.selectedSoundFontId).toBe("fluid");
+    expect((await engine.execute({ type: "select-soundfont", soundFontId: "missing" })).accepted).toBe(false);
+    expect(engine.snapshot().synth.selectedSoundFontId).toBe("fluid");
+  });
+
+  it("replaces the SoundFont catalog while preserving a valid selection", () => {
+    const engine = new SimulatedHostEngine({ soundFonts: [{ id: "sonic", name: "Sonic" }], selectedSoundFontId: "sonic" });
+    const result = engine.replaceSoundFonts([
+      { id: "sonic", name: "Sonic" },
+      { id: "new-bank", name: "New Bank" },
+    ], "sonic");
+
+    expect(result.accepted).toBe(true);
+    expect(engine.snapshot().synth).toMatchObject({
+      selectedSoundFontId: "sonic",
+      soundFonts: [{ id: "sonic", name: "Sonic" }, { id: "new-bank", name: "New Bank" }],
+    });
+  });
+
   it("starts with the metronome enabled at 25 percent", () => {
     const engine = new SimulatedHostEngine();
 

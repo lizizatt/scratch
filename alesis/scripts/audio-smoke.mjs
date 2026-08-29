@@ -6,7 +6,7 @@ import WebSocket from "ws";
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
 await settleAudioServer();
-const { synthPeak, metronomePeak } = await runProbe(8791, async (port) => {
+const { synthPeak, neonPeak, metronomePeak } = await runProbe(8791, async (port) => {
   await sendCommands(port, [
     { type: "configure", settings: { bpm: 240, beatsPerMeasure: 4, loopMeasures: 1, countInEnabled: false, metronomeEnabled: true, metronomeVolume: 1 } },
     { type: "play" },
@@ -19,10 +19,15 @@ const { synthPeak, metronomePeak } = await runProbe(8791, async (port) => {
   ]);
   await waitForSnapshot(port, (snapshot) => snapshot.engine.midiEventsReceived >= 2);
   const synthPeak = await capturePeak();
-  return { synthPeak, metronomePeak };
+  await sendCommands(port, [{ type: "select-synth", synthId: "subtractive" }]);
+  await waitForSnapshot(port, (snapshot) => snapshot.synth.selectedId === "subtractive" && snapshot.engine.midiEventsReceived >= 4);
+  const neonPeak = await capturePeak();
+  await sendCommands(port, [{ type: "select-synth", synthId: "soundfont" }]);
+  return { synthPeak, neonPeak, metronomePeak };
 });
 
 console.log(`Synth peak: ${synthPeak.toFixed(1)} dB`);
+console.log(`Neon peak: ${neonPeak.toFixed(1)} dB`);
 console.log(`Metronome peak: ${metronomePeak.toFixed(1)} dB`);
 
 async function runProbe(port, probe) {
@@ -53,6 +58,7 @@ async function runProbe(port, probe) {
       throw new Error(`${message}\nAudio host output:\n${hostOutput.trim() || "(none)"}`);
     }
     if (peaks.synthPeak <= -60) throw new Error(`Expected audible synth PCM above -60 dB, received ${peaks.synthPeak.toFixed(1)} dB`);
+    if (peaks.neonPeak <= -60) throw new Error(`Expected audible Neon PCM above -60 dB, received ${peaks.neonPeak.toFixed(1)} dB`);
     if (peaks.metronomePeak <= -60) throw new Error(`Expected audible metronome PCM above -60 dB, received ${peaks.metronomePeak.toFixed(1)} dB`);
     if (/Ringbuffer full|Failed to allocate a synthesis process|FluidSynth renderer stalled|audio recovery failed/i.test(hostOutput)) {
       throw new Error(`FluidSynth saturation detected:\n${hostOutput}`);

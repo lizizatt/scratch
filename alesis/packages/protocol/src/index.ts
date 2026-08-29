@@ -33,6 +33,11 @@ export const synthParameterSchema = z.object({
   unit: z.string(),
 });
 
+export const soundFontSchema = z.object({
+  id: z.string().min(1).max(128),
+  name: z.string().min(1).max(256),
+});
+
 export const engineSnapshotSchema = z.object({
   protocolVersion: z.literal(PROTOCOL_VERSION),
   revision: z.number().int().nonnegative(),
@@ -53,6 +58,8 @@ export const engineSnapshotSchema = z.object({
   synth: z.object({
     selectedId: z.string(),
     available: z.array(z.object({ id: z.string(), name: z.string() })),
+    soundFonts: z.array(soundFontSchema),
+    selectedSoundFontId: z.string().nullable(),
     parameters: z.array(synthParameterSchema),
   }),
   capture: z.object({
@@ -70,6 +77,8 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("set-monitor-only"), enabled: z.boolean() }),
   z.object({ type: z.literal("configure"), settings: settingsSchema.partial(), clearAudio: z.boolean().optional() }),
   z.object({ type: z.literal("select-synth"), synthId: z.string().min(1) }),
+  z.object({ type: z.literal("select-soundfont"), soundFontId: z.string().min(1).max(128) }),
+  z.object({ type: z.literal("refresh-soundfonts") }),
   z.object({ type: z.literal("set-synth-parameter"), parameterId: z.string().min(1), value: z.number() }),
   z.object({ type: z.literal("set-staged-audible"), audible: z.boolean() }),
   z.object({ type: z.literal("promote-staged") }),
@@ -101,6 +110,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 export type Settings = z.infer<typeof settingsSchema>;
 export type Take = z.infer<typeof takeSchema>;
 export type SynthParameter = z.infer<typeof synthParameterSchema>;
+export type SoundFont = z.infer<typeof soundFontSchema>;
 export type EngineSnapshot = z.infer<typeof engineSnapshotSchema>;
 export type EngineCommand = z.infer<typeof commandSchema>;
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;

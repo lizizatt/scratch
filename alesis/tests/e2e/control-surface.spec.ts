@@ -21,7 +21,14 @@ test("connects every selected pane to the host without viewport overflow", async
   const beatCount = Number(await page.getByLabel("Beats per measure").inputValue()) * Number(await page.getByLabel("Loop measures").inputValue());
 
   await page.getByRole("button", { name: "Synth" }).click();
+  await page.getByLabel("Synthesizer").selectOption("subtractive");
+  await expect(page.locator(".parameter")).toHaveCount(6);
   await page.getByLabel("Synthesizer").selectOption("soundfont");
+  const soundFont = page.getByLabel("SoundFont", { exact: true });
+  await expect(soundFont).toHaveValue("hs-synthetic-electronic-sf2");
+  await expect(soundFont.locator("option", { hasText: "FluidR3_GM" })).toHaveCount(1);
+  await page.getByRole("button", { name: "Refresh SoundFonts" }).click();
+  await expect(soundFont).toHaveValue("hs-synthetic-electronic-sf2");
   await expect(page.locator(".parameter")).toHaveCount(5);
 
   await page.getByRole("button", { name: "Loops" }).click();

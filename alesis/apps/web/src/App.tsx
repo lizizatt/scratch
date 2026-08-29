@@ -6,6 +6,7 @@ import {
   Pause,
   Play,
   Plus,
+  RefreshCw,
   Repeat2,
   RotateCcw,
   Settings,
@@ -114,14 +115,23 @@ function SettingsPane({ snapshot, send }: PaneProps) {
 function SynthPane({ snapshot, send }: PaneProps) {
   return (
     <section className="pane synth-pane" aria-label="Synth controls">
-      <select className="synth-select" aria-label="Synthesizer" value={snapshot.synth.selectedId} onChange={(event) => send({ type: "select-synth", synthId: event.target.value })}>
-        {snapshot.synth.available.map((synth) => <option key={synth.id} value={synth.id}>{synth.name}</option>)}
-      </select>
+      <div className="synth-selectors">
+        <select className="synth-select" aria-label="Synthesizer" value={snapshot.synth.selectedId} onChange={(event) => send({ type: "select-synth", synthId: event.target.value })}>
+          {snapshot.synth.available.map((synth) => <option key={synth.id} value={synth.id}>{synth.name}</option>)}
+        </select>
+        {snapshot.synth.selectedId === "soundfont" && <div className="soundfont-picker">
+          <select className="soundfont-select" aria-label="SoundFont" value={snapshot.synth.selectedSoundFontId ?? ""} disabled={snapshot.synth.soundFonts.length === 0} onChange={(event) => send({ type: "select-soundfont", soundFontId: event.target.value })}>
+            {snapshot.synth.soundFonts.length === 0 && <option value="">No SoundFonts found</option>}
+            {snapshot.synth.soundFonts.map((soundFont) => <option key={soundFont.id} value={soundFont.id}>{soundFont.name}</option>)}
+          </select>
+          <IconButton label="Refresh SoundFonts" onClick={() => send({ type: "refresh-soundfonts" })}><RefreshCw /></IconButton>
+        </div>}
+      </div>
       <section className="synth-module" aria-label="Synth parameter module">
         {snapshot.synth.parameters.map((parameter) => (
           <label className="parameter" key={parameter.id}>
             <span>{parameter.label}</span>
-            <input type="range" min={parameter.minimum} max={parameter.maximum} step={(parameter.maximum - parameter.minimum) / 200} value={parameter.value} onChange={(event) => send({ type: "set-synth-parameter", parameterId: parameter.id, value: Number(event.target.value) })} />
+            <input type="range" min={parameter.minimum} max={parameter.maximum} step={parameter.id === "bank" || parameter.id === "program" ? 1 : (parameter.maximum - parameter.minimum) / 200} value={parameter.value} onChange={(event) => send({ type: "set-synth-parameter", parameterId: parameter.id, value: Number(event.target.value) })} />
             <output>{formatParameter(parameter.value, parameter.unit)}</output>
           </label>
         ))}

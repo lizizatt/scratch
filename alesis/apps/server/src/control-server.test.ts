@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SimulatedHostEngine } from "@alesis/engine";
 import { PROTOCOL_VERSION, serverMessageSchema, type ServerMessage } from "@alesis/protocol";
 import WebSocket from "ws";
@@ -58,6 +58,24 @@ describe("control server", () => {
     await collectUntil(inbox, (message) => message.type === "command-result");
 
     expect(engine.snapshot().promoted).toHaveLength(1);
+    socket.close();
+  });
+
+  it("routes commands through a host executor", async () => {
+    engine = new SimulatedHostEngine();
+    const executeCommand = vi.fn((command) => engine!.execute(command));
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    socket.send(JSON.stringify({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: "7b9eff8a-730e-4f0f-aa58-e603bf1125c0",
+      command: { type: "play" },
+    }));
+
+    await collectUntil(inbox, (message) => message.type === "command-result");
+    expect(executeCommand).toHaveBeenCalledWith({ type: "play" });
     socket.close();
   });
 

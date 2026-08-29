@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { PassThrough } from "node:stream";
-import { drainFluidSynthStdout, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, waitForFluidSynthShell } from "./index.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { discoverSoundFonts, drainFluidSynthStdout, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, preferredSoundFont, soundFontParameterCommands, waitForFluidSynthShell } from "./index.js";
 
 describe("FluidSynth output", () => {
   it("maps normalized MIDI events to FluidSynth commands", () => {
@@ -52,10 +55,54 @@ describe("FluidSynth output", () => {
     await expect(waitForFluidSynthShell(stdin, stdout, 100)).resolves.toBeUndefined();
   });
 
-  it("maps metronome accents and level to short GM percussion notes", () => {
-    expect(metronomeCommands(true, 1)).toEqual({ noteOn: "noteon 9 76 127", noteOff: "noteoff 9 76" });
-    expect(metronomeCommands(false, 0.4)).toEqual({ noteOn: "noteon 9 77 51", noteOff: "noteoff 9 77" });
+  it("maps metronome accents and level to short bank-agnostic notes", () => {
+    expect(metronomeCommands(true, 1)).toEqual({ noteOn: "noteon 15 96 127", noteOff: "noteoff 15 96" });
+    expect(metronomeCommands(false, 0.4)).toEqual({ noteOn: "noteon 15 84 51", noteOff: "noteoff 15 84" });
     expect(metronomeCommands(false, 0)).toBeNull();
+  });
+
+  it("prefers HS Synthetic Electronic, then Sonic, FluidR3, and the first available file", () => {
+    const electronic = { id: "hs", name: "HS Synthetic Electronic", path: "/fonts/HS Synthetic Electronic.sf2" };
+    const fluid = { id: "fluid", name: "FluidR3_GM", path: "/fonts/FluidR3_GM.sf2" };
+    const sonic = { id: "sth", name: "STH", path: "/fonts/STH.sf2" };
+    const piano = { id: "piano", name: "Piano", path: "/fonts/Piano.sf2" };
+
+    expect(preferredSoundFont([piano, fluid, sonic, electronic])).toBe(electronic);
+    expect(preferredSoundFont([piano, fluid, sonic])).toBe(sonic);
+    expect(preferredSoundFont([piano, fluid])).toBe(fluid);
+    expect(preferredSoundFont([piano])).toBe(piano);
+    expect(preferredSoundFont([])).toBeNull();
+  });
+
+  it("discovers SF2 and SF3 files without exposing unrelated files", () => {
+    const directory = mkdtempSync(join(tmpdir(), "alesis-soundfonts-"));
+    try {
+      writeFileSync(join(directory, "Sonic Bank.sf2"), "fixture");
+      writeFileSync(join(directory, "Compact.sf3"), "fixture");
+      writeFileSync(join(directory, "notes.txt"), "fixture");
+      mkdirSync(join(directory, "nested"));
+      writeFileSync(join(directory, "nested", "Strings.sf2"), "fixture");
+
+      expect(discoverSoundFonts([directory])).toEqual([
+        { id: "compact-sf3", name: "Compact", path: join(directory, "Compact.sf3") },
+        { id: "sonic-bank-sf2", name: "Sonic Bank", path: join(directory, "Sonic Bank.sf2") },
+        { id: "strings-sf2", name: "Strings", path: join(directory, "nested", "Strings.sf2") },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("maps every SoundFont control to real-time FluidSynth commands", () => {
+    expect(soundFontParameterCommands("bank", 2, { bank: 0, program: 7 })).toContain("select 0 1 2 7");
+    expect(soundFontParameterCommands("program", 7, { bank: 2, program: 0 })).toContain("select 14 1 2 7");
+    expect(soundFontParameterCommands("gain", 0.72)).toEqual(["gain 0.72"]);
+    expect(soundFontParameterCommands("chorus", 0.4)).toContain("cho_set_level 4");
+    expect(soundFontParameterCommands("chorus", 0.4)).toContain("cc 0 93 51");
+    expect(soundFontParameterCommands("chorus", 0)).toContain("chorus 0");
+    expect(soundFontParameterCommands("reverb", 0.6)).toContain("rev_setlevel 0.6");
+    expect(soundFontParameterCommands("reverb", 0.6)).toContain("cc 14 91 76");
+    expect(soundFontParameterCommands("reverb", 0)).toContain("reverb 0");
   });
 
 });

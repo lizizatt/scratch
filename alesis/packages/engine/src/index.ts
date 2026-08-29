@@ -3,6 +3,7 @@ import {
   engineSnapshotSchema,
   type EngineCommand,
   type EngineSnapshot,
+  type SoundFont,
   type SynthParameter,
   type Take,
 } from "@alesis/protocol";
@@ -60,6 +61,11 @@ interface DeletedTake {
   index: number;
 }
 
+export interface SimulatedHostEngineOptions {
+  soundFonts?: SoundFont[];
+  selectedSoundFontId?: string | null;
+}
+
 export class SimulatedHostEngine implements HostEngine {
   private state: EngineSnapshot;
   private listeners = new Set<EngineListener>();
@@ -70,7 +76,9 @@ export class SimulatedHostEngine implements HostEngine {
   private deletedTake: DeletedTake | null = null;
   private nextTakeId = 1;
 
-  constructor() {
+  constructor(options: SimulatedHostEngineOptions = {}) {
+    const soundFonts = options.soundFonts ?? [];
+    const selectedSoundFontId = options.selectedSoundFontId ?? soundFonts[0]?.id ?? null;
     this.state = engineSnapshotSchema.parse({
       protocolVersion: PROTOCOL_VERSION,
       revision: 0,
@@ -93,6 +101,8 @@ export class SimulatedHostEngine implements HostEngine {
           { id: "subtractive", name: "Neon Pressure" },
           { id: "soundfont", name: "SoundFont Player" },
         ],
+        soundFonts,
+        selectedSoundFontId,
         parameters: subtractiveParameters,
       },
       capture: { currentWaveform: [], staged: null, stagedAudible: true },
@@ -125,6 +135,22 @@ export class SimulatedHostEngine implements HostEngine {
     const result = this.applyCommand(command);
     if (result.accepted) this.publish();
     return result;
+  }
+
+  replaceSoundFonts(soundFonts: SoundFont[], selectedSoundFontId: string | null): EngineResult {
+    if (selectedSoundFontId !== null && !soundFonts.some(({ id }) => id === selectedSoundFontId)) {
+      return {
+        accepted: false,
+        revision: this.state.revision,
+        appliedCycle: this.state.transport.cycle,
+        error: `Unknown SoundFont: ${selectedSoundFontId}`,
+      };
+    }
+    this.state.synth.soundFonts = structuredClone(soundFonts);
+    this.state.synth.selectedSoundFontId = selectedSoundFontId;
+    this.state.revision += 1;
+    this.publish(false);
+    return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
   }
 
   advance(seconds: number): void {
@@ -225,6 +251,12 @@ export class SimulatedHostEngine implements HostEngine {
         this.state.synth.parameters = structuredClone(parameters);
         break;
       }
+      case "select-soundfont":
+        if (!this.state.synth.soundFonts.some(({ id }) => id === command.soundFontId)) return reject(`Unknown SoundFont: ${command.soundFontId}`);
+        this.state.synth.selectedSoundFontId = command.soundFontId;
+        break;
+      case "refresh-soundfonts":
+        return reject("SoundFont refresh requires the host catalog");
       case "set-synth-parameter": {
         const parameter = this.state.synth.parameters.find(({ id }) => id === command.parameterId);
         if (!parameter) return reject(`Unknown parameter: ${command.parameterId}`);

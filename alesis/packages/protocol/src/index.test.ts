@@ -47,7 +47,7 @@ describe("control protocol", () => {
       },
       transport: { state: "stopped", cycle: 0, progress: 0 },
       monitorOnly: false,
-      synth: { selectedId: "subtractive", available: [], parameters: [] },
+      synth: { selectedId: "subtractive", available: [], soundFonts: [], selectedSoundFontId: null, parameters: [] },
       capture: { currentWaveform: Array.from({ length: 257 }, () => 0), staged: null, stagedAudible: true },
       promoted: [],
       canUndoDelete: false,

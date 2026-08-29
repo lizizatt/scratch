@@ -28,7 +28,10 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .setting input:not([type="checkbox"]), .setting select { width: 100%; min-width: 0; padding: 5px 9px; color: var(--cyan); border: 0; border-bottom: 1px solid var(--blue); background: #000; font-size: inherit; }
 .setting input[type="checkbox"] { width: 28px; height: 28px; accent-color: var(--cyan); }
 .synth-pane { padding: clamp(24px,5vh,48px) 6vw 20px; }
-.synth-select { width: min(560px,70vw); height: 44px; display: block; margin: 0 auto 3vh; padding: 0 14px; color: var(--ice); border: 1px solid var(--blue); background: #000; font-size: clamp(16px,2vw,24px); }
+.synth-selectors { width: min(900px,88vw); margin: 0 auto 3vh; display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 10px; }
+.synth-select, .soundfont-select { width: 100%; min-width: 0; height: 44px; padding: 0 14px; color: var(--ice); border: 1px solid var(--blue); background: #000; font-size: clamp(16px,2vw,24px); }
+.soundfont-picker { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) 40px; gap: 5px; align-items: center; }
+.soundfont-picker .icon-button { height: 44px; }
 .synth-module { width: min(1080px,88vw); min-height: 48vh; margin: auto; padding: clamp(18px,3vw,38px); display: grid; grid-template-columns: repeat(6,minmax(70px,1fr)); gap: 22px 16px; border: 1px solid rgba(0,183,255,.18); border-radius: 8px; }
 .parameter { min-width: 0; display: grid; align-content: center; gap: 12px; color: var(--dim); text-align: center; text-transform: uppercase; }
 .parameter input { width: 100%; accent-color: var(--cyan); }
@@ -76,8 +79,11 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
   .settings-pane { padding: 10px 0; }
   .settings-list { gap: 6px; }
   .setting { font-size: clamp(14px,2.5vw,23px); }
-  .synth-pane { padding-top: 8px; }
-  .synth-select { height: 34px; margin-bottom: 7px; }
+  .synth-pane { padding-top: 25px; }
+  .synth-selectors { margin-bottom: 7px; }
+  .synth-select, .soundfont-select { height: 34px; }
+  .soundfont-picker { grid-template-columns: minmax(0,1fr) 35px; }
+  .soundfont-picker .icon-button { height: 34px; }
   .synth-module { min-height:0; height:calc(100% - 42px); padding:12px; gap:8px; }
   .take-row { min-height: 42px; }
   .take-row .waveform { height: 32px; }

@@ -12,7 +12,7 @@ interface AudibleTake {
   channel: number;
 }
 
-const playbackChannels = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15];
+const playbackChannels = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
 
 export class MidiLoopScheduler {
   private recordings = new Map<string, RecordedMidiEvent[]>();
