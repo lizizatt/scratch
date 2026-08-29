@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Alesis UI Prototype</title>
+  <!-- Throwaway prototype: three landscape-first interpretations, switchable via ?variant=A|B|C. -->
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Space+Mono:wght@400;700&display=swap");
+    :root {
+      color-scheme: dark;
+      --black: #000;
+      --deep: #032b61;
+      --blue: #075dff;
+      --cyan: #00b7ff;
+      --ice: #8cecff;
+      --text: #b9f5ff;
+      --dim: #32688a;
+      --line: rgba(0, 183, 255, .24);alesis vortex wireless 2 keytar, 
+      --danger: #ff3d8d;
+      --radius: 7px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-width: 320px; min-height: 100%; overflow: hidden; background: var(--black); }
+    body { color: var(--text); font-family: "Share Tech Mono", monospace; letter-spacing: 0; }
+    button, input, select { font: inherit; }
+    button { color: var(--cyan); border: 1px solid var(--line); border-radius: 6px; background: rgba(0, 17, 34, .68); cursor: pointer; }
+    button:hover, button:focus-visible, select:focus-visible, input:focus-visible { outline: 1px solid var(--ice); border-color: var(--cyan); box-shadow: 0 0 14px rgba(0, 183, 255, .2); }
+    button[aria-pressed="true"], button.active { color: var(--black); background: var(--cyan); border-color: var(--ice); }
+    svg { width: 1.35rem; height: 1.35rem; stroke-width: 1.7; }
+
+    .app { width: 100vw; height: 100dvh; min-height: 320px; position: relative; isolation: isolate; overflow: hidden; background: #000; }
+    .pane { position: absolute; inset: 0 0 58px; display: none; overflow: hidden; }
+    .pane.active { display: block; }
+
+    .app-nav { position: fixed; z-index: 30; left: max(14px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+    .app-nav button { width: 42px; height: 42px; display: grid; place-items: center; border: 0; background: transparent; }
+    .app-nav button.active { color: var(--ice); background: transparent; filter: drop-shadow(0 0 7px var(--cyan)); }
+
+    .settings-pane { place-items: center; }
+    .settings-pane.active { display: grid; }
+    .settings-list { width: min(760px, 88vw); display: grid; gap: clamp(14px, 3.2vh, 34px); }
+    .setting { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(180px, .72fr); align-items: center; gap: 30px; font-family: "Space Mono", monospace; font-size: clamp(20px, 3.6vw, 42px); text-transform: uppercase; }
+    .setting label { color: var(--ice); text-align: right; text-shadow: 0 0 12px rgba(0, 183, 255, .35); }
+    .setting input, .setting select { width: 100%; min-width: 0; padding: 7px 10px; color: var(--cyan); border: 0; border-bottom: 1px solid var(--blue); border-radius: 0; background: #000; font-size: inherit; }
+
+    .synth-pane { padding: clamp(18px, 4vh, 42px) 6vw 20px; }
+    .synth-select { width: min(560px, 70vw); height: 46px; display: block; margin: 0 auto 3vh; padding: 0 14px; color: var(--ice); border: 1px solid var(--blue); border-radius: 5px; background: #000; font-size: clamp(16px, 2vw, 25px); }
+    .synth-module { width: min(1080px, 88vw); min-height: 50vh; margin: auto; padding: clamp(20px, 4vw, 48px); border: 1px solid rgba(0, 183, 255, .18); border-radius: 8px; }
+    .synth-module header { margin-bottom: 28px; color: var(--dim); font-size: 12px; text-transform: uppercase; }
+    .knobs { display: grid; grid-template-columns: repeat(6, minmax(70px, 1fr)); gap: 28px 16px; }
+    .control { text-align: center; }
+    .knob { --angle: 30deg; width: clamp(54px, 7vw, 86px); aspect-ratio: 1; margin: auto; position: relative; border: 2px solid var(--blue); border-radius: 50%; background: radial-gradient(circle, #041526 35%, #000 67%); box-shadow: inset 0 0 14px rgba(0, 93, 255, .28); }
+    .knob::after { content: ""; width: 2px; height: 36%; position: absolute; top: 9%; left: calc(50% - 1px); background: var(--ice); transform: rotate(var(--angle)); transform-origin: 50% 115%; box-shadow: 0 0 7px var(--cyan); }
+    .control label { display: block; margin-top: 10px; color: var(--dim); font-size: clamp(10px, 1.2vw, 14px); text-transform: uppercase; }
+    .control output { display: block; margin-top: 3px; color: var(--cyan); font-size: clamp(11px, 1.3vw, 16px); }
+
+    .loop-pane { padding: max(12px, env(safe-area-inset-top)) 3vw 10px; }
+    .loop-toolbar { height: 46px; display: flex; align-items: center; justify-content: space-between; }
+    .transport-controls { display: flex; gap: 7px; }
+    .tool-button { width: 42px; height: 38px; display: grid; place-items: center; border-color: transparent; background: transparent; }
+    .save-status { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: 11px; text-transform: uppercase; }
+    .save-status button { border-color: transparent; }
+    .loop-workspace { height: calc(100% - 48px); min-height: 0; }
+    .lane-label { color: var(--dim); font-size: 10px; text-transform: uppercase; }
+    .wave-shell { min-width: 0; position: relative; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .progress { position: absolute; top: 0; bottom: 0; left: var(--progress, 62%); width: 1px; background: var(--ice); box-shadow: 0 0 12px var(--cyan); }
+    .take-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    .take-actions button, .row-actions button { width: 38px; height: 34px; display: grid; place-items: center; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--blue) 8%, var(--blue) 92%, transparent); opacity: .6; }
+    .promoted-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--blue) #000; }
+    .promoted-row { min-width: 0; display: grid; align-items: center; gap: 10px; }
+    .take-number { color: var(--deep); font: 700 13px "Space Mono", monospace; }
+    .row-wave { height: 42px; min-width: 0; border-bottom: 1px solid rgba(0, 93, 255, .2); }
+    .row-actions { display: flex; gap: 5px; }
+    .delete:hover { color: var(--danger); border-color: var(--danger); }
+    .empty-state { padding: 26px; color: var(--deep); text-align: center; text-transform: uppercase; }
+
+    /* A: faithful vertical stack, long waveform lanes. */
+    [data-variant="A"] .loop-workspace { display: grid; grid-template-rows: minmax(75px, 1.05fr) minmax(58px, .78fr) 1px minmax(78px, 1.55fr); gap: 10px; }
+    [data-variant="A"] .current-block { display: grid; grid-template-rows: auto 1fr; gap: 4px; }
+    [data-variant="A"] .staged-block { width: 91%; margin-left: 5%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+    [data-variant="A"] .staged-block .wave-shell { height: 100%; }
+    [data-variant="A"] .promoted-scroll { padding: 0 5%; }
+    [data-variant="A"] .promoted-row { grid-template-columns: 28px minmax(0, 1fr) auto; min-height: 54px; }
+
+    /* B: two equal performance decks, compact promoted strips. */
+    [data-variant="B"] .loop-workspace { display: grid; grid-template-columns: 1.28fr .72fr; grid-template-rows: minmax(0, 1fr) 1px minmax(84px, .56fr); gap: 10px 18px; }
+    [data-variant="B"] .current-block, [data-variant="B"] .staged-block { min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 6px; }
+    [data-variant="B"] .staged-block { grid-column: 2; }
+    [data-variant="B"] .divider { grid-column: 1 / -1; }
+    [data-variant="B"] .promoted-scroll { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 31vw); gap: 12px; overflow-x: auto; overflow-y: hidden; }
+    [data-variant="B"] .promoted-row { grid-template-columns: 20px minmax(0, 1fr) auto; border-right: 1px solid var(--line); }
+    [data-variant="B"] .row-actions button { width: 32px; }
+
+    /* C: live waveform is the stage; takes float as translucent ribbons. */
+    [data-variant="C"] .loop-workspace { position: relative; padding-top: 3px; }
+    [data-variant="C"] .current-block { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr; gap: 5px; }
+    [data-variant="C"] .current-block .wave-shell { border-color: rgba(0, 93, 255, .2); }
+    [data-variant="C"] .staged-block { width: min(72%, 820px); height: 26%; position: absolute; z-index: 3; left: 6%; top: 39%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 7px; border: 1px solid rgba(0, 183, 255, .35); border-radius: 8px; background: rgba(0, 0, 0, .82); box-shadow: 0 10px 35px #000; }
+    [data-variant="C"] .divider { display: none; }
+    [data-variant="C"] .promoted-scroll { width: 88%; height: 29%; position: absolute; z-index: 4; left: 6%; bottom: 2%; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 8px; padding: 6px; border-top: 1px solid var(--blue); background: rgba(0, 0, 0, .86); overflow-x: auto; overflow-y: hidden; }
+    [data-variant="C"] .promoted-row { grid-template-columns: 20px minmax(0, 1fr) auto; }
+    [data-variant="C"] .row-actions button { width: 30px; border: 0; background: transparent; }
+    [data-variant="C"] .row-actions button[aria-pressed="true"] { color: var(--cyan); }
+
+    .prototype-switcher { position: fixed; z-index: 50; left: 50%; bottom: max(11px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: 35px auto 35px; align-items: center; border: 1px solid #777; border-radius: 18px; color: #eee; background: #242424; box-shadow: 0 5px 20px #000; transform: translateX(-50%); font: 11px sans-serif; }
+    .prototype-switcher button { width: 35px; height: 32px; border: 0; color: #fff; background: transparent; }
+    .prototype-label { min-width: 150px; padding: 0 9px; text-align: center; }
+
+    @media (orientation: portrait) {
+      .app::before { content: "ROTATE DEVICE FOR PERFORMANCE VIEW"; position: absolute; z-index: 100; inset: 0; display: grid; place-items: center; padding: 30px; color: var(--cyan); background: #000; text-align: center; font-size: 18px; }
+    }
+    @media (max-height: 500px) {
+      .pane { inset-bottom: 50px; }
+      .loop-pane { padding-top: 5px; }
+      .loop-toolbar { height: 38px; }
+      .tool-button { width: 36px; height: 32px; }
+      .app-nav button { width: 37px; height: 37px; }
+      .synth-pane { padding-top: 8px; }
+      .synth-select { height: 35px; margin-bottom: 8px; }
+      .synth-module { min-height: 0; height: calc(100% - 45px); padding: 14px; }
+      .synth-module header { margin-bottom: 10px; }
+      .knobs { gap: 9px; }
+      .knob { width: min(55px, 9vh); }
+      .setting { font-size: clamp(15px, 3.2vw, 27px); }
+      [data-variant="A"] .loop-workspace { gap: 6px; }
+      [data-variant="A"] .promoted-row { min-height: 43px; }
+    }
+    @media (max-width: 700px) and (orientation: landscape) {
+      .prototype-switcher { bottom: 7px; }
+      .prototype-label { min-width: 118px; }
+      .settings-list { width: 82vw; gap: 11px; }
+      .setting { grid-template-columns: 1fr 1fr; gap: 15px; }
+      .knobs { grid-template-columns: repeat(6, 1fr); gap: 5px; }
+      .take-actions button, .row-actions button { width: 31px; height: 29px; }
+      [data-variant="C"] .staged-block { top: 34%; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <div class="app" data-variant="A">
+    <section class="pane settings-pane" data-pane="settings" aria-label="Options">
+      <div class="settings-list">
+        <div class="setting"><label for="bpm">BPM</label><input id="bpm" type="number" min="30" max="300" value="118"></div>
+        <div class="setting"><label for="meter">Notes per measure</label><input id="meter" type="number" min="1" max="16" value="4"></div>
+        <div class="setting"><label for="input-device">Input device</label><select id="input-device"><option>Vortex Wireless 2</option><option>USB MIDI Interface</option></select></div>
+        <div class="setting"><label for="output-device">Output device</label><select id="output-device"><option>Built-in audio</option><option>USB audio CODEC</option></select></div>
+      </div>
+    </section>
+
+    <section class="pane synth-pane" data-pane="synth" aria-label="Synth controls">
+      <select class="synth-select" aria-label="Synthesizer"><option>Neon Pressure</option><option>Glass FM</option><option>SoundFont Player</option></select>
+      <section class="synth-module" aria-label="Portable per-synth control module">
+        <header>Engine controls // schema-owned module</header>
+        <div class="knobs"></div>
+      </section>
+    </section>
+
+    <section class="pane loop-pane active" data-pane="loops" aria-label="Looper">
+      <header class="loop-toolbar">
+        <div class="transport-controls">
+          <button class="tool-button stop" type="button" aria-label="Stop" title="Stop"><i data-lucide="square"></i></button>
+          <button class="tool-button play active" type="button" aria-label="Play" title="Play"><i data-lucide="play"></i></button>
+          <button class="tool-button monitor" type="button" aria-label="Monitor only" aria-pressed="false" title="Mute loops; monitor synth"><i data-lucide="headphones"></i></button>
+        </div>
+        <div class="save-status"><span class="status-text">Recording loop 03</span><button class="tool-button save" type="button" aria-label="Download promoted takes as MP3" title="Download mix"><i data-lucide="save"></i></button></div>
+      </header>
+      <div class="loop-workspace">
+        <section class="current-block">
+          <span class="lane-label">Current capture // live</span>
+          <div class="wave-shell current-wave"><canvas></canvas><i class="progress"></i></div>
+        </section>
+        <section class="staged-block">
+          <div class="wave-shell staged-wave"><canvas></canvas></div>
+          <div class="take-actions">
+            <button class="promote" type="button" aria-label="Promote staged take" title="Promote take"><i data-lucide="plus"></i></button>
+            <button class="audition active" type="button" aria-label="Mute staged take" aria-pressed="true" title="Mute or unmute staged take"><i data-lucide="volume-2"></i></button>
+          </div>
+        </section>
+        <div class="divider"></div>
+        <section class="promoted-scroll" aria-label="Promoted loops"></section>
+      </div>
+    </section>
+
+    <nav class="app-nav" aria-label="Application sections">
+      <button type="button" data-target="settings" aria-label="Options" title="Options"><i data-lucide="settings"></i></button>
+      <button type="button" data-target="synth" aria-label="Synth" title="Synth"><i data-lucide="music-2"></i></button>
+      <button class="active" type="button" data-target="loops" aria-label="Loops" title="Loops"><i data-lucide="repeat-2"></i></button>
+    </nav>
+
+    <aside class="prototype-switcher" aria-label="Prototype variant switcher">
+      <button class="previous" type="button" aria-label="Previous variant">&#8592;</button>
+      <span class="prototype-label"></span>
+      <button class="next" type="button" aria-label="Next variant">&#8594;</button>
+    </aside>
+  </div>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    const variants = [
+      { key: "A", name: "Signal stack" },
+      { key: "B", name: "Dual deck" },
+      { key: "C", name: "Wave stage" }
+    ];
+    const app = document.querySelector(".app");
+    const query = new URLSearchParams(location.search);
+    let variantIndex = Math.max(0, variants.findIndex(({ key }) => key === (query.get("variant") || "A").toUpperCase()));
+    let playing = true;
+    let phase = 0;
+    let takeCounter = 3;
+    let promotedCount = 0;
+    let lastRollover = performance.now();
+    const liveSamples = Array.from({ length: 180 }, (_, index) => Math.sin(index * .24) * .42 + Math.sin(index * .071) * .26);
+    let stagedSamples = [...liveSamples];
+
+    const knobSets = {
+      "Neon Pressure": [["Cutoff", "6.3k", 38], ["Resonance", "42%", -16], ["Attack", "24ms", -38], ["Release", "1.8s", 48], ["LFO", "3.2Hz", 5], ["Drive", "18%", -27]],
+      "Glass FM": [["Ratio", "2.00", 14], ["Index", "4.2", 37], ["Feedback", "21%", -22], ["Attack", "8ms", -42], ["Decay", "760ms", 28], ["Width", "68%", 19]],
+      "SoundFont Player": [["Bank", "001", -42], ["Program", "089", 25], ["Attack", "0ms", -45], ["Release", "940ms", 31], ["Chorus", "12%", -29], ["Reverb", "36%", 4]]
+    };
+
+    function icon(name) { return `<i data-lucide="${name}"></i>`; }
+    function renderKnobs() {
+      const synth = document.querySelector(".synth-select").value;
+      document.querySelector(".knobs").innerHTML = knobSets[synth].map(([label, value, angle]) => `<div class="control"><div class="knob" style="--angle:${angle}deg"></div><label>${label}</label><output>${value}</output></div>`).join("");
+    }
+    function renderVariant() {
+      const variant = variants[variantIndex];
+      app.dataset.variant = variant.key;
+      document.querySelector(".prototype-label").textContent = `${variant.key} — ${variant.name}`;
+      const params = new URLSearchParams(location.search);
+      params.set("variant", variant.key);
+      history.replaceState(null, "", `${location.pathname}?${params}`);
+      requestAnimationFrame(resizeCanvases);
+    }
+    function cycleVariant(direction) { variantIndex = (variantIndex + direction + variants.length) % variants.length; renderVariant(); }
+
+    function drawWave(canvas, samples, live = false) {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = devicePixelRatio || 1;
+      const width = Math.max(1, Math.round(rect.width * ratio));
+      const height = Math.max(1, Math.round(rect.height * ratio));
+      if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+      const context = canvas.getContext("2d");
+      context.clearRect(0, 0, width, height);
+      context.strokeStyle = live ? "#00b7ff" : "#075dff";
+      context.lineWidth = Math.max(1, ratio * (live ? 1.7 : 1.2));
+      context.shadowBlur = live ? 9 * ratio : 3 * ratio;
+      context.shadowColor = live ? "#00b7ff" : "#075dff";
+      context.beginPath();
+      samples.forEach((sample, index) => {
+        const x = index / (samples.length - 1) * width;
+        const motion = live ? Math.sin(index * .11 + phase) * .08 : 0;
+        const y = height * (.5 + (sample + motion) * .43);
+        index ? context.lineTo(x, y) : context.moveTo(x, y);
+      });
+      context.stroke();
+    }
+    function resizeCanvases() {
+      drawWave(document.querySelector(".current-wave canvas"), liveSamples, true);
+      drawWave(document.querySelector(".staged-wave canvas"), stagedSamples);
+      document.querySelectorAll(".row-wave").forEach((canvas, index) => drawWave(canvas, liveSamples.map((sample, point) => sample * (.52 + index * .08) + Math.sin(point * (index + 2) * .047) * .12)));
+    }
+    function addPromotedTake() {
+      promotedCount += 1;
+      const row = document.createElement("article");
+      row.className = "promoted-row";
+      row.innerHTML = `<span class="take-number">${String(promotedCount).padStart(2, "0")}</span><canvas class="row-wave"></canvas><div class="row-actions"><button class="mute active" type="button" aria-label="Mute promoted take ${promotedCount}" aria-pressed="true" title="Mute or unmute">${icon("volume-2")}</button><button class="delete" type="button" aria-label="Delete promoted take ${promotedCount}" title="Delete">${icon("x")}</button></div>`;
+      document.querySelector(".promoted-scroll").append(row);
+      lucide.createIcons({ attrs: { "aria-hidden": "true" } });
+      resizeCanvases();
+    }
+    function rollover(now) {
+      if (!playing || now - lastRollover < 4000) return;
+      lastRollover = now;
+      takeCounter += 1;
+      stagedSamples = liveSamples.map((sample, index) => sample * .86 + Math.sin(index * .16 + phase) * .14);
+      document.querySelector(".status-text").textContent = `Recording loop ${String(takeCounter).padStart(2, "0")}`;
+    }
+    function animate(now) {
+      phase += playing ? .035 : 0;
+      const progress = playing ? ((now - lastRollover) % 4000) / 40 : 0;
+      document.querySelector(".progress").style.setProperty("--progress", `${progress}%`);
+      rollover(now);
+      drawWave(document.querySelector(".current-wave canvas"), liveSamples, true);
+      requestAnimationFrame(animate);
+    }
+
+    document.querySelectorAll(".app-nav button").forEach((button) => button.addEventListener("click", () => {
+      document.querySelectorAll(".app-nav button").forEach((item) => item.classList.toggle("active", item === button));
+      document.querySelectorAll(".pane").forEach((pane) => pane.classList.toggle("active", pane.dataset.pane === button.dataset.target));
+      requestAnimationFrame(resizeCanvases);
+    }));
+    document.querySelector(".synth-select").addEventListener("change", renderKnobs);
+    document.querySelector(".play").addEventListener("click", (event) => { playing = !playing; event.currentTarget.classList.toggle("active", playing); });
+    document.querySelector(".stop").addEventListener("click", () => { playing = false; document.querySelector(".play").classList.remove("active"); document.querySelector(".status-text").textContent = "Stopped"; });
+    document.querySelector(".monitor").addEventListener("click", (event) => { const next = event.currentTarget.getAttribute("aria-pressed") !== "true"; event.currentTarget.setAttribute("aria-pressed", String(next)); });
+    document.querySelector(".audition").addEventListener("click", (event) => { const next = event.currentTarget.getAttribute("aria-pressed") !== "true"; event.currentTarget.setAttribute("aria-pressed", String(next)); event.currentTarget.innerHTML = icon(next ? "volume-2" : "volume-x"); lucide.createIcons({ attrs: { "aria-hidden": "true" } }); });
+    document.querySelector(".promote").addEventListener("click", addPromotedTake);
+    document.querySelector(".promoted-scroll").addEventListener("click", (event) => {
+      const remove = event.target.closest(".delete");
+      if (remove) { remove.closest(".promoted-row").remove(); resizeCanvases(); return; }
+      const mute = event.target.closest(".mute");
+      if (mute) { const next = mute.getAttribute("aria-pressed") !== "true"; mute.setAttribute("aria-pressed", String(next)); mute.innerHTML = icon(next ? "volume-2" : "volume-x"); lucide.createIcons({ attrs: { "aria-hidden": "true" } }); }
+    });
+    document.querySelector(".save").addEventListener("click", () => { document.querySelector(".status-text").textContent = `Mix queued // ${promotedCount} takes`; });
+    document.querySelector(".previous").addEventListener("click", () => cycleVariant(-1));
+    document.querySelector(".next").addEventListener("click", () => cycleVariant(1));
+    addEventListener("keydown", (event) => { if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return; if (event.key === "ArrowLeft") cycleVariant(-1); if (event.key === "ArrowRight") cycleVariant(1); });
+    addEventListener("resize", resizeCanvases);
+
+    renderKnobs();
+    renderVariant();
+    addPromotedTake(); addPromotedTake(); addPromotedTake();
+    lucide.createIcons({ attrs: { "aria-hidden": "true" } });
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
