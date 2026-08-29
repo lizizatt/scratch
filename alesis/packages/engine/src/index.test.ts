@@ -9,6 +9,13 @@ async function captureOneCycle(engine: SimulatedHostEngine): Promise<void> {
 }
 
 describe("SimulatedHostEngine", () => {
+  it("publishes observable normalized MIDI activity", () => {
+    const engine = new SimulatedHostEngine();
+    engine.dispatchMidi({ type: "pitch-bend", channel: 0, value: 0.5 });
+
+    expect(engine.snapshot().engine).toMatchObject({ midiEventsReceived: 1, lastMidiEvent: "pitch-bend" });
+  });
+
   it("counts in, captures, and rolls a cycle into staging", async () => {
     const engine = new SimulatedHostEngine();
     await engine.execute({ type: "configure", settings: { bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });

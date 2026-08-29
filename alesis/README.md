@@ -8,6 +8,7 @@ Host-rendered synthesizer and live looper built around the Alesis Vortex Wireles
 - [Research and architecture recommendation](RESEARCH.md)
 - [Selected UI design](UI_DESIGN.md)
 - [Host-engine architecture decision](docs/adr/0001-host-owned-realtime-engine.md)
+- [Verified hardware and acceptance notes](docs/HARDWARE.md)
 - [Interactive layout studies](mockups/index.html)
 - [Landscape UI comparison prototype](mockups/ui-prototype.html) (`?variant=A`, `B`, or `C`)
 
@@ -21,19 +22,25 @@ Run MIDI, synthesis, transport, loop capture/playback, persistence, MP3 export, 
 
 ## Current implementation
 
-The first vertical slice is runnable with a deterministic host engine and software Vortex. It includes the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
+The first vertical slice is runnable with a deterministic host engine and either the real ALSA Vortex input or a software Vortex fallback. It includes USB-ID-based hardware discovery, raw MIDI stream decoding, observable MIDI activity, the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
 
-Native audio output, ALSA Vortex input, durable host persistence, and MP3 encoding are not implemented yet. The simulated engine rejects MP3 export rather than pretending a file was produced.
+Native synthesis/audio output, durable host persistence, and MP3 encoding are not implemented yet. The simulated engine rejects MP3 export rather than pretending a file was produced.
 
 ## Run locally
 
 ```bash
 npm install
 npm run build
-SOFTWARE_VORTEX_DEMO=1 npm run start --workspace @alesis/server
+npm run start --workspace @alesis/server
 ```
 
-Open `http://127.0.0.1:8787`. The software Vortex alternates notes while the transport runs.
+Open `http://127.0.0.1:8787`. The server automatically uses a connected Vortex Wireless 2 and otherwise falls back to the software source. The upper-right status displays the normalized MIDI event count.
+
+Force the deterministic software source and demo notes with:
+
+```bash
+MIDI_MODE=software SOFTWARE_VORTEX_DEMO=1 npm run start --workspace @alesis/server
+```
 
 Validation:
 

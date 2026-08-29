@@ -29,7 +29,7 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <div className="connection-line"><span className={`connection-dot ${connection}`} /> {connection} // rev {snapshot.revision}</div>
+      <div className="connection-line"><span className={`connection-dot ${connection}`} /> {connection} // rev {snapshot.revision} // MIDI {snapshot.engine.midiEventsReceived}{snapshot.engine.lastMidiEvent ? ` ${snapshot.engine.lastMidiEvent}` : ""}</div>
       {lastError && <div className="error-line" role="alert">{lastError}</div>}
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
@@ -101,7 +101,7 @@ function SettingsPane({ snapshot, send }: PaneProps) {
         <Setting label="BPM"><input aria-label="BPM" type="number" min="30" max="300" value={numberDraft.bpm} onChange={setNumber("bpm")} onBlur={commitNumber("bpm")} onKeyDown={commitOnEnter} /></Setting>
         <Setting label="Beats per measure"><input aria-label="Beats per measure" type="number" min="1" max="16" value={numberDraft.beatsPerMeasure} onChange={setNumber("beatsPerMeasure")} onBlur={commitNumber("beatsPerMeasure")} onKeyDown={commitOnEnter} /></Setting>
         <Setting label="Loop measures"><input aria-label="Loop measures" type="number" min="1" max="128" value={numberDraft.loopMeasures} onChange={setNumber("loopMeasures")} onBlur={commitNumber("loopMeasures")} onKeyDown={commitOnEnter} /></Setting>
-        <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateDevice("midiInputId")}><option value="software-vortex">Software Vortex</option></select></Setting>
+        <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateDevice("midiInputId")}><option value={draft.midiInputId}>{draft.midiInputId.startsWith("alsa:") ? "Vortex Wireless 2" : "Software Vortex"}</option></select></Setting>
         <Setting label="Output device"><select aria-label="Output device" value={draft.audioOutputId} onChange={updateDevice("audioOutputId")}><option value="simulated-output">Simulated output</option></select></Setting>
         <Setting label="Metronome"><input aria-label="Metronome" type="checkbox" checked={draft.metronomeEnabled} onChange={updateBoolean("metronomeEnabled")} /></Setting>
         <Setting label="Click volume"><input aria-label="Click volume" type="range" min="0" max="100" value={numberDraft.metronomeVolume} onChange={setNumber("metronomeVolume")} onBlur={commitNumber("metronomeVolume", 0.01)} /></Setting>

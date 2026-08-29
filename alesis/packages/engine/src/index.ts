@@ -71,7 +71,7 @@ export class SimulatedHostEngine implements HostEngine {
     this.state = engineSnapshotSchema.parse({
       protocolVersion: PROTOCOL_VERSION,
       revision: 0,
-      engine: { mode: "simulated", midiConnected: true, audioConnected: true },
+      engine: { mode: "simulated", midiConnected: true, audioConnected: true, midiEventsReceived: 0, lastMidiEvent: null },
       settings: {
         bpm: 118,
         beatsPerMeasure: 4,
@@ -111,6 +111,9 @@ export class SimulatedHostEngine implements HostEngine {
   dispatchMidi(event: MidiEvent): void {
     if (event.type === "note-on" && event.velocity > 0) this.activeNotes.add(event.note);
     if (event.type === "note-off" || (event.type === "note-on" && event.velocity === 0)) this.activeNotes.delete(event.note);
+    this.state.engine.midiEventsReceived += 1;
+    this.state.engine.lastMidiEvent = event.type;
+    this.publish();
   }
 
   async execute(command: EngineCommand): Promise<EngineResult> {

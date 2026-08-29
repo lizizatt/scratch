@@ -40,6 +40,8 @@ export const engineSnapshotSchema = z.object({
     mode: z.enum(["simulated", "native"]),
     midiConnected: z.boolean(),
     audioConnected: z.boolean(),
+    midiEventsReceived: z.number().int().nonnegative(),
+    lastMidiEvent: z.enum(["note-on", "note-off", "pitch-bend", "control-change", "channel-pressure"]).nullable(),
   }),
   settings: settingsSchema,
   transport: z.object({

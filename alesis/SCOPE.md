@@ -123,7 +123,7 @@ Implementation note: the metronome must join after every loop record tap. Tests 
 - [x] Initial scope and explicit exclusions.
 - [x] Standards/library and architecture research report.
 - [x] Landscape UI exploration; Variant A “Signal Stack” selected and documented in [UI_DESIGN.md](UI_DESIGN.md).
-- [ ] Raw Vortex MIDI capture from the physical instrument.
+- [ ] Complete raw Vortex control capture. Receiver discovery/opening is verified; physical message capture is pending control movement.
 - [ ] Browser latency and loop-timing spike.
 - [ ] Synth adapter proof of concept with two engines.
 - [ ] Architecture decision record for web-only versus native shell.

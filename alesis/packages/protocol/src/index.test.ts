@@ -34,7 +34,7 @@ describe("control protocol", () => {
     const snapshot = {
       protocolVersion: PROTOCOL_VERSION,
       revision: 0,
-      engine: { mode: "simulated", midiConnected: true, audioConnected: true },
+      engine: { mode: "simulated", midiConnected: true, audioConnected: true, midiEventsReceived: 0, lastMidiEvent: null },
       settings: {
         bpm: 120,
         beatsPerMeasure: 4,

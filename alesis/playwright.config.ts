@@ -7,7 +7,7 @@ export default defineConfig({
   reporter: "line",
   use: { baseURL: "http://127.0.0.1:8787", trace: "retain-on-failure" },
   webServer: {
-    command: "SOFTWARE_VORTEX_DEMO=1 npm run start --workspace @alesis/server",
+    command: "MIDI_MODE=software SOFTWARE_VORTEX_DEMO=1 npm run start --workspace @alesis/server",
     url: "http://127.0.0.1:8787/health",
     reuseExistingServer: true,
   },

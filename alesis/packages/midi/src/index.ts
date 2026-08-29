@@ -1,9 +1,15 @@
 import type { MidiEvent } from "@alesis/engine";
+import { createReadStream, existsSync, readFileSync, readdirSync, type ReadStream } from "node:fs";
+import { basename, join } from "node:path";
 
 export type MidiListener = (event: MidiEvent) => void;
 
 export interface MidiSource {
+  readonly id: string;
+  readonly name: string;
   subscribe(listener: MidiListener): () => void;
+  start(): Promise<void>;
+  close(): Promise<void>;
 }
 
 type ControlIndex = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -34,11 +40,19 @@ export const SOFTWARE_VORTEX_PROFILE: Readonly<Record<SoftwareControl, number>> 
 };
 
 export class SoftwareVortex implements MidiSource {
+  readonly id = "software-vortex";
+  readonly name = "Software Vortex";
   private listeners = new Set<MidiListener>();
 
   subscribe(listener: MidiListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  async start(): Promise<void> {}
+
+  async close(): Promise<void> {
+    this.listeners.clear();
   }
 
   keyDown(note: number, velocity = 100, channel = 0): void {
@@ -64,6 +78,136 @@ export class SoftwareVortex implements MidiSource {
 
   private emit(event: MidiEvent): void {
     this.listeners.forEach((listener) => listener(event));
+  }
+}
+
+export const VORTEX_WIRELESS_2_USB_ID = "13b2:005f";
+
+export interface AlsaMidiDevice {
+  id: string;
+  name: string;
+  path: string;
+  usbId: string;
+}
+
+export function discoverVortexDevice(asoundRoot = "/proc/asound", deviceRoot = "/dev/snd"): AlsaMidiDevice | null {
+  if (!existsSync(asoundRoot)) return null;
+  for (const entry of readdirSync(asoundRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !/^card\d+$/.test(entry.name)) continue;
+    const cardDirectory = join(asoundRoot, entry.name);
+    const usbIdPath = join(cardDirectory, "usbid");
+    const midiInfoPath = join(cardDirectory, "midi0");
+    if (!existsSync(usbIdPath) || !existsSync(midiInfoPath)) continue;
+    const usbId = readFileSync(usbIdPath, "utf8").trim().toLowerCase();
+    if (usbId !== VORTEX_WIRELESS_2_USB_ID) continue;
+    const cardNumber = entry.name.slice(4);
+    const path = join(deviceRoot, `midiC${cardNumber}D0`);
+    if (!existsSync(path)) continue;
+    const name = readFileSync(midiInfoPath, "utf8").split("\n", 1)[0]?.trim() || "Vortex Wireless 2";
+    return { id: `alsa:${basename(path)}`, name, path, usbId };
+  }
+  return null;
+}
+
+export class AlsaRawMidiSource implements MidiSource {
+  readonly id: string;
+  readonly name: string;
+  private listeners = new Set<MidiListener>();
+  private stream: ReadStream | null = null;
+  private decoder: MidiByteStreamDecoder;
+
+  constructor(private readonly device: AlsaMidiDevice) {
+    this.id = device.id;
+    this.name = device.name;
+    this.decoder = new MidiByteStreamDecoder((event) => this.listeners.forEach((listener) => listener(event)));
+  }
+
+  subscribe(listener: MidiListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  async start(): Promise<void> {
+    if (this.stream) return;
+    const stream = createReadStream(this.device.path, { highWaterMark: 256 });
+    await new Promise<void>((resolve, reject) => {
+      stream.once("open", () => resolve());
+      stream.once("error", reject);
+    });
+    stream.on("data", (chunk) => {
+      if (typeof chunk !== "string") this.decoder.push(chunk);
+    });
+    stream.on("error", (error) => console.error(`Vortex MIDI input failed: ${error.message}`));
+    this.stream = stream;
+  }
+
+  async close(): Promise<void> {
+    const stream = this.stream;
+    this.stream = null;
+    this.listeners.clear();
+    if (!stream) return;
+    await new Promise<void>((resolve) => {
+      stream.once("close", resolve);
+      stream.destroy();
+    });
+  }
+}
+
+export class MidiByteStreamDecoder {
+  private runningStatus: number | null = null;
+  private status: number | null = null;
+  private data: number[] = [];
+  private inSysEx = false;
+
+  constructor(private readonly emit: MidiListener) {}
+
+  push(bytes: Iterable<number>): void {
+    for (const byte of bytes) this.pushByte(byte);
+  }
+
+  private pushByte(rawByte: number): void {
+    const byte = rawByte & 0xff;
+    if (byte >= 0xf8) return;
+    if (this.inSysEx) {
+      if (byte === 0xf7) this.inSysEx = false;
+      return;
+    }
+    if (byte >= 0x80) {
+      if (byte === 0xf0) {
+        this.inSysEx = true;
+        this.runningStatus = null;
+        this.resetMessage();
+        return;
+      }
+      if (byte >= 0xf0) {
+        this.runningStatus = null;
+        this.resetMessage();
+        return;
+      }
+      this.status = byte;
+      this.runningStatus = byte;
+      this.data = [];
+      return;
+    }
+
+    if (this.status === null) this.status = this.runningStatus;
+    if (this.status === null) return;
+    this.data.push(byte);
+    const expected = messageDataLength(this.status);
+    if (expected === null) {
+      this.resetMessage();
+      return;
+    }
+    if (this.data.length < expected) return;
+    const event = decodeMidiMessage([this.status, ...this.data]);
+    if (event) this.emit(event);
+    this.status = this.runningStatus;
+    this.data = [];
+  }
+
+  private resetMessage(): void {
+    this.status = null;
+    this.data = [];
   }
 }
 
@@ -96,4 +240,11 @@ function dataByte(value: number): number {
 
 function midiChannel(value: number): number {
   return Math.max(0, Math.min(15, Math.round(value)));
+}
+
+function messageDataLength(status: number): number | null {
+  const type = status & 0xf0;
+  if (type === 0xc0 || type === 0xd0) return 1;
+  if (type >= 0x80 && type <= 0xe0) return 2;
+  return null;
 }
