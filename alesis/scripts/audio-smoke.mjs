@@ -6,21 +6,26 @@ import WebSocket from "ws";
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
 await settleAudioServer();
-const synthPeak = await runProbe(8791, true, async (port) => {
-  await waitForSnapshot(port, (snapshot) => snapshot.engine.midiEventsReceived >= 4);
-});
-const metronomePeak = await runProbe(8792, false, async (port) => {
+const { synthPeak, metronomePeak } = await runProbe(8791, async (port) => {
   await sendCommands(port, [
     { type: "configure", settings: { bpm: 240, beatsPerMeasure: 4, loopMeasures: 1, countInEnabled: false, metronomeEnabled: true, metronomeVolume: 1 } },
     { type: "play" },
   ]);
   await waitForSnapshot(port, (snapshot) => snapshot.transport.state === "playing" && snapshot.transport.progress >= 0.25);
+  const metronomePeak = await capturePeak();
+  await sendCommands(port, [
+    { type: "stop" },
+    { type: "configure", settings: { metronomeEnabled: false } },
+  ]);
+  await waitForSnapshot(port, (snapshot) => snapshot.engine.midiEventsReceived >= 2);
+  const synthPeak = await capturePeak();
+  return { synthPeak, metronomePeak };
 });
 
 console.log(`Synth peak: ${synthPeak.toFixed(1)} dB`);
 console.log(`Metronome peak: ${metronomePeak.toFixed(1)} dB`);
 
-async function runProbe(port, softwareDemo, afterStart) {
+async function runProbe(port, probe) {
   const host = spawn("npm", ["run", "start", "--workspace", "@alesis/server"], {
     cwd: projectRoot,
     detached: true,
@@ -29,7 +34,8 @@ async function runProbe(port, softwareDemo, afterStart) {
       PORT: String(port),
       MIDI_MODE: "software",
       AUDIO_MODE: "native",
-      SOFTWARE_VORTEX_DEMO: softwareDemo ? "1" : "0",
+      SOFTWARE_VORTEX_DEMO: "1",
+      SOFTWARE_VORTEX_DEMO_DELAY_MS: "2500",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -39,13 +45,19 @@ async function runProbe(port, softwareDemo, afterStart) {
 
   try {
     await waitUntil(() => hostOutput.includes("Audio output: System Speakers"), 5_000, () => hostOutput);
-    await afterStart?.(port);
-    const peak = await capturePeak();
-    if (peak <= -60) throw new Error(`Expected audible PCM above -60 dB, received ${peak.toFixed(1)} dB`);
-    if (/Ringbuffer full|Failed to allocate a synthesis process/.test(hostOutput)) {
+    let peaks;
+    try {
+      peaks = await probe(port);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${message}\nAudio host output:\n${hostOutput.trim() || "(none)"}`);
+    }
+    if (peaks.synthPeak <= -60) throw new Error(`Expected audible synth PCM above -60 dB, received ${peaks.synthPeak.toFixed(1)} dB`);
+    if (peaks.metronomePeak <= -60) throw new Error(`Expected audible metronome PCM above -60 dB, received ${peaks.metronomePeak.toFixed(1)} dB`);
+    if (/Ringbuffer full|Failed to allocate a synthesis process|FluidSynth renderer stalled|audio recovery failed/i.test(hostOutput)) {
       throw new Error(`FluidSynth saturation detected:\n${hostOutput}`);
     }
-    return peak;
+    return peaks;
   } finally {
     await stopProcess(host);
     await settleAudioServer();

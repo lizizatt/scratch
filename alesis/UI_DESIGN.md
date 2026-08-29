@@ -43,9 +43,10 @@ The loop pane follows a vertical signal stack.
 
 ### Toolbar
 
-- Stop, play, and monitor-only controls sit at the upper left.
+- Stop, play, monitor-only, and metronome mute controls sit at the upper left.
 - Stop discards a partial current capture and resets transport to the start of the cycle. Staged and promoted takes remain unchanged.
 - Monitor-only means promoted and staged playback are muted while direct synth output remains audible.
+- Metronome mute toggles the same host setting shown in Options and takes effect on the next scheduled beat.
 - Save sits at the upper right and exports the current audible promoted mix as an MP3 download. Muted promoted takes, staged audio, direct synth, and metronome are excluded.
 
 ### Current capture

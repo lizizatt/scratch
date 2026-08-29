@@ -53,6 +53,14 @@ npm run test:e2e
 npm run test:audio  # Linux host with PulseAudio/PipeWire speakers
 ```
 
+If the host and FluidSynth stream are visible but both synth and metronome are silent, run `npm run test:audio`. Repeating `snd_pcm_avail after recover: Broken pipe` entries in `journalctl --user -u pipewire` indicate a wedged PipeWire ALSA node rather than another application owning the device. With the Alesis host stopped, recover the per-user audio graph with:
+
+```bash
+systemctl --user restart pipewire pipewire-pulse wireplumber
+```
+
+Then restart the Alesis host. The FluidSynth adapter automatically replaces its own child process if that renderer reports ring-buffer saturation; restarting PipeWire is only needed when the underlying ALSA node itself remains in an `EPIPE` loop.
+
 ## Serve privately to an iPad
 
 With the app running on port 8787 and Tailscale connected on both devices:

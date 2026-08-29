@@ -25,6 +25,14 @@ test("connects every selected pane to the host without viewport overflow", async
 
   await page.getByRole("button", { name: "Loops" }).click();
   await expect(page.getByRole("region", { name: "Looper" })).toBeVisible();
+  const unmuteMetronome = page.getByRole("button", { name: "Unmute metronome" });
+  if (await unmuteMetronome.isVisible()) await unmuteMetronome.click();
+  const muteMetronome = page.getByRole("button", { name: "Mute metronome" });
+  await expect(muteMetronome).toHaveAttribute("aria-pressed", "true");
+  await muteMetronome.click();
+  await expect(unmuteMetronome).toHaveAttribute("aria-pressed", "false");
+  await unmuteMetronome.click();
+  await expect(muteMetronome).toHaveAttribute("aria-pressed", "true");
 
   const dimensions = await page.evaluate(() => ({
     width: innerWidth,

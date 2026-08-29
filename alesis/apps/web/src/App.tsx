@@ -139,6 +139,7 @@ function LoopPane({ snapshot, send }: PaneProps) {
           <IconButton label="Stop" onClick={() => send({ type: "stop" })}><Square /></IconButton>
           <IconButton label={isPlaying ? "Pause unavailable; stop transport" : "Play"} active={isPlaying} onClick={() => send({ type: "play" })}>{isPlaying ? <Pause /> : <Play />}</IconButton>
           <IconButton label="Monitor only" active={snapshot.monitorOnly} pressed={snapshot.monitorOnly} onClick={() => send({ type: "set-monitor-only", enabled: !snapshot.monitorOnly })}><Headphones /></IconButton>
+          <IconButton label={snapshot.settings.metronomeEnabled ? "Mute metronome" : "Unmute metronome"} active={snapshot.settings.metronomeEnabled} pressed={snapshot.settings.metronomeEnabled} onClick={() => send({ type: "configure", settings: { metronomeEnabled: !snapshot.settings.metronomeEnabled } })}>{snapshot.settings.metronomeEnabled ? <Volume2 /> : <VolumeX />}</IconButton>
         </div>
         <div className="transport-status">{snapshot.transport.state} // cycle {String(snapshot.transport.cycle + 1).padStart(2, "0")}</div>
         <IconButton label="Download promoted mix as MP3" onClick={() => send({ type: "export-mp3" })}><Download /></IconButton>

@@ -51,6 +51,10 @@ export function waitForFluidSynthShell(stdin: Writable, stdout: Readable, timeou
   });
 }
 
+export function isFluidSynthRendererStalled(message: string): boolean {
+  return /Ringbuffer full|Failed to allocate a synthesis process/i.test(message);
+}
+
 export class SilentAudioOutput implements AudioOutput {
   readonly id = "simulated-output";
   readonly name = "Simulated output";
@@ -67,6 +71,8 @@ export class FluidSynthOutput implements AudioOutput {
   private readonly soundFontPath: string;
   private readonly gain: number;
   private clickTimers = new Set<ReturnType<typeof setTimeout>>();
+  private recovery: Promise<void> | null = null;
+  private closing = false;
 
   constructor(private readonly options: FluidSynthOptions) {
     this.id = `pulse:${options.device.id}`;
@@ -77,6 +83,11 @@ export class FluidSynthOutput implements AudioOutput {
 
   async start(): Promise<void> {
     if (this.process) return;
+    this.closing = false;
+    await this.launch();
+  }
+
+  private async launch(): Promise<void> {
     if (!existsSync(this.soundFontPath)) throw new Error(`SoundFont not found: ${this.soundFontPath}`);
     const child = spawn("fluidsynth", fluidSynthArguments(this.options.device.id, this.soundFontPath, this.gain), {
       stdio: fluidSynthStdio,
@@ -88,8 +99,13 @@ export class FluidSynthOutput implements AudioOutput {
     child.once("exit", () => {
       if (this.process === child) this.process = null;
     });
+    child.stdin.on("error", () => {});
     child.stderr.on("data", (chunk) => {
       const message = String(chunk).trim();
+      if (isFluidSynthRendererStalled(message)) {
+        this.recover(child);
+        return;
+      }
       if (message && !message.includes("Failed to set thread to high priority")) console.error(message);
     });
     this.process = child;
@@ -115,20 +131,59 @@ export class FluidSynthOutput implements AudioOutput {
   }
 
   async close(): Promise<void> {
-    const child = this.process;
-    this.process = null;
+    this.closing = true;
     for (const timer of this.clickTimers) clearTimeout(timer);
     this.clickTimers.clear();
-    if (!child || child.exitCode !== null) return;
-    await new Promise<void>((resolve) => {
-      child.once("exit", () => resolve());
-      child.stdin.end("quit\n");
-    });
+    if (this.recovery) await this.recovery;
+    const child = this.process;
+    this.process = null;
+    if (child) await stopFluidSynth(child);
   }
 
   private writeCommand(command: string): void {
     if (this.process?.stdin.writable) this.process.stdin.write(`${command}\n`);
   }
+
+  private recover(child: ChildProcessWithoutNullStreams): void {
+    if (this.closing || this.process !== child || this.recovery) return;
+    console.error("FluidSynth renderer stalled; restarting audio output");
+    this.process = null;
+    const recovery = (async () => {
+      await stopFluidSynth(child);
+      if (this.closing) return;
+      await this.launch();
+      console.error("FluidSynth audio output recovered");
+    })().catch((error) => {
+      console.error(`FluidSynth audio recovery failed: ${String(error)}`);
+    }).finally(() => {
+      if (this.recovery === recovery) this.recovery = null;
+    });
+    this.recovery = recovery;
+  }
+}
+
+async function stopFluidSynth(child: ChildProcessWithoutNullStreams): Promise<void> {
+  if (child.exitCode !== null) return;
+  if (child.stdin.writable) child.stdin.end("quit\n");
+  if (await waitForExit(child, 500)) return;
+  child.kill("SIGTERM");
+  if (await waitForExit(child, 500)) return;
+  child.kill("SIGKILL");
+  await waitForExit(child, 500);
+}
+
+function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {
+  if (child.exitCode !== null) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const onExit = (): void => finish(true);
+    const timeout = setTimeout(() => finish(false), timeoutMs);
+    const finish = (exited: boolean): void => {
+      clearTimeout(timeout);
+      child.off("exit", onExit);
+      resolve(exited);
+    };
+    child.once("exit", onExit);
+  });
 }
 
 export function discoverDefaultPulseAudioDevice(): PulseAudioDevice | null {

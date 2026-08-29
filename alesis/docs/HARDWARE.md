@@ -43,4 +43,8 @@ Run `npm run test:audio` on the host to repeat isolated synth and metronome PCM 
 
 During silence diagnosis, the physical Speaker sink was also found OS-muted at 70%. It was restored to unmuted at 70%. The smoke test now detects this state explicitly and reports the muted sink instead of waiting for monitor frames.
 
+A later connected-but-silent incident was not exclusive device ownership: `fuser` showed PipeWire as the only playback PCM owner, the FluidSynth Pulse stream was uncorked and unmuted on the correct sink, and the Vortex ALSA subscription remained connected. PipeWire was repeatedly logging `snd_pcm_avail after recover: Broken pipe` for `hw:sofhdadspp`; even suspending and resuming the sink did not restore monitor frames. Restarting the per-user `pipewire`, `pipewire-pulse`, and `wireplumber` services rebuilt the ALSA node and restored measured output to `-16.7 dB` synth and `-7.5 dB` metronome peaks.
+
+FluidSynth now detects its `Ringbuffer full` and `Failed to allocate a synthesis process` signatures, terminates the stale child with a bounded shutdown, and reconnects a fresh renderer to the selected sink. If PipeWire itself is in the persistent ALSA broken-pipe state, stop the host and run `systemctl --user restart pipewire pipewire-pulse wireplumber` before restarting it.
+
 The metronome uses short GM percussion clicks on channel 10, follows authoritative count-in and transport beats, accents each measure start, and remains outside the take capture path. Audible host output has been confirmed by the user. A systematic control-by-control keytar acceptance pass remains pending.

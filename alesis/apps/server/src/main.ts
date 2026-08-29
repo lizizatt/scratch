@@ -26,12 +26,18 @@ const timer = setInterval(() => {
   metronome.update(engine.snapshot());
 }, 50);
 let demoNoteOn = false;
-const midiDemo = midi instanceof SoftwareVortex && process.env.SOFTWARE_VORTEX_DEMO === "1"
-  ? setInterval(() => {
+let midiDemo: ReturnType<typeof setInterval> | undefined;
+const softwareMidi = midi instanceof SoftwareVortex ? midi : null;
+const startMidiDemo = (): void => {
+  if (!softwareMidi) return;
+  midiDemo = setInterval(() => {
       demoNoteOn = !demoNoteOn;
-      if (demoNoteOn) midi.keyDown(60 + engine.snapshot().transport.cycle % 12, 104);
-      else midi.keyUp(60 + engine.snapshot().transport.cycle % 12);
-    }, 500)
+      if (demoNoteOn) softwareMidi.keyDown(60 + engine.snapshot().transport.cycle % 12, 104);
+      else softwareMidi.keyUp(60 + engine.snapshot().transport.cycle % 12);
+    }, 500);
+};
+const midiDemoStart = softwareMidi && process.env.SOFTWARE_VORTEX_DEMO === "1"
+  ? setTimeout(startMidiDemo, Number(process.env.SOFTWARE_VORTEX_DEMO_DELAY_MS ?? 0))
   : undefined;
 
 console.log(`Alesis control server listening on http://127.0.0.1:${server.port}`);
@@ -40,6 +46,7 @@ console.log(`Audio output: ${audio.name} (${audio.id})`);
 
 async function shutdown(): Promise<void> {
   clearInterval(timer);
+  if (midiDemoStart) clearTimeout(midiDemoStart);
   if (midiDemo) clearInterval(midiDemo);
   disconnectMidi();
   await midi.close();

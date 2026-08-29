@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PassThrough } from "node:stream";
-import { drainFluidSynthStdout, fluidSynthArguments, fluidSynthStdio, metronomeCommands, midiEventToFluidCommand, waitForFluidSynthShell } from "./index.js";
+import { drainFluidSynthStdout, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, waitForFluidSynthShell } from "./index.js";
 
 describe("FluidSynth output", () => {
   it("maps normalized MIDI events to FluidSynth commands", () => {
@@ -35,6 +35,12 @@ describe("FluidSynth output", () => {
     expect(stdout.readableFlowing).toBe(true);
   });
 
+  it("recognizes renderer failures that require a fresh FluidSynth process", () => {
+    expect(isFluidSynthRendererStalled("fluidsynth: warning: Ringbuffer full, try increasing synth.polyphony!")).toBe(true);
+    expect(isFluidSynthRendererStalled("Failed to allocate a synthesis process. (chan=9,key=77)")).toBe(true);
+    expect(isFluidSynthRendererStalled("Using PulseAudio driver")).toBe(false);
+  });
+
   it("waits until the FluidSynth shell consumes commands", async () => {
     const stdin = new PassThrough();
     const stdout = new PassThrough();
@@ -51,4 +57,5 @@ describe("FluidSynth output", () => {
     expect(metronomeCommands(false, 0.4)).toEqual({ noteOn: "noteon 9 77 51", noteOff: "noteoff 9 77" });
     expect(metronomeCommands(false, 0)).toBeNull();
   });
+
 });
