@@ -22,9 +22,9 @@ Run MIDI, synthesis, transport, loop capture/playback, persistence, MP3 export, 
 
 ## Current implementation
 
-The first vertical slice is runnable with a deterministic host engine and either the real ALSA Vortex input or a software Vortex fallback. It includes USB-ID-based hardware discovery, raw MIDI stream decoding, observable MIDI activity, the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
+The first vertical slice is runnable with the real ALSA Vortex input and native FluidSynth output to the host's default system speakers, with software MIDI and silent-audio fallbacks for tests. It includes USB-ID-based hardware discovery, raw MIDI stream decoding, observable MIDI activity, PulseAudio/PipeWire sink discovery, SoundFont synthesis, the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
 
-Native synthesis/audio output, durable host persistence, and MP3 encoding are not implemented yet. The simulated engine rejects MP3 export rather than pretending a file was produced.
+The built-in subtractive synth, real PCM loop capture/playback, durable host persistence, and MP3 encoding are not implemented yet. The simulated loop engine rejects MP3 export rather than pretending a file was produced.
 
 ## Run locally
 
@@ -36,10 +36,12 @@ npm run start --workspace @alesis/server
 
 Open `http://127.0.0.1:8787`. The server automatically uses a connected Vortex Wireless 2 and otherwise falls back to the software source. The upper-right status displays the normalized MIDI event count.
 
+When PulseAudio/PipeWire and `/usr/share/sounds/sf2/FluidR3_GM.sf2` are available, the server starts FluidSynth on the default host sink and selects SoundFont Player. Set `AUDIO_MODE=simulated` to disable physical audio output.
+
 Force the deterministic software source and demo notes with:
 
 ```bash
-MIDI_MODE=software SOFTWARE_VORTEX_DEMO=1 npm run start --workspace @alesis/server
+MIDI_MODE=software AUDIO_MODE=simulated SOFTWARE_VORTEX_DEMO=1 npm run start --workspace @alesis/server
 ```
 
 Validation:

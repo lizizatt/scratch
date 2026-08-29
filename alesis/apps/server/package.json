@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@alesis/audio": "0.1.0",
     "@alesis/engine": "0.1.0",
     "@alesis/midi": "0.1.0",
     "@alesis/protocol": "0.1.0",

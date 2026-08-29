@@ -22,3 +22,13 @@ The raw stream decoder supports MIDI 1.0 channel note on/off, Control Change, ch
 6. Capture the emitted controller numbers for every remappable control and replace provisional profile values with a recorded fixture.
 
 Opening, ownership, and physical note delivery are verified. During acceptance, ALSA received 132 bytes with zero overruns and the host normalized 92 MIDI events; the UI reported `note-off` as the final event and produced live capture plus a staged take. Full pitch, pressure, pad, fader, touch-strip, accelerometer, and sustain mapping remains pending a systematic control-by-control capture.
+
+## System speaker output
+
+- Audio server: PulseAudio compatibility on PipeWire 1.0.5
+- Format: 48 kHz stereo
+- Selected node: `Meteor Lake-P HD Audio Controller Speaker + Headphones`
+- Active port: `Speaker`
+- Synth: FluidSynth 2.3.4 with `/usr/share/sounds/sf2/FluidR3_GM.sf2`
+
+A generated 440 Hz tone and direct FluidSynth note/CC/pitch commands completed through the selected sink. The integrated host creates an uncorked, unmuted `FluidSynth output` stream on that same sink and forwards normalized Vortex note, note-off, CC, and pitch-bend events. Human confirmation of an audible physical key press remains pending.
