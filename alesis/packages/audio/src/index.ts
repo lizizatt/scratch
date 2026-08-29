@@ -72,7 +72,7 @@ export class FluidSynthOutput implements AudioOutput {
     this.id = `pulse:${options.device.id}`;
     this.name = options.device.name;
     this.soundFontPath = options.soundFontPath ?? "/usr/share/sounds/sf2/FluidR3_GM.sf2";
-    this.gain = options.gain ?? 0.2;
+    this.gain = options.gain ?? 0.6;
   }
 
   async start(): Promise<void> {

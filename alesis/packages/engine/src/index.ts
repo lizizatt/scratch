@@ -79,7 +79,7 @@ export class SimulatedHostEngine implements HostEngine {
         midiInputId: "software-vortex",
         audioOutputId: "simulated-output",
         metronomeEnabled: true,
-        metronomeVolume: 0.3,
+        metronomeVolume: 0.65,
         countInEnabled: true,
       },
       transport: { state: "stopped", cycle: 0, progress: 0 },

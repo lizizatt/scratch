@@ -5,15 +5,16 @@ import WebSocket from "ws";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
+await settleAudioServer();
 const synthPeak = await runProbe(8791, true, async (port) => {
-  await waitForSnapshot(port, (snapshot) => snapshot.engine.midiEventsReceived > 0);
+  await waitForSnapshot(port, (snapshot) => snapshot.engine.midiEventsReceived >= 4);
 });
 const metronomePeak = await runProbe(8792, false, async (port) => {
   await sendCommands(port, [
     { type: "configure", settings: { bpm: 240, beatsPerMeasure: 4, loopMeasures: 1, countInEnabled: false, metronomeEnabled: true, metronomeVolume: 1 } },
     { type: "play" },
   ]);
-  await waitForSnapshot(port, (snapshot) => snapshot.transport.state === "playing");
+  await waitForSnapshot(port, (snapshot) => snapshot.transport.state === "playing" && snapshot.transport.progress >= 0.25);
 });
 
 console.log(`Synth peak: ${synthPeak.toFixed(1)} dB`);
@@ -47,6 +48,7 @@ async function runProbe(port, softwareDemo, afterStart) {
     return peak;
   } finally {
     await stopProcess(host);
+    await settleAudioServer();
   }
 }
 
@@ -102,6 +104,18 @@ async function capturePeak() {
   const sink = execFileSync("pactl", ["get-default-sink"], { encoding: "utf8" }).trim();
   const muteState = execFileSync("pactl", ["get-sink-mute", sink], { encoding: "utf8" });
   if (/\byes\b/i.test(muteState)) throw new Error(`System speaker sink is muted: ${sink}`);
+  const failures = [];
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await capturePeakOnce(sink);
+    } catch (error) {
+      failures.push(error.message);
+    }
+  }
+  throw new Error(`No PCM frames received after three attempts:\n${failures.join("\n---\n")}`);
+}
+
+async function capturePeakOnce(sink) {
   const capture = spawn("ffmpeg", [
     "-hide_banner", "-loglevel", "info",
     "-f", "pulse", "-i", `${sink}.monitor`,
@@ -139,4 +153,8 @@ function signalProcessGroup(pid, signal) {
   } catch (error) {
     if (error.code !== "ESRCH") throw error;
   }
+}
+
+async function settleAudioServer() {
+  await new Promise((resolve) => setTimeout(resolve, 750));
 }

@@ -32,11 +32,11 @@ Opening, ownership, and physical note delivery are verified. During acceptance, 
 
 A generated 440 Hz tone and direct FluidSynth note/CC/pitch commands completed through the selected sink. The first integrated adapter produced digital silence (`-91.0 dB` peak) because FluidSynth command output was piped but never consumed; its output buffer filled, followed by `Ringbuffer full` and `Failed to allocate a synthesis process` warnings. The final path observes the Vortex through ALSA sequencer input, forwards normalized events through a local FluidSynth command shell, and actively drains shell output to prevent backpressure. FluidSynth's TCP shell was rejected because it binds to all interfaces.
 
-Measured at the physical speaker sink monitor after the fix:
+Measured at the physical speaker sink monitor after the final gain and routing fixes:
 
-- Deterministic synth notes with transport stopped: `-26.3 dB` peak
-- Full sequencer-observer/normalizer/synth path: `-22.8 dB` peak
-- Production host metronome with no note source: `-16.9 dB` peak
+- Deterministic synth notes with transport stopped: `-16.7 dB` peak
+- Full sequencer-observer/normalizer/synth path: `-22.8 dB` peak before the final gain increase
+- Host metronome with no note source: `-7.4` to `-7.5 dB` peak
 - No FluidSynth allocation or ring-buffer warnings
 
 Run `npm run test:audio` on the host to repeat isolated synth and metronome PCM checks. The command fails if the speaker monitor receives no frames, peak level remains at or below `-60 dB`, startup times out, or FluidSynth reports saturation.

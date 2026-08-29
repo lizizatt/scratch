@@ -23,6 +23,11 @@ describe("FluidSynth output", () => {
     ]);
   });
 
+  it("uses audible host gain unless explicitly overridden", () => {
+    const args = fluidSynthArguments("speaker-sink", "/sounds/gm.sf2", 0.6);
+    expect(args).toContain("synth.gain=0.6");
+  });
+
   it("cannot block synthesis on unread shell output", () => {
     const stdout = new PassThrough();
     drainFluidSynthStdout(stdout);
