@@ -4,18 +4,17 @@ Verified on 2026-08-28:
 
 - USB receiver ID: `13b2:005f` (`ALESIS Vortex Wireless 2`)
 - ALSA sequencer port: `20:0` during this session
-- ALSA raw-MIDI port: `hw:1,0,0` during this session
-- Raw device: `/dev/snd/midiC1D0` during this session
-- Runtime identifier: `alsa:midiC1D0`
+- ALSA raw-MIDI port: `hw:1,0,0` during this session (diagnostics only)
+- ALSA sequencer runtime identifier: `alsa-seq:20:0`
 
-Card and client numbers are not stable. Runtime discovery scans `/proc/asound/card*/usbid` for `13b2:005f`, verifies `midi0`, and opens the corresponding `/dev/snd/midiC*D0` device. The server falls back to the software Vortex when the receiver is absent. Set `MIDI_MODE=software` to force deterministic software input.
+Card and client numbers are not stable. Runtime discovery enumerates ALSA sequencer inputs and selects the port named `Vortex Wireless 2`. The maintained `@julusian/midi` RtMidi binding subscribes without exclusively opening the raw device, normalizes events for host telemetry, and forwards them to FluidSynth. The server falls back to the software Vortex when the receiver is absent. Set `MIDI_MODE=software` to force deterministic software input.
 
 The raw stream decoder supports MIDI 1.0 channel note on/off, Control Change, channel pressure, and 14-bit pitch bend. It preserves running status across read chunks, ignores interleaved realtime bytes, and skips SysEx payloads. The software assignments for faders, pads, accelerometer, touch strip, and sustain are provisional because the Alesis editor can remap controller presets.
 
 ## Physical acceptance check
 
 1. Start the server in auto mode.
-2. Confirm startup prints `MIDI input: Vortex Wireless 2 (alsa:midiC...D0)`.
+2. Confirm startup prints `MIDI input: Vortex Wireless 2 (alsa-seq:...)`.
 3. Open the control surface and note `MIDI 0` in the upper-right status.
 4. Play keys, move pitch, apply aftertouch, move the touch strip and accelerometer, move each fader, press each pad, and press sustain.
 5. Confirm the MIDI count increments and the final event class changes among `note-on`, `note-off`, `pitch-bend`, `control-change`, and `channel-pressure`.
@@ -31,4 +30,17 @@ Opening, ownership, and physical note delivery are verified. During acceptance, 
 - Active port: `Speaker`
 - Synth: FluidSynth 2.3.4 with `/usr/share/sounds/sf2/FluidR3_GM.sf2`
 
-A generated 440 Hz tone and direct FluidSynth note/CC/pitch commands completed through the selected sink. The integrated host creates an uncorked, unmuted `FluidSynth output` stream on that same sink and forwards normalized Vortex note, note-off, CC, and pitch-bend events. Human confirmation of an audible physical key press remains pending.
+A generated 440 Hz tone and direct FluidSynth note/CC/pitch commands completed through the selected sink. The first integrated adapter produced digital silence (`-91.0 dB` peak) because FluidSynth command output was piped but never consumed; its output buffer filled, followed by `Ringbuffer full` and `Failed to allocate a synthesis process` warnings. The final path observes the Vortex through ALSA sequencer input, forwards normalized events through a local FluidSynth command shell, and actively drains shell output to prevent backpressure. FluidSynth's TCP shell was rejected because it binds to all interfaces.
+
+Measured at the physical speaker sink monitor after the fix:
+
+- Deterministic synth notes with transport stopped: `-26.3 dB` peak
+- Full sequencer-observer/normalizer/synth path: `-22.8 dB` peak
+- Production host metronome with no note source: `-16.9 dB` peak
+- No FluidSynth allocation or ring-buffer warnings
+
+Run `npm run test:audio` on the host to repeat isolated synth and metronome PCM checks. The command fails if the speaker monitor receives no frames, peak level remains at or below `-60 dB`, startup times out, or FluidSynth reports saturation.
+
+During silence diagnosis, the physical Speaker sink was also found OS-muted at 70%. It was restored to unmuted at 70%. The smoke test now detects this state explicitly and reports the muted sink instead of waiting for monitor frames.
+
+The metronome uses short GM percussion clicks on channel 10, follows authoritative count-in and transport beats, accents each measure start, and remains outside the take capture path. Audible host output has been confirmed by the user. A systematic control-by-control keytar acceptance pass remains pending.

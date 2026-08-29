@@ -10,6 +10,7 @@
   "scripts": {
     "build": "npm run build --workspace @alesis/protocol && npm run build --workspace @alesis/web",
     "test": "vitest run",
+    "test:audio": "node scripts/audio-smoke.mjs",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
     "typecheck": "npm run typecheck --workspaces --if-present",

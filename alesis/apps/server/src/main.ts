@@ -1,12 +1,13 @@
 import { SimulatedHostEngine } from "@alesis/engine";
 import { discoverDefaultPulseAudioDevice, FluidSynthOutput, SilentAudioOutput } from "@alesis/audio";
-import { AlsaRawMidiSource, discoverVortexDevice, SoftwareVortex } from "@alesis/midi";
+import { AlsaSequencerMidiSource, discoverVortexSequencerPort, SoftwareVortex } from "@alesis/midi";
 import { fileURLToPath } from "node:url";
 import { createControlServer } from "./control-server.js";
+import { MetronomeScheduler } from "./metronome.js";
 
 const engine = new SimulatedHostEngine();
-const hardware = process.env.MIDI_MODE === "software" ? null : discoverVortexDevice();
-const midi = hardware ? new AlsaRawMidiSource(hardware) : new SoftwareVortex();
+const hardware = process.env.MIDI_MODE === "software" ? null : discoverVortexSequencerPort();
+const midi = hardware ? new AlsaSequencerMidiSource(hardware) : new SoftwareVortex();
 const pulseDevice = process.env.AUDIO_MODE === "simulated" ? null : discoverDefaultPulseAudioDevice();
 const audio = pulseDevice ? new FluidSynthOutput({ device: pulseDevice }) : new SilentAudioOutput();
 const disconnectMidi = midi.subscribe((event) => {
@@ -19,7 +20,11 @@ await engine.execute({ type: "configure", settings: { midiInputId: midi.id, audi
 if (audio instanceof FluidSynthOutput) await engine.execute({ type: "select-synth", synthId: "soundfont" });
 const webDirectory = fileURLToPath(new URL("../../web/dist", import.meta.url));
 const server = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory);
-const timer = setInterval(() => engine.advance(0.05), 50);
+const metronome = new MetronomeScheduler(audio);
+const timer = setInterval(() => {
+  engine.advance(0.05);
+  metronome.update(engine.snapshot());
+}, 50);
 let demoNoteOn = false;
 const midiDemo = midi instanceof SoftwareVortex && process.env.SOFTWARE_VORTEX_DEMO === "1"
   ? setInterval(() => {

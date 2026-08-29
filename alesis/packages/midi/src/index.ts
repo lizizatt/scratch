@@ -1,4 +1,5 @@
 import type { MidiEvent } from "@alesis/engine";
+import { Input } from "@julusian/midi/lazy";
 import { createReadStream, existsSync, readFileSync, readdirSync, type ReadStream } from "node:fs";
 import { basename, join } from "node:path";
 
@@ -88,6 +89,69 @@ export interface AlsaMidiDevice {
   name: string;
   path: string;
   usbId: string;
+}
+
+export interface AlsaSequencerPort {
+  id: string;
+  name: string;
+  portName: string;
+}
+
+export function selectVortexSequencerPort(portNames: readonly string[]): AlsaSequencerPort | null {
+  const portName = portNames.find((name) => name.toLowerCase().includes("vortex wireless 2"));
+  if (!portName) return null;
+  const address = portName.match(/(\d+:\d+)$/)?.[1];
+  return { id: `alsa-seq:${address ?? portName}`, name: "Vortex Wireless 2", portName };
+}
+
+export function discoverVortexSequencerPort(): AlsaSequencerPort | null {
+  try {
+    return selectVortexSequencerPort(Input.getPortNames());
+  } catch {
+    return null;
+  }
+}
+
+export class AlsaSequencerMidiSource implements MidiSource {
+  readonly id: string;
+  readonly name: string;
+  private listeners = new Set<MidiListener>();
+  private input: Input | null = null;
+
+  constructor(private readonly port: AlsaSequencerPort) {
+    this.id = port.id;
+    this.name = port.name;
+  }
+
+  subscribe(listener: MidiListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  async start(): Promise<void> {
+    if (this.input) return;
+    const input = new Input();
+    input.ignoreTypes(true, false, true);
+    input.on("message", (_deltaTime, message) => {
+      const event = decodeMidiMessage(message);
+      if (event) this.listeners.forEach((listener) => listener(event));
+    });
+    input.openPortByName(this.port.portName);
+    if (!input.isPortOpen()) {
+      input.destroy();
+      throw new Error(`Unable to open MIDI sequencer port: ${this.port.portName}`);
+    }
+    this.input = input;
+  }
+
+  async close(): Promise<void> {
+    const input = this.input;
+    this.input = null;
+    this.listeners.clear();
+    if (!input) return;
+    input.closePort();
+    input.destroy();
+  }
 }
 
 export function discoverVortexDevice(asoundRoot = "/proc/asound", deviceRoot = "/dev/snd"): AlsaMidiDevice | null {

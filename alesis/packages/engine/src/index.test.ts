@@ -22,7 +22,9 @@ describe("SimulatedHostEngine", () => {
     await engine.execute({ type: "play" });
 
     expect(engine.snapshot().transport.state).toBe("counting-in");
-    engine.advance(2);
+    engine.advance(0.5);
+    expect(engine.snapshot().transport.progress).toBeCloseTo(0.25);
+    engine.advance(1.5);
     expect(engine.snapshot().transport.state).toBe("playing");
     engine.advance(2);
 

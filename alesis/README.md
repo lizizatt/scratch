@@ -22,7 +22,7 @@ Run MIDI, synthesis, transport, loop capture/playback, persistence, MP3 export, 
 
 ## Current implementation
 
-The first vertical slice is runnable with the real ALSA Vortex input and native FluidSynth output to the host's default system speakers, with software MIDI and silent-audio fallbacks for tests. It includes USB-ID-based hardware discovery, raw MIDI stream decoding, observable MIDI activity, PulseAudio/PipeWire sink discovery, SoundFont synthesis, the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
+The first vertical slice is runnable with the real ALSA Vortex input and native FluidSynth output to the host's default system speakers, with software MIDI and silent-audio fallbacks for tests. It includes USB-ID-based hardware discovery, raw MIDI stream decoding, observable MIDI activity, PulseAudio/PipeWire sink discovery, SoundFont synthesis, audible count-in/metronome clicks, the versioned control protocol, WebSocket server, reconnecting landscape PWA, synth parameter schemas, transport/cycle capture, staging, promotion, level, mute, delete/undo, and responsive phone/tablet layouts.
 
 The built-in subtractive synth, real PCM loop capture/playback, durable host persistence, and MP3 encoding are not implemented yet. The simulated loop engine rejects MP3 export rather than pretending a file was produced.
 
@@ -50,6 +50,7 @@ Validation:
 npm test
 npm run typecheck
 npm run test:e2e
+npm run test:audio  # Linux host with PulseAudio/PipeWire speakers
 ```
 
 ## Serve privately to an iPad

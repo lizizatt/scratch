@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@alesis/engine": "0.1.0"
+    "@alesis/engine": "0.1.0",
+    "@julusian/midi": "^3.8.1"
   }
 }

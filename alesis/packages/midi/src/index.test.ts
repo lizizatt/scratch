@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decodeMidiMessage, discoverVortexDevice, MidiByteStreamDecoder, SoftwareVortex } from "./index.js";
+import { decodeMidiMessage, discoverVortexDevice, MidiByteStreamDecoder, selectVortexSequencerPort, SoftwareVortex } from "./index.js";
 
 describe("MIDI normalization", () => {
   it("decodes note, pressure, control, and 14-bit pitch bend messages", () => {
@@ -46,6 +46,17 @@ describe("MIDI normalization", () => {
       usbId: "13b2:005f",
     });
     rmSync(root, { recursive: true });
+  });
+
+  it("selects the Vortex ALSA sequencer port by name", () => {
+    expect(selectVortexSequencerPort([
+      "Midi Through:Midi Through Port-0 14:0",
+      "Vortex Wireless 2:Vortex Wireless 2  20:0",
+    ])).toEqual({
+      id: "alsa-seq:20:0",
+      name: "Vortex Wireless 2",
+      portName: "Vortex Wireless 2:Vortex Wireless 2  20:0",
+    });
   });
 
   it("decodes split and running-status messages while ignoring realtime and SysEx", () => {

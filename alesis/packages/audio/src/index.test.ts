@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { fluidSynthArguments, midiEventToFluidCommand } from "./index.js";
+import { PassThrough } from "node:stream";
+import { drainFluidSynthStdout, fluidSynthArguments, fluidSynthStdio, metronomeCommands, midiEventToFluidCommand, waitForFluidSynthShell } from "./index.js";
 
 describe("FluidSynth output", () => {
   it("maps normalized MIDI events to FluidSynth commands", () => {
@@ -14,10 +15,35 @@ describe("FluidSynth output", () => {
 
   it("builds an explicit PulseAudio sink invocation", () => {
     expect(fluidSynthArguments("speaker-sink", "/sounds/gm.sf2", 0.25)).toEqual([
+      "-q",
       "-a", "pulseaudio",
       "-o", "audio.pulseaudio.device=speaker-sink",
       "-o", "synth.gain=0.25",
       "/sounds/gm.sf2",
     ]);
+  });
+
+  it("cannot block synthesis on unread shell output", () => {
+    const stdout = new PassThrough();
+    drainFluidSynthStdout(stdout);
+    expect(fluidSynthStdio).toEqual(["pipe", "pipe", "pipe"]);
+    expect(stdout.readableFlowing).toBe(true);
+  });
+
+  it("waits until the FluidSynth shell consumes commands", async () => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    stdin.once("data", (chunk) => {
+      const token = String(chunk).match(/echo (ALESIS_READY_[^\n]+)/)?.[1];
+      setTimeout(() => stdout.write(`${token}\n`), 10);
+    });
+
+    await expect(waitForFluidSynthShell(stdin, stdout, 100)).resolves.toBeUndefined();
+  });
+
+  it("maps metronome accents and level to short GM percussion notes", () => {
+    expect(metronomeCommands(true, 1)).toEqual({ noteOn: "noteon 9 76 127", noteOff: "noteoff 9 76" });
+    expect(metronomeCommands(false, 0.4)).toEqual({ noteOn: "noteon 9 77 51", noteOff: "noteoff 9 77" });
+    expect(metronomeCommands(false, 0)).toBeNull();
   });
 });
