@@ -184,6 +184,25 @@ describe("MidiLoopScheduler", () => {
     expect(scheduler.storageStats()).toEqual({ recordings: 0, rawRecordings: 0, channels: 0 });
   });
 
+  it("exports defensive copies of requested retained recordings", async () => {
+    const engine = new SimulatedHostEngine();
+    const scheduler = new MidiLoopScheduler(fakeOutput());
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+    scheduler.record({ type: "note-on", channel: 0, note: 60, velocity: 100 }, engine.snapshot());
+    engine.advance(2);
+    scheduler.update(engine.snapshot());
+    const stagedId = engine.snapshot().capture.staged!.id;
+    const exported = scheduler.exportRecordings([stagedId]);
+
+    expect(exported.get(stagedId)).toEqual([
+      { position: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
+      { position: 1, event: { type: "note-off", channel: 0, note: 60 } },
+    ]);
+    exported.get(stagedId)![0]!.position = 0.5;
+    expect(scheduler.exportRecordings([stagedId]).get(stagedId)?.[0]?.position).toBe(0);
+  });
+
   it("replays a completed cycle as an audible staged take", async () => {
     const engine = new SimulatedHostEngine();
     const output = fakeOutput();

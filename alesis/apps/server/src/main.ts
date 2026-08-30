@@ -2,12 +2,14 @@ import { SimulatedHostEngine, type MidiEvent } from "@alesis/engine";
 import { discoverDefaultPulseAudioDevice, discoverSoundFontPresets, discoverSoundFonts, FluidSynthOutput, preferredSoundFont, SilentAudioOutput } from "@alesis/audio";
 import { AlsaSequencerMidiSource, discoverVortexSequencerPort, SoftwareVortex } from "@alesis/midi";
 import type { EngineCommand } from "@alesis/protocol";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createControlServer } from "./control-server.js";
 import { MidiArpeggiator } from "./arpeggiator.js";
 import { DrumPatternScheduler } from "./drum-patterns.js";
 import { MidiLoopScheduler } from "./loop-playback.js";
 import { MetronomeScheduler } from "./metronome.js";
+import { exportMp3Session } from "./mp3-exporter.js";
 
 let soundFonts = discoverSoundFonts();
 const defaultSoundFont = preferredSoundFont(soundFonts);
@@ -60,6 +62,25 @@ const restoreAudioSelection = async (snapshot: ReturnType<typeof engine.snapshot
   }
 };
 const executeCommand = async (command: EngineCommand) => {
+  if (command.type === "export-mp3") {
+    const snapshot = engine.snapshot();
+    const soundFont = snapshot.synth.selectedSoundFontId ? soundFontsById.get(snapshot.synth.selectedSoundFontId) : defaultSoundFont;
+    if (!soundFont) {
+      return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: "MP3 export requires an installed SoundFont" };
+    }
+    try {
+      const result = await exportMp3Session({
+        name: command.name,
+        snapshot,
+        recordings: loops.exportRecordings(snapshot.promoted.map(({ id }) => id)),
+        soundFontPath: soundFont.path,
+        ...(existsSync("/usr/share/sounds/sf2/FluidR3_GM.sf2") ? { percussionSoundFontPath: "/usr/share/sounds/sf2/FluidR3_GM.sf2" } : {}),
+      });
+      return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, message: `Saved ${result.tracks.length} tracks and mix to ${result.directory}` };
+    } catch (error) {
+      return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: `Unable to export MP3: ${error instanceof Error ? error.message : String(error)}` };
+    }
+  }
   if (command.type === "configure-arpeggiator") {
     const result = await engine.execute(command);
     if (!result.accepted) return result;

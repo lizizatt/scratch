@@ -29,13 +29,13 @@ describe("MIDI normalization", () => {
     ]);
   });
 
-  it("discovers the Vortex by USB ID rather than ALSA card number", () => {
+  it.each(["13B2:005E", "13B2:005F"])("discovers the Vortex USB device %s rather than relying on its ALSA card number", (usbId) => {
     const root = mkdtempSync(join(tmpdir(), "alesis-midi-"));
     const asound = join(root, "asound");
     const devices = join(root, "snd");
     mkdirSync(join(asound, "card7"), { recursive: true });
     mkdirSync(devices);
-    writeFileSync(join(asound, "card7", "usbid"), "13B2:005F\n");
+    writeFileSync(join(asound, "card7", "usbid"), `${usbId}\n`);
     writeFileSync(join(asound, "card7", "midi0"), "Vortex Wireless 2\n\nType: Legacy\n");
     writeFileSync(join(devices, "midiC7D0"), "");
 
@@ -43,7 +43,7 @@ describe("MIDI normalization", () => {
       id: "alsa:midiC7D0",
       name: "Vortex Wireless 2",
       path: join(devices, "midiC7D0"),
-      usbId: "13b2:005f",
+      usbId: usbId.toLowerCase(),
     });
     rmSync(root, { recursive: true });
   });

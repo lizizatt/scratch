@@ -15,6 +15,7 @@
     "@alesis/midi": "0.1.0",
     "@alesis/protocol": "0.1.0",
     "@tonaljs/tonal": "^4.10.0",
+    "@tonejs/midi": "^2.0.28",
     "sirv": "^3.0.1",
     "ws": "^8.18.2"
   },

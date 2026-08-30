@@ -14,8 +14,11 @@ The Linux host owns MIDI, synthesis, transport, loops, and audio output. Browser
 - Staged quantization at 1/4, 1/8, 1/16, or 1/32 resolution.
 - A silent previous-staged recovery slot that expires after one cycle.
 - Beat-aligned waveform intensity summaries and a monitor-only metronome.
+- Named MP3 export of every promoted take plus a merged mix.
 
-PCM loop capture, persistence, and MP3 export are not implemented.
+PCM loop capture and session persistence are not implemented.
+
+Use the save control in the Loops toolbar to choose a folder name. The host writes every promoted take, including muted takes, to `~/alesis_recordings/<name>/track-01.mp3`, `track-02.mp3`, and so on, with the combined result at `mix.mp3`. Existing folders are never overwritten.
 
 ## Run
 
@@ -80,5 +83,6 @@ Open the reported HTTPS URL in Safari and use **Add to Home Screen**. The receiv
 - [Scope](SCOPE.md)
 - [UI behavior](UI_DESIGN.md)
 - [Hardware notes](docs/HARDWARE.md)
+- [Minimum hardware BOM](docs/MINIMUM_HARDWARE_BOM.md)
 - [Host-owned engine ADR](docs/adr/0001-host-owned-realtime-engine.md)
 - [Capability-driven instruments ADR](docs/adr/0002-capability-driven-instrument-host.md)

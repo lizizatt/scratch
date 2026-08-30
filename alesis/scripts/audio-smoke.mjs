@@ -6,31 +6,31 @@ import WebSocket from "ws";
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
 await settleAudioServer();
-const { synthPeak, arpeggiatorPeak, drumPeak, neonPeak, metronomePeak } = await runProbe(8791, async (port) => {
+const { synthPeak, arpeggiatorPeak, drumPeak, neonPeak, metronomePeak } = await runProbe(8791, async (port, capturePeak) => {
   await sendCommands(port, [
     { type: "configure", settings: { bpm: 240, beatsPerMeasure: 4, loopMeasures: 1, countInEnabled: false, metronomeEnabled: true, metronomeVolume: 0.25 } },
     { type: "play" },
   ]);
   await waitForSnapshot(port, (snapshot) => snapshot.transport.state === "playing" && snapshot.transport.progress >= 0.25);
-  const metronomePeak = await capturePeak();
+  const metronomePeak = await capturePeak("FluidSynth");
   await sendCommands(port, [
     { type: "configure", settings: { metronomeEnabled: false } },
     { type: "configure-drums", settings: { enabled: true, pattern: "four-on-floor", volume: 1 } },
   ]);
-  const drumPeak = await capturePeak();
+  const drumPeak = await capturePeak("FluidSynth");
   await sendCommands(port, [
     { type: "stop" },
     { type: "configure-drums", settings: { enabled: false } },
     { type: "configure-arpeggiator", settings: { enabled: true, mode: "up", rate: "1/16", octaves: 2, gate: 0.5 } },
   ]);
   await waitForSnapshot(port, (snapshot) => snapshot.engine.midiEventsReceived >= 2);
-  const arpeggiatorPeak = await capturePeak();
+  const arpeggiatorPeak = await capturePeak("FluidSynth");
   await sendCommands(port, [{ type: "configure-arpeggiator", settings: { enabled: false } }]);
   await waitForSnapshot(port, (snapshot) => snapshot.engine.midiEventsReceived >= 4);
-  const synthPeak = await capturePeak();
+  const synthPeak = await capturePeak("FluidSynth");
   await sendCommands(port, [{ type: "select-synth", synthId: "subtractive" }]);
   await waitForSnapshot(port, (snapshot) => snapshot.synth.selectedId === "subtractive" && snapshot.engine.midiEventsReceived >= 4);
-  const neonPeak = await capturePeak();
+  const neonPeak = await capturePeak("pw-cat");
   await sendCommands(port, [{ type: "select-synth", synthId: "soundfont" }]);
   return { synthPeak, arpeggiatorPeak, drumPeak, neonPeak, metronomePeak };
 });
@@ -56,14 +56,18 @@ async function runProbe(port, probe) {
     stdio: ["ignore", "pipe", "pipe"],
   });
   let hostOutput = "";
+  let closeMonitors = () => {};
   host.stdout.on("data", (chunk) => { hostOutput += String(chunk); });
   host.stderr.on("data", (chunk) => { hostOutput += String(chunk); });
 
   try {
     await waitUntil(() => hostOutput.includes("Audio output: System Speakers"), 5_000, () => hostOutput);
+    await waitForStableProducer("FluidSynth", 1_000, 5_000);
+    const monitors = createProducerMonitors();
+    closeMonitors = monitors.close;
     let peaks;
     try {
-      peaks = await probe(port);
+      peaks = await probe(port, monitors.capturePeak);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`${message}\nAudio host output:\n${hostOutput.trim() || "(none)"}`);
@@ -78,6 +82,7 @@ async function runProbe(port, probe) {
     }
     return peaks;
   } finally {
+    closeMonitors();
     await stopProcess(host);
     await settleAudioServer();
   }
@@ -131,35 +136,78 @@ async function waitForSnapshot(port, predicate) {
   socket.close();
 }
 
-async function capturePeak() {
+function createProducerMonitors() {
   const sink = execFileSync("pactl", ["get-default-sink"], { encoding: "utf8" }).trim();
   const muteState = execFileSync("pactl", ["get-sink-mute", sink], { encoding: "utf8" });
   if (/\byes\b/i.test(muteState)) throw new Error(`System speaker sink is muted: ${sink}`);
-  const failures = [];
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      return await capturePeakOnce(sink);
-    } catch (error) {
-      failures.push(error.message);
-    }
-  }
-  throw new Error(`No PCM frames received after three attempts:\n${failures.join("\n---\n")}`);
+  const monitors = new Map();
+  const monitorFor = (producerName) => {
+    const producer = pipeWireOutputStreams().find((stream) => stream.name === producerName && stream.target === sink);
+    if (!producer) throw new Error(`No ${producerName} PipeWire stream routed to ${sink}`);
+    const existing = monitors.get(producerName);
+    if (existing?.serial === producer.serial && existing.process.exitCode === null) return existing;
+    if (existing?.process.exitCode === null) existing.process.kill("SIGTERM");
+    const process = spawn("pw-record", [
+      `--target=${producer.serial}`,
+      "--properties=stream.capture.sink=true",
+      "--rate=48000", "--channels=2", "--format=f32", "-",
+    ], { stdio: ["ignore", "pipe", "ignore"] });
+    const monitor = { serial: producer.serial, process, active: false, peak: 0, samples: 0 };
+    process.stdout.on("data", (chunk) => {
+      if (!monitor.active) return;
+      for (let offset = 0; offset + 4 <= chunk.length; offset += 4) {
+        monitor.peak = Math.max(monitor.peak, Math.abs(chunk.readFloatLE(offset)));
+        monitor.samples += 1;
+      }
+    });
+    monitors.set(producerName, monitor);
+    return monitor;
+  };
+  return {
+    capturePeak: async (producerName) => {
+      const monitor = monitorFor(producerName);
+      monitor.peak = 0;
+      monitor.samples = 0;
+      monitor.active = true;
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      monitor.active = false;
+      if (monitor.process.exitCode !== null || monitor.samples === 0) throw new Error(`No PCM frames received from ${producerName} stream`);
+      return 20 * Math.log10(Math.min(1, monitor.peak));
+    },
+    close: () => {
+      for (const monitor of monitors.values()) if (monitor.process.exitCode === null) monitor.process.kill("SIGTERM");
+    },
+  };
 }
 
-async function capturePeakOnce(sink) {
-  const capture = spawn("ffmpeg", [
-    "-hide_banner", "-loglevel", "info",
-    "-f", "pulse", "-i", `${sink}.monitor`,
-    "-t", "1", "-af", "volumedetect", "-f", "null", "-",
-  ], { stdio: ["ignore", "ignore", "pipe"] });
-  let output = "";
-  capture.stderr.on("data", (chunk) => { output += String(chunk); });
-  const timeout = setTimeout(() => capture.kill("SIGKILL"), 6_000);
-  const exitCode = await new Promise((resolve) => capture.once("exit", resolve));
-  clearTimeout(timeout);
-  const match = output.match(/max_volume:\s*(-?[\d.]+) dB/);
-  if (exitCode !== 0 || !match) throw new Error(`No PCM frames received from speaker monitor:\n${output}`);
-  return Number(match[1]);
+function pipeWireOutputStreams() {
+  const nodes = JSON.parse(execFileSync("pw-dump", { encoding: "utf8" }));
+  return nodes.flatMap((node) => {
+    const props = node.info?.props;
+    if (props?.["media.class"] !== "Stream/Output/Audio") return [];
+    return [{
+      serial: String(props["object.serial"]),
+      name: props["node.name"] ?? props["application.name"],
+      target: props["target.object"],
+    }];
+  });
+}
+
+async function waitForStableProducer(producerName, stableMs, timeoutMs) {
+  const sink = execFileSync("pactl", ["get-default-sink"], { encoding: "utf8" }).trim();
+  const started = Date.now();
+  let stableSince = 0;
+  let serial = null;
+  while (Date.now() - started < timeoutMs) {
+    const producer = pipeWireOutputStreams().find((stream) => stream.name === producerName && stream.target === sink);
+    if (producer?.serial !== serial) {
+      serial = producer?.serial ?? null;
+      stableSince = serial ? Date.now() : 0;
+    }
+    if (stableSince && Date.now() - stableSince >= stableMs) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`${producerName} PipeWire stream did not stabilize on ${sink}`);
 }
 
 async function waitUntil(predicate, timeoutMs, details) {

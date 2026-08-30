@@ -79,6 +79,15 @@ test("connects every selected pane to the host without viewport overflow", async
   await unmuteMetronome.click();
   await expect(muteMetronome).toHaveAttribute("aria-pressed", "true");
 
+  const save = page.getByRole("button", { name: "Save promoted tracks as MP3 files" });
+  if (await save.isEnabled()) {
+    await save.click();
+    await expect(page.getByRole("dialog", { name: "Save MP3 session" })).toBeVisible();
+    await page.getByLabel("Folder name").fill("E2E Session");
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("dialog", { name: "Save MP3 session" })).not.toBeVisible();
+  }
+
   const dimensions = await page.evaluate(() => ({
     width: innerWidth,
     height: innerHeight,

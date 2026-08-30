@@ -21,6 +21,7 @@ export interface EngineResult {
   revision: number;
   appliedCycle: number;
   error?: string;
+  message?: string;
 }
 
 export type EngineListener = (snapshot: EngineSnapshot) => void;

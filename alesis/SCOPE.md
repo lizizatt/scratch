@@ -13,6 +13,7 @@ A host-rendered performance instrument and MIDI looper for the Alesis Vortex Wir
 - Musical transport, count-in, beat-only metronome, and monitor-only mode.
 - Cycle-aligned MIDI capture, staging, previous-staged recovery, promotion, quantization, level, mute, delete, and undo.
 - Percussion-channel, sustain, controller, and pitch-bend replay.
+- SoundFont and Neon Pressure MP3 rendering, with individual promoted tracks and a merged mix written on the host.
 - Versioned WebSocket protocol and responsive landscape PWA.
 
 ## Invariants
@@ -29,7 +30,7 @@ A host-rendered performance instrument and MIDI looper for the Alesis Vortex Wir
 
 - PCM loop capture/playback and boundary crossfades.
 - Session persistence and migration.
-- WAV/MP3 export.
+- WAV export.
 - MIDI learn and complete Vortex control mapping.
 - Device selection beyond the discovered defaults.
 - LV2 hosting; see [ADR 0002](docs/adr/0002-capability-driven-instrument-host.md).

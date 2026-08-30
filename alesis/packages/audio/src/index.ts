@@ -7,6 +7,8 @@ import type { Readable, Writable } from "node:stream";
 import type { MidiEvent } from "@alesis/engine";
 import { NeonPressureSynth, type NeonPressureParameters } from "./renderers.js";
 
+export { NeonPressureSynth, type NeonPressureParameters } from "./renderers.js";
+
 export interface AudioOutput {
   readonly id: string;
   readonly name: string;

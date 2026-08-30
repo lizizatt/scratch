@@ -81,7 +81,7 @@ export class SoftwareVortex implements MidiSource {
   }
 }
 
-export const VORTEX_WIRELESS_2_USB_ID = "13b2:005f";
+export const VORTEX_WIRELESS_2_USB_IDS = ["13b2:005e", "13b2:005f"] as const;
 
 export interface AlsaMidiDevice {
   id: string;
@@ -162,7 +162,7 @@ export function discoverVortexDevice(asoundRoot = "/proc/asound", deviceRoot = "
     const midiInfoPath = join(cardDirectory, "midi0");
     if (!existsSync(usbIdPath) || !existsSync(midiInfoPath)) continue;
     const usbId = readFileSync(usbIdPath, "utf8").trim().toLowerCase();
-    if (usbId !== VORTEX_WIRELESS_2_USB_ID) continue;
+    if (!VORTEX_WIRELESS_2_USB_IDS.includes(usbId as typeof VORTEX_WIRELESS_2_USB_IDS[number])) continue;
     const cardNumber = entry.name.slice(4);
     const path = join(deviceRoot, `midiC${cardNumber}D0`);
     if (!existsSync(path)) continue;

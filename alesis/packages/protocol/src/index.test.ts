@@ -30,6 +30,11 @@ describe("control protocol", () => {
     expect(parsed.command).toMatchObject({ clearAudio: true });
   });
 
+  it("accepts safe export folder names and rejects path traversal", () => {
+    expect(commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "export-mp3", name: "Friday Jam 01" } }).success).toBe(true);
+    expect(commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "export-mp3", name: "../escape" } }).success).toBe(false);
+  });
+
   it("bounds waveform summaries", () => {
     const snapshot = {
       protocolVersion: PROTOCOL_VERSION,

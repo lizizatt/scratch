@@ -22,6 +22,7 @@ Landscape phone and tablet are primary. The interface uses a black canvas, blue/
 ### Toolbar
 
 - Stop, Play, Monitor Only, and Metronome Mute appear at upper left.
+- Save prompts for a host folder name and exports each promoted take plus `mix.mp3` under `~/alesis_recordings/<name>/`.
 - Monitor Only suppresses staged and promoted playback while preserving direct synth output.
 - Metronome defaults to 25% and triggers once per beat.
 
@@ -48,6 +49,7 @@ Landscape phone and tablet are primary. The interface uses a black canvas, blue/
 
 - Promoted takes play as immutable synchronized layers.
 - Each row has waveform, level, mute, and delete controls.
+- Export includes every promoted take, even when its playback mute is active, and applies each take's level.
 - One-level undo restores the latest deleted take.
 
 ## Accessibility

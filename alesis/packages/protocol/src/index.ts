@@ -4,6 +4,7 @@ export const PROTOCOL_VERSION = 1 as const;
 
 const waveformSchema = z.array(z.number().min(-1).max(1)).max(256);
 const takeIdSchema = z.string().min(1).max(128);
+export const exportNameSchema = z.string().trim().min(1).max(80).regex(/^[a-zA-Z0-9][a-zA-Z0-9 _-]*$/);
 export const quantizationModeSchema = z.enum(["off", "1/4", "1/8", "1/16", "1/32"]);
 
 export const settingsSchema = z.object({
@@ -132,7 +133,7 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("set-take-muted"), takeId: takeIdSchema, muted: z.boolean() }),
   z.object({ type: z.literal("delete-take"), takeId: takeIdSchema }),
   z.object({ type: z.literal("undo-delete") }),
-  z.object({ type: z.literal("export-mp3") }),
+  z.object({ type: z.literal("export-mp3"), name: exportNameSchema }),
 ]);
 
 export const commandEnvelopeSchema = z.object({
@@ -150,6 +151,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     revision: z.number().int().nonnegative(),
     appliedCycle: z.number().int().nonnegative(),
     error: z.string().optional(),
+    message: z.string().optional(),
   }),
 ]);
 

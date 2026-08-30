@@ -135,6 +135,13 @@ export class MidiLoopScheduler {
     return { recordings: this.recordings.size, rawRecordings: this.rawRecordings.size, channels: this.takeChannels.size };
   }
 
+  exportRecordings(takeIds: readonly string[]): Map<string, RecordedMidiEvent[]> {
+    return new Map(takeIds.flatMap((takeId) => {
+      const recording = this.recordings.get(takeId);
+      return recording ? [[takeId, structuredClone(recording)] as const] : [];
+    }));
+  }
+
   private audibleTakes(snapshot: EngineSnapshot): AudibleTake[] {
     if (snapshot.monitorOnly) return [];
     const takes = [

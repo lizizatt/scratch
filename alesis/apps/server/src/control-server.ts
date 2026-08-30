@@ -106,7 +106,11 @@ function commandResult(envelope: CommandEnvelope, result: EngineResult): ServerM
     revision: result.revision,
     appliedCycle: result.appliedCycle,
   };
-  return result.error === undefined ? base : { ...base, error: result.error };
+  return {
+    ...base,
+    ...(result.error === undefined ? {} : { error: result.error }),
+    ...(result.message === undefined ? {} : { message: result.message }),
+  };
 }
 
 function closeWebSocketServer(server: WebSocketServer): Promise<void> {

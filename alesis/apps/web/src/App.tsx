@@ -21,7 +21,7 @@ import { useControlSocket } from "./use-control-socket";
 type Pane = "settings" | "synth" | "loops";
 
 export function App() {
-  const { snapshot, connection, lastError, send } = useControlSocket();
+  const { snapshot, connection, lastError, lastMessage, send } = useControlSocket();
   const [pane, setPane] = useState<Pane>("loops");
 
   if (!snapshot) {
@@ -32,6 +32,7 @@ export function App() {
     <main className="app-shell">
       <div className="connection-line"><span className={`connection-dot ${connection}`} /> {connection} // rev {snapshot.revision} // MIDI {snapshot.engine.midiEventsReceived}{snapshot.engine.lastMidiEvent ? ` ${snapshot.engine.lastMidiEvent}` : ""}</div>
       {lastError && <div className="error-line" role="alert">{lastError}</div>}
+      {lastMessage && <div className="success-line" role="status">{lastMessage}</div>}
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
       {pane === "loops" && <LoopPane snapshot={snapshot} send={send} />}
@@ -102,7 +103,7 @@ function SettingsPane({ snapshot, send }: PaneProps) {
         <Setting label="BPM"><input aria-label="BPM" type="number" min="30" max="300" value={numberDraft.bpm} onChange={setNumber("bpm")} onBlur={commitNumber("bpm")} onKeyDown={commitOnEnter} /></Setting>
         <Setting label="Beats per measure"><input aria-label="Beats per measure" type="number" min="1" max="16" value={numberDraft.beatsPerMeasure} onChange={setNumber("beatsPerMeasure")} onBlur={commitNumber("beatsPerMeasure")} onKeyDown={commitOnEnter} /></Setting>
         <Setting label="Loop measures"><input aria-label="Loop measures" type="number" min="1" max="128" value={numberDraft.loopMeasures} onChange={setNumber("loopMeasures")} onBlur={commitNumber("loopMeasures")} onKeyDown={commitOnEnter} /></Setting>
-        <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateDevice("midiInputId")}><option value={draft.midiInputId}>{draft.midiInputId.startsWith("alsa:") ? "Vortex Wireless 2" : "Software Vortex"}</option></select></Setting>
+        <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateDevice("midiInputId")}><option value={draft.midiInputId}>{draft.midiInputId.startsWith("alsa") ? "Vortex Wireless 2" : "Software Vortex"}</option></select></Setting>
         <Setting label="Output device"><select aria-label="Output device" value={draft.audioOutputId} onChange={updateDevice("audioOutputId")}><option value={draft.audioOutputId}>{draft.audioOutputId.startsWith("pulse:") ? "System Speakers" : "Simulated output"}</option></select></Setting>
         <Setting label="Metronome"><input aria-label="Metronome" type="checkbox" checked={draft.metronomeEnabled} onChange={updateBoolean("metronomeEnabled")} /></Setting>
         <Setting label="Click volume"><input aria-label="Click volume" type="range" min="0" max="100" value={numberDraft.metronomeVolume} onChange={setNumber("metronomeVolume")} onBlur={commitNumber("metronomeVolume", 0.01)} /></Setting>
@@ -175,6 +176,14 @@ function SynthPane({ snapshot, send }: PaneProps) {
 function LoopPane({ snapshot, send }: PaneProps) {
   const isPlaying = snapshot.transport.state !== "stopped";
   const beatCount = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
+  const [saving, setSaving] = useState(false);
+  const [exportName, setExportName] = useState("");
+  const saveExport = (): void => {
+    if (!exportName.trim()) return;
+    send({ type: "export-mp3", name: exportName.trim() });
+    setSaving(false);
+    setExportName("");
+  };
   return (
     <section className="pane loop-pane" aria-label="Looper">
       <header className="loop-toolbar">
@@ -185,8 +194,16 @@ function LoopPane({ snapshot, send }: PaneProps) {
           <IconButton label={snapshot.settings.metronomeEnabled ? "Mute metronome" : "Unmute metronome"} active={snapshot.settings.metronomeEnabled} pressed={snapshot.settings.metronomeEnabled} onClick={() => send({ type: "configure", settings: { metronomeEnabled: !snapshot.settings.metronomeEnabled } })}>{snapshot.settings.metronomeEnabled ? <Volume2 /> : <VolumeX />}</IconButton>
         </div>
         <div className="transport-status">{snapshot.transport.state} // cycle {String(snapshot.transport.cycle + 1).padStart(2, "0")}</div>
-        <IconButton label="Download promoted mix as MP3" onClick={() => send({ type: "export-mp3" })}><Download /></IconButton>
+        <IconButton label="Save promoted tracks as MP3 files" disabled={snapshot.promoted.length === 0} onClick={() => setSaving(true)}><Download /></IconButton>
       </header>
+
+      {saving && <div className="dialog-backdrop" onMouseDown={() => setSaving(false)}>
+        <form className="save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveExport(); }}>
+          <h2 id="save-title">Save MP3 session</h2>
+          <label>Folder name<input autoFocus required maxLength={80} pattern="[A-Za-z0-9][A-Za-z0-9 _-]*" value={exportName} onChange={(event) => setExportName(event.target.value)} /></label>
+          <div className="dialog-actions"><button type="button" onClick={() => setSaving(false)}>Cancel</button><button type="submit">Save</button></div>
+        </form>
+      </div>}
 
       <div className="signal-stack">
         <section className="current-capture">

@@ -12,11 +12,13 @@ export function useControlSocket(): {
   snapshot: EngineSnapshot | null;
   connection: ConnectionState;
   lastError: string | null;
+  lastMessage: string | null;
   send: (command: EngineCommand) => string | null;
 } {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [lastError, setLastError] = useState<string | null>(null);
+  const [lastMessage, setLastMessage] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export function useControlSocket(): {
         }
         if (parsed.data.type === "snapshot") setSnapshot(parsed.data.snapshot);
         if (parsed.data.type === "command-result" && !parsed.data.accepted) setLastError(parsed.data.error ?? "Command rejected");
+        if (parsed.data.type === "command-result" && parsed.data.accepted && parsed.data.message) setLastMessage(parsed.data.message);
       });
       socket.addEventListener("close", () => {
         if (socketRef.current === socket) socketRef.current = null;
@@ -69,9 +72,11 @@ export function useControlSocket(): {
       return null;
     }
     const commandId = crypto.randomUUID();
+    setLastError(null);
+    setLastMessage(null);
     socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId, command }));
     return commandId;
   };
 
-  return { snapshot, connection, lastError, send };
+  return { snapshot, connection, lastError, lastMessage, send };
 }
