@@ -16,6 +16,7 @@ Landscape phone and tablet are primary. The interface uses a black canvas, blue/
 - Its primary controls are Volume, Chorus Send, and Reverb Send. Advanced effect parameters are expandable.
 - Neon Pressure exposes cutoff, resonance, attack, release, LFO rate, and drive.
 - Arpeggiator and drum controls apply to either instrument.
+- Up to root then down ascends through held notes to the lowest note transposed by the selected octave count, then descends without repeating either endpoint.
 
 ## Loops
 

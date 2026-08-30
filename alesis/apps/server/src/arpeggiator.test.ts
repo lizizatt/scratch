@@ -44,6 +44,27 @@ describe("MidiArpeggiator", () => {
     expect(first("random", () => 0.5)).toMatchObject({ note: 64 });
   });
 
+  it("walks up to the lowest held note one octave above and back down without repeating endpoints", () => {
+    const arp = new MidiArpeggiator({ ...defaults, mode: "up-to-root-then-down" });
+    [60, 62, 64, 67].forEach((note) => arp.handle({ type: "note-on", channel: 0, note, velocity: 100 }));
+
+    const notes = [arp.advance(0, 120), ...Array.from({ length: 7 }, () => arp.advance(0.25, 120))]
+      .flatMap((events) => events.flatMap((event) => event.type === "note-on" ? [event.note] : []));
+
+    expect(notes).toEqual([60, 62, 64, 67, 72, 67, 64, 62]);
+    expect(arp.advance(0.25, 120).find(({ type }) => type === "note-on")).toMatchObject({ note: 60 });
+  });
+
+  it("does not ascend past the upper root when a held note crosses the octave boundary", () => {
+    const arp = new MidiArpeggiator({ ...defaults, mode: "up-to-root-then-down" });
+    [60, 72, 74].forEach((note) => arp.handle({ type: "note-on", channel: 0, note, velocity: 100 }));
+
+    const notes = [arp.advance(0, 120), arp.advance(0.25, 120), arp.advance(0.25, 120)]
+      .flatMap((events) => events.flatMap((event) => event.type === "note-on" ? [event.note] : []));
+
+    expect(notes).toEqual([60, 72, 60]);
+  });
+
   it("latches released notes until latch is disabled", () => {
     const arp = new MidiArpeggiator({ ...defaults, latch: true });
     arp.handle({ type: "note-on", channel: 0, note: 60, velocity: 100 });

@@ -1,7 +1,7 @@
 import { Midi, Note } from "@tonaljs/tonal";
 import type { MidiEvent } from "@alesis/engine";
 
-export type ArpeggiatorMode = "up" | "down" | "up-down" | "played" | "random";
+export type ArpeggiatorMode = "up" | "down" | "up-down" | "up-to-root-then-down" | "played" | "random";
 export type ArpeggiatorRate = "1/4" | "1/8" | "1/16" | "1/8T" | "1/16T";
 
 export interface ArpeggiatorConfig {
@@ -128,8 +128,24 @@ export class MidiArpeggiator {
       ? [...expanded].reverse()
       : this.config.mode === "up-down" && expanded.length > 1
         ? [...expanded, ...expanded.slice(1, -1).reverse()]
+        : this.config.mode === "up-to-root-then-down"
+          ? this.upToRootThenDown(expanded)
         : expanded;
     return sequence[this.step % sequence.length]!;
+  }
+
+  private upToRootThenDown(expanded: HeldNote[]): HeldNote[] {
+    const lowest = expanded[0];
+    if (!lowest) return [];
+    const upperRoot = { ...lowest, note: transposeMidi(lowest.note, this.config.octaves) };
+    const seen = new Set<number>();
+    const ascent = expanded.filter(({ note }) => {
+      if (note > upperRoot.note || seen.has(note)) return false;
+      seen.add(note);
+      return true;
+    });
+    if (!seen.has(upperRoot.note)) ascent.push(upperRoot);
+    return [...ascent, ...ascent.slice(1, -1).reverse()];
   }
 
   private expandedNotes(): HeldNote[] {

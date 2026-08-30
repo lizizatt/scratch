@@ -60,7 +60,7 @@ export const soundFontPresetSchema = z.object({
 
 export const arpeggiatorSchema = z.object({
   enabled: z.boolean(),
-  mode: z.enum(["up", "down", "up-down", "played", "random"]),
+  mode: z.enum(["up", "down", "up-down", "up-to-root-then-down", "played", "random"]),
   rate: z.enum(["1/4", "1/8", "1/16", "1/8T", "1/16T"]),
   octaves: z.number().int().min(1).max(4),
   gate: z.number().min(0.1).max(1),

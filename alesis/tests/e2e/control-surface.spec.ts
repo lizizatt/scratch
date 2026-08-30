@@ -37,8 +37,8 @@ test("connects every selected pane to the host without viewport overflow", async
   await expect(page.locator(".effects-controls")).toBeVisible();
   await expect(page.locator(".effects-controls .parameter")).toHaveCount(6);
   await page.getByText("Arpeggiator", { exact: true }).click();
-  await page.getByLabel("Arpeggiator mode").selectOption("up-down");
-  await expect(page.getByLabel("Arpeggiator mode")).toHaveValue("up-down");
+  await page.getByLabel("Arpeggiator mode").selectOption("up-to-root-then-down");
+  await expect(page.getByLabel("Arpeggiator mode")).toHaveValue("up-to-root-then-down");
   await page.getByLabel("Arpeggiator rate").selectOption("1/16");
   await expect(page.getByLabel("Arpeggiator rate")).toHaveValue("1/16");
   await page.getByLabel("Arpeggiator octaves").fill("2");
