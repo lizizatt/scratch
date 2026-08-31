@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { SimulatedHostEngine } from "@alesis/engine";
 import { PROTOCOL_VERSION, serverMessageSchema, type ServerMessage } from "@alesis/protocol";
 import WebSocket from "ws";
@@ -6,15 +9,32 @@ import { createControlServer, type ControlServer } from "./control-server.js";
 
 let server: ControlServer | undefined;
 let engine: SimulatedHostEngine | undefined;
+const temporaryDirectories = new Set<string>();
 
 afterEach(async () => {
   await server?.close();
   await engine?.dispose();
+  await Promise.all([...temporaryDirectories].map((directory) => rm(directory, { recursive: true, force: true })));
+  temporaryDirectories.clear();
   server = undefined;
   engine = undefined;
 });
 
 describe("control server", () => {
+  it("serves assets created after startup", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "alesis-static-test-"));
+    temporaryDirectories.add(directory);
+    await writeFile(join(directory, "index.html"), "<h1>Alesis</h1>");
+    engine = new SimulatedHostEngine();
+    server = await createControlServer(engine, 0, directory);
+
+    await writeFile(join(directory, "rebuilt.js"), "export const rebuilt = true;");
+
+    const response = await fetch(`http://127.0.0.1:${server.port}/rebuilt.js`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("export const rebuilt = true;");
+  });
+
   it("sends authoritative state and applies valid commands", async () => {
     engine = new SimulatedHostEngine();
     server = await createControlServer(engine);
@@ -76,6 +96,29 @@ describe("control server", () => {
 
     await collectUntil(inbox, (message) => message.type === "command-result");
     expect(executeCommand).toHaveBeenCalledWith({ type: "play" });
+    socket.close();
+  });
+
+  it("coalesces high-rate MIDI updates while delivering the latest state", async () => {
+    engine = new SimulatedHostEngine();
+    server = await createControlServer(engine);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    const snapshots: ServerMessage[] = [];
+    socket.on("message", (data) => {
+      const message = serverMessageSchema.parse(JSON.parse(data.toString()));
+      if (message.type === "snapshot") snapshots.push(message);
+    });
+
+    for (let index = 0; index < 256; index += 1) {
+      engine.dispatchMidi({ type: "pitch-bend", channel: 0, value: index / 255 * 2 - 1 });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(snapshots.length).toBeGreaterThan(0);
+    expect(snapshots.length).toBeLessThanOrEqual(4);
+    expect(snapshots.at(-1)).toMatchObject({ snapshot: { engine: { midiEventsReceived: 256, lastMidiEvent: "pitch-bend" } } });
     socket.close();
   });
 

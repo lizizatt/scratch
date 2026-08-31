@@ -1,4 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { rm, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const exportDirectories = new Set<string>();
+
+test.afterEach(async () => {
+  await Promise.all([...exportDirectories].map((directory) => rm(directory, { recursive: true, force: true })));
+  exportDirectories.clear();
+});
 
 test("runs the application bundle advertised by the current server", async ({ page, request }) => {
   await page.goto("/");
@@ -79,15 +89,6 @@ test("connects every selected pane to the host without viewport overflow", async
   await unmuteMetronome.click();
   await expect(muteMetronome).toHaveAttribute("aria-pressed", "true");
 
-  const save = page.getByRole("button", { name: "Save promoted tracks as MP3 files" });
-  if (await save.isEnabled()) {
-    await save.click();
-    await expect(page.getByRole("dialog", { name: "Save MP3 session" })).toBeVisible();
-    await page.getByLabel("Folder name").fill("E2E Session");
-    await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByRole("dialog", { name: "Save MP3 session" })).not.toBeVisible();
-  }
-
   const dimensions = await page.evaluate(() => ({
     width: innerWidth,
     height: innerHeight,
@@ -99,7 +100,7 @@ test("connects every selected pane to the host without viewport overflow", async
   expect(pageErrors).toEqual([]);
 });
 
-test("edits BPM locally and confirms only on commit", async ({ page }) => {
+test("edits BPM locally and confirms only on commit", async ({ page }, testInfo) => {
   let dialogs = 0;
   page.on("dialog", async (dialog) => {
     dialogs += 1;
@@ -127,6 +128,18 @@ test("edits BPM locally and confirms only on commit", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Promote previous staged take" })).toBeDisabled();
   await expect(page.locator(".take-row")).toHaveCount(1);
   await expect(page.locator(".current-capture svg .intensity-sample")).toHaveCount(96);
+  const exportName = `E2E ${testInfo.project.name} ${process.pid}`;
+  const exportDirectory = join(homedir(), "alesis_recordings", exportName);
+  exportDirectories.add(exportDirectory);
+  await rm(exportDirectory, { recursive: true, force: true });
+  await page.getByRole("button", { name: "Save promoted tracks as MP3 files" }).click();
+  const exportInput = page.getByLabel("Folder name");
+  await exportInput.fill(exportName);
+  expect(await exportInput.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText(`Saved 1 tracks and mix to ${exportDirectory}`, { timeout: 30_000 });
+  expect((await stat(join(exportDirectory, "track-01.mp3"))).size).toBeGreaterThan(1_000);
+  expect((await stat(join(exportDirectory, "mix.mp3"))).size).toBeGreaterThan(1_000);
   await page.getByRole("button", { name: "Options" }).click();
 
   const bpm = page.getByLabel("BPM");

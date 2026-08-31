@@ -24,14 +24,26 @@ export async function createControlServer(
   const httpServer = createHttpServer(staticDirectory);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control" });
   const results = new Map<string, ServerMessage>();
+  let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
+  let snapshotPending = false;
 
-  const broadcastSnapshot = (): void => {
+  const broadcastSnapshotNow = (): void => {
     const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot() } satisfies ServerMessage);
     webSocketServer.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) client.send(payload);
     });
   };
-  const unsubscribe = engine.subscribe(broadcastSnapshot);
+  const scheduleSnapshot = (): void => {
+    snapshotPending = true;
+    if (snapshotTimer) return;
+    snapshotTimer = setTimeout(() => {
+      snapshotTimer = undefined;
+      if (!snapshotPending) return;
+      snapshotPending = false;
+      broadcastSnapshotNow();
+    }, 1000 / 30);
+  };
+  const unsubscribe = engine.subscribe(scheduleSnapshot);
 
   webSocketServer.on("connection", (socket) => {
     socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot() } satisfies ServerMessage));
@@ -49,6 +61,8 @@ export async function createControlServer(
       }
 
       const result = await executeCommand(envelope.command);
+      snapshotPending = false;
+      broadcastSnapshotNow();
       const message = commandResult(envelope, result);
       results.set(envelope.commandId, message);
       if (results.size > 512) results.delete(results.keys().next().value!);
@@ -65,6 +79,7 @@ export async function createControlServer(
     port: (httpServer.address() as AddressInfo).port,
     async close() {
       unsubscribe();
+      if (snapshotTimer) clearTimeout(snapshotTimer);
       for (const client of webSocketServer.clients) client.terminate();
       await closeWebSocketServer(webSocketServer);
       await closeHttpServer(httpServer);
@@ -73,7 +88,7 @@ export async function createControlServer(
 }
 
 function createHttpServer(staticDirectory?: string): HttpServer {
-  const serveStatic = staticDirectory ? sirv(staticDirectory, { single: true }) : undefined;
+  const serveStatic = staticDirectory ? sirv(staticDirectory, { single: true, dev: true }) : undefined;
   return createServer((request, response) => {
     if (request.url === "/health") {
       response.writeHead(200, { "content-type": "application/json" });

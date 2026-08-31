@@ -200,7 +200,7 @@ function LoopPane({ snapshot, send }: PaneProps) {
       {saving && <div className="dialog-backdrop" onMouseDown={() => setSaving(false)}>
         <form className="save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveExport(); }}>
           <h2 id="save-title">Save MP3 session</h2>
-          <label>Folder name<input autoFocus required maxLength={80} pattern="[A-Za-z0-9][A-Za-z0-9 _-]*" value={exportName} onChange={(event) => setExportName(event.target.value)} /></label>
+          <label>Folder name<input autoFocus required maxLength={80} pattern="[A-Za-z0-9][-A-Za-z0-9 _]*" value={exportName} onChange={(event) => setExportName(event.target.value)} /></label>
           <div className="dialog-actions"><button type="button" onClick={() => setSaving(false)}>Cancel</button><button type="submit">Save</button></div>
         </form>
       </div>}

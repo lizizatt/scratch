@@ -203,6 +203,25 @@ describe("MidiLoopScheduler", () => {
     expect(scheduler.exportRecordings([stagedId]).get(stagedId)?.[0]?.position).toBe(0);
   });
 
+  it("retains the completed cycle when a generated event arrives before the rollover update", async () => {
+    const engine = new SimulatedHostEngine();
+    const scheduler = new MidiLoopScheduler(fakeOutput());
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+    scheduler.record({ type: "note-on", channel: 0, note: 60, velocity: 100 }, engine.snapshot());
+    scheduler.record({ type: "note-off", channel: 0, note: 60 }, engine.snapshot());
+
+    engine.advance(2);
+    scheduler.record({ type: "note-on", channel: 0, note: 64, velocity: 100 }, engine.snapshot());
+    scheduler.update(engine.snapshot());
+
+    const stagedId = engine.snapshot().capture.staged!.id;
+    expect(scheduler.exportRecordings([stagedId]).get(stagedId)).toEqual([
+      { position: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
+      { position: 0, event: { type: "note-off", channel: 0, note: 60 } },
+    ]);
+  });
+
   it("replays a completed cycle as an audible staged take", async () => {
     const engine = new SimulatedHostEngine();
     const output = fakeOutput();

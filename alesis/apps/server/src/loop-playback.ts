@@ -39,10 +39,7 @@ export class MidiLoopScheduler {
 
   record(event: MidiEvent, snapshot: EngineSnapshot): void {
     if (snapshot.transport.state !== "playing") return;
-    if (this.recordingCycle !== snapshot.transport.cycle) {
-      this.currentRecording = [];
-      this.recordingCycle = snapshot.transport.cycle;
-    }
+    this.advanceRecordingCycle(snapshot);
     this.currentRecording.push({ position: snapshot.transport.progress, event: structuredClone(event) });
     const noteKey = "note" in event ? `${event.channel}:${event.note}` : null;
     if (event.type === "note-on" && event.velocity > 0) this.heldRecordingNotes.set(noteKey!, structuredClone(event));
@@ -62,21 +59,7 @@ export class MidiLoopScheduler {
       return;
     }
 
-    if (this.recordingCycle === null) this.recordingCycle = snapshot.transport.cycle;
-    if (snapshot.transport.cycle !== this.recordingCycle) {
-      for (const note of this.heldRecordingNotes.values()) {
-        this.currentRecording.push({ position: 1, event: { type: "note-off", channel: note.channel, note: note.note } });
-      }
-      if (snapshot.capture.staged) {
-        const totalBeats = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
-        const rawRecording = structuredClone(this.currentRecording);
-        this.rawRecordings.set(snapshot.capture.staged.id, rawRecording);
-        this.recordings.set(snapshot.capture.staged.id, quantizeRecording(rawRecording, snapshot.capture.quantization, totalBeats));
-        this.appliedQuantization.set(snapshot.capture.staged.id, snapshot.capture.quantization);
-      }
-      this.currentRecording = [...this.heldRecordingNotes.values()].map((event) => ({ position: 0, event: structuredClone(event) }));
-      this.recordingCycle = snapshot.transport.cycle;
-    }
+    this.advanceRecordingCycle(snapshot);
 
     if (snapshot.capture.staged) {
       const rawRecording = this.rawRecordings.get(snapshot.capture.staged.id);
@@ -140,6 +123,28 @@ export class MidiLoopScheduler {
       const recording = this.recordings.get(takeId);
       return recording ? [[takeId, structuredClone(recording)] as const] : [];
     }));
+  }
+
+  private advanceRecordingCycle(snapshot: EngineSnapshot): void {
+    if (this.recordingCycle === null) {
+      this.recordingCycle = snapshot.transport.cycle;
+      return;
+    }
+    if (snapshot.transport.cycle === this.recordingCycle) return;
+    for (const note of this.heldRecordingNotes.values()) {
+      this.currentRecording.push({ position: 1, event: { type: "note-off", channel: note.channel, note: note.note } });
+    }
+    const completedTake = [snapshot.capture.staged, snapshot.capture.previousStaged]
+      .find((take) => take?.cycle === this.recordingCycle);
+    if (completedTake) {
+      const totalBeats = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
+      const rawRecording = structuredClone(this.currentRecording);
+      this.rawRecordings.set(completedTake.id, rawRecording);
+      this.recordings.set(completedTake.id, quantizeRecording(rawRecording, snapshot.capture.quantization, totalBeats));
+      this.appliedQuantization.set(completedTake.id, snapshot.capture.quantization);
+    }
+    this.currentRecording = [...this.heldRecordingNotes.values()].map((event) => ({ position: 0, event: structuredClone(event) }));
+    this.recordingCycle = snapshot.transport.cycle;
   }
 
   private audibleTakes(snapshot: EngineSnapshot): AudibleTake[] {

@@ -151,14 +151,29 @@ function createProducerMonitors() {
       `--target=${producer.serial}`,
       "--properties=stream.capture.sink=true",
       "--rate=48000", "--channels=2", "--format=f32", "-",
-    ], { stdio: ["ignore", "pipe", "ignore"] });
-    const monitor = { serial: producer.serial, process, active: false, peak: 0, samples: 0 };
+    ], { stdio: ["ignore", "pipe", "pipe"] });
+    let recorderError = "";
+    process.stderr.on("data", (chunk) => { recorderError += String(chunk); });
+    let readyResolve;
+    let readyReject;
+    const ready = new Promise((resolve, reject) => {
+      readyResolve = resolve;
+      readyReject = reject;
+    });
+    const readyTimeout = setTimeout(() => readyReject(new Error(`${producerName} monitor did not receive PCM frames: ${recorderError.trim() || "no pw-record error"}`)), 3_000);
+    const monitor = { serial: producer.serial, process, ready, active: false, peak: 0, samples: 0 };
     process.stdout.on("data", (chunk) => {
+      clearTimeout(readyTimeout);
+      readyResolve();
       if (!monitor.active) return;
       for (let offset = 0; offset + 4 <= chunk.length; offset += 4) {
         monitor.peak = Math.max(monitor.peak, Math.abs(chunk.readFloatLE(offset)));
         monitor.samples += 1;
       }
+    });
+    process.once("error", readyReject);
+    process.once("exit", (code) => {
+      if (monitor.samples === 0) readyReject(new Error(`${producerName} monitor exited with code ${code}: ${recorderError.trim() || "no pw-record error"}`));
     });
     monitors.set(producerName, monitor);
     return monitor;
@@ -169,6 +184,7 @@ function createProducerMonitors() {
       monitor.peak = 0;
       monitor.samples = 0;
       monitor.active = true;
+      await monitor.ready;
       await new Promise((resolve) => setTimeout(resolve, 1_000));
       monitor.active = false;
       if (monitor.process.exitCode !== null || monitor.samples === 0) throw new Error(`No PCM frames received from ${producerName} stream`);

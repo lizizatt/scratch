@@ -10,6 +10,7 @@ import { DrumPatternScheduler } from "./drum-patterns.js";
 import { MidiLoopScheduler } from "./loop-playback.js";
 import { MetronomeScheduler } from "./metronome.js";
 import { exportMp3Session } from "./mp3-exporter.js";
+import { PerformanceRouter } from "./performance-router.js";
 
 let soundFonts = discoverSoundFonts();
 const defaultSoundFont = preferredSoundFont(soundFonts);
@@ -29,6 +30,7 @@ const audio = pulseDevice
   : new SilentAudioOutput();
 const loops = new MidiLoopScheduler(audio);
 const arpeggiator = new MidiArpeggiator(engine.snapshot().arpeggiator);
+const performanceRouter = new PerformanceRouter();
 const drums = new DrumPatternScheduler();
 const dispatchPerformance = (event: MidiEvent): void => {
   loops.record(event, engine.snapshot());
@@ -36,7 +38,9 @@ const dispatchPerformance = (event: MidiEvent): void => {
 };
 const disconnectMidi = midi.subscribe((event) => {
   engine.dispatchMidi(event);
-  for (const outputEvent of arpeggiator.handle(event)) dispatchPerformance(outputEvent);
+  for (const routedEvent of performanceRouter.route(event)) {
+    for (const outputEvent of arpeggiator.handle(routedEvent)) dispatchPerformance(outputEvent);
+  }
 });
 await audio.start();
 await engine.execute({ type: "configure", settings: { midiInputId: midi.id, audioOutputId: audio.id } });
