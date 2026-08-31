@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "alesis",
+  "name": "Alesis",
+  "kind": "managed",
+  "systemdUnit": "jarvis-alesis.service",
+  "runner": "deploy/run-jarvis.sh",
+  "healthUrl": "http://127.0.0.1:8787/health",
+  "actions": ["start", "stop", "restart"]
+}

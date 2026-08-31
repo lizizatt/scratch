@@ -213,7 +213,8 @@ const executeCommand = async (command: EngineCommand) => {
   if (result.accepted && command.type === "undo-delete") loops.restoreDeleted();
   return result;
 };
-const server = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeCommand);
+const host = process.env.HOST ?? "127.0.0.1";
+const server = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeCommand, host);
 const metronome = new MetronomeScheduler(audio);
 const timer = setInterval(() => {
   engine.advance(0.05);
@@ -243,7 +244,7 @@ const midiDemoStart = softwareMidi && process.env.SOFTWARE_VORTEX_DEMO === "1"
   ? setTimeout(startMidiDemo, Number(process.env.SOFTWARE_VORTEX_DEMO_DELAY_MS ?? 0))
   : undefined;
 
-console.log(`Alesis control server listening on http://127.0.0.1:${server.port}`);
+console.log(`Alesis control server listening on http://${host}:${server.port}`);
 console.log(`MIDI input: ${midi.name} (${midi.id})`);
 console.log(`Audio output: ${audio.name} (${audio.id})`);
 console.log(`SoundFont: ${defaultSoundFont?.name ?? "none"}${defaultSoundFont ? ` (${defaultSoundFont.path})` : ""}`);

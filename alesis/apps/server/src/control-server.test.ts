@@ -21,6 +21,17 @@ afterEach(async () => {
 });
 
 describe("control server", () => {
+  it("reports health from the production HTTP server", async () => {
+    engine = new SimulatedHostEngine();
+    server = await createControlServer(engine);
+
+    const response = await fetch(`http://127.0.0.1:${server.port}/health`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/json");
+    expect(await response.json()).toEqual({ status: "ok" });
+  });
+
   it("serves assets created after startup", async () => {
     const directory = await mkdtemp(join(tmpdir(), "alesis-static-test-"));
     temporaryDirectories.add(directory);

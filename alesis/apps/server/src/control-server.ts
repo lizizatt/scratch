@@ -20,6 +20,7 @@ export async function createControlServer(
   port = 0,
   staticDirectory?: string,
   executeCommand: (command: EngineCommand) => Promise<EngineResult> = (command) => engine.execute(command),
+  host = "127.0.0.1",
 ): Promise<ControlServer> {
   const httpServer = createHttpServer(staticDirectory);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control" });
@@ -72,7 +73,7 @@ export async function createControlServer(
 
   await new Promise<void>((resolve, reject) => {
     httpServer.once("error", reject);
-    httpServer.listen(port, "127.0.0.1", resolve);
+    httpServer.listen(port, host, resolve);
   });
 
   return {

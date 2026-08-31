@@ -27,16 +27,23 @@ The known-harmony MIDI library and reference-audio caveats are documented in
 
 ## Jarvis deployment contract
 
-When supervised by Jarvis, Jam Assistant runs from this checkout with Vite on
-`127.0.0.1:4173` and must honor the requested port (`--strictPort`); it must
-not silently move to another port. The Jarvis systemd launcher supplies the
-host and port and waits for the root page to respond before configuring access.
+[`deploy/run-jarvis.sh`](deploy/run-jarvis.sh) owns the supervised application
+lifecycle. It starts Vite on `127.0.0.1:4173` with `--strictPort`, waits for the
+root page, replaces any stale private Tailscale Serve mapping on HTTPS port
+`4173`, and removes that mapping while forwarding shutdown signals to Vite. It
+does not enable Funnel or bind to a public/LAN interface.
 
-Jarvis owns the Tailscale Serve mapping for the private tailnet URL on HTTPS
-port `4173`. Jam Assistant must not configure Tailscale, enable Funnel, or bind
-to a public/LAN interface. Jarvis's separate HTTPS mapping on port `443` serves
-the Jarvis API/PWA and is outside this application's contract. Vite requires
-Node.js `20.19+` (or `22.12+`) in the supervised environment.
+The runner accepts the existing `JARVIS_JAM_ASSISTANT_ROOT`,
+`JARVIS_JAM_ASSISTANT_HOST`, `JARVIS_JAM_ASSISTANT_PORT`, and
+`JARVIS_JAM_ASSISTANT_TAILSCALE_PORT` overrides. The older
+`JARVIS_JAM_ASSISTANT_TAILSCALE_HTTPS_PORT` and
+`JARVIS_JAM_ASSISTANT_HTTPS_PORT` names remain supported.
+`JARVIS_JAM_ASSISTANT_TAILSCALE_EXECUTABLE` or
+`JARVIS_TAILSCALE_EXECUTABLE` can select the Tailscale binary. The host override
+must resolve directly to a loopback address. The committed
+[`jarvis.deployment.json`](jarvis.deployment.json) is the discovery contract for
+Jarvis. Vite requires Node.js `20.19+` (or `22.12+`) in the supervised
+environment.
 
 ## Product goal
 

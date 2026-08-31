@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspace @alesis/protocol && npm run build --workspace @alesis/web",
+    "start": "npm run start --workspace @alesis/server",
     "test": "vitest run",
     "test:audio": "node scripts/audio-smoke.mjs",
     "test:e2e": "playwright test",

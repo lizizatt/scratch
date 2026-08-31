@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "jam-assistant",
+  "name": "Jam Assistant",
+  "kind": "managed",
+  "systemdUnit": "jarvis-jam-assistant.service",
+  "runner": "deploy/run-jarvis.sh",
+  "healthUrl": "http://127.0.0.1:4173/",
+  "actions": ["start", "stop", "restart"]
+}
