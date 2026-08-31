@@ -5,6 +5,7 @@
   "kind": "managed",
   "systemdUnit": "jarvis-alesis.service",
   "runner": "deploy/run-jarvis.sh",
+  "build": ["npm", "run", "build"],
   "healthUrl": "http://127.0.0.1:8787/health",
   "actions": ["start", "stop", "restart"]
 }

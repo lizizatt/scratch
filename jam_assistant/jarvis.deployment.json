@@ -5,6 +5,7 @@
   "kind": "managed",
   "systemdUnit": "jarvis-jam-assistant.service",
   "runner": "deploy/run-jarvis.sh",
+  "build": ["npm", "run", "build"],
   "healthUrl": "http://127.0.0.1:4173/",
   "actions": ["start", "stop", "restart"]
 }
