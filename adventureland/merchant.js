@@ -1,6 +1,6 @@
 var FREE = 5, busy = false, PLAN_OK = false, CYCLE_MS = 300000, cycle_at = 0;
 var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "II"];
-var HOLD = [["armorring", 1]], STOCK = [], GOLD_FLOAT = 100000, PONTY_MAX = 1.25, COMBINE_MAX = 5;
+var HOLD = [["armorring", 1]], STOCK = [], GOLD_FLOAT = 100000, PONTY_MAX = 1.25, COMBINE_MAX = 5, SALE_MULT = 0.95;
 try {
   load_code("merchant_plan"); load_code("merchant_ponty"); load_code("merchant_ops"); load_code("merchant_craft"); load_code("merchant_combine");
   if (typeof run_acquire === "function" && typeof run_craft === "function" && typeof buy_leaf === "function") PLAN_OK = true; else throw 1;
@@ -33,7 +33,7 @@ async function list_sale() {
     it = character.items[cand[i].i];
     if (!it || it.name !== cand[i].name) continue;
     slot = next_trade(); if (slot < 0) return;
-    try { await trade(cand[i].i, slot, Math.max(1, Math.floor(cand[i].g * 1.5)), cand[i].q); } catch (e) {}
+    try { await trade(cand[i].i, slot, sale_price(it), cand[i].q); } catch (e) {}
   }
 }
 async function empty_sale() {

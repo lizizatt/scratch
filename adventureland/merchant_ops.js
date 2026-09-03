@@ -5,6 +5,15 @@ async function go_npc(to) {
 }
 async function move_ent(e, dest) {
   if (e.where === dest) return "have";
+  if (e.where === "gear") {
+    if (!character.slots[e.loc]) return "fail";
+    try { await unequip(e.loc); } catch (err) { return "fail"; }
+    if (character.slots[e.loc]) return "fail";
+    if (dest === "bag") return "moved";
+    e = find_ent(e.name, e.level, "bag");
+    if (!e) return "fail";
+    return await move_ent(e, dest);
+  }
   if (e.where === "sale") {
     if (!character.slots["trade" + e.loc]) return "fail";
     close_stand();
@@ -24,13 +33,17 @@ async function move_ent(e, dest) {
     snap_bank(); return character.items[e.loc] ? "fail" : "moved";
   }
   if (e.where === "bag" && dest === "sale") {
-    var slot = next_trade(); if (slot < 0 || !character.items[e.loc]) return "fail";
-    try { await trade(e.loc, slot, Math.max(1, Math.floor(vg(e.name) * 1.5)), 1); } catch (err) { return "fail"; }
+    var slot = next_trade(), it, q;
+    if (slot < 0 || !character.items[e.loc]) return "fail";
+    it = character.items[e.loc]; q = it.q || 1;
+    try { await trade(e.loc, slot, sale_price(it), q); } catch (err) { return "fail"; }
     return character.items[e.loc] ? "fail" : "moved";
   }
   if (e.where === "bank" && dest === "sale") {
+    var name = e.name, level = e.level;
     if ((await move_ent(e, "bag")) === "fail") return "fail";
-    e = find_ent(e.name, e.level, "bag");
+    e = find_ent(name, level, "bag");
+    if (!e) { await strip_gear(); e = find_ent(name, level, "bag"); }
     if (!e) return "fail";
     return await move_ent(e, "sale");
   }
@@ -50,6 +63,13 @@ function bag_three(name, level) {
   return slots.length === 3 ? slots : null;
 }
 async function wait_q(k) { var n; for (n = 0; n < 200 && character.q && character.q[k]; n++) await sleep(250); }
+async function strip_gear() {
+  var s;
+  for (s in character.slots) {
+    if (!character.slots[s] || ("" + s).indexOf("trade") === 0) continue;
+    try { await unequip(s); } catch (e) {}
+  }
+}
 async function acquire_step(name, qty, dest, level) {
   var e;
   level = level || 0;
@@ -66,11 +86,13 @@ async function acquire(name, qty, dest) {
   for (n = 0; n < 40; n++) { r = await acquire_step(name, qty, dest, 0); if (r === "have" || r === "fail") return r; }
   return "fail";
 }
-function bank_sellable() {
-  var i, a = idx(), best = null, skip = held_set();
+function bank_sellable(bad) {
+  var i, a = idx(), best = null, skip = held_set(), key;
   for (i = 0; i < a.length; i++) {
     if (a[i].where !== "bank") continue;
     if (skip[a[i].name]) continue;
+    key = a[i].loc[0] + ":" + a[i].loc[1];
+    if (bad && bad[key]) continue;
     if (!best || vg(a[i].name) > vg(best.name)) best = a[i];
   }
   return best;
@@ -78,6 +100,7 @@ function bank_sellable() {
 async function park_bag() {
   var i, it, skip = held_set();
   if (!(await go_npc("bank"))) return false;
+  await strip_gear();
   for (i = 0; i < character.items.length; i++) {
     it = character.items[i];
     if (!it || is_pot(it) || it.name === "stand0" || it.l || skip[it.name]) continue;
@@ -87,11 +110,17 @@ async function park_bag() {
   return true;
 }
 async function restock_sale() {
-  var n, src;
-  for (n = 0; n < 16; n++) {
+  var n, src, r, bad = {}, key, filled = 0;
+  for (n = 0; n < 32 && filled < 16; n++) {
     if (next_trade() < 0) return;
-    src = bank_sellable(); if (!src) return;
-    if ((await move_ent(src, "sale")) === "fail") return;
+    src = bank_sellable(bad); if (!src) return;
+    r = await move_ent(src, "sale");
+    if (r === "fail") {
+      key = src.loc[0] + ":" + src.loc[1];
+      bad[key] = 1;
+      continue;
+    }
+    filled++;
   }
 }
 async function run_acquire() {
@@ -109,7 +138,7 @@ function hold_done() {
 async function stock_store() {
   if (!(await go_npc("bank"))) return false;
   await park_bag();
-  await empty_sale();
+  if (!(await empty_sale())) { await park_bag(); if (!(await empty_sale())) return false; }
   await park_bag();
   await restock_sale();
   close_stand();

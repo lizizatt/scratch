@@ -198,6 +198,35 @@ test("empty STOCK still restocks sale from expensive unheld bank loot", async ()
   assert.ok(env.character.bank.items0[0] && env.character.bank.items0[0].name === "armorring");
 });
 
+test("park_bag strips equipped gear before banking", async () => {
+  const env = envOf({ esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.character.slots.helmet = { name: "helmet", q: 1 };
+  env.character.slots.chest = { name: "coat", q: 1 };
+  env.character.slots.trade1 = { name: "shoes", q: 1, price: 100 };
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  await env.park_bag();
+  assert.ok(!env.character.slots.helmet);
+  assert.ok(!env.character.slots.chest);
+  assert.ok(env.character.slots.trade1 && env.character.slots.trade1.name === "shoes");
+  assert.ok(env.log.unequipped.includes("helmet"));
+  assert.ok(env.log.unequipped.includes("chest"));
+  assert.ok(env.log.stored.some((s) => s.item === "helmet"));
+  assert.ok(env.log.stored.some((s) => s.item === "coat"));
+});
+
+test("list_sale prices at SALE_MULT * item_value", async () => {
+  const env = envOf({ esize: 41 });
+  env.HOLD = [];
+  env.SALE_MULT = 0.95;
+  env.character.items[1] = { name: "helmet", q: 1 };
+  await env.list_sale();
+  assert.strictEqual(env.log.traded[0].gold, Math.floor(1200 * 0.95));
+  assert.strictEqual(env.character.slots.trade1.price, 1140);
+});
+
 test("list_sale skips HOLD bill-of-material names", async () => {
   const env = envOf();
   env.character.items[1] = { name: "helmet", q: 1 };
@@ -276,6 +305,32 @@ test("awaited unequip clears trade before restock (async bank ops)", async () =>
   assert.strictEqual(names[0], "coat");
   assert.ok(names.includes("pants"));
   assert.ok(names.includes("helmet"));
+});
+
+test("restock_sale skips a stuck bank slot and keeps filling", async () => {
+  const env = envOf({ gold: 100000, esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "coat", q: 1 };
+  env.character.bank.items0[1] = { name: "pants", q: 1 };
+  env.character.bank.items0[2] = { name: "helmet", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  const realRetrieve = env.bank_retrieve.bind(env);
+  let blocked = true;
+  env.bank_retrieve = async (pack, i) => {
+    if (blocked && pack === "items0" && i === 0) {
+      env.log.bankFail.push({ pack, i, reason: "stuck" });
+      return;
+    }
+    return realRetrieve(pack, i);
+  };
+  await env.restock_sale();
+  blocked = false;
+  assert.ok(!env.character.slots.trade1 || env.character.slots.trade1.name !== "coat");
+  assert.ok(env.character.slots.trade1 && env.character.slots.trade1.name === "pants");
+  assert.ok(env.character.slots.trade2 && env.character.slots.trade2.name === "helmet");
+  assert.ok(env.character.bank.items0[0] && env.character.bank.items0[0].name === "coat");
 });
 
 test("try_buy buys lotus not extra vitrings when +2 already exists", async () => {

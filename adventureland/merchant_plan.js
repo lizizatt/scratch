@@ -1,4 +1,9 @@
 function vg(n) { return (G.items[n] && G.items[n].g) || 0; }
+function sale_price(it) {
+  if (!it) return 1;
+  var v = (typeof item_value === "function") ? item_value(it) : vg(it.name);
+  return Math.max(1, Math.floor(v * (SALE_MULT != null ? SALE_MULT : 0.95)));
+}
 function lv(it) { return (it && it.level) || 0; }
 function skip_it(it) { return !it || is_pot(it) || it.name === "stand0" || it.l; }
 function cscroll(name, level) {
@@ -62,6 +67,10 @@ function idx() {
     for (i = 0; i < bag.length; i++) if ((it = bag[i]) && !skip_it(it)) out.push({ name: it.name, level: lv(it), qty: it.q || 1, where: "bank", loc: [pack, i] });
   }
   for (s = 1; s <= 16; s++) if ((it = character.slots["trade" + s]) && !skip_it(it)) out.push({ name: it.name, level: lv(it), qty: it.q || 1, where: "sale", loc: s });
+  for (s in character.slots) {
+    if (("" + s).indexOf("trade") === 0) continue;
+    if ((it = character.slots[s]) && !skip_it(it)) out.push({ name: it.name, level: lv(it), qty: it.q || 1, where: "gear", loc: s });
+  }
   return out;
 }
 function cnt(name, level, where) {
