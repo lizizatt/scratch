@@ -505,6 +505,21 @@ test("potion restock banks loot and does not sell it", async () => {
   assert.ok(env.log.bought.some((b) => b.name === "hpot0"));
 });
 
+test("warrior needs_vendor when esize is 0 drives restock", async () => {
+  const items = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) items[i] = { name: "helmet", q: 1 };
+  items[0] = { name: "hpot0", q: 200 };
+  items[1] = { name: "mpot0", q: 200 };
+  const env = loadScript("warrior.js", {
+    name: "Jazwyn", ctype: "warrior", items, gold: 50000, esize: 0, map: "main", level: 12,
+    _server: ["US", "III"]
+  });
+  assert.strictEqual(env.needs_vendor(), true);
+  await env.logistics();
+  assert.ok(env.log.said.some((s) => s === "I need some potions!"));
+  assert.ok(wentTo(env, "bank") || wentTo(env, "potions"));
+});
+
 test("upgrade rally skips the bank dump", async () => {
   const items = new Array(42).fill(null);
   items[0] = { name: "helmet", q: 1 };

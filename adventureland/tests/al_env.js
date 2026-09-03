@@ -188,7 +188,18 @@ function makeEnv(charOver) {
     item_grade: (it) => (it && (it.level || 0) >= 7 ? 1 : 0),
     mssince: (t) => Date.now() - (t instanceof Date ? t.getTime() : t),
     min: Math.min, max: Math.max,
-    sleep: (ms) => { if (character.q) character.q = {}; return Promise.resolve(ms); },
+    sleep: (ms) => {
+      if (character.q) {
+        for (const k of Object.keys(character.q)) {
+          const e = character.q[k];
+          if (e && typeof e.ms === "number") {
+            e.ms -= (ms || 0);
+            if (e.ms <= 0) delete character.q[k];
+          } else delete character.q[k];
+        }
+      }
+      return Promise.resolve(ms);
+    },
     stop: () => { smart.moving = false; },
     say: (m) => log.global.push(m),
     party_say: (m) => log.said.push(m),

@@ -632,4 +632,135 @@ test("compound path via run_combine walks to the upgrade NPC", async () => {
   assert.ok(env.log.moved.some((d) => d && d.to === "upgrade"));
 });
 
+test("boot PLAN_OK is true with plan/ops/combine helpers only", () => {
+  const env = envOf();
+  assert.strictEqual(env.PLAN_OK, true);
+  assert.strictEqual(typeof env.run_combine, "function");
+  assert.strictEqual(typeof env.stock_store, "function");
+  assert.strictEqual(typeof env.park_bag, "function");
+  assert.strictEqual(typeof env.buy_scroll, "function");
+  assert.strictEqual(typeof env.run_craft, "undefined");
+  assert.strictEqual(typeof env.buy_leaf, "undefined");
+});
+
+test("happy cycle never crafts or buys Ponty secondhands", async () => {
+  const env = envOf({ gold: 100000, esize: 40 });
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "coat", q: 1 };
+  env.character._bank = env.character.bank;
+  env.HOLD = [];
+  env.ponty = [{ name: "snakefang", rid: "f1", price: 1200, level: 0 }];
+  await env.logistics();
+  assert.deepStrictEqual(env.log.crafted, []);
+  assert.deepStrictEqual(env.log.secondhand, []);
+  assert.ok(!(env.log.ponty && env.log.ponty.length));
+});
+
+test("run_cycle returns false when park_bag fails", async () => {
+  const env = envOf({ gold: 100000, map: "bank" });
+  env.park_bag = async () => false;
+  assert.strictEqual(await env.run_cycle(), false);
+  assert.ok((env.log.game || []).includes("park fail"));
+});
+
+test("stock_store returns false when empty_sale cannot clear", async () => {
+  const env = envOf({ gold: 100000, esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.character.slots.trade1 = { name: "shoes", q: 1, price: 100 };
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "coat", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  env.empty_sale = async () => false;
+  const before = env.log.traded.length;
+  assert.strictEqual(await env.stock_store(), false);
+  assert.ok((env.log.game || []).includes("stock empty fail"));
+  assert.strictEqual(env.log.traded.length, before);
+});
+
+test("ensure_stand no-op when already in the desired state", async () => {
+  const env = envOf();
+  env.character.stand = true;
+  env.log.merchant.length = 0;
+  await env.ensure_stand(true);
+  assert.deepStrictEqual(env.log.merchant, []);
+  env.character.stand = false;
+  await env.ensure_stand(false);
+  assert.deepStrictEqual(env.log.merchant, []);
+  await env.ensure_stand(true);
+  assert.ok(env.log.merchant.some((m) => m.open != null));
+  env.log.merchant.length = 0;
+  await env.ensure_stand(false);
+  assert.ok(env.log.merchant.some((m) => m.close));
+});
+
+test("pull_combine from sale then compounds", async () => {
+  const env = envOf({ gold: 400000, esize: 38, map: "bank" });
+  env.GOLD_FLOAT = 0;
+  env.COMBINE_MAX = 5;
+  env.HOLD = [];
+  env.character.items[1] = { name: "cscroll0", q: 4 };
+  for (let s = 1; s <= 3; s++) env.character.slots["trade" + s] = { name: "vitring", q: 1, price: 1 };
+  env.character.stand = false;
+  const r = await env.combine_step();
+  assert.strictEqual(r, "ok");
+  assert.ok(env.log.unequipped.filter((s) => ("" + s).indexOf("trade") === 0).length >= 3);
+  assert.ok(env.log.compound.length >= 1);
+});
+
+test("pull_combine fails when ensure_bag fails", async () => {
+  const env = envOf({ gold: 400000, esize: 0, map: "bank" });
+  env.HOLD = [];
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "vitring", q: 1 };
+  env.character.bank.items0[1] = { name: "vitring", q: 1 };
+  env.character.bank.items0[2] = { name: "vitring", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  env.ensure_bag = async () => false;
+  assert.strictEqual(await env.pull_combine("vitring", 0), "fail");
+  assert.deepStrictEqual(env.log.compound, []);
+});
+
+test("restock_sale does N retrieves then one list_sale", async () => {
+  const env = envOf({ gold: 100000, esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  for (let i = 0; i < 3; i++) env.character.bank.items0[i] = { name: i === 0 ? "coat" : "helmet", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  let lists = 0;
+  const realList = env.list_sale.bind(env);
+  env.list_sale = async () => { lists++; return realList(); };
+  await env.restock_sale();
+  assert.ok(env.log.retrieved.length >= 3);
+  assert.strictEqual(lists, 1);
+  assert.ok(env.character.slots.trade1);
+});
+
+test("combine_step tries next candidate when scroll buy fails", async () => {
+  const env = envOf({ gold: 100000, esize: 30 });
+  env.GOLD_FLOAT = 100000;
+  env.COMBINE_MAX = 5;
+  env.HOLD = [];
+  const items = env.character.items;
+  for (let i = 0; i < 3; i++) items[1 + i] = { name: "vitring", level: 2, q: 1 };
+  items[4] = { name: "cscroll0", q: 4 };
+  for (let i = 0; i < 3; i++) items[5 + i] = { name: "vitring", q: 1 };
+  const r = await env.combine_step();
+  assert.strictEqual(r, "ok");
+  assert.strictEqual(env.log.compound[0].from, 0);
+  assert.deepStrictEqual(env.log.bought, []);
+});
+
+test("sleep decrements compound queue ms instead of wiping q", async () => {
+  const env = envOf();
+  env.character.q = { compound: { ms: 500 } };
+  await env.sleep(200);
+  assert.ok(env.character.q.compound);
+  assert.strictEqual(env.character.q.compound.ms, 300);
+  await env.sleep(400);
+  assert.ok(!env.character.q.compound);
+});
+
 module.exports = { tests };

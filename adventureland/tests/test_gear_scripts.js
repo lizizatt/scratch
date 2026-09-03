@@ -114,6 +114,39 @@ SPECS.forEach((spec) => {
     assert.strictEqual(env.lastMessage, "Wrong class");
     assert.strictEqual(env.done, true);
   });
+
+  test(spec.file + ": ensure_scroll buys SCROLL_BUY when missing", async () => {
+    const items = new Array(42).fill(null);
+    items[0] = { name: spec.weapon, level: 0 };
+    const env = loadScript(spec.file, {
+      name: spec.name, ctype: spec.ctype, gold: 200000, map: "main", items
+    });
+    const sn = await env.ensure_scroll("scroll0");
+    assert.ok(sn >= 0);
+    assert.ok(env.log.bought.some((b) => b.name === "scroll0" && b.q === 10));
+  });
+
+  test(spec.file + ": ensure_scroll refuses when gold below SCROLL_BUY reserve", async () => {
+    const items = new Array(42).fill(null);
+    items[0] = { name: spec.weapon, level: 0 };
+    const env = loadScript(spec.file, {
+      name: spec.name, ctype: spec.ctype, gold: 8000 + 1000, map: "main", items
+    });
+    const sn = await env.ensure_scroll("scroll0");
+    assert.strictEqual(sn, -1);
+    assert.deepStrictEqual(env.log.bought, []);
+  });
+
+  test(spec.file + ": tick says No scrolls when ensure_scroll fails", async () => {
+    const items = new Array(42).fill(null);
+    items[0] = { name: spec.weapon, level: 0 };
+    const env = loadScript(spec.file, {
+      name: spec.name, ctype: spec.ctype, gold: 9000, map: "main", items
+    });
+    await env.tick();
+    assert.strictEqual(env.lastMessage, "No scrolls");
+    assert.deepStrictEqual(env.log.upgraded, []);
+  });
 });
 
 test("warrior treats blade as short_sword gear", () => {
