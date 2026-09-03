@@ -11,8 +11,9 @@ function stand_i() { return locate_item("stand0"); }
 function open_stand() { var s = stand_i(); if (s >= 0) try { parent.open_merchant(s); } catch (e) {} }
 function close_stand() { try { parent.close_merchant(); } catch (e) {} }
 async function ensure_stand(on) {
+  if (!!character.stand === !!on) return;
   if (on) open_stand(); else close_stand();
-  await sleep(120);
+  await sleep(200);
 }
 function tell(on) {
   var i, msg = "hold:" + (on ? 1 : 0), data = { hold: on ? 1 : 0 };

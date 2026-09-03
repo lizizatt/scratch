@@ -4,8 +4,21 @@ async function buy_scroll(name) {
   if (!(await go_npc("upgrade"))) return "fail";
   try { await buy_with_gold(name, 1); return "bought"; } catch (e) { game_log("scroll buy fail"); return "fail"; }
 }
+async function pull_combine(name, level) {
+  var need, e, r;
+  need = 3 - cnt(name, level, "bag");
+  if (need <= 0) return "have";
+  if (typeof ensure_bag === "function" && !(await ensure_bag(need))) return "fail";
+  while (cnt(name, level, "bag") < 3) {
+    e = find_ent(name, level, "bank") || find_ent(name, level, "sale") || find_ent(name, level, "gear");
+    if (!e) return "fail";
+    r = await move_ent(e, "bag");
+    if (r === "fail") return "fail";
+  }
+  return "have";
+}
 async function combine_step() {
-  var a = idx(), cand = [], seen = {}, i, name, lv0, e, three, sc, sci;
+  var a = idx(), cand = [], seen = {}, i, name, lv0, three, sc, sci, r;
   for (i = 0; i < a.length; i++) {
     name = a[i].name; lv0 = a[i].level || 0;
     if (seen[name + "@" + lv0] || !(G.items[name] && G.items[name].compound) || lv0 >= (COMBINE_MAX || 5)) continue;
@@ -15,13 +28,18 @@ async function combine_step() {
   cand.sort(function (x, y) { return y.level - x.level; });
   for (i = 0; i < cand.length; i++) {
     name = cand[i].name; lv0 = cand[i].level;
-    if (cnt(name, lv0, "bag") < 3) {
-      e = find_ent(name, lv0); if (!e || e.where === "bag") return null;
-      return await move_ent(e, "bag");
-    }
+    r = await pull_combine(name, lv0);
+    if (r !== "have") continue;
     three = bag_three(name, lv0); sc = cscroll(name, lv0); sci = locate_item(sc);
-    if (!three) return null;
-    if (sci < 0) return await buy_scroll(sc);
+    if (!three) continue;
+    if (sci < 0) {
+      r = await buy_scroll(sc);
+      if (r !== "bought") continue;
+      sci = locate_item(sc);
+      if (sci < 0) continue;
+      three = bag_three(name, lv0);
+      if (!three) continue;
+    }
     if (!(await go_npc("upgrade"))) return "fail";
     try { await compound(three[0], three[1], three[2], sci); await wait_q("compound"); return "ok"; } catch (err) { return "fail"; }
   }
@@ -29,5 +47,9 @@ async function combine_step() {
 }
 async function run_combine() {
   var n, r;
-  for (n = 0; n < 24; n++) { r = await combine_step(); if (!r || r === "fail") return; }
+  for (n = 0; n < 24; n++) {
+    r = await combine_step();
+    if (r === "ok") continue;
+    return;
+  }
 }

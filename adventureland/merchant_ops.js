@@ -1,5 +1,6 @@
 async function go_npc(to) {
-  var r; close_stand();
+  var r;
+  if (typeof ensure_stand === "function") await ensure_stand(false); else close_stand();
   if (to === "bank" && character.map === "bank") return true;
   return !!(r = await smart_move({ to: to })) && !r.failed;
 }
@@ -87,14 +88,14 @@ function bank_sellable(bad) {
   return best;
 }
 async function park_bag() {
-  var i, it, pass, left;
+  var i, it, pass, left, fail = 0;
   if (!(await go_npc("bank"))) { game_log("park no bank"); return false; }
   for (pass = 0; pass < 2; pass++) {
     if (pass) await strip_gear();
     for (i = 0; i < character.items.length; i++) {
       it = character.items[i];
       if (!it || is_pot(it) || it.name === "stand0" || it.l) continue;
-      try { await bank_store(i); } catch (e) { game_log("store fail"); }
+      try { await bank_store(i); } catch (e) { fail = 1; }
     }
   }
   snap_bank();
@@ -104,6 +105,7 @@ async function park_bag() {
     if (it && !is_pot(it) && it.name !== "stand0" && !it.l) left++;
   }
   if (left) { game_log("park left " + left); return false; }
+  if (fail) game_log("park store fail");
   return true;
 }
 async function ensure_bag(n) {
@@ -118,28 +120,30 @@ async function ensure_bag(n) {
   return false;
 }
 async function restock_sale() {
-  var n, src, r, bad = {}, key, filled = 0;
-  for (n = 0; n < 32 && filled < 16; n++) {
-    if (next_trade() < 0) return;
-    src = bank_sellable(bad); if (!src) return;
-    r = await move_ent(src, "sale");
+  var n, src, r, bad = {}, key, bagged = 0;
+  if (typeof ensure_stand === "function") await ensure_stand(false); else close_stand();
+  for (n = 0; n < 32 && bagged < 16; n++) {
+    if ((character.esize || 0) <= 0) break;
+    src = bank_sellable(bad); if (!src) break;
+    r = await move_ent(src, "bag");
     if (r === "fail") {
       key = src.loc[0] + ":" + src.loc[1];
       bad[key] = 1;
       continue;
     }
-    filled++;
+    bagged++;
   }
+  if (bagged) await list_sale();
 }
 async function stock_store() {
-  close_stand();
+  if (typeof ensure_stand === "function") await ensure_stand(false); else close_stand();
   if (!(await go_npc("bank"))) { game_log("stock no bank"); return false; }
   if (!(await park_bag())) return false;
   if (!(await empty_sale())) { await park_bag(); if (!(await empty_sale())) { game_log("stock empty fail"); return false; } }
   if (!sale_clear()) { game_log("sale not clear"); return false; }
   if (!(await park_bag())) return false;
   await restock_sale();
-  close_stand();
+  if (typeof ensure_stand === "function") await ensure_stand(false); else close_stand();
   if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) { game_log("plaza fail"); return false; }
   await list_sale();
   return true;

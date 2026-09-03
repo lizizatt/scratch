@@ -448,6 +448,40 @@ test("missing plan CODE leaves PLAN_OK false and skips econ", async () => {
   assert.deepStrictEqual(env.log.bought, []);
 });
 
+test("run_combine pulls bank copies when bag only has a partial set", async () => {
+  const env = envOf({ gold: 400000, esize: 38, map: "bank" });
+  env.GOLD_FLOAT = 0;
+  env.COMBINE_MAX = 5;
+  env.HOLD = [];
+  env.character.items[1] = { name: "cscroll0", q: 4 };
+  env.character.items[2] = { name: "vitring", q: 1 };
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "vitring", q: 1 };
+  env.character.bank.items0[1] = { name: "vitring", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  const r = await env.combine_step();
+  assert.strictEqual(r, "ok");
+  assert.ok(env.log.compound.length >= 1);
+  assert.ok(env.log.retrieved.length >= 2);
+});
+
+test("restock_sale opens the stand once after banking pulls", async () => {
+  const env = envOf({ gold: 100000, esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "coat", q: 1 };
+  env.character.bank.items0[1] = { name: "helmet", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  env.character.stand = false;
+  await env.restock_sale();
+  const opens = (env.log.merchant || []).filter((m) => m.open != null).length;
+  assert.ok(opens <= 2, "opens=" + opens);
+  assert.ok(env.character.slots.trade1);
+  assert.ok(!env.log.tradeFail || !env.log.tradeFail.some((f) => f.reason === "stand_closed"));
+});
+
 test("run_combine compounds duplicates toward COMBINE_MAX", async () => {
   const env = envOf({ gold: 400000, esize: 30 });
   env.GOLD_FLOAT = 0;
