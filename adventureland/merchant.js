@@ -10,6 +10,10 @@ function is_pot(it) { return it && (it.name.indexOf("hpot") === 0 || it.name.ind
 function stand_i() { return locate_item("stand0"); }
 function open_stand() { var s = stand_i(); if (s >= 0) try { parent.open_merchant(s); } catch (e) {} }
 function close_stand() { try { parent.close_merchant(); } catch (e) {} }
+async function ensure_stand(on) {
+  if (on) open_stand(); else close_stand();
+  await sleep(120);
+}
 function tell(on) {
   var i, msg = "hold:" + (on ? 1 : 0), data = { hold: on ? 1 : 0 };
   for (i = 0; i < FIGHTERS.length; i++) try { pm(FIGHTERS[i], msg); } catch (e) {}
@@ -33,6 +37,7 @@ function next_trade() { for (var s = 1; s <= 16; s++) if (!character.slots["trad
 function sale_clear() { for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) return false; return true; }
 async function list_sale() {
   var cand = [], i, it, g, slot, skip = typeof held_set === "function" ? held_set() : {};
+  await ensure_stand(true);
   for (i = 0; i < character.items.length; i++) {
     it = character.items[i];
     if (!it || it.price != null || is_pot(it) || it.name === "stand0" || it.l) continue;
@@ -50,12 +55,13 @@ async function list_sale() {
 }
 async function empty_sale() {
   var s, n;
-  close_stand();
   for (n = 0; n < 4; n++) {
+    await ensure_stand(true);
     for (s = 1; s <= 16; s++) {
       if (!character.slots["trade" + s]) continue;
       if ((character.esize || 0) <= 0 && typeof ensure_bag === "function") {
         if (!(await ensure_bag(1))) { game_log("empty bag full"); return sale_clear(); }
+        await ensure_stand(true);
       }
       try { await unequip("trade" + s); } catch (e) { game_log("unequip fail"); }
     }

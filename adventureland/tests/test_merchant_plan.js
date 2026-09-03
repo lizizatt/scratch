@@ -322,10 +322,29 @@ test("stock_store empties stand then restocks bank loot expensive-first skipping
   assert.ok((env.character._bank.items0 || []).some((it) => it && it.name === "armorring"));
 });
 
+test("empty_sale and restock open the stand before trade-slot moves", async () => {
+  const env = envOf({ gold: 100000, esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.character.slots.trade1 = { name: "shoes", q: 1, price: 100 };
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "coat", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  env.character.stand = false;
+  assert.ok(await env.empty_sale());
+  assert.ok(env.log.merchant.some((m) => m.open != null), "must open before unequip");
+  assert.ok(!env.log.unequipFail || !env.log.unequipFail.some((f) => f.reason === "stand_closed"));
+  env.character.stand = false;
+  await env.restock_sale();
+  assert.ok(env.log.merchant.some((m) => m.open != null));
+  assert.ok(env.character.slots.trade1 && env.character.slots.trade1.name === "coat");
+  assert.ok(!env.log.tradeFail || !env.log.tradeFail.some((f) => f.reason === "stand_closed"));
+});
+
 test("empty_sale parks mid-clear when bag is full so the stand empties", async () => {
   const env = envOf({ esize: 0, map: "bank" });
   env.HOLD = [];
-  env.character.items = new Array(42).fill(null).map(() => ({ name: "helmet", q: 1 }));
+  env.character.items = new Array(42).fill(null).map((_, i) => (i === 0 ? { name: "stand0", q: 1 } : { name: "helmet", q: 1 }));
   env.character.slots.trade1 = { name: "coat", q: 1, price: 3000 };
   env.character.slots.trade2 = { name: "shoes", q: 1, price: 100 };
   env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
@@ -341,7 +360,7 @@ test("empty_sale parks mid-clear when bag is full so the stand empties", async (
 test("stock_store refuses to restock until the stand is fully cleared", async () => {
   const env = envOf({ gold: 100000, esize: 0, map: "bank" });
   env.HOLD = [];
-  env.character.items = new Array(42).fill(null).map(() => ({ name: "shoes", q: 1 }));
+  env.character.items = new Array(42).fill(null).map((_, i) => (i === 0 ? { name: "stand0", q: 1 } : { name: "shoes", q: 1 }));
   for (let s = 1; s <= 16; s++) env.character.slots["trade" + s] = { name: "gloves", q: 1, price: 1 };
   // Extra pack so bag + trade clear can park honestly before restock.
   env.character.bank = {

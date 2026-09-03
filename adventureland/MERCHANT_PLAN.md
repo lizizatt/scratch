@@ -36,6 +36,7 @@ var SALE_MULT = 0.95;
 
 Load order: `plan → ops → combine`. Cap 176 lines/slot.
 
-## Console
+## Stand rule
 
-`hold()` / `resume()` / `hunt("mob")` / `grind()` — unchanged party messaging.
+Trade slots need the merchant stand **open** to unequip out or `trade()` in. Close the stand for bank/travel (`go_npc` / `park_bag`).
+

@@ -204,6 +204,11 @@ function makeEnv(charOver) {
     sell: (i, q) => { log.sold.push({ i, q }); character.items[i] = null; },
     trade: async (i, slot, gold, q) => {
       await Promise.resolve();
+      if (!character.stand) {
+        log.tradeFail = log.tradeFail || [];
+        log.tradeFail.push({ i, slot, reason: "stand_closed" });
+        throw { reason: "Can't equip", failed: true };
+      }
       const key = "trade" + slot;
       if (character.slots[key]) { log.tradeFail = log.tradeFail || []; log.tradeFail.push({ i, slot, reason: "slot_occuppied" }); return; }
       const it = character.items[i];
@@ -356,6 +361,11 @@ function makeEnv(charOver) {
     equip: async (n) => { log.equipped.push(n); },
     unequip: async (slot) => {
       await Promise.resolve();
+      if (("" + slot).indexOf("trade") === 0 && !character.stand) {
+        log.unequipFail = log.unequipFail || [];
+        log.unequipFail.push({ slot, reason: "stand_closed" });
+        throw { reason: "Can't equip", failed: true };
+      }
       log.unequipped.push(slot);
       const it = character.slots[slot];
       if (!it) { character.slots[slot] = null; return; }

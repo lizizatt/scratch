@@ -16,7 +16,7 @@ async function move_ent(e, dest) {
   }
   if (e.where === "sale") {
     if (!character.slots["trade" + e.loc]) return "fail";
-    close_stand();
+    if (typeof ensure_stand === "function") await ensure_stand(true); else open_stand();
     try { await unequip("trade" + e.loc); } catch (err) { game_log("unequip fail"); return "fail"; }
     return character.slots["trade" + e.loc] ? "fail" : "moved";
   }
@@ -36,6 +36,7 @@ async function move_ent(e, dest) {
     var slot = next_trade(), it, q;
     if (slot < 0 || !character.items[e.loc]) return "fail";
     it = character.items[e.loc]; q = it.q || 1;
+    if (typeof ensure_stand === "function") await ensure_stand(true); else open_stand();
     try { await trade(e.loc, slot, sale_price(it), q); } catch (err) { game_log("trade fail"); return "fail"; }
     return character.items[e.loc] ? "fail" : "moved";
   }
@@ -140,6 +141,6 @@ async function stock_store() {
   await restock_sale();
   close_stand();
   if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) { game_log("plaza fail"); return false; }
-  open_stand(); await list_sale();
+  await list_sale();
   return true;
 }
