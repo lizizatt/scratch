@@ -344,6 +344,54 @@ test("stale bank retrieve does not report moved", async () => {
   assert.strictEqual(r, "fail");
 });
 
+test("plan_item does not compound upgrade-only gear", () => {
+  const env = envOf();
+  const p = env.plan_item("helmet", 1);
+  assert.strictEqual(p.tree.via, "ponty");
+  assert.ok(p.ops.every((o) => o.op === "ponty"));
+  assert.ok(!p.ops.some((o) => o.op === "compound"));
+});
+
+test("craft aborts when fee would break the gold float", async () => {
+  const env = envOf({ gold: 100500, esize: 38 });
+  env.GOLD_FLOAT = 100000;
+  env.G.craft.armorring.cost = 1000;
+  env.character.items[1] = { name: "snakefang", q: 1 };
+  env.character.items[2] = { name: "lotusf", q: 1 };
+  env.character.items[3] = { name: "vitring", level: 2, q: 1 };
+  env.ponty = [];
+  const r = await env.try_plan("armorring", 0);
+  assert.strictEqual(r, "fail");
+  assert.deepStrictEqual(env.log.crafted, []);
+  assert.strictEqual(env.character.gold, 100500);
+});
+
+test("missing plan CODE leaves PLAN_OK false and skips econ", async () => {
+  const env = envOf({ gold: 400000 });
+  env.PLAN_OK = false;
+  env.HOLD = [["snakefang", 1]];
+  env.ponty = [{ name: "snakefang", rid: "f1", price: 1200, level: 0 }];
+  await env.logistics();
+  assert.strictEqual(env.lastMessage, "No plan");
+  assert.deepStrictEqual(env.log.secondhand, []);
+});
+
+test("boot snaps bank without dumping loot into the bag", async () => {
+  const bag = new Array(42).fill(null);
+  for (let i = 0; i < 35; i++) bag[i] = { name: "helmet", q: 1 };
+  bag[35] = { name: "armorring", q: 1 };
+  const env = loadScript("merchant.js", {
+    name: "puppygirl", ctype: "merchant", gold: 100000, map: "main", esize: 40,
+    items: (() => { const it = new Array(42).fill(null); it[0] = { name: "stand0", q: 1 }; return it; })(),
+    bank: { gold: 0, items0: bag },
+    _server: ["US", "II"]
+  });
+  await env.logistics();
+  assert.ok(env.character.esize >= 20, "boot must leave craft space, esize=" + env.character.esize);
+  assert.ok(env.cnt("helmet", 0, "bag") < 20, "must not dump bank into bag");
+  assert.strictEqual(env.cnt("armorring", 0, "bank"), 1);
+});
+
 test("compound path walks to the upgrade NPC", async () => {
   const env = envOf({ gold: 400000, esize: 28 });
   const items = env.character.items;

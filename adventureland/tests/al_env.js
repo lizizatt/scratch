@@ -396,6 +396,8 @@ function makeEnv(charOver) {
     auto_craft: async (name) => {
       const rec = G.craft && G.craft[name];
       if (!rec) throw { reason: "no_recipe", failed: true };
+      const cost = rec.cost || 0;
+      if (character.gold < cost) throw { reason: "gold", failed: true };
       for (const ing of rec.items) {
         const needLv = ing[2] || 0;
         let left = ing[0];
@@ -410,6 +412,7 @@ function makeEnv(charOver) {
       }
       const slot = character.items.findIndex((x) => !x);
       if (slot < 0) throw { reason: "space", failed: true };
+      character.gold -= cost;
       character.items[slot] = { name: name, q: 1 };
       character.esize = Math.max(0, (character.esize || 1) - 1);
       character.q = Object.assign(character.q || {}, { craft: { ms: 400 } });

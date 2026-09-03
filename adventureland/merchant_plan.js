@@ -18,6 +18,8 @@ function plan_item(name, level, stack) {
   if (stack[key]) return { failed: true, reason: "cycle", tree: { name: name, level: level } };
   stack[key] = 1;
   if (level > 0) {
+    if (!(G.items[name] && G.items[name].compound))
+      return { tree: { name: name, level: level, via: "ponty" }, bom: [{ k: key, name: name, level: level, qty: 1 }], ops: [{ op: "ponty", name: name, level: level }] };
     p = plan_item(name, level - 1, Object.assign({}, stack));
     if (p.failed) return p;
     bom = []; ops = [];

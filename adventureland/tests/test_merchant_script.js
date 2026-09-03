@@ -90,7 +90,7 @@ test("merchant does not re-list into occupied trade slots", async () => {
   assert.ok(!env.log.tradeFail || env.log.tradeFail.length === 0);
 });
 
-test("boot bank pull leaves 5 free slots", async () => {
+test("boot snaps bank and restocks sale without dumping the bag", async () => {
   const bag = new Array(42).fill(null);
   for (let i = 0; i < 42; i++) bag[i] = { name: "helmet", q: 1 };
   const env = merchant({
@@ -100,16 +100,16 @@ test("boot bank pull leaves 5 free slots", async () => {
   await env.logistics();
   assert.ok(env.log.moved.some((d) => d && d.to === "bank"));
   assert.ok(env.log.moved.some((d) => d && d.to === "potions"));
-  assert.strictEqual(env.character.esize, 5);
-  assert.strictEqual(env.log.retrieved.length, 35);
+  assert.ok(env.character.esize >= 20, "leave craft space, esize=" + env.character.esize);
+  assert.ok(env.cnt("helmet", 0, "bag") < 10, "must not dump bank into bag");
   assert.ok(env.log.merchant.some((m) => m.close));
   assert.ok(env.log.merchant.some((m) => m.open != null));
   assert.ok(env.log.traded.some((t) => t.gold > 0));
 });
 
-test("bank pull runs once on boot", async () => {
+test("bank snap runs once on boot", async () => {
   const bag = new Array(42).fill(null);
-  bag[0] = { name: "helmet", q: 1 };
+  bag[0] = { name: "armorring", q: 1 };
   const env = merchant({ esize: 40, bank: { gold: 0, items0: bag } });
   await env.logistics();
   const banks = env.log.moved.filter((d) => d && d.to === "bank").length;

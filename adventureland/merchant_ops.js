@@ -81,7 +81,7 @@ async function try_plan(name, level) {
     if (op.op === "craft") {
       rec = (G.craft || {})[op.name]; ok = rec;
       if (rec) for (q = 0; q < rec.items.length; q++) { ing = rec.items[q]; n = ing[1]; need = ing[2] || 0; if (cnt(n, need, "bag") < ing[0]) ok = false; }
-      if (ok) { if (!(await go_npc(op.npc === "mcollector" ? "mcollector" : "craftsman"))) return "fail"; try { await auto_craft(op.name); await wait_q("craft"); return "crafted"; } catch (err) { return "fail"; } }
+      if (ok) { if ((character.gold - (GOLD_FLOAT || 0)) < ((rec && rec.cost) || 0)) return "fail"; if (!(await go_npc(op.npc === "mcollector" ? "mcollector" : "craftsman"))) return "fail"; try { await auto_craft(op.name); await wait_q("craft"); return "crafted"; } catch (err) { return "fail"; } }
     }
   }
   for (i = 0; i < p.ops.length; i++) {
