@@ -7,7 +7,7 @@ async function move_ent(e, dest) {
   if (e.where === dest) return "have";
   if (e.where === "gear") {
     if (!character.slots[e.loc]) return "fail";
-    try { await unequip(e.loc); } catch (err) { return "fail"; }
+    try { await unequip(e.loc); } catch (err) { game_log("unequip fail"); return "fail"; }
     if (character.slots[e.loc]) return "fail";
     if (dest === "bag") return "moved";
     e = find_ent(e.name, e.level, "bag");
@@ -17,26 +17,26 @@ async function move_ent(e, dest) {
   if (e.where === "sale") {
     if (!character.slots["trade" + e.loc]) return "fail";
     close_stand();
-    try { await unequip("trade" + e.loc); } catch (err) { return "fail"; }
+    try { await unequip("trade" + e.loc); } catch (err) { game_log("unequip fail"); return "fail"; }
     return character.slots["trade" + e.loc] ? "fail" : "moved";
   }
   if (e.where === "bank" && dest === "bag") {
     if (!(bank_obj() && bank_obj()[e.loc[0]] && bank_obj()[e.loc[0]][e.loc[1]])) return "fail";
     if (!(await go_npc("bank"))) return "fail";
-    try { await bank_retrieve(e.loc[0], e.loc[1]); } catch (err) { return "fail"; }
+    try { await bank_retrieve(e.loc[0], e.loc[1]); } catch (err) { game_log("retrieve fail"); return "fail"; }
     snap_bank(); return (bank_obj()[e.loc[0]] && bank_obj()[e.loc[0]][e.loc[1]]) ? "fail" : "moved";
   }
   if (e.where === "bag" && dest === "bank") {
     if (!character.items[e.loc]) return "fail";
     if (!(await go_npc("bank"))) return "fail";
-    try { await bank_store(e.loc); } catch (err) { return "fail"; }
+    try { await bank_store(e.loc); } catch (err) { game_log("store fail"); return "fail"; }
     snap_bank(); return character.items[e.loc] ? "fail" : "moved";
   }
   if (e.where === "bag" && dest === "sale") {
     var slot = next_trade(), it, q;
     if (slot < 0 || !character.items[e.loc]) return "fail";
     it = character.items[e.loc]; q = it.q || 1;
-    try { await trade(e.loc, slot, sale_price(it), q); } catch (err) { return "fail"; }
+    try { await trade(e.loc, slot, sale_price(it), q); } catch (err) { game_log("trade fail"); return "fail"; }
     return character.items[e.loc] ? "fail" : "moved";
   }
   if (e.where === "bank" && dest === "sale") {
@@ -70,22 +70,6 @@ async function strip_gear() {
     try { await unequip(s); } catch (e) {}
   }
 }
-async function acquire_step(name, qty, dest, level) {
-  var e;
-  level = level || 0;
-  if (cnt(name, level, dest) >= qty) return "have";
-  e = find_ent(name, level);
-  if (e && e.where !== dest) return await move_ent(e, dest);
-  e = await try_buy(name, level);
-  if (e) return e;
-  e = await buy_leaf(name, level);
-  return e === "bought" ? e : "fail";
-}
-async function acquire(name, qty, dest) {
-  var n, r = "ok";
-  for (n = 0; n < 40; n++) { r = await acquire_step(name, qty, dest, 0); if (r === "have" || r === "fail") return r; }
-  return "fail";
-}
 function bank_sellable(bad) {
   var i, a = idx(), best = null, skip = held_set(), key, it, val, bestv = -1, bank;
   bank = bank_obj();
@@ -95,25 +79,42 @@ function bank_sellable(bad) {
     key = a[i].loc[0] + ":" + a[i].loc[1];
     if (bad && bad[key]) continue;
     it = bank && bank[a[i].loc[0]] && bank[a[i].loc[0]][a[i].loc[1]];
-    if (keep_combine(it || a[i])) continue;
+    if (skip_it(it || a[i]) || keep_combine(it || a[i])) continue;
     val = rank_val(it || a[i]);
     if (!best || val > bestv) { best = a[i]; bestv = val; }
   }
   return best;
 }
 async function park_bag() {
-  var i, it, pass;
-  if (!(await go_npc("bank"))) return false;
+  var i, it, pass, left;
+  if (!(await go_npc("bank"))) { game_log("park no bank"); return false; }
   for (pass = 0; pass < 2; pass++) {
     if (pass) await strip_gear();
     for (i = 0; i < character.items.length; i++) {
       it = character.items[i];
       if (!it || is_pot(it) || it.name === "stand0" || it.l) continue;
-      try { await bank_store(i); } catch (e) {}
+      try { await bank_store(i); } catch (e) { game_log("store fail"); }
     }
   }
   snap_bank();
+  left = 0;
+  for (i = 0; i < character.items.length; i++) {
+    it = character.items[i];
+    if (it && !is_pot(it) && it.name !== "stand0" && !it.l) left++;
+  }
+  if (left) { game_log("park left " + left); return false; }
   return true;
+}
+async function ensure_bag(n) {
+  n = n || 1;
+  if ((character.esize || 0) >= n) return true;
+  if (!(await park_bag())) return false;
+  if ((character.esize || 0) >= n) return true;
+  await strip_gear();
+  if (!(await park_bag())) return false;
+  if ((character.esize || 0) >= n) return true;
+  game_log("ensure_bag fail");
+  return false;
 }
 async function restock_sale() {
   var n, src, r, bad = {}, key, filled = 0;
@@ -129,39 +130,16 @@ async function restock_sale() {
     filled++;
   }
 }
-async function run_acquire() {
-  var i, list;
-  list = (HOLD || []).slice().sort(function (a, b) { return vg(a[0]) - vg(b[0]); });
-  for (i = 0; i < list.length; i++) await acquire(list[i][0], list[i][1], "bank");
-  list = (STOCK || []).slice().sort(function (a, b) { return vg(a[0]) - vg(b[0]); });
-  for (i = 0; i < list.length; i++) await acquire(list[i][0], list[i][1], "bag");
-}
-function hold_done() {
-  var i, list = HOLD || [];
-  for (i = 0; i < list.length; i++) if (cnt(list[i][0], 0, "bank") < list[i][1]) return false;
-  return true;
-}
 async function stock_store() {
   close_stand();
-  if (!(await go_npc("bank"))) return false;
-  await park_bag();
+  if (!(await go_npc("bank"))) { game_log("stock no bank"); return false; }
+  if (!(await park_bag())) return false;
   if (!(await empty_sale())) { await park_bag(); if (!(await empty_sale())) { game_log("stock empty fail"); return false; } }
-  if (!sale_clear()) return false;
-  await park_bag();
+  if (!sale_clear()) { game_log("sale not clear"); return false; }
+  if (!(await park_bag())) return false;
   await restock_sale();
   close_stand();
-  if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) return false;
+  if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) { game_log("plaza fail"); return false; }
   open_stand(); await list_sale();
   return true;
-}
-async function run_econ() {
-  var n;
-  if (typeof ponty_miss === "object") for (n in ponty_miss) delete ponty_miss[n];
-  for (n = 0; n < 30; n++) {
-    await run_acquire();
-    await run_craft();
-    if (hold_done()) break;
-  }
-  if (typeof run_combine === "function") await run_combine();
-  await stock_store();
 }

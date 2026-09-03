@@ -1,3 +1,9 @@
+async function buy_scroll(name) {
+  var spend = character.gold - (GOLD_FLOAT || 0), cost = vg(name);
+  if (!(spend > 0) || !(cost > 0) || spend < cost) return "fail";
+  if (!(await go_npc("upgrade"))) return "fail";
+  try { await buy_with_gold(name, 1); return "bought"; } catch (e) { game_log("scroll buy fail"); return "fail"; }
+}
 async function combine_step() {
   var a = idx(), cand = [], seen = {}, i, name, lv0, e, three, sc, sci;
   for (i = 0; i < a.length; i++) {
@@ -15,9 +21,9 @@ async function combine_step() {
     }
     three = bag_three(name, lv0); sc = cscroll(name, lv0); sci = locate_item(sc);
     if (!three) return null;
-    if (sci < 0) return await buy_leaf(sc, 0);
+    if (sci < 0) return await buy_scroll(sc);
     if (!(await go_npc("upgrade"))) return "fail";
-    try { await compound(three[0], three[1], three[2], sci); await wait_q("compound"); return "crafted"; } catch (err) { return "fail"; }
+    try { await compound(three[0], three[1], three[2], sci); await wait_q("compound"); return "ok"; } catch (err) { return "fail"; }
   }
   return null;
 }

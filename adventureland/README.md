@@ -21,13 +21,13 @@ Do **not** paste the MCP token into chat or character CODE; rotate it in Mainfra
 
 Gearing (run separately at the upgrade NPC when you have gold): `warrior_upgrade.js`, `mage_upgrade.js`, `priest_upgrade.js`.
 
-Keep the browser tab focused, or call `performance_trick()` once. Puppygirl already has a `stand0`; on boot she pulls bank loot (5 free slots reserved), then stands in town and lists it.
+Keep the browser tab focused, or call `performance_trick()` once. Puppygirl already has a `stand0`.
 
 ## Party plan
 
 **Jazwyn** (warrior) is party lead and tank: she invites the fighters, picks the ladder pack, pulls, taunts/charges/cleaves, and stands on the far side of the mob. **Sarene** (mage) and **Zarook** (priest) assist her target and stay off the warrior. Sarene also magiports the party when she's at the pack.
 
-**puppygirl** (merchant) is **passive** and stays out of the combat party (she cannot join it). On CODE start she visits the **bank** once, `bank_retrieve`s packs into inventory while leaving **5 free slots**, then stands in town and lists non-potion loot for sale (`trade` slots 1–16). She also mlucks anyone who walks by once she's **level 40+**.
+**puppygirl** (merchant) stays out of the combat party. On a ~5‑minute cycle she banks, parks the bag, combines compoundables (gold float reserved), clears the stand, then lists the most expensive unheld bank loot in town (`trade` 1–16). She mlucks passersby at level 40+. See `MERCHANT_PLAN.md` / `REFACTOR_PLAN.md`.
 
 Run `hold()` on puppygirl's CODE console to whisper each fighter `hold:1` (and also `send_cm` `{hold:1}`). They hop to **Americas II** (`US`/`II`, home with puppygirl), party-say each step (`Hold: restocking` → `banking` → `buying pots` → `ready`), and stay put until you run `resume()` (`hold:0` → hop to **Americas III** / `US`/`III` → `Resuming`). Hold survives the server reload via `localStorage`. You should see the whisper in each fighter's PM chat. Puppygirl stays on Americas II. Fighters still restock potions on their own when low (on the farm server). On a potion run they visit the bank first and `bank_store` everything that is not an hp/mp potion. If they walk past puppygirl they send her gold down to a 1k float.
 

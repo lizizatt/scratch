@@ -1,9 +1,9 @@
-var FREE = 5, busy = false, PLAN_OK = false, CYCLE_MS = 300000, cycle_at = 0;
+var busy = false, PLAN_OK = false, CYCLE_MS = 300000, cycle_at = 0;
 var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "II"];
-var HOLD = [["armorring", 1]], STOCK = [], GOLD_FLOAT = 100000, PONTY_MAX = 1.25, COMBINE_MAX = 5, SALE_MULT = 0.95;
+var HOLD = [["armorring", 1]], GOLD_FLOAT = 100000, COMBINE_MAX = 5, SALE_MULT = 0.95;
 try {
-  load_code("merchant_plan"); load_code("merchant_ponty"); load_code("merchant_ops"); load_code("merchant_craft"); load_code("merchant_combine");
-  if (typeof run_acquire === "function" && typeof run_craft === "function" && typeof buy_leaf === "function") PLAN_OK = true; else throw 1;
+  load_code("merchant_plan"); load_code("merchant_ops"); load_code("merchant_combine");
+  if (typeof run_combine === "function" && typeof stock_store === "function" && typeof park_bag === "function" && typeof buy_scroll === "function") PLAN_OK = true; else throw 1;
 } catch (e) { game_log("plan load fail"); set_message("No plan"); }
 function go_home() { if (parent.server_region === HOME[0] && parent.server_identifier === HOME[1]) return false; try { change_server(HOME[0], HOME[1]); } catch (e) {} return true; }
 function is_pot(it) { return it && (it.name.indexOf("hpot") === 0 || it.name.indexOf("mpot") === 0); }
@@ -45,7 +45,7 @@ async function list_sale() {
     it = character.items[cand[i].i];
     if (!it || it.name !== cand[i].name) continue;
     slot = next_trade(); if (slot < 0) return;
-    try { await trade(cand[i].i, slot, sale_price(it), cand[i].q); } catch (e) {}
+    try { await trade(cand[i].i, slot, sale_price(it), cand[i].q); } catch (e) { game_log("list fail"); }
   }
 }
 async function empty_sale() {
@@ -54,8 +54,10 @@ async function empty_sale() {
   for (n = 0; n < 4; n++) {
     for (s = 1; s <= 16; s++) {
       if (!character.slots["trade" + s]) continue;
-      if ((character.esize || 0) <= 0 && typeof park_bag === "function") await park_bag();
-      try { await unequip("trade" + s); } catch (e) {}
+      if ((character.esize || 0) <= 0 && typeof ensure_bag === "function") {
+        if (!(await ensure_bag(1))) { game_log("empty bag full"); return sale_clear(); }
+      }
+      try { await unequip("trade" + s); } catch (e) { game_log("unequip fail"); }
     }
     if (sale_clear()) return true;
     if (typeof park_bag === "function") await park_bag();
@@ -78,30 +80,17 @@ function mluck_near() {
     use_skill("mluck", p); return;
   }
 }
+async function run_econ() {
+  set_message("Combine"); if (typeof run_combine === "function") await run_combine();
+  set_message("Stock"); return !!(await stock_store());
+}
 async function run_cycle() {
-  var n, i;
   set_message("Bank");
   close_stand();
   if (!(await go_npc("bank"))) return false;
-  if (typeof park_bag === "function") await park_bag();
-  set_message("Empty");
-  if (!(await empty_sale())) {
-    if (typeof park_bag === "function") await park_bag();
-    if (!(await empty_sale())) { game_log("empty sale fail"); return false; }
-  }
-  if (typeof park_bag === "function") await park_bag();
+  if (typeof park_bag === "function" && !(await park_bag())) { game_log("park fail"); return false; }
   if (typeof snap_bank === "function") snap_bank(); await sleep(400);
-  if (typeof ponty_miss === "object") for (i in ponty_miss) delete ponty_miss[i];
-  for (n = 0; n < 30; n++) {
-    set_message("Buy"); await run_acquire();
-    set_message("Craft"); await run_craft();
-    if (typeof hold_done === "function" && hold_done()) break;
-  }
-  set_message("Combine"); if (typeof run_combine === "function") await run_combine();
-  set_message("Stock");
-  if (!(await stock_store())) return false;
-  set_message("Stand");
-  return true;
+  return await run_econ();
 }
 async function logistics() {
   if (busy || character.rip) return;
@@ -110,7 +99,7 @@ async function logistics() {
   if (character.map === "jail") { await leave(); return; }
   if (cycle_at && Date.now() - cycle_at < (CYCLE_MS || 300000)) return;
   busy = true;
-  try { if (await run_cycle()) cycle_at = Date.now(); } catch (e) { game_log("cycle fail"); }
+  try { if (await run_cycle()) { cycle_at = Date.now(); set_message("Stand"); } } catch (e) { game_log("cycle fail"); }
   busy = false;
 }
 try { performance_trick(); } catch (e) {}
