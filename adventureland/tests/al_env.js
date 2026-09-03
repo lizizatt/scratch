@@ -432,7 +432,7 @@ function loadScript(filename, charOver) {
     .replace(/\ntry \{ performance_trick\(\); \} catch \(e\) \{\}\n/, "\n")
     .replace(/\nsetInterval\(function \(\) \{[\s\S]*?\}, 250\);\n/, "\n")
     .replace(/\nsetInterval\(loop, 500\);\s*$/, "\n")
-    .replace(/\nsetInterval\(logistics, 2500\); logistics\(\);\s*$/, "\n");
+    .replace(/\nsetInterval\(logistics, \d+\); logistics\(\);\s*$/, "\n");
   vm.createContext(env);
   vm.runInContext(src, env, { filename });
   return env;

@@ -99,7 +99,7 @@ test("boot snaps bank and restocks sale without dumping the bag", async () => {
   });
   await env.logistics();
   assert.ok(env.log.moved.some((d) => d && d.to === "bank"));
-  assert.ok(env.log.moved.some((d) => d && d.to === "potions"));
+  assert.ok(env.log.moved.some((d) => d && d.map === "main" && d.x === 40 && d.y === -20));
   assert.ok(env.character.esize >= 20, "leave craft space, esize=" + env.character.esize);
   assert.ok(env.cnt("helmet", 0, "bag") < 10, "must not dump bank into bag");
   assert.ok(env.log.merchant.some((m) => m.close));
@@ -107,14 +107,14 @@ test("boot snaps bank and restocks sale without dumping the bag", async () => {
   assert.ok(env.log.traded.some((t) => t.gold > 0));
 });
 
-test("bank snap runs once on boot", async () => {
+test("cycle throttles repeats within CYCLE_MS", async () => {
   const bag = new Array(42).fill(null);
   bag[0] = { name: "armorring", q: 1 };
   const env = merchant({ esize: 40, bank: { gold: 0, items0: bag } });
   await env.logistics();
   const banks = env.log.moved.filter((d) => d && d.to === "bank").length;
-  assert.strictEqual(banks, 1);
-  assert.strictEqual(env.pulled, true);
+  assert.ok(banks >= 1);
+  assert.ok(env.cycle_at > 0);
   assert.strictEqual(env.character.bank, null);
   env.log.moved = [];
   await env.logistics();

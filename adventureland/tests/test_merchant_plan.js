@@ -22,7 +22,7 @@ function envOf(extra) {
 }
 
 test("merchant_plan.js / merchant_ops.js stay within 176 CODE lines", () => {
-  ["merchant_plan.js", "merchant_ponty.js", "merchant_ops.js", "merchant_combine.js", "merchant.js"].forEach((f) => {
+  ["merchant_plan.js", "merchant_ponty.js", "merchant_ops.js", "merchant_craft.js", "merchant_combine.js", "merchant.js"].forEach((f) => {
     const n = lines(f);
     assert.ok(n <= 176, f + " has " + n + " lines");
   });
@@ -153,7 +153,7 @@ test("acquire buys a finished ring from Ponty when craft cannot progress", async
   assert.ok(env.log.stored.some((s) => s.item === "armorring"));
 });
 
-test("acquire compounds vitring and crafts armorring at Cole", async () => {
+test("craft_one compounds vitring and crafts armorring at Cole", async () => {
   const env = envOf({ gold: 400000, esize: 28 });
   const items = env.character.items;
   items[1] = { name: "snakefang", q: 1 };
@@ -162,7 +162,7 @@ test("acquire compounds vitring and crafts armorring at Cole", async () => {
   for (let i = 0; i < 9; i++) items[4 + i] = { name: "vitring", q: 1 };
   env.GOLD_FLOAT = 0;
   env.ponty = [];
-  const r = await env.acquire("armorring", 1, "bank");
+  const r = await env.craft_one("armorring", 1);
   assert.strictEqual(r, "have");
   assert.ok(env.log.compound.length >= 4);
   assert.deepStrictEqual(env.log.crafted, ["armorring"]);
@@ -170,7 +170,7 @@ test("acquire compounds vitring and crafts armorring at Cole", async () => {
   assert.ok(env.log.stored.some((s) => s.item === "armorring"));
 });
 
-test("run_econ sorts HOLD by vendor gold and stops on first fail", async () => {
+test("run_acquire processes cheaper HOLD items even if a later item is uncraftable", async () => {
   const env = envOf({ gold: 400000 });
   env.G.items.loopa = { g: 1 };
   env.G.craft.loopa = { items: [[1, "loopb"]], cost: 0 };
@@ -178,9 +178,9 @@ test("run_econ sorts HOLD by vendor gold and stops on first fail", async () => {
   env.HOLD = [["snakefang", 1], ["loopa", 1]];
   env.STOCK = [];
   env.ponty = [{ name: "snakefang", rid: "f1", price: 1200, level: 0 }];
-  await env.run_econ();
-  assert.deepStrictEqual(env.log.secondhand, []);
-  assert.strictEqual(env.character.gold, 400000);
+  await env.run_acquire();
+  assert.ok(env.log.secondhand.some((s) => s.name === "snakefang"));
+  assert.ok(env.cnt("snakefang", 0) >= 1);
 });
 
 test("empty STOCK still restocks sale from expensive unheld bank loot", async () => {
@@ -207,13 +207,13 @@ test("list_sale skips HOLD bill-of-material names", async () => {
   assert.ok(!env.log.traded.some((t) => t.i === 2));
 });
 
-test("try_plan buys lotus not extra vitrings when +2 already exists", async () => {
+test("try_buy buys lotus not extra vitrings when +2 already exists", async () => {
   const env = envOf({ gold: 400000, esize: 38 });
   env.character.items[1] = { name: "vitring", level: 2, q: 1 };
   env.character.items[2] = { name: "snakefang", q: 1 };
   env.GOLD_FLOAT = 0;
   env.ponty = [{ name: "lotusf", rid: "l1", price: 12000, level: 0 }, { name: "vitring", rid: "v1", price: 24000, level: 0 }];
-  const r = await env.try_plan("armorring", 0);
+  const r = await env.try_buy("armorring", 0);
   assert.strictEqual(r, "bought");
   assert.ok(env.log.secondhand.some((s) => s.name === "lotusf"));
   assert.ok(!env.log.secondhand.some((s) => s.name === "vitring"));
@@ -266,7 +266,7 @@ test("acquire cycle recipe without Ponty fails", async () => {
   assert.strictEqual(r, "fail");
 });
 
-test("boot snapshot still sees bank after leaving for potions", async () => {
+test("boot snapshot still sees bank after cycle returns to plaza", async () => {
   const bag = new Array(42).fill(null);
   for (let i = 0; i < 35; i++) bag[i] = { name: "helmet", q: 1 };
   bag[35] = { name: "armorring", q: 1 };
@@ -306,20 +306,22 @@ test("buy_leaf uses the cheapest in-cap Ponty rid, not first listing", async () 
   assert.deepStrictEqual(env.log.secondhand.map((s) => s.rid), ["lo"]);
 });
 
-test("acquire crafts armorring from Ponty ingredients only", async () => {
+test("run_econ buys Ponty ingredients then crafts armorring", async () => {
   const env = envOf({ gold: 500000, esize: 40 });
   env.GOLD_FLOAT = 0;
+  env.HOLD = [["armorring", 1]];
+  env.STOCK = [];
   env.ponty = [];
   for (let i = 0; i < 9; i++) env.ponty.push({ name: "vitring", rid: "v" + i, price: 24000, level: 0 });
   env.ponty.push({ name: "snakefang", rid: "f1", price: 1200, level: 0 });
   env.ponty.push({ name: "lotusf", rid: "l1", price: 12000, level: 0 });
-  const r = await env.acquire("armorring", 1, "bank");
-  assert.strictEqual(r, "have");
+  await env.run_econ();
   assert.deepStrictEqual(env.log.crafted, ["armorring"]);
   assert.ok(env.log.compound.length >= 4);
+  assert.ok(env.cnt("armorring", 0, "bank") >= 1);
 });
 
-test("try_plan compounds existing +1 rings instead of buying more +0", async () => {
+test("try_craft compounds existing +1 rings instead of buying more +0", async () => {
   const env = envOf({ gold: 400000, esize: 30 });
   env.GOLD_FLOAT = 0;
   env.ponty = [{ name: "vitring", rid: "extra", price: 24000, level: 0 }];
@@ -328,19 +330,19 @@ test("try_plan compounds existing +1 rings instead of buying more +0", async () 
   items[2] = { name: "lotusf", q: 1 };
   items[3] = { name: "cscroll0", q: 4 };
   for (let i = 0; i < 3; i++) items[4 + i] = { name: "vitring", level: 1, q: 1 };
-  const r = await env.try_plan("armorring", 0);
+  const r = await env.try_craft("armorring", 0);
   assert.strictEqual(r, "crafted");
   assert.ok(env.log.compound.length >= 1);
   assert.ok(!env.log.secondhand.some((s) => s.name === "vitring"));
 });
 
-test("try_plan buys a Ponty vitring+2 instead of skipping leveled ings", async () => {
+test("try_buy buys a Ponty vitring+2 instead of skipping leveled ings", async () => {
   const env = envOf({ gold: 400000, esize: 38 });
   env.GOLD_FLOAT = 0;
   env.character.items[1] = { name: "snakefang", q: 1 };
   env.character.items[2] = { name: "lotusf", q: 1 };
   env.ponty = [{ name: "vitring", rid: "p2", price: 24000, level: 2 }];
-  const r = await env.try_plan("armorring", 0);
+  const r = await env.try_buy("armorring", 0);
   assert.strictEqual(r, "bought");
   assert.ok(env.log.secondhand.some((s) => s.rid === "p2"));
 });
@@ -377,7 +379,7 @@ test("craft aborts when fee would break the gold float", async () => {
   env.character.items[2] = { name: "lotusf", q: 1 };
   env.character.items[3] = { name: "vitring", level: 2, q: 1 };
   env.ponty = [];
-  const r = await env.try_plan("armorring", 0);
+  const r = await env.try_craft("armorring", 0);
   assert.strictEqual(r, "fail");
   assert.deepStrictEqual(env.log.crafted, []);
   assert.strictEqual(env.character.gold, 100500);
@@ -474,6 +476,22 @@ test("run_combine does not compound at or above COMBINE_MAX", async () => {
   assert.strictEqual(env.cnt("vitring", 5), 3);
 });
 
+test("5-minute cycle empties sale, banks, then restocks plaza", async () => {
+  const env = envOf({ gold: 100000, esize: 40 });
+  env.character.slots.trade1 = { name: "helmet", q: 1, price: 2000 };
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "armorring", q: 1 };
+  env.character._bank = env.character.bank;
+  env.HOLD = [["armorring", 1]];
+  env.STOCK = [];
+  await env.run_cycle();
+  assert.ok(env.log.unequipped.includes("trade1"));
+  assert.ok(env.log.moved.some((d) => d && d.to === "bank"));
+  assert.ok(env.log.moved.some((d) => d && d.map === "main" && d.x === 40));
+  assert.ok(env.log.merchant.some((m) => m.open != null));
+  assert.strictEqual(env.lastMessage, "Stand");
+});
+
 test("compound path walks to the upgrade NPC", async () => {
   const env = envOf({ gold: 400000, esize: 28 });
   const items = env.character.items;
@@ -483,7 +501,7 @@ test("compound path walks to the upgrade NPC", async () => {
   for (let i = 0; i < 9; i++) items[4 + i] = { name: "vitring", q: 1 };
   env.GOLD_FLOAT = 0;
   env.ponty = [];
-  await env.acquire("armorring", 1, "bank");
+  await env.craft_one("armorring", 1);
   assert.ok(env.log.moved.some((d) => d && d.to === "upgrade"));
 });
 

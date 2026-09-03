@@ -48,66 +48,13 @@ function bag_three(name, level) {
   return slots.length === 3 ? slots : null;
 }
 async function wait_q(k) { var n; for (n = 0; n < 200 && character.q && character.q[k]; n++) await sleep(250); }
-async function try_plan(name, level) {
-  var p = plan_item(name, level), i, op, three, sc, sci, rec, ing, ok, q, n, need, e, froms = {}, keys, f, r;
-  if (!p || p.failed) return null;
-  for (i = 0; i < p.ops.length; i++) {
-    op = p.ops[i];
-    if (op.op === "compound") {
-      three = bag_three(op.name, op.from); sc = cscroll(op.name, op.from); sci = locate_item(sc);
-      if (three && sci >= 0) {
-        if (!(await go_npc("upgrade"))) return "fail";
-        try { await compound(three[0], three[1], three[2], sci); await wait_q("compound"); return "crafted"; } catch (err) { return "fail"; }
-      }
-    }
-    if (op.op === "craft") {
-      rec = (G.craft || {})[op.name]; ok = rec;
-      if (rec) for (q = 0; q < rec.items.length; q++) { ing = rec.items[q]; n = ing[1]; need = ing[2] || 0; if (cnt(n, need, "bag") < ing[0]) ok = false; }
-      if (ok) { if ((character.gold - (GOLD_FLOAT || 0)) < ((rec && rec.cost) || 0)) return "fail"; if (!(await go_npc(op.npc === "mcollector" ? "mcollector" : "craftsman"))) return "fail"; try { await auto_craft(op.name); await wait_q("craft"); return "crafted"; } catch (err) { return "fail"; } }
-    }
-  }
-  for (i = 0; i < p.ops.length; i++) {
-    op = p.ops[i];
-    if (op.op !== "craft") continue;
-    rec = (G.craft || {})[op.name];
-    if (!rec) continue;
-    for (q = 0; q < rec.items.length; q++) {
-      ing = rec.items[q]; n = ing[1]; need = ing[2] || 0;
-      if (cnt(n, need) < ing[0]) {
-        if ((e = find_ent(n, need)) && e.where !== "bag") return await move_ent(e, "bag");
-        if ((await buy_leaf(n, need)) === "bought") return "bought";
-      }
-      if (cnt(n, need, "bag") < ing[0] && (e = find_ent(n, need)) && e.where !== "bag") return await move_ent(e, "bag");
-    }
-  }
-  for (i = 0; i < p.ops.length; i++) if (p.ops[i].op === "compound") froms[p.ops[i].name + "@" + p.ops[i].from] = p.ops[i];
-  keys = Object.keys(froms);
-  keys.sort(function (a, b) { return froms[b].from - froms[a].from; });
-  for (i = 0; i < keys.length; i++) {
-    op = froms[keys[i]]; f = op.from; sc = cscroll(op.name, op.from); sci = locate_item(sc);
-    if (cnt(op.name, froms[keys[0]].to) >= 1) continue;
-    if (cnt(op.name, op.from) >= 3) {
-      if ((e = find_ent(op.name, op.from)) && e.where !== "bag") return await move_ent(e, "bag");
-      if (sci < 0 && (e = find_ent(sc, 0)) && e.where !== "bag") return await move_ent(e, "bag");
-      if (sci < 0 && (r = await buy_leaf(sc, 0)) === "bought") return r;
-    } else if (f === 0 && cnt(op.name, 1) < 3 && (r = await buy_leaf(op.name, 0)) === "bought") return r;
-  }
-  for (i = 0; i < p.ops.length; i++) {
-    op = p.ops[i];
-    if (op.op === "ponty" && cnt(op.name, op.level || 0) < 1) {
-      if ((e = find_ent(op.name, op.level || 0)) && e.where !== "bag") return await move_ent(e, "bag");
-      if ((r = await buy_leaf(op.name, op.level || 0)) === "bought") return r;
-    }
-  }
-  return null;
-}
 async function acquire_step(name, qty, dest, level) {
   var e;
   level = level || 0;
   if (cnt(name, level, dest) >= qty) return "have";
   e = find_ent(name, level);
   if (e && e.where !== dest) return await move_ent(e, dest);
-  e = await try_plan(name, level);
+  e = await try_buy(name, level);
   if (e) return e;
   e = await buy_leaf(name, level);
   return e === "bought" ? e : "fail";
@@ -143,10 +90,32 @@ async function restock_sale() {
     if ((await move_ent(src, "sale")) === "fail") return;
   }
 }
-async function run_econ() {
-  var i, r = "have", list = (HOLD || []).slice().sort(function (a, b) { return vg(a[0]) - vg(b[0]); });
-  for (i = 0; i < list.length; i++) { r = await acquire(list[i][0], list[i][1], "bank"); if (r === "fail") break; }
-  if (r !== "fail") for (list = (STOCK || []).slice().sort(function (a, b) { return vg(a[0]) - vg(b[0]); }), i = 0; i < list.length; i++) { r = await acquire(list[i][0], list[i][1], "sale"); if (r === "fail") break; }
-  if (typeof run_combine === "function") await run_combine();
+async function run_acquire() {
+  var i, list;
+  list = (HOLD || []).slice().sort(function (a, b) { return vg(a[0]) - vg(b[0]); });
+  for (i = 0; i < list.length; i++) await acquire(list[i][0], list[i][1], "bank");
+  list = (STOCK || []).slice().sort(function (a, b) { return vg(a[0]) - vg(b[0]); });
+  for (i = 0; i < list.length; i++) await acquire(list[i][0], list[i][1], "bag");
+}
+function hold_done() {
+  var i, list = HOLD || [];
+  for (i = 0; i < list.length; i++) if (cnt(list[i][0], 0, "bank") < list[i][1]) return false;
+  return true;
+}
+async function stock_store() {
   await restock_sale();
+  close_stand();
+  if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) return;
+  open_stand(); list_sale();
+}
+async function run_econ() {
+  var n;
+  if (typeof ponty_miss === "object") for (n in ponty_miss) delete ponty_miss[n];
+  for (n = 0; n < 30; n++) {
+    await run_acquire();
+    await run_craft();
+    if (hold_done()) break;
+  }
+  if (typeof run_combine === "function") await run_combine();
+  await stock_store();
 }
