@@ -356,6 +356,7 @@ function makeEnv(charOver) {
       const src = fs.readFileSync(path.join(ROOT, file), "utf8");
       vm.runInContext(src, env, { filename: file });
     },
+    item_value: (it) => (it && G.items[it.name] && G.items[it.name].g) || 0,
     get_secondhands: async () => {
       log.ponty = log.ponty || [];
       log.ponty.push("list");

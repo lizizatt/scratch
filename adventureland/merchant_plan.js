@@ -78,13 +78,18 @@ function held_set() {
   }
   return s;
 }
+function ponty_fair(it) {
+  if (!it || !it.name) return 0;
+  var fair = (typeof item_value === "function") ? item_value(it) : vg(it.name);
+  return fair * ((G.items[it.name] && G.items[it.name].cash) ? 3 : 2);
+}
 function pick_ponty(items, name, level) {
-  var best = null, i, it, cap = vg(name) * (PONTY_MAX || 1.25), price;
+  var best = null, i, it, price, want = { name: name, level: level || 0 }, cap = ponty_fair(want) * (PONTY_MAX || 1.25);
   items = items || [];
   for (i = 0; i < items.length; i++) {
     it = items[i];
     if (!it || it.name !== name || lv(it) !== (level || 0)) continue;
-    price = it.price != null ? it.price : it.g;
+    price = it.price != null ? it.price : ponty_fair(it);
     if (price > cap) continue;
     if (!best || price < best.price) best = { rid: it.rid, price: price };
   }

@@ -22,6 +22,7 @@ const UPLOADS = [
   { file: "priest.js", name: "Zarook", match: /zarook/i },
   { file: "merchant.js", name: "Puppygirl", match: /puppygirl/i },
   { file: "merchant_plan.js", name: "merchant_plan", match: /merchant_plan/i },
+  { file: "merchant_ponty.js", name: "merchant_ponty", match: /merchant_ponty/i },
   { file: "merchant_ops.js", name: "merchant_ops", match: /merchant_ops/i },
   { file: "merchant_combine.js", name: "merchant_combine", match: /merchant_combine/i },
 ];

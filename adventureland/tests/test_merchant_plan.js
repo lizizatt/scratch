@@ -22,7 +22,7 @@ function envOf(extra) {
 }
 
 test("merchant_plan.js / merchant_ops.js stay within 176 CODE lines", () => {
-  ["merchant_plan.js", "merchant_ops.js", "merchant_combine.js", "merchant.js"].forEach((f) => {
+  ["merchant_plan.js", "merchant_ponty.js", "merchant_ops.js", "merchant_combine.js", "merchant.js"].forEach((f) => {
     const n = lines(f);
     assert.ok(n <= 176, f + " has " + n + " lines");
   });
@@ -63,9 +63,10 @@ test("plan_item detects craft cycles", () => {
   assert.strictEqual(p.reason, "cycle");
 });
 
-test("pick_ponty rejects listings above vendor g * 1.25", () => {
+test("pick_ponty rejects listings above fair Ponty price * PONTY_MAX", () => {
   const env = envOf();
-  const cap = env.G.items.snakefang.g * 1.25;
+  const fair = env.G.items.snakefang.g * 2;
+  const cap = fair * 1.25;
   const pick = env.pick_ponty([
     { name: "snakefang", rid: "hi", price: cap + 1 },
     { name: "snakefang", rid: "ok", price: cap }
@@ -126,7 +127,23 @@ test("acquire moves a bag ring into the bank", async () => {
   assert.ok(env.log.moved.some((d) => d && d.to === "bank"));
 });
 
-test("acquire buys a finished ring from Ponty before crafting", async () => {
+test("list_ponty falls back to the secondhands socket event", async () => {
+  const env = envOf({ gold: 400000 });
+  env.get_secondhands = async () => { throw { failed: true, reason: "timeout" }; };
+  let resolveSock;
+  const sockPromise = new Promise((r) => { resolveSock = r; });
+  env.parent.socket = {
+    on(ev, fn) { if (ev === "secondhands") setTimeout(() => fn([{ name: "snakefang", rid: "s1", price: 1200 }]), 0); },
+    off() {},
+    removeListener() {},
+    emit(ev) { if (ev === "secondhands") resolveSock(true); }
+  };
+  const items = await env.list_ponty();
+  await sockPromise;
+  assert.strictEqual(items[0].rid, "s1");
+});
+
+test("acquire buys a finished ring from Ponty when craft cannot progress", async () => {
   const env = envOf({ gold: 400000 });
   env.ponty = [{ name: "armorring", rid: "r1", price: 180000, level: 0 }];
   const r = await env.acquire("armorring", 1, "bank");

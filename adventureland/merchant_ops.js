@@ -47,27 +47,9 @@ function bag_three(name, level) {
   }
   return slots.length === 3 ? slots : null;
 }
-async function buy_leaf(name, level) {
-  var spend = character.gold - (GOLD_FLOAT || 0), list, items, it, i;
-  if (spend <= 0) return "fail";
-  if ((name.indexOf("cscroll") === 0 || name.indexOf("scroll") === 0) && spend >= vg(name)) {
-    try { if (!(await go_npc("upgrade"))) return "fail"; await buy_with_gold(name, 1); return "bought"; } catch (e) {}
-  }
-  if (!(await go_npc("secondhands"))) return "fail";
-  try { list = await get_secondhands(); } catch (e) { return "fail"; }
-  items = (list && list.items) || list || [];
-  for (i = 0; i < 16; i++) {
-    it = pick_ponty(items, name, level);
-    if (!it || !it.rid || it.price > spend) return "fail";
-    try { await buy_secondhand(it.rid); return "bought"; } catch (e) {
-      items = items.filter(function (x) { return x && String(x.rid) !== String(it.rid); });
-    }
-  }
-  return "fail";
-}
 async function wait_q(k) { var n; for (n = 0; n < 200 && character.q && character.q[k]; n++) await sleep(250); }
 async function try_plan(name, level) {
-  var p = plan_item(name, level), i, op, three, sc, sci, rec, ing, ok, q, n, need, e, froms = {}, keys, f;
+  var p = plan_item(name, level), i, op, three, sc, sci, rec, ing, ok, q, n, need, e, froms = {}, keys, f, r;
   if (!p || p.failed) return null;
   for (i = 0; i < p.ops.length; i++) {
     op = p.ops[i];
@@ -107,14 +89,14 @@ async function try_plan(name, level) {
     if (cnt(op.name, op.from) >= 3) {
       if ((e = find_ent(op.name, op.from)) && e.where !== "bag") return await move_ent(e, "bag");
       if (sci < 0 && (e = find_ent(sc, 0)) && e.where !== "bag") return await move_ent(e, "bag");
-      if (sci < 0) return await buy_leaf(sc, 0);
-    } else if (f === 0 && cnt(op.name, 1) < 3) return await buy_leaf(op.name, 0);
+      if (sci < 0 && (r = await buy_leaf(sc, 0)) === "bought") return r;
+    } else if (f === 0 && cnt(op.name, 1) < 3 && (r = await buy_leaf(op.name, 0)) === "bought") return r;
   }
   for (i = 0; i < p.ops.length; i++) {
     op = p.ops[i];
     if (op.op === "ponty" && cnt(op.name, op.level || 0) < 1) {
       if ((e = find_ent(op.name, op.level || 0)) && e.where !== "bag") return await move_ent(e, "bag");
-      return await buy_leaf(op.name, op.level || 0);
+      if ((r = await buy_leaf(op.name, op.level || 0)) === "bought") return r;
     }
   }
   return null;
@@ -125,10 +107,10 @@ async function acquire_step(name, qty, dest, level) {
   if (cnt(name, level, dest) >= qty) return "have";
   e = find_ent(name, level);
   if (e && e.where !== dest) return await move_ent(e, dest);
-  e = await buy_leaf(name, level);
-  if (e === "bought") return e;
   e = await try_plan(name, level);
-  return e || "fail";
+  if (e) return e;
+  e = await buy_leaf(name, level);
+  return e === "bought" ? e : "fail";
 }
 async function acquire(name, qty, dest) {
   var n, r = "ok";
@@ -156,12 +138,8 @@ async function restock_sale() {
   for (n = 0; n < 16; n++) {
     src = bank_sellable(); if (!src) return;
     if (src.where === "bank" && (character.esize || 0) <= FREE) return;
-    slot = next_trade();
-    cheap = cheapest_sale();
-    if (slot < 0) {
-      if (!cheap || vg(src.name) <= vg(cheap.name)) return;
-      close_stand(); unequip("trade" + cheap.loc);
-    }
+    slot = next_trade(); cheap = cheapest_sale();
+    if (slot < 0) { if (!cheap || vg(src.name) <= vg(cheap.name)) return; close_stand(); unequip("trade" + cheap.loc); }
     if ((await move_ent(src, "sale")) === "fail") return;
   }
 }

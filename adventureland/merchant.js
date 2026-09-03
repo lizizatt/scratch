@@ -1,8 +1,8 @@
 var FREE = 5, pulled = false, busy = false, PLAN_OK = false, FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "II"];
 var HOLD = [["armorring", 1]], STOCK = [], GOLD_FLOAT = 100000, PONTY_MAX = 1.25, COMBINE_MAX = 5;
 try {
-  load_code("merchant_plan"); load_code("merchant_ops"); load_code("merchant_combine");
-  if (typeof plan_item === "function" && typeof run_econ === "function") PLAN_OK = true; else throw 1;
+  load_code("merchant_plan"); load_code("merchant_ponty"); load_code("merchant_ops"); load_code("merchant_combine");
+  if (typeof plan_item === "function" && typeof run_econ === "function" && typeof buy_leaf === "function") PLAN_OK = true; else throw 1;
 } catch (e) { game_log("plan load fail"); set_message("No plan"); }
 function go_home() { if (parent.server_region === HOME[0] && parent.server_identifier === HOME[1]) return false; try { change_server(HOME[0], HOME[1]); } catch (e) {} return true; }
 function is_pot(it) { return it && (it.name.indexOf("hpot") === 0 || it.name.indexOf("mpot") === 0); }
