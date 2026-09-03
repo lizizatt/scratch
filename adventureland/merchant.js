@@ -17,6 +17,18 @@ function tell(on) {
 }
 function hold() { tell(1); set_message("Hold"); game_log("Hold sent"); }
 function resume() { tell(0); set_message("Stand"); game_log("Resume sent"); }
+function hunt(mob) {
+  var k = ("" + (mob || "")).toLowerCase().replace(/[^a-z0-9_]/g, "");
+  if (!k) return;
+  try { pm("Jazwyn", "hunt:" + k); } catch (e) {}
+  try { send_cm("Jazwyn", { hunt: k }); } catch (e) {}
+  set_message("Hunt " + k); game_log("Hunt " + k);
+}
+function grind() {
+  try { pm("Jazwyn", "grind"); } catch (e) {}
+  try { send_cm("Jazwyn", { grind: 1 }); } catch (e) {}
+  set_message("Grind"); game_log("Grind sent");
+}
 function next_trade() { for (var s = 1; s <= 16; s++) if (!character.slots["trade" + s]) return s; return -1; }
 function sale_clear() { for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) return false; return true; }
 async function list_sale() {

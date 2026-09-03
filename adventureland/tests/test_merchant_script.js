@@ -166,6 +166,22 @@ test("resume() DMs every fighter with {hold:0}", async () => {
   assert.strictEqual(env.lastMessage, "Stand");
 });
 
+test("hunt() tells Jazwyn to kill a mob", () => {
+  const env = merchant();
+  env.hunt("Spider");
+  assert.ok(env.log.pm.some((p) => p.name === "Jazwyn" && p.message === "hunt:spider"));
+  assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.hunt === "spider"));
+  assert.strictEqual(env.lastMessage, "Hunt spider");
+});
+
+test("grind() tells Jazwyn to resume the ladder", () => {
+  const env = merchant();
+  env.grind();
+  assert.ok(env.log.pm.some((p) => p.name === "Jazwyn" && p.message === "grind"));
+  assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.grind === 1));
+  assert.strictEqual(env.lastMessage, "Grind");
+});
+
 test("merchant hops to Americas II when elsewhere", async () => {
   const env = merchant({ _server: ["US", "III"] });
   await env.logistics();

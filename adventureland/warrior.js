@@ -1,7 +1,7 @@
 var ATTACK_MODE = true, POTION_TARGET = 500, POTION_MIN = 40, MAX_ATTACK_RATIO = 0.28;
 var LEADER = "Jazwyn", TANK = "Jazwyn", MERCHANT = "puppygirl", PARTY = ["Jazwyn", "Sarene", "Zarook"];
 var LADDER = [[1, "goo"], [8, "bee"], [12, "crab"], [16, "snake"], [20, "armadillo"], [24, "arcticbee"], [28, "porcupine"], [32, "croc"], [34, "tortoise"], [36, "bat"], [42, "spider"], [48, "scorpion"], [54, "boar"], [60, "bigbird"], [66, "gscorpion"], [72, "wolf"], [78, "dryad"]];
-var busy = false, farm = null, last_lv = character.level, is_lead = character.name === LEADER;
+var busy = false, farm = null, farm_ovr = null, last_lv = character.level, is_lead = character.name === LEADER;
 var HOME = ["US", "II"], FARM = ["US", "III"], HK = "hold_" + character.name, rally = false, hold_done = false;
 function ls(v) { try { if (v == null) return localStorage.getItem(HK) === "1"; localStorage.setItem(HK, v ? "1" : "0"); } catch (e) { return false; } }
 var hold = !!ls(), last_pots_say = new Date(0), last_summon = new Date(0), last_invite = new Date(0), last_gold = new Date(0), seen = {};
@@ -15,20 +15,17 @@ function is_pot(it) { return it && (it.name.indexOf("hpot") === 0 || it.name.ind
 function member(n) { return n === character.name ? character : ((get_party() || {})[n] || get_player(n)); }
 function desired() {
   var lvl = 99, hp = character.max_hp, i, j, d, pickm, p, cap, n, s;
+  if (farm_ovr && G.monsters[farm_ovr]) return farm_ovr;
   bump(character.name, character.level, character.max_hp);
   for (i = 0; i < PARTY.length; i++) {
-    n = PARTY[i]; p = member(n);
-    if (p && !p.rip && p.level >= 1) bump(n, p.level, p.max_hp || 0);
+    n = PARTY[i]; p = member(n); if (p && !p.rip && p.level >= 1) bump(n, p.level, p.max_hp || 0);
     s = seen[n]; if (s && s.l && s.l < lvl) { lvl = s.l; hp = s.h || hp; }
   }
   if (lvl === 99) lvl = character.level;
   lvl = Math.min(lvl, 90); pickm = LADDER[0][1]; cap = Math.max(8, Math.floor(hp * MAX_ATTACK_RATIO));
   for (i = 0; i < LADDER.length; i++) if (lvl >= LADDER[i][0]) pickm = LADDER[i][1];
   if (G.monsters[pickm] && G.monsters[pickm].attack > cap) {
-    for (j = LADDER.length - 1; j >= 0; j--) {
-      d = G.monsters[LADDER[j][1]];
-      if (d && d.attack <= cap && lvl >= LADDER[j][0]) return LADDER[j][1];
-    }
+    for (j = LADDER.length - 1; j >= 0; j--) { d = G.monsters[LADDER[j][1]]; if (d && d.attack <= cap && lvl >= LADDER[j][0]) return LADDER[j][1]; }
     return "goo";
   }
   return pickm;
@@ -47,9 +44,7 @@ function use_pots() {
   var skill = character.hp / character.max_hp < 0.5 ? "use_hp" : character.mp / character.max_mp < 0.5 ? "use_mp" : null;
   if (skill) { last_potion = new Date(); use_skill(skill); }
 }
-function ding() {
-  if (character.level <= last_lv) return; last_lv = character.level; party_say("Ding! Hah."); var e = []; for (var n in G.skills) if (G.skills[n].emote) e.push(n); if (e.length) use_skill(e[Math.floor(Math.random() * e.length)]);
-}
+function ding() { if (character.level <= last_lv) return; last_lv = character.level; party_say("Ding! Hah."); var e = []; for (var n in G.skills) if (G.skills[n].emote) e.push(n); if (e.length) use_skill(e[Math.floor(Math.random() * e.length)]); }
 function on_party_invite(name) { if (in_arr(name, PARTY)) accept_party_invite(name); }
 function on_magiport(name) { if (in_arr(name, PARTY)) accept_magiport(name); }
 function invite_party() {
@@ -66,20 +61,26 @@ async function buy_pots() {
 }
 async function restock(to) {
   if (!in_arr(character.map, ["main", "halloween", "winterland", "winter_inn", "winter_cave", "bank"])) { use("town"); await sleep(2000); }
-  if (to !== "upgrade") {
-    if (hold) party_say("Hold: banking");
-    if ((await smart_move({ to: "bank" }) || {}).failed) return;
-    bank_dump(); await sleep(400);
-  }
+  if (to !== "upgrade") { if (hold) party_say("Hold: banking"); if ((await smart_move({ to: "bank" }) || {}).failed) return; bank_dump(); await sleep(400); }
   if ((await smart_move({ to: to || "potions" }) || {}).failed) return;
   if (to !== "upgrade") { if (hold) party_say("Hold: buying pots"); await buy_pots(); }
 }
 function hear_cmd(m) {
   if (!m) return;
-  var from = ("" + (m.name || m.from || "")).toLowerCase(), d = m.message != null ? m.message : m.data, v = null;
+  var from = ("" + (m.name || m.from || "")).toLowerCase(), d = m.message != null ? m.message : m.data, v = null, h = null, k;
   if (from !== MERCHANT.toLowerCase()) return;
-  if (typeof d === "string") { if (d.indexOf("hold:1") >= 0) v = 1; else if (d.indexOf("hold:0") >= 0) v = 0; else try { d = JSON.parse(d); } catch (e) { return; } }
+  if (typeof d === "string") {
+    if (d.indexOf("hold:1") >= 0) v = 1; else if (d.indexOf("hold:0") >= 0) v = 0;
+    else if (d.indexOf("hunt:") === 0) h = d.slice(5); else if (/^grind/i.test(d)) h = "";
+    else try { d = JSON.parse(d); } catch (e) { return; }
+  }
   if (v == null && d && d.hold != null) v = d.hold;
+  if (h == null && d && d.hunt != null) h = d.hunt; if (h == null && d && d.grind) h = "";
+  if (h != null && is_lead) {
+    if (h === "") { farm_ovr = farm = null; party_say("Back to the grind"); }
+    else { k = ("" + h).toLowerCase().replace(/[^a-z0-9_]/g, ""); if (G.monsters[k]) { farm_ovr = farm = k; party_say("Let's kill " + k + "!"); try { stop("smart"); } catch (e) {} } }
+    return;
+  }
   if (v == 1) { hold = true; hold_done = false; ls(1); party_say("Hold: restocking"); try { stop("smart"); } catch (e) {} go_s(HOME); }
   else if (v == 0) { var was = hold; hold = false; hold_done = false; ls(0); if (was) party_say("Resuming"); go_s(FARM); }
 }
@@ -91,14 +92,11 @@ function farmable(t) { return t && !t.dead && t.mtype && t.mtype.indexOf("target
 function ready(s) { var d = G.skills[s] || {}; return can_use(s) && character.mp >= (d.mp || 0) && (!d.level || character.level >= d.level); }
 function combat(mtype) {
   if (character.rip || is_moving(character)) return;
-  var cap = att_cap(), lead = get_player(LEADER), t = null, i, p, n = 0, cx = 0, cy = 0, dx, dy, d, id, peel = null;
-  if (!is_lead && lead && lead.target) {
-    t = get_monster(lead.target) || parent.entities[lead.target];
-    if (!farmable(t)) { set_message("Assist"); return; }
-  } else {
+  var cap = farm_ovr ? 1e9 : att_cap(), lead = get_player(LEADER), t = null, i, p, n = 0, cx = 0, cy = 0, dx, dy, d, id, peel = null;
+  if (!is_lead && lead && lead.target) { t = get_monster(lead.target) || parent.entities[lead.target]; if (!farmable(t)) { set_message("Assist"); return; } }
+  else {
     t = get_targeted_monster();
-    if (!farmable(t) || (mtype && t.mtype !== mtype))
-      t = get_nearest_monster({ type: mtype, max_att: cap, no_target: true }) || get_nearest_monster({ type: mtype, max_att: cap });
+    if (!farmable(t) || (mtype && t.mtype !== mtype)) t = get_nearest_monster({ type: mtype, max_att: cap, no_target: true }) || get_nearest_monster({ type: mtype, max_att: cap });
   }
   if (!farmable(t)) return;
   change_target(t); set_message("Hunt " + t.mtype);
@@ -107,22 +105,14 @@ function combat(mtype) {
     else {
       for (id in parent.entities) {
         p = parent.entities[id];
-        if (!p || p.type !== "monster" || !farmable(p) || !p.target || p.target === character.name) continue;
-        if (!in_arr(p.target, PARTY) || parent.distance(character, p) > 200) continue;
+        if (!p || p.type !== "monster" || !farmable(p) || !p.target || p.target === character.name || !in_arr(p.target, PARTY) || parent.distance(character, p) > 200) continue;
         peel = p; break;
       }
       if (peel) use_skill("taunt", peel);
     }
   }
-  if (!is_in_range(t)) {
-    if (ready("charge")) use_skill("charge", t);
-    move(character.real_x + (t.real_x - character.real_x) / 2, character.real_y + (t.real_y - character.real_y) / 2);
-    return;
-  }
-  for (i = 0; i < PARTY.length; i++) {
-    p = get_player(PARTY[i]);
-    if (p && !p.rip && p.name !== character.name) { cx += p.real_x; cy += p.real_y; n++; }
-  }
+  if (!is_in_range(t)) { if (ready("charge")) use_skill("charge", t); move(character.real_x + (t.real_x - character.real_x) / 2, character.real_y + (t.real_y - character.real_y) / 2); return; }
+  for (i = 0; i < PARTY.length; i++) { p = get_player(PARTY[i]); if (p && !p.rip && p.name !== character.name) { cx += p.real_x; cy += p.real_y; n++; } }
   if (n) {
     dx = t.real_x - cx / n; dy = t.real_y - cy / n; d = Math.sqrt(dx * dx + dy * dy) || 1;
     cx = t.real_x + dx / d * 30; cy = t.real_y + dy / d * 30;
@@ -148,10 +138,7 @@ async function logistics() {
       if (needs_vendor() || rally) {
         if (needs_vendor() && mssince(last_pots_say) > 20000) { party_say("I need some potions!"); last_pots_say = new Date(); }
         set_message("Vendor"); await restock(rally === "upgrade" ? "upgrade" : "potions"); rally = false;
-      } else {
-        farm = desired();
-        if (!get_nearest_monster({ type: farm, max_att: att_cap() }) && !smart.moving) await go_farm(farm);
-      }
+      } else { farm = desired(); if (!get_nearest_monster({ type: farm, max_att: farm_ovr ? 1e9 : att_cap() }) && !smart.moving) await go_farm(farm); }
     }
   } catch (e) {}
   busy = false;
@@ -159,10 +146,14 @@ async function logistics() {
 try { performance_trick(); } catch (e) {}
 function hear(d) {
   if (!d.from || d.from === character.name) return;
-  var m = ("" + d.message).toLowerCase();
+  var m = ("" + d.message).toLowerCase(), k;
   if (m.indexOf("ding") >= 0) party_say(pick(["Gratz!", "Yes!", "Proud of you."]));
   if (!in_arr(d.from, PARTY)) return;
-  if (m.indexOf("potion") >= 0) { party_say(pick(["Ok!", "On my way!", "Coming!"])); rally = "potions"; }
+  if (m.indexOf("let's kill ") === 0 || m.indexOf("lets kill ") === 0) {
+    k = m.replace(/^let'?s kill /, "").replace(/!+$/, "").replace(/[^a-z0-9_]/g, "");
+    if (G.monsters[k]) { farm_ovr = farm = k; try { stop("smart"); } catch (e) {} }
+  } else if (m.indexOf("back to the grind") >= 0) { farm_ovr = farm = null; try { stop("smart"); } catch (e) {} }
+  else if (m.indexOf("potion") >= 0) { party_say(pick(["Ok!", "On my way!", "Coming!"])); rally = "potions"; }
   else if (m.indexOf("upgrade") >= 0) { party_say(pick(["Ok!", "On my way!", "Coming!"])); rally = "upgrade"; }
 }
 character.on("partym", hear); character.on("cm", hear_cmd); character.on("pm", hear_cmd);

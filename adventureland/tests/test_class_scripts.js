@@ -274,6 +274,27 @@ eachClass("desired() matches ladder at lvl 1 and 40 when alone", (spec) => {
   assert.strictEqual(env.desired(), "bat");
 });
 
+eachClass("party Let's kill overrides the ladder", (spec) => {
+  const env = loadClass(spec, { level: 1, max_hp: 320 });
+  const other = spec.name === "Jazwyn" ? "Sarene" : "Jazwyn";
+  env.emitChat(other, "Let's kill SpIdEr!");
+  assert.strictEqual(env.farm_ovr, "spider");
+  assert.strictEqual(env.desired(), "spider");
+  env.emitChat(other, "Back to the grind");
+  assert.strictEqual(env.farm_ovr, null);
+  assert.strictEqual(env.desired(), "goo");
+});
+
+test("Jazwyn forwards puppygirl hunt/grind into party chat", () => {
+  const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior", level: 40, max_hp: 2000 });
+  env.emitCm("puppygirl", { hunt: "boar" });
+  assert.ok(env.log.said.some((s) => /Let's kill boar!/i.test(s)));
+  assert.strictEqual(env.farm_ovr, "boar");
+  env.emitCm("puppygirl", { grind: 1 });
+  assert.ok(env.log.said.some((s) => /Back to the grind/i.test(s)));
+  assert.strictEqual(env.farm_ovr, null);
+});
+
 eachClass("desired() uses lowest party member", (spec) => {
   const env = loadClass(spec, { level: 40, max_hp: 2000 });
   env.parent.party = lowestOther(spec.name);
