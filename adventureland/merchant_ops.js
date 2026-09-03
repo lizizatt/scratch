@@ -169,5 +169,6 @@ async function run_econ() {
   var i, r = "have", list = (HOLD || []).slice().sort(function (a, b) { return vg(a[0]) - vg(b[0]); });
   for (i = 0; i < list.length; i++) { r = await acquire(list[i][0], list[i][1], "bank"); if (r === "fail") break; }
   if (r !== "fail") for (list = (STOCK || []).slice().sort(function (a, b) { return vg(a[0]) - vg(b[0]); }), i = 0; i < list.length; i++) { r = await acquire(list[i][0], list[i][1], "sale"); if (r === "fail") break; }
+  if (typeof run_combine === "function") await run_combine();
   await restock_sale();
 }

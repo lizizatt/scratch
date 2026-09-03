@@ -23,6 +23,7 @@ const UPLOADS = [
   { file: "merchant.js", name: "Puppygirl", match: /puppygirl/i },
   { file: "merchant_plan.js", name: "merchant_plan", match: /merchant_plan/i },
   { file: "merchant_ops.js", name: "merchant_ops", match: /merchant_ops/i },
+  { file: "merchant_combine.js", name: "merchant_combine", match: /merchant_combine/i },
 ];
 
 function readToken() {
@@ -122,10 +123,26 @@ async function main() {
   const slots = listed.codes || [];
   for (const s of slots) console.log("  slot=%s name=%s v=%s", s.slot, s.name, s.version);
 
+  function usedSlots() {
+    const used = new Set();
+    for (const s of slots) used.add(String(s.slot));
+    return used;
+  }
+
+  function nextFreeSlot() {
+    const used = usedSlots();
+    for (let i = 1; i <= 100; i++) if (!used.has(String(i))) return String(i);
+    throw new Error("No free CODE slot (1-100)");
+  }
+
   function findSlot(upload) {
     const hit = slots.find((s) => upload.match.test(s.name || ""));
     if (hit) return hit;
-    return { slot: upload.name, name: upload.name };
+    const slot = nextFreeSlot();
+    const created = { slot, name: upload.name };
+    slots.push(created);
+    console.log("  allocating new slot=%s name=%s", slot, upload.name);
+    return created;
   }
 
   let failed = 0;
@@ -134,16 +151,21 @@ async function main() {
     const filePath = path.join(ROOT, u.file);
     const code = fs.readFileSync(filePath, "utf8").replace(/\r\n/g, "\n");
     const lines = code.replace(/\s+$/, "").split("\n").length;
-    console.log("Reading existing %s (%s)...", slot.name, slot.slot);
-    const existing = await tool("get_code", { slot: String(slot.slot) });
-    const before =
-      (existing.code && existing.code.code && existing.code.code.length) ||
-      (typeof existing.code === "string" && existing.code.length) ||
-      0;
-    console.log("  existing bytes=%s -> uploading %s (%s lines)", before, u.file, lines);
+    console.log("Saving %s -> slot %s (%s lines)...", u.file, slot.slot, lines);
+    let before = 0;
+    try {
+      const existing = await tool("get_code", { slot: String(slot.slot) });
+      before =
+        (existing.code && existing.code.code && existing.code.code.length) ||
+        (typeof existing.code === "string" && existing.code.length) ||
+        0;
+    } catch (e) {
+      console.log("  (new slot, no existing code)");
+    }
+    console.log("  existing bytes=%s", before);
     const saved = await tool("save_code", {
       slot: String(slot.slot),
-      name: slot.name,
+      name: u.name,
       code,
     });
     const verify = await tool("get_code", { slot: String(slot.slot) });
@@ -155,7 +177,7 @@ async function main() {
       console.log("  WARN: readback mismatch (got %s bytes, expected %s)", src.length, code.length);
       failed++;
     } else {
-      console.log("  save_code ok v%s verified", (saved.code && saved.code.version) || "?");
+      console.log("  save_code ok v%s verified name=%s", (saved.code && saved.code.version) || "?", u.name);
     }
   }
 

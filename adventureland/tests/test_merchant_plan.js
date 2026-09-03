@@ -22,7 +22,7 @@ function envOf(extra) {
 }
 
 test("merchant_plan.js / merchant_ops.js stay within 176 CODE lines", () => {
-  ["merchant_plan.js", "merchant_ops.js", "merchant.js"].forEach((f) => {
+  ["merchant_plan.js", "merchant_ops.js", "merchant_combine.js", "merchant.js"].forEach((f) => {
     const n = lines(f);
     assert.ok(n <= 176, f + " has " + n + " lines");
   });
@@ -390,6 +390,71 @@ test("boot snaps bank without dumping loot into the bag", async () => {
   assert.ok(env.character.esize >= 20, "boot must leave craft space, esize=" + env.character.esize);
   assert.ok(env.cnt("helmet", 0, "bag") < 20, "must not dump bank into bag");
   assert.strictEqual(env.cnt("armorring", 0, "bank"), 1);
+});
+
+test("run_combine compounds duplicates toward COMBINE_MAX", async () => {
+  const env = envOf({ gold: 400000, esize: 30 });
+  env.GOLD_FLOAT = 0;
+  env.COMBINE_MAX = 5;
+  env.HOLD = [];
+  env.STOCK = [];
+  env.ponty = [];
+  const items = env.character.items;
+  items[1] = { name: "cscroll0", q: 20 };
+  for (let i = 0; i < 9; i++) items[2 + i] = { name: "vitring", q: 1 };
+  await env.run_combine();
+  assert.ok(env.log.compound.length >= 4);
+  assert.ok(env.cnt("vitring", 2) >= 1);
+  assert.strictEqual(env.cnt("vitring", 0), 0);
+});
+
+test("run_combine prefers higher levels first", async () => {
+  const env = envOf({ gold: 400000, esize: 30 });
+  env.GOLD_FLOAT = 0;
+  env.COMBINE_MAX = 5;
+  env.ponty = [];
+  const items = env.character.items;
+  items[1] = { name: "cscroll0", q: 4 };
+  items[2] = { name: "cscroll1", q: 2 };
+  for (let i = 0; i < 3; i++) items[3 + i] = { name: "vitring", level: 2, q: 1 };
+  for (let i = 0; i < 3; i++) items[6 + i] = { name: "vitring", q: 1 };
+  const r = await env.combine_step();
+  assert.strictEqual(r, "crafted");
+  assert.strictEqual(env.log.compound[0].from, 2);
+});
+
+test("run_combine skips when scroll purchase would break float", async () => {
+  const env = envOf({ gold: 100000, esize: 30 });
+  env.GOLD_FLOAT = 100000;
+  env.ponty = [];
+  const items = env.character.items;
+  for (let i = 0; i < 3; i++) items[1 + i] = { name: "vitring", q: 1 };
+  await env.run_combine();
+  assert.deepStrictEqual(env.log.compound, []);
+  assert.strictEqual(env.character.gold, 100000);
+});
+
+test("run_combine ignores upgrade-only duplicates", async () => {
+  const env = envOf({ gold: 400000, esize: 30 });
+  env.GOLD_FLOAT = 0;
+  const items = env.character.items;
+  items[1] = { name: "scroll0", q: 5 };
+  for (let i = 0; i < 3; i++) items[2 + i] = { name: "helmet", q: 1 };
+  await env.run_combine();
+  assert.deepStrictEqual(env.log.compound, []);
+  assert.deepStrictEqual(env.log.upgraded, []);
+});
+
+test("run_combine does not compound at or above COMBINE_MAX", async () => {
+  const env = envOf({ gold: 400000, esize: 30 });
+  env.GOLD_FLOAT = 0;
+  env.COMBINE_MAX = 5;
+  const items = env.character.items;
+  items[1] = { name: "cscroll1", q: 4 };
+  for (let i = 0; i < 3; i++) items[2 + i] = { name: "vitring", level: 5, q: 1 };
+  await env.run_combine();
+  assert.deepStrictEqual(env.log.compound, []);
+  assert.strictEqual(env.cnt("vitring", 5), 3);
 });
 
 test("compound path walks to the upgrade NPC", async () => {
