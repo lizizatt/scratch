@@ -217,6 +217,68 @@ test("park_bag strips equipped gear before banking", async () => {
   assert.ok(env.log.stored.some((s) => s.item === "coat"));
 });
 
+test("park_bag strips rings even when bag is clogged with HOLD BOM", async () => {
+  const env = envOf({ esize: 0, map: "bank" });
+  env.HOLD = [["armorring", 1]];
+  env.character.items = new Array(42).fill(null).map(() => ({ name: "vitring", q: 1 }));
+  env.character.slots.ring1 = { name: "vitring", q: 1 };
+  env.character.slots.ring2 = { name: "armorring", q: 1 };
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  await env.park_bag();
+  assert.ok(!env.character.slots.ring1, "ring1 still equipped");
+  assert.ok(!env.character.slots.ring2, "ring2 still equipped");
+  assert.ok(env.log.unequipped.includes("ring1"));
+  assert.ok(env.log.unequipped.includes("ring2"));
+});
+
+test("sale_price never below SALE_MULT * vendor g", () => {
+  const env = envOf();
+  env.SALE_MULT = 0.95;
+  env.item_value = () => 1;
+  assert.ok(env.sale_price({ name: "helmet", q: 1 }) >= Math.floor(1200 * 0.95));
+  assert.strictEqual(env.sale_price({ name: "helmet", q: 1 }), 1140);
+  assert.strictEqual(env.sale_price({ name: "coat", q: 1 }), Math.floor(2400 * 0.95));
+  assert.ok(env.sale_price({ name: "shoes", q: 1 }) >= Math.floor(800 * 0.95));
+});
+
+test("list_sale never lists below SALE_MULT * vendor g", async () => {
+  const env = envOf({ esize: 38 });
+  env.HOLD = [];
+  env.SALE_MULT = 0.95;
+  env.item_value = () => 1;
+  env.character.items[1] = { name: "helmet", q: 1 };
+  env.character.items[2] = { name: "coat", q: 1 };
+  env.character.items[3] = { name: "shoes", q: 1 };
+  await env.list_sale();
+  assert.ok(env.log.traded.length >= 3);
+  for (const t of env.log.traded) {
+    const name = env.character.slots["trade" + t.slot].name;
+    const vendor = env.G.items[name].g;
+    assert.ok(t.gold >= Math.floor(vendor * 0.95), name + " listed at " + t.gold);
+  }
+});
+
+test("restock_sale prices at or above SALE_MULT * vendor g", async () => {
+  const env = envOf({ gold: 100000, esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.SALE_MULT = 0.95;
+  env.item_value = () => 1;
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "coat", q: 1 };
+  env.character.bank.items0[1] = { name: "helmet", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  await env.restock_sale();
+  for (let s = 1; s <= 16; s++) {
+    const it = env.character.slots["trade" + s];
+    if (!it) continue;
+    const vendor = env.G.items[it.name].g;
+    assert.ok(it.price >= Math.floor(vendor * 0.95), it.name + " trade price " + it.price);
+  }
+});
+
 test("list_sale prices at SALE_MULT * item_value", async () => {
   const env = envOf({ esize: 41 });
   env.HOLD = [];

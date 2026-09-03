@@ -98,13 +98,15 @@ function bank_sellable(bad) {
   return best;
 }
 async function park_bag() {
-  var i, it, skip = held_set();
+  var i, it, pass;
   if (!(await go_npc("bank"))) return false;
-  await strip_gear();
-  for (i = 0; i < character.items.length; i++) {
-    it = character.items[i];
-    if (!it || is_pot(it) || it.name === "stand0" || it.l || skip[it.name]) continue;
-    try { await bank_store(i); } catch (e) {}
+  for (pass = 0; pass < 2; pass++) {
+    if (pass) await strip_gear();
+    for (i = 0; i < character.items.length; i++) {
+      it = character.items[i];
+      if (!it || is_pot(it) || it.name === "stand0" || it.l) continue;
+      try { await bank_store(i); } catch (e) {}
+    }
   }
   snap_bank();
   return true;

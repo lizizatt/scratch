@@ -1,8 +1,12 @@
 function vg(n) { return (G.items[n] && G.items[n].g) || 0; }
 function sale_price(it) {
-  if (!it) return 1;
-  var v = (typeof item_value === "function") ? item_value(it) : vg(it.name);
-  return Math.max(1, Math.floor(v * (SALE_MULT != null ? SALE_MULT : 0.95)));
+  if (!it || !it.name) return 1;
+  var vendor = vg(it.name), v = vendor, mult = SALE_MULT != null ? SALE_MULT : 0.95, priced;
+  if (!(vendor > 0)) vendor = 20;
+  try { if (typeof item_value === "function") v = Math.max(vendor, item_value(it) || 0); } catch (e) { v = vendor; }
+  if (!(v > 0)) v = vendor;
+  priced = Math.floor(v * mult);
+  return Math.max(1, Math.floor(vendor * mult), priced);
 }
 function lv(it) { return (it && it.level) || 0; }
 function skip_it(it) { return !it || is_pot(it) || it.name === "stand0" || it.l; }
