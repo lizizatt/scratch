@@ -279,6 +279,52 @@ test("restock_sale prices at or above SALE_MULT * vendor g", async () => {
   }
 });
 
+test("list_sale lists event valuables like gem0 and prefers them over junk", async () => {
+  const env = envOf({ esize: 40 });
+  env.HOLD = [];
+  env.COMBINE_MAX = 5;
+  env.character.items[1] = { name: "helmet", q: 1 };
+  env.character.items[2] = { name: "gem0", q: 1 };
+  env.character.items[3] = { name: "cryptkey", q: 1 };
+  await env.list_sale();
+  assert.ok(env.log.traded.some((t) => t.i === 2), "gem0 (e:1) must list");
+  assert.ok(env.log.traded.some((t) => t.i === 3), "cryptkey must list");
+  assert.ok(env.log.traded[0].i === 2 || env.character.slots.trade1.name === "gem0");
+  assert.ok(env.character.slots.trade1.price >= Math.floor(240000 * 0.95));
+});
+
+test("list_sale and bank_sellable skip compoundables below COMBINE_MAX", async () => {
+  const env = envOf({ esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.COMBINE_MAX = 5;
+  env.character.items[1] = { name: "vitring", level: 2, q: 1 };
+  env.character.items[2] = { name: "helmet", q: 1 };
+  await env.list_sale();
+  assert.ok(!env.log.traded.some((t) => t.i === 1));
+  assert.ok(env.log.traded.some((t) => t.i === 2));
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "vitring", level: 1, q: 1 };
+  env.character.bank.items0[1] = { name: "coat", q: 1 };
+  env.character.bank.items0[2] = { name: "vitring", level: 5, q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  assert.strictEqual(env.bank_sellable().name, "vitring");
+  assert.strictEqual(env.bank_sellable().level, 5);
+  env.character.bank.items0[2] = null;
+  assert.strictEqual(env.bank_sellable().name, "coat");
+});
+
+test("bank_sellable ranks by item_value not only catalog g", () => {
+  const env = envOf({ map: "bank" });
+  env.HOLD = [];
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "coat", q: 1 };
+  env.character.bank.items0[1] = { name: "gem0", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  assert.strictEqual(env.bank_sellable().name, "gem0");
+});
+
 test("list_sale prices at SALE_MULT * item_value", async () => {
   const env = envOf({ esize: 41 });
   env.HOLD = [];

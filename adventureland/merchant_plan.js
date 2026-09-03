@@ -1,12 +1,20 @@
 function vg(n) { return (G.items[n] && G.items[n].g) || 0; }
+function rank_val(it) {
+  if (!it || !it.name) return 0;
+  var vendor = vg(it.name), v = vendor;
+  try { if (typeof item_value === "function") v = Math.max(vendor, item_value(it) || 0); } catch (e) {}
+  return v > 0 ? v : vendor;
+}
+function keep_combine(it) {
+  var g = it && G.items[it.name];
+  return !!(g && g.compound && (it.level || 0) < (COMBINE_MAX || 5));
+}
 function sale_price(it) {
   if (!it || !it.name) return 1;
-  var vendor = vg(it.name), v = vendor, mult = SALE_MULT != null ? SALE_MULT : 0.95, priced;
+  var vendor = vg(it.name), v = rank_val(it), mult = SALE_MULT != null ? SALE_MULT : 0.95;
   if (!(vendor > 0)) vendor = 20;
-  try { if (typeof item_value === "function") v = Math.max(vendor, item_value(it) || 0); } catch (e) { v = vendor; }
   if (!(v > 0)) v = vendor;
-  priced = Math.floor(v * mult);
-  return Math.max(1, Math.floor(vendor * mult), priced);
+  return Math.max(1, Math.floor(vendor * mult), Math.floor(v * mult));
 }
 function lv(it) { return (it && it.level) || 0; }
 function skip_it(it) { return !it || is_pot(it) || it.name === "stand0" || it.l; }

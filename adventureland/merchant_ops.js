@@ -87,13 +87,17 @@ async function acquire(name, qty, dest) {
   return "fail";
 }
 function bank_sellable(bad) {
-  var i, a = idx(), best = null, skip = held_set(), key;
+  var i, a = idx(), best = null, skip = held_set(), key, it, val, bestv = -1, bank;
+  bank = bank_obj();
   for (i = 0; i < a.length; i++) {
     if (a[i].where !== "bank") continue;
     if (skip[a[i].name]) continue;
     key = a[i].loc[0] + ":" + a[i].loc[1];
     if (bad && bad[key]) continue;
-    if (!best || vg(a[i].name) > vg(best.name)) best = a[i];
+    it = bank && bank[a[i].loc[0]] && bank[a[i].loc[0]][a[i].loc[1]];
+    if (keep_combine(it || a[i])) continue;
+    val = rank_val(it || a[i]);
+    if (!best || val > bestv) { best = a[i]; bestv = val; }
   }
   return best;
 }

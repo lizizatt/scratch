@@ -36,9 +36,9 @@ async function list_sale() {
   for (i = 0; i < character.items.length; i++) {
     it = character.items[i];
     if (!it || it.price != null || is_pot(it) || it.name === "stand0" || it.l) continue;
-    if (skip[it.name]) continue;
-    g = G.items[it.name]; if (!g || g.e) continue;
-    cand.push({ i: i, name: it.name, g: g.g || 20, q: it.q || 1 });
+    if (skip[it.name] || (typeof keep_combine === "function" && keep_combine(it))) continue;
+    g = G.items[it.name]; if (!g) continue;
+    cand.push({ i: i, name: it.name, g: typeof rank_val === "function" ? rank_val(it) : (g.g || 20), q: it.q || 1 });
   }
   cand.sort(function (a, b) { return b.g - a.g; });
   for (i = 0; i < cand.length; i++) {
