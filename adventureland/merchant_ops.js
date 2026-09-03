@@ -7,23 +7,25 @@ async function move_ent(e, dest) {
   if (e.where === dest) return "have";
   if (e.where === "sale") {
     if (!character.slots["trade" + e.loc]) return "fail";
-    close_stand(); unequip("trade" + e.loc); return character.slots["trade" + e.loc] ? "fail" : "moved";
+    close_stand();
+    try { await unequip("trade" + e.loc); } catch (err) { return "fail"; }
+    return character.slots["trade" + e.loc] ? "fail" : "moved";
   }
   if (e.where === "bank" && dest === "bag") {
     if (!(bank_obj() && bank_obj()[e.loc[0]] && bank_obj()[e.loc[0]][e.loc[1]])) return "fail";
     if (!(await go_npc("bank"))) return "fail";
-    try { bank_retrieve(e.loc[0], e.loc[1]); } catch (err) { return "fail"; }
+    try { await bank_retrieve(e.loc[0], e.loc[1]); } catch (err) { return "fail"; }
     snap_bank(); return (bank_obj()[e.loc[0]] && bank_obj()[e.loc[0]][e.loc[1]]) ? "fail" : "moved";
   }
   if (e.where === "bag" && dest === "bank") {
     if (!character.items[e.loc]) return "fail";
     if (!(await go_npc("bank"))) return "fail";
-    try { bank_store(e.loc); } catch (err) { return "fail"; }
+    try { await bank_store(e.loc); } catch (err) { return "fail"; }
     snap_bank(); return character.items[e.loc] ? "fail" : "moved";
   }
   if (e.where === "bag" && dest === "sale") {
     var slot = next_trade(); if (slot < 0 || !character.items[e.loc]) return "fail";
-    try { trade(e.loc, slot, Math.max(1, Math.floor(vg(e.name) * 1.5)), 1); } catch (err) { return "fail"; }
+    try { await trade(e.loc, slot, Math.max(1, Math.floor(vg(e.name) * 1.5)), 1); } catch (err) { return "fail"; }
     return character.items[e.loc] ? "fail" : "moved";
   }
   if (e.where === "bank" && dest === "sale") {
@@ -79,7 +81,7 @@ async function park_bag() {
   for (i = 0; i < character.items.length; i++) {
     it = character.items[i];
     if (!it || is_pot(it) || it.name === "stand0" || it.l || skip[it.name]) continue;
-    try { bank_store(i); } catch (e) {}
+    try { await bank_store(i); } catch (e) {}
   }
   snap_bank();
   return true;
@@ -107,12 +109,12 @@ function hold_done() {
 async function stock_store() {
   if (!(await go_npc("bank"))) return false;
   await park_bag();
-  empty_sale();
+  await empty_sale();
   await park_bag();
   await restock_sale();
   close_stand();
   if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) return false;
-  open_stand(); list_sale();
+  open_stand(); await list_sale();
   return true;
 }
 async function run_econ() {

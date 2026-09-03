@@ -121,9 +121,9 @@ test("cycle throttles repeats within CYCLE_MS", async () => {
   assert.ok(!env.log.moved.some((d) => d && d.to === "bank"));
 });
 
-test("bank_retrieve refused outside the bank map", () => {
+test("bank_retrieve refused outside the bank map", async () => {
   const env = merchant({ map: "main", bank: { gold: 0, items0: [{ name: "helmet", q: 1 }] } });
-  env.bank_retrieve("items0", 0);
+  await env.bank_retrieve("items0", 0);
   assert.deepStrictEqual(env.log.retrieved, []);
   assert.ok(env.log.bankFail.some((f) => f.reason === "not_bank"));
 });
@@ -213,10 +213,10 @@ test("send_item fails when receiver has no space", () => {
   assert.ok(env.log.sendFail.some((f) => f.reason === "no_space"));
 });
 
-test("bank_store refused outside the bank map", () => {
+test("bank_store refused outside the bank map", async () => {
   const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior", map: "main" });
   env.character.items[1] = { name: "helmet", q: 1 };
-  env.bank_store(1);
+  await env.bank_store(1);
   assert.deepStrictEqual(env.log.stored, []);
   assert.ok(env.log.bankFail.some((f) => f.reason === "not_bank"));
   env.bank_dump();

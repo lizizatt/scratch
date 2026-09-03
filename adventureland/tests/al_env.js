@@ -199,7 +199,8 @@ function makeEnv(charOver) {
     game_log: (m) => { log.game = log.game || []; log.game.push(m); },
     buy: async (name, q) => { log.bought.push({ name, q: q || 1 }); const i = character.items.findIndex((x) => !x); if (i >= 0) character.items[i] = { name, q: q || 1 }; character.gold -= (G.items[name] && G.items[name].g || 20) * (q || 1); return { num: i }; },
     sell: (i, q) => { log.sold.push({ i, q }); character.items[i] = null; },
-    trade: (i, slot, gold, q) => {
+    trade: async (i, slot, gold, q) => {
+      await Promise.resolve();
       const key = "trade" + slot;
       if (character.slots[key]) { log.tradeFail = log.tradeFail || []; log.tradeFail.push({ i, slot, reason: "slot_occuppied" }); return; }
       const it = character.items[i];
@@ -208,7 +209,8 @@ function makeEnv(charOver) {
       character.items[i] = null;
       log.traded.push({ i, slot, gold, q: q || 1 });
     },
-    bank_store: (i) => {
+    bank_store: async (i) => {
+      await Promise.resolve();
       if (character.map !== "bank") { log.bankFail.push({ i, reason: "not_bank" }); return; }
       const it = character.items[i];
       if (!it) return;
@@ -229,7 +231,8 @@ function makeEnv(charOver) {
       character.esize = (character.esize || 0) + 1;
       character._bank = character.bank;
     },
-    bank_retrieve: (pack, i) => {
+    bank_retrieve: async (pack, i) => {
+      await Promise.resolve();
       if (character.map !== "bank") { log.bankFail.push({ pack, i, reason: "not_bank" }); return; }
       const bag = character.bank && character.bank[pack];
       if (!bag || !bag[i]) return;
@@ -348,7 +351,8 @@ function makeEnv(charOver) {
     accept_party_request: (n) => { log.acceptedReq = log.acceptedReq || []; log.acceptedReq.push(n); },
     accept_magiport: (n) => { log.magiport = log.magiport || []; log.magiport.push(n); },
     equip: async (n) => { log.equipped.push(n); },
-    unequip: (slot) => {
+    unequip: async (slot) => {
+      await Promise.resolve();
       log.unequipped.push(slot);
       const it = character.slots[slot];
       if (!it) { character.slots[slot] = null; return; }

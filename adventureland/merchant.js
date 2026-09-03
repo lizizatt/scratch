@@ -19,7 +19,7 @@ function hold() { tell(1); set_message("Hold"); game_log("Hold sent"); }
 function resume() { tell(0); set_message("Stand"); game_log("Resume sent"); }
 function next_trade() { for (var s = 1; s <= 16; s++) if (!character.slots["trade" + s]) return s; return -1; }
 function sale_clear() { for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) return false; return true; }
-function list_sale() {
+async function list_sale() {
   var cand = [], i, it, g, slot, skip = typeof held_set === "function" ? held_set() : {};
   for (i = 0; i < character.items.length; i++) {
     it = character.items[i];
@@ -33,12 +33,12 @@ function list_sale() {
     it = character.items[cand[i].i];
     if (!it || it.name !== cand[i].name) continue;
     slot = next_trade(); if (slot < 0) return;
-    try { trade(cand[i].i, slot, Math.max(1, Math.floor(cand[i].g * 1.5)), cand[i].q); } catch (e) {}
+    try { await trade(cand[i].i, slot, Math.max(1, Math.floor(cand[i].g * 1.5)), cand[i].q); } catch (e) {}
   }
 }
-function empty_sale() {
+async function empty_sale() {
   close_stand();
-  for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) try { unequip("trade" + s); } catch (e) {}
+  for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) try { await unequip("trade" + s); } catch (e) {}
   return sale_clear();
 }
 function use_pots() {
@@ -62,7 +62,7 @@ async function run_cycle() {
   if (!(await go_npc("bank"))) return false;
   if (typeof park_bag === "function") await park_bag();
   set_message("Empty");
-  empty_sale();
+  await empty_sale();
   if (typeof park_bag === "function") await park_bag();
   if (typeof snap_bank === "function") snap_bank(); await sleep(400);
   if (typeof ponty_miss === "object") for (i in ponty_miss) delete ponty_miss[i];
