@@ -65,28 +65,30 @@ async function acquire(name, qty, dest) {
   return "fail";
 }
 function bank_sellable() {
-  var hold = {}, i, list = HOLD || [], a = idx(), best = null, skip = held_set();
-  for (i = 0; i < list.length; i++) hold[list[i][0]] = (hold[list[i][0]] || 0) + list[i][1];
+  var i, a = idx(), best = null, skip = held_set();
   for (i = 0; i < a.length; i++) {
     if (a[i].where !== "bank") continue;
-    if ((hold[a[i].name] || 0) > 0) { hold[a[i].name]--; continue; }
-    if (skip[a[i].name] && !(HOLD || []).some(function (h) { return h[0] === a[i].name; })) continue;
+    if (skip[a[i].name]) continue;
     if (!best || vg(a[i].name) > vg(best.name)) best = a[i];
   }
   return best;
 }
-function cheapest_sale() {
-  var a = idx(), i, best = null, skip = held_set();
-  for (i = 0; i < a.length; i++) if (a[i].where === "sale" && !skip[a[i].name] && (!best || vg(a[i].name) < vg(best.name))) best = a[i];
-  return best;
+async function park_bag() {
+  var i, it, skip = held_set();
+  if (!(await go_npc("bank"))) return false;
+  for (i = 0; i < character.items.length; i++) {
+    it = character.items[i];
+    if (!it || is_pot(it) || it.name === "stand0" || it.l || skip[it.name]) continue;
+    try { bank_store(i); } catch (e) {}
+  }
+  snap_bank();
+  return true;
 }
 async function restock_sale() {
-  var n, src, cheap, slot;
+  var n, src;
   for (n = 0; n < 16; n++) {
+    if (next_trade() < 0) return;
     src = bank_sellable(); if (!src) return;
-    if (src.where === "bank" && (character.esize || 0) <= FREE) return;
-    slot = next_trade(); cheap = cheapest_sale();
-    if (slot < 0) { if (!cheap || vg(src.name) <= vg(cheap.name)) return; close_stand(); unequip("trade" + cheap.loc); }
     if ((await move_ent(src, "sale")) === "fail") return;
   }
 }
@@ -103,10 +105,15 @@ function hold_done() {
   return true;
 }
 async function stock_store() {
+  if (!(await go_npc("bank"))) return false;
+  await park_bag();
+  empty_sale();
+  await park_bag();
   await restock_sale();
   close_stand();
-  if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) return;
+  if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) return false;
   open_stand(); list_sale();
+  return true;
 }
 async function run_econ() {
   var n;

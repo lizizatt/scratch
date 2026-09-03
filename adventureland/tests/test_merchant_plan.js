@@ -207,6 +207,59 @@ test("list_sale skips HOLD bill-of-material names", async () => {
   assert.ok(!env.log.traded.some((t) => t.i === 2));
 });
 
+test("list_sale fills scarce slots expensive-first", () => {
+  const env = envOf({ esize: 39 });
+  env.HOLD = [];
+  env.character.items[1] = { name: "shoes", q: 1 };
+  env.character.items[2] = { name: "coat", q: 1 };
+  env.character.items[3] = { name: "pants", q: 1 };
+  for (let s = 3; s <= 16; s++) env.character.slots["trade" + s] = { name: "blade", q: 1, price: 1 };
+  env.list_sale();
+  assert.deepStrictEqual(env.log.traded.map((t) => t.i), [2, 3]);
+  assert.strictEqual(env.character.slots.trade1.name, "coat");
+  assert.strictEqual(env.character.slots.trade2.name, "pants");
+  assert.ok(env.character.items[1] && env.character.items[1].name === "shoes");
+});
+
+test("stock_store empties stand then restocks bank loot expensive-first skipping HOLD", async () => {
+  const env = envOf({ gold: 100000, esize: 40, map: "bank" });
+  env.HOLD = [["armorring", 1]];
+  env.STOCK = [];
+  env.character.slots.trade1 = { name: "shoes", q: 1, price: 100 };
+  env.character.slots.trade2 = { name: "gloves", q: 1, price: 100 };
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "armorring", q: 1 };
+  env.character.bank.items0[1] = { name: "helmet", q: 1 };
+  env.character.bank.items0[2] = { name: "coat", q: 1 };
+  env.character.bank.items0[3] = { name: "pants", q: 1 };
+  env.character.bank.items0[4] = { name: "vitring", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  await env.stock_store();
+  assert.ok(env.log.unequipped.includes("trade1"));
+  assert.ok(env.log.unequipped.includes("trade2"));
+  assert.strictEqual(env.character.slots.trade1 && env.character.slots.trade1.name, "coat");
+  assert.strictEqual(env.character.slots.trade2 && env.character.slots.trade2.name, "pants");
+  assert.strictEqual(env.character.slots.trade3 && env.character.slots.trade3.name, "helmet");
+  assert.ok(!Object.keys(env.character.slots).some((k) => k.indexOf("trade") === 0 && env.character.slots[k] && (env.character.slots[k].name === "armorring" || env.character.slots[k].name === "vitring")));
+  assert.ok((env.character._bank.items0 || []).some((it) => it && it.name === "armorring"));
+});
+
+test("empty_sale needs park_bag first when bag is full", async () => {
+  const env = envOf({ esize: 0, map: "bank" });
+  env.HOLD = [];
+  env.character.items = new Array(42).fill(null).map(() => ({ name: "helmet", q: 1 }));
+  env.character.slots.trade1 = { name: "coat", q: 1, price: 3000 };
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  assert.strictEqual(env.empty_sale(), false);
+  await env.park_bag();
+  assert.ok(env.character.esize > 0);
+  assert.ok(env.empty_sale());
+  assert.ok(!env.character.slots.trade1);
+});
+
 test("try_buy buys lotus not extra vitrings when +2 already exists", async () => {
   const env = envOf({ gold: 400000, esize: 38 });
   env.character.items[1] = { name: "vitring", level: 2, q: 1 };

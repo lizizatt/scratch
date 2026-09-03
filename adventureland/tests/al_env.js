@@ -348,7 +348,16 @@ function makeEnv(charOver) {
     accept_party_request: (n) => { log.acceptedReq = log.acceptedReq || []; log.acceptedReq.push(n); },
     accept_magiport: (n) => { log.magiport = log.magiport || []; log.magiport.push(n); },
     equip: async (n) => { log.equipped.push(n); },
-    unequip: (slot) => { log.unequipped.push(slot); const it = character.slots[slot]; character.slots[slot] = null; if (it) { const i = character.items.findIndex((x) => !x); if (i >= 0) character.items[i] = it; } },
+    unequip: (slot) => {
+      log.unequipped.push(slot);
+      const it = character.slots[slot];
+      if (!it) { character.slots[slot] = null; return; }
+      const i = character.items.findIndex((x) => !x);
+      if (i < 0) { log.unequipFail = log.unequipFail || []; log.unequipFail.push({ slot, reason: "full" }); return; }
+      character.slots[slot] = null;
+      character.items[i] = it;
+      character.esize = Math.max(0, (character.esize || 1) - 1);
+    },
     upgrade: async (item, scroll) => { log.upgraded.push({ item, scroll }); const it = character.items[item]; if (it) it.level = (it.level || 0) + 1; },
     is_character_local: () => true,
     load_code: (name) => {
