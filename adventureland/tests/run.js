@@ -4,7 +4,8 @@ const suites = [
   require("./test_al_core"),
   require("./test_class_scripts"),
   require("./test_gear_scripts"),
-  require("./test_merchant_script")
+  require("./test_merchant_script"),
+  require("./test_merchant_plan")
 ];
 
 async function main() {

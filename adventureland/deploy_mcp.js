@@ -21,6 +21,8 @@ const UPLOADS = [
   { file: "mage.js", name: "Sarene", match: /sarene/i },
   { file: "priest.js", name: "Zarook", match: /zarook/i },
   { file: "merchant.js", name: "Puppygirl", match: /puppygirl/i },
+  { file: "merchant_plan.js", name: "merchant_plan", match: /merchant_plan/i },
+  { file: "merchant_ops.js", name: "merchant_ops", match: /merchant_ops/i },
 ];
 
 function readToken() {
@@ -122,8 +124,8 @@ async function main() {
 
   function findSlot(upload) {
     const hit = slots.find((s) => upload.match.test(s.name || ""));
-    if (!hit) throw new Error("No CODE slot matching " + upload.name);
-    return hit;
+    if (hit) return hit;
+    return { slot: upload.name, name: upload.name };
   }
 
   let failed = 0;

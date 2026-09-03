@@ -22,7 +22,7 @@ function lines(file) {
 }
 
 test("warrior.js / priest.js / mage.js / merchant.js stay within 176 CODE lines", () => {
-  ["warrior.js", "priest.js", "mage.js", "merchant.js"].forEach((f) => {
+  ["warrior.js", "priest.js", "mage.js", "merchant.js", "merchant_plan.js", "merchant_ops.js"].forEach((f) => {
     const n = lines(f);
     assert.ok(n <= 176, f + " has " + n + " lines");
   });

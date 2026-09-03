@@ -1,4 +1,6 @@
-var FREE = 5, pulled = false, FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "II"];
+var FREE = 5, pulled = false, busy = false, FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "II"];
+var HOLD = [["armorring", 1]], STOCK = [], GOLD_FLOAT = 100000, PONTY_MAX = 1.25;
+try { load_code("merchant_plan"); load_code("merchant_ops"); } catch (e) { game_log("plan load fail"); }
 function go_home() { if (parent.server_region === HOME[0] && parent.server_identifier === HOME[1]) return false; try { change_server(HOME[0], HOME[1]); } catch (e) {} return true; }
 function is_pot(it) { return it && (it.name.indexOf("hpot") === 0 || it.name.indexOf("mpot") === 0); }
 function stand_i() { return locate_item("stand0"); }
@@ -16,6 +18,7 @@ function list_sale() {
   for (var i = 0, slot, it, g; i < character.items.length; i++) {
     it = character.items[i];
     if (!it || it.price != null || is_pot(it) || it.name === "stand0" || it.l) continue;
+    if (typeof held_set === "function" && held_set()[it.name]) continue;
     g = G.items[it.name]; if (!g || g.e) continue;
     slot = next_trade(); if (slot < 0) return;
     try { trade(i, slot, Math.max(1, Math.floor((g.g || 20) * 1.5)), it.q || 1); } catch (e) {}
@@ -47,23 +50,29 @@ function bank_pull() {
   }
 }
 async function logistics() {
-  if (character.rip) return;
-  if (go_home()) return;
-  if (character.map === "jail") { await leave(); return; }
-  if (!pulled) {
-    close_stand();
-    if ((await smart_move({ to: "bank" }) || {}).failed) return;
-    bank_pull(); await sleep(400); pulled = true;
-    if ((await smart_move({ to: "potions" }) || {}).failed) return;
-  } else if (character.map !== "main") {
-    if (!in_arr(character.map, ["halloween", "winterland", "winter_inn", "winter_cave"])) { use("town"); await sleep(2000); }
-    await smart_move({ to: "potions" });
-  }
-  if (parent.distance(character, { real_x: 40, real_y: -20 }) > 25) {
-    close_stand();
-    if ((await smart_move({ x: 40, y: -20 }) || {}).failed) return;
-  }
-  open_stand(); list_sale(); set_message("Stand");
+  if (busy || character.rip) return;
+  busy = true;
+  try {
+    if (go_home()) { busy = false; return; }
+    if (character.map === "jail") { await leave(); busy = false; return; }
+    if (!pulled) {
+      close_stand();
+      if ((await smart_move({ to: "bank" }) || {}).failed) { busy = false; return; }
+      bank_pull(); if (typeof snap_bank === "function") snap_bank(); await sleep(400); pulled = true;
+      if ((await smart_move({ to: "potions" }) || {}).failed) { busy = false; return; }
+    } else if (character.map !== "main") {
+      close_stand();
+      if (!in_arr(character.map, ["halloween", "winterland", "winter_inn", "winter_cave"])) { use("town"); await sleep(2000); }
+      await smart_move({ to: "potions" });
+    }
+    if (typeof run_econ === "function") await run_econ();
+    if (parent.distance(character, { real_x: 40, real_y: -20 }) > 25 || character.map !== "main") {
+      close_stand();
+      if ((await smart_move({ map: "main", x: 40, y: -20 }) || {}).failed) { busy = false; return; }
+    }
+    open_stand(); list_sale(); set_message("Stand");
+  } catch (e) {}
+  busy = false;
 }
 try { performance_trick(); } catch (e) {}
 setInterval(function () { use_pots(); if (!smart.moving) mluck_near(); }, 250);

@@ -50,7 +50,16 @@ function baseG() {
       tracker: { g: 1 },
       stand0: { g: 40000 },
       cscroll0: { g: 800 },
-      essenceoflife: { g: 100 }
+      cscroll1: { g: 40000 },
+      cscroll2: { g: 160000 },
+      essenceoflife: { g: 100 },
+      armorring: { g: 180000, type: "ring", compound: { armor: 9 } },
+      vitring: { g: 24000, type: "ring", compound: { armor: 1 }, grades: [2, 5] },
+      lotusf: { g: 12000 },
+      snakefang: { g: 1200 }
+    },
+    craft: {
+      armorring: { items: [[1, "snakefang"], [1, "lotusf"], [1, "vitring", 2]], cost: 0, quest: "mcollector" }
     },
     skills: {
       hearts: { emote: true },
@@ -103,7 +112,7 @@ function makeEnv(charOver) {
   }
   const character = makeCharacter(charOver);
   const smart = { moving: false };
-  const log = { said: [], global: [], bought: [], sold: [], attacked: [], healed: [], moved: [], skills: [], equipped: [], unequipped: [], upgraded: [], invited: [], accepted: [], merchant: [], sent: [], gold: [], traded: [], stored: [], retrieved: [], sendFail: [], bankFail: [], server: [] };
+  const log = { said: [], global: [], bought: [], sold: [], attacked: [], healed: [], moved: [], skills: [], equipped: [], unequipped: [], upgraded: [], invited: [], accepted: [], merchant: [], sent: [], gold: [], traded: [], stored: [], retrieved: [], sendFail: [], bankFail: [], server: [], secondhand: [], crafted: [], compound: [] };
   const parent = {
     entities: {},
     server_region: (srv && srv[0]) || "US",
@@ -176,7 +185,7 @@ function makeEnv(charOver) {
     item_grade: (it) => (it && (it.level || 0) >= 7 ? 1 : 0),
     mssince: (t) => Date.now() - (t instanceof Date ? t.getTime() : t),
     min: Math.min, max: Math.max,
-    sleep: (ms) => Promise.resolve(ms),
+    sleep: (ms) => { if (character.q) character.q = {}; return Promise.resolve(ms); },
     stop: () => { smart.moving = false; },
     say: (m) => log.global.push(m),
     party_say: (m) => log.said.push(m),
@@ -203,9 +212,22 @@ function makeEnv(charOver) {
       if (character.map !== "bank") { log.bankFail.push({ i, reason: "not_bank" }); return; }
       const it = character.items[i];
       if (!it) return;
+      if (!character.bank) character.bank = { gold: 0, items0: new Array(42).fill(null) };
+      let placed = false;
+      for (const pack of Object.keys(character.bank)) {
+        if (("" + pack).indexOf("items") !== 0) continue;
+        const bag = character.bank[pack];
+        if (!bag) continue;
+        for (let j = 0; j < bag.length; j++) if (!bag[j]) {
+          bag[j] = it; placed = true; break;
+        }
+        if (placed) break;
+      }
+      if (!placed) { log.bankFail.push({ i, reason: "bank_full" }); return; }
       log.stored.push({ i, item: it.name, q: it.q || 1 });
       character.items[i] = null;
       character.esize = (character.esize || 0) + 1;
+      character._bank = character.bank;
     },
     bank_retrieve: (pack, i) => {
       if (character.map !== "bank") { log.bankFail.push({ pack, i, reason: "not_bank" }); return; }
@@ -219,6 +241,7 @@ function makeEnv(charOver) {
       character.items[slot] = it;
       character.esize = (character.esize || 0) - 1;
       log.retrieved.push({ pack, i, item: it.name, q: it.q || 1 });
+      if (character.bank) character._bank = character.bank;
     },
     send_item: (name, i, q) => {
       const it = character.items[i];
@@ -260,13 +283,18 @@ function makeEnv(charOver) {
     },
     smart_move: async (dest) => {
       log.moved.push(dest);
+      if (env.moveFail) return { failed: true };
       if (dest && dest.to === "potions") { character.map = "main"; character.real_x = 56; character.real_y = -122; character.bank = null; }
       if (dest && dest.to === "upgrade") { character.map = "main"; character.real_x = -204; character.real_y = -129; character.bank = null; }
       if (dest && dest.to === "bank") {
         character.map = "bank"; character.real_x = 0; character.real_y = 0;
-        if (!character.bank) character.bank = { gold: 0, items0: new Array(42).fill(null) };
+        if (!character.bank) character.bank = character._bank || { gold: 0, items0: new Array(42).fill(null) };
       }
       if (dest && dest.to === "goo") { character.map = "main"; character.real_x = 0; character.real_y = 0; character.bank = null; }
+      if (dest && dest.to === "upgrade") { character.map = "main"; character.real_x = -204; character.real_y = -129; character.bank = null; }
+      if (dest && (dest.to === "secondhands" || dest.to === "mcollector" || dest.to === "craftsman")) {
+        character.map = "main"; character.real_x = 40; character.real_y = -120; character.bank = null;
+      }
       if (dest && (dest.x != null || dest.y != null)) {
         if (dest.map) character.map = dest.map;
         if (dest.map && dest.map !== "bank") character.bank = null;
@@ -322,7 +350,72 @@ function makeEnv(charOver) {
     equip: async (n) => { log.equipped.push(n); },
     unequip: (slot) => { log.unequipped.push(slot); const it = character.slots[slot]; character.slots[slot] = null; if (it) { const i = character.items.findIndex((x) => !x); if (i >= 0) character.items[i] = it; } },
     upgrade: async (item, scroll) => { log.upgraded.push({ item, scroll }); const it = character.items[item]; if (it) it.level = (it.level || 0) + 1; },
-    is_character_local: () => true
+    is_character_local: () => true,
+    load_code: (name) => {
+      const file = /\.js$/.test(name) ? name : name + ".js";
+      const src = fs.readFileSync(path.join(ROOT, file), "utf8");
+      vm.runInContext(src, env, { filename: file });
+    },
+    get_secondhands: async () => {
+      log.ponty = log.ponty || [];
+      log.ponty.push("list");
+      return { success: true, items: env.ponty || [] };
+    },
+    buy_secondhand: async (rid) => {
+      const items = env.ponty || [];
+      const it = items.find((x) => x && x.rid === rid);
+      if (!it) throw { reason: "gone", failed: true };
+      if (env.pontyGone && env.pontyGone[rid]) { delete env.pontyGone[rid]; throw { reason: "gone", failed: true }; }
+      const price = it.price != null ? it.price : it.g;
+      if (character.gold < price) throw { reason: "cost", failed: true };
+      const slot = character.items.findIndex((x) => !x);
+      if (slot < 0) throw { reason: "space", failed: true };
+      character.gold -= price;
+      character.items[slot] = { name: it.name, level: it.level || 0, q: it.q || 1 };
+      character.esize = Math.max(0, (character.esize || 1) - 1);
+      env.ponty = items.filter((x) => x.rid !== rid);
+      log.secondhand.push({ rid, name: it.name, price });
+      return { success: true, cost: price, num: slot };
+    },
+    buy_with_gold: async (name, q) => env.buy(name, q),
+    compound: async (a, b, c, s) => {
+      const items = [character.items[a], character.items[b], character.items[c]];
+      const sc = character.items[s];
+      if (!items[0] || !items[1] || !items[2] || !sc || ("" + sc.name).indexOf("cscroll") !== 0) throw { reason: "no_scroll", failed: true };
+      const n = items[0].name, level = items[0].level || 0;
+      character.items[a] = { name: n, level: level + 1 };
+      character.items[b] = null;
+      character.items[c] = null;
+      const left = (sc.q || 1) - 1;
+      character.items[s] = left > 0 ? Object.assign({}, sc, { q: left }) : null;
+      character.esize = (character.esize || 0) + 2 + (left > 0 ? 0 : 1);
+      character.q = Object.assign(character.q || {}, { compound: { ms: 400 } });
+      log.compound.push({ name: n, from: level });
+      return { success: true, level: level + 1 };
+    },
+    auto_craft: async (name) => {
+      const rec = G.craft && G.craft[name];
+      if (!rec) throw { reason: "no_recipe", failed: true };
+      for (const ing of rec.items) {
+        const needLv = ing[2] || 0;
+        let left = ing[0];
+        for (let i = 0; i < character.items.length && left > 0; i++) {
+          const it = character.items[i];
+          if (!it || it.name !== ing[1] || (it.level || 0) !== needLv) continue;
+          character.items[i] = null;
+          character.esize = (character.esize || 0) + 1;
+          left--;
+        }
+        if (left > 0) throw { reason: "ingredients", failed: true };
+      }
+      const slot = character.items.findIndex((x) => !x);
+      if (slot < 0) throw { reason: "space", failed: true };
+      character.items[slot] = { name: name, q: 1 };
+      character.esize = Math.max(0, (character.esize || 1) - 1);
+      character.q = Object.assign(character.q || {}, { craft: { ms: 400 } });
+      log.crafted.push(name);
+      return { success: true, num: slot };
+    }
   };
   env.global = env;
   return env;
