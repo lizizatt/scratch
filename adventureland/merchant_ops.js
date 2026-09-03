@@ -142,9 +142,11 @@ function hold_done() {
   return true;
 }
 async function stock_store() {
+  close_stand();
   if (!(await go_npc("bank"))) return false;
   await park_bag();
-  if (!(await empty_sale())) { await park_bag(); if (!(await empty_sale())) return false; }
+  if (!(await empty_sale())) { await park_bag(); if (!(await empty_sale())) { game_log("stock empty fail"); return false; } }
+  if (!sale_clear()) return false;
   await park_bag();
   await restock_sale();
   close_stand();

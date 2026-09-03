@@ -49,8 +49,18 @@ async function list_sale() {
   }
 }
 async function empty_sale() {
+  var s, n;
   close_stand();
-  for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) try { await unequip("trade" + s); } catch (e) {}
+  for (n = 0; n < 4; n++) {
+    for (s = 1; s <= 16; s++) {
+      if (!character.slots["trade" + s]) continue;
+      if ((character.esize || 0) <= 0 && typeof park_bag === "function") await park_bag();
+      try { await unequip("trade" + s); } catch (e) {}
+    }
+    if (sale_clear()) return true;
+    if (typeof park_bag === "function") await park_bag();
+    await sleep(250);
+  }
   return sale_clear();
 }
 function use_pots() {
@@ -71,10 +81,14 @@ function mluck_near() {
 async function run_cycle() {
   var n, i;
   set_message("Bank");
+  close_stand();
   if (!(await go_npc("bank"))) return false;
   if (typeof park_bag === "function") await park_bag();
   set_message("Empty");
-  await empty_sale();
+  if (!(await empty_sale())) {
+    if (typeof park_bag === "function") await park_bag();
+    if (!(await empty_sale())) { game_log("empty sale fail"); return false; }
+  }
   if (typeof park_bag === "function") await park_bag();
   if (typeof snap_bank === "function") snap_bank(); await sleep(400);
   if (typeof ponty_miss === "object") for (i in ponty_miss) delete ponty_miss[i];
