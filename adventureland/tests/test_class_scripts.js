@@ -22,7 +22,7 @@ function lines(file) {
 }
 
 test("warrior.js / priest.js / mage.js / merchant.js stay within 176 CODE lines", () => {
-  ["warrior.js", "priest.js", "mage.js", "merchant.js", "merchant_plan.js", "merchant_ops.js", "merchant_combine.js"].forEach((f) => {
+  ["warrior.js", "priest.js", "mage.js", "merchant.js", "merchant_ops.js", "gear_ops.js", "fighter_core.js"].forEach((f) => {
     const n = lines(f);
     assert.ok(n <= 176, f + " has " + n + " lines");
   });
@@ -69,18 +69,16 @@ test("warrior cleaves only at 52+ with enough MP", () => {
   assert.ok(env.log.skills.indexOf("cleave") >= 0);
 });
 
-test("warrior asks for a summon when leaving for the pack", async () => {
+test("warrior go_farm walks without summon spam", async () => {
   const env = loadScript("warrior.js", stocked({ name: "Jazwyn", ctype: "warrior", level: 1 }));
   await env.go_farm("goo");
-  assert.ok(env.log.said.some((s) => /summon/i.test(s)));
+  assert.ok(!env.log.said.some((s) => /summon/i.test(s)));
   assert.ok(env.log.moved.some((d) => d && d.to === "goo"));
 });
 
-test("warrior accepts a party magiport", () => {
+test("fighters do not register on_magiport", () => {
   const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
-  env.on_magiport("Sarene");
-  env.on_magiport("Bandit");
-  assert.deepStrictEqual(env.log.magiport, ["Sarene"]);
+  assert.strictEqual(typeof env.on_magiport, "undefined");
 });
 
 test("priest does not curse when short on MP", () => {
@@ -114,7 +112,7 @@ test("priest revives a dead ally when holding essenceoflife", () => {
   env.parent.entities.Sarene = {
     name: "Sarene", type: "character", rip: true, real_x: 10, real_y: 0, hp: 0, max_hp: 320
   };
-  assert.strictEqual(env.priest_tick(), true);
+  assert.strictEqual(env.pre_combat(), true);
   assert.ok(env.log.skills.indexOf("revive") >= 0);
 });
 
@@ -123,7 +121,7 @@ test("priest partyheals in an emergency", () => {
     name: "Zarook", ctype: "priest", real_x: 0, real_y: 0, range: 120, hp: 300, max_hp: 320, mp: 400, max_mp: 400
   });
   env.parent.entities.Sarene = { name: "Sarene", type: "character", hp: 40, max_hp: 320, rip: false, real_x: 10, real_y: 0 };
-  env.priest_tick();
+  env.pre_combat();
   assert.ok(env.log.skills.indexOf("partyheal") >= 0);
 });
 
@@ -132,14 +130,8 @@ test("priest does not partyheal when short on MP", () => {
     name: "Zarook", ctype: "priest", real_x: 0, real_y: 0, range: 120, hp: 300, max_hp: 320, mp: 80, max_mp: 80
   });
   env.parent.entities.Sarene = { name: "Sarene", type: "character", hp: 40, max_hp: 320, rip: false, real_x: 10, real_y: 0 };
-  env.priest_tick();
+  env.pre_combat();
   assert.ok(env.log.skills.indexOf("partyheal") < 0);
-});
-
-test("priest asks for a summon when traveling", async () => {
-  const env = loadScript("priest.js", stocked({ name: "Zarook", ctype: "priest", level: 5 }));
-  await env.go_farm("goo");
-  assert.ok(env.log.said.some((s) => /summon/i.test(s)));
 });
 
 test("mage attacks lead target without bursting", () => {
@@ -153,48 +145,170 @@ test("mage attacks lead target without bursting", () => {
   assert.strictEqual(env.log.attacked[0].mtype, "goo");
 });
 
-test("mage explains when short on magiport MP", () => {
-  const env = loadScript("mage.js", {
-    name: "Sarene", ctype: "mage", real_x: 0, real_y: 0, range: 200, level: 1, max_hp: 400, mp: 200, max_mp: 200
-  });
-  env.parent.entities.goo1 = { id: "goo1", type: "monster", mtype: "goo", dead: false, attack: 5, real_x: 20, real_y: 0 };
-  env.farm = "goo";
-  env.emitChat("Jazwyn", "I need a summon!");
-  assert.ok(env.log.skills.indexOf("magiport") < 0);
-  assert.ok(env.log.said.some((s) => /900 MP/i.test(s)));
+test("mage follows formation when leader is present", async () => {
+  const env = loadScript("mage.js", stocked({ name: "Sarene", ctype: "mage", level: 40, max_hp: 2000, real_x: 0, real_y: 0, map: "main" }));
+  env.parent.entities.Jazwyn = {
+    name: "Jazwyn", type: "character", rip: false, map: "main", real_x: 100, real_y: 0, angle: 0, level: 40, max_hp: 2000
+  };
+  env.parent.party = { Jazwyn: { name: "Jazwyn", map: "main", x: 100, y: 0, level: 40, max_hp: 2000 } };
+  await env.follow_formation();
+  assert.ok(env.log.moved.some((d) => d && d.x != null && d.x > 50));
+  assert.ok(env.form_anchor && env.form_anchor.x === 100);
 });
 
-test("mage magiports a summon request only while at the farm pack", () => {
-  const env = loadScript("mage.js", {
-    name: "Sarene", ctype: "mage", real_x: 0, real_y: 0, range: 200, level: 1, max_hp: 400, mp: 900, max_mp: 900
-  });
-  env.parent.entities.goo1 = { id: "goo1", type: "monster", mtype: "goo", dead: false, attack: 5, real_x: 20, real_y: 0 };
-  env.farm = "goo";
-  env.emitChat("Jazwyn", "I need a summon!");
-  assert.ok(env.log.skills.indexOf("magiport") >= 0);
-  assert.ok(env.log.said.some((s) => /hang on/i.test(s)));
+test("formation ignores lead micro-moves until FORM_REANCHOR", async () => {
+  const env = loadScript("mage.js", stocked({ name: "Sarene", ctype: "mage", level: 40, max_hp: 2000, real_x: 55, real_y: 55, map: "main" }));
+  env.parent.entities.Jazwyn = {
+    name: "Jazwyn", type: "character", rip: false, map: "main", real_x: 100, real_y: 0, angle: 0
+  };
+  env.parent.party = { Jazwyn: { name: "Jazwyn", map: "main", x: 100, y: 0 } };
+  await env.follow_formation();
+  const slot1x = env.form_slot.x, slot1y = env.form_slot.y, ax = env.form_anchor.x, ay = env.form_anchor.y;
+  env.log.moved = [];
+  env.parent.entities.Jazwyn.real_x = 130;
+  env.parent.entities.Jazwyn.angle = Math.PI / 2;
+  await env.follow_formation();
+  assert.strictEqual(env.form_anchor.x, ax);
+  assert.strictEqual(env.form_anchor.y, ay);
+  assert.strictEqual(env.form_slot.x, slot1x);
+  assert.strictEqual(env.form_slot.y, slot1y);
+  assert.deepStrictEqual(env.log.moved, []);
+  env.parent.entities.Jazwyn.real_x = 200;
+  await env.follow_formation();
+  assert.strictEqual(env.form_anchor.x, 200);
+  assert.ok(env.form_slot.x !== slot1x || env.form_slot.y !== slot1y);
 });
 
-test("mage explains when summon asked but she is not at the pack", () => {
-  const env = loadScript("mage.js", {
-    name: "Sarene", ctype: "mage", real_x: 0, real_y: 0, level: 40, max_hp: 2000, mp: 900, max_mp: 900
-  });
-  env.farm = "bat";
-  env.emitChat("Jazwyn", "I need a summon!");
-  assert.ok(env.log.skills.indexOf("magiport") < 0);
-  assert.ok(env.log.said.some((s) => /not at pack/i.test(s)));
+test("!hold from self applies hold on that character", () => {
+  const env = loadScript("mage.js", { name: "Sarene", ctype: "mage" });
+  env.hear({ from: "Sarene", message: "!hold" });
+  assert.strictEqual(env.hold, true);
+  assert.ok(env.log.said.some((s) => /Hold: restocking/i.test(s)));
 });
 
-test("mage does not ask for a summon when she walks herself", async () => {
-  const env = loadScript("mage.js", stocked({ name: "Sarene", ctype: "mage", level: 1 }));
-  await env.go_farm("goo");
-  assert.ok(!env.log.said.some((s) => /summon/i.test(s)));
+test("!hunt from another party member updates farm_ovr quietly", () => {
+  const env = loadScript("mage.js", { name: "Sarene", ctype: "mage" });
+  env.hear({ from: "Jazwyn", message: "!hunt spider" });
+  assert.strictEqual(env.farm_ovr, "spider");
+  assert.ok(!env.log.said.some((s) => /Let's kill spider/i.test(s)));
 });
 
 test("summon chat does not start a potion rally", () => {
   const env = loadScript("priest.js", { name: "Zarook", ctype: "priest" });
   env.emitChat("Jazwyn", "I need a summon!");
   assert.strictEqual(env.rally, false);
+});
+
+test("busy_watch clears a hung busy flag", () => {
+  const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
+  env.busy = true;
+  env.busy_since = Date.now() - 70000;
+  env.BUSY_MS = 60000;
+  env.busy_watch();
+  assert.strictEqual(env.busy, false);
+});
+
+test("smart_watch stops smart_move with no progress", () => {
+  const env = loadScript("mage.js", { name: "Sarene", ctype: "mage", real_x: 10, real_y: 10 });
+  env.smart.moving = true;
+  env.last_xy = "10,10";
+  env.last_xy_t = Date.now() - 30000;
+  env.SMART_STUCK_MS = 20000;
+  env.smart_watch();
+  assert.strictEqual(env.smart.moving, false);
+});
+
+test("!resume from self clears hold", () => {
+  const env = loadScript("priest.js", { name: "Zarook", ctype: "priest" });
+  env.hear({ from: "Zarook", message: "!hold" });
+  assert.strictEqual(env.hold, true);
+  env.hear({ from: "Zarook", message: "!resume" });
+  assert.strictEqual(env.hold, false);
+  assert.ok(env.log.said.some((s) => /Resuming/i.test(s)));
+});
+
+test("psay rate-limits party chat", () => {
+  const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
+  assert.strictEqual(env.psay("one"), true);
+  assert.strictEqual(env.psay("two"), false);
+  assert.strictEqual(env.log.said.filter((s) => s === "one" || s === "two").length, 1);
+});
+
+test("only leader broadcasts ~s state", () => {
+  const mage = loadScript("mage.js", { name: "Sarene", ctype: "mage" });
+  mage.last_psay = new Date(0);
+  mage.broadcast_state(true);
+  assert.ok(!mage.log.said.some((s) => /^~s /.test(s)));
+  const lead = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
+  lead.last_psay = new Date(0);
+  lead.broadcast_state(true);
+  assert.ok(lead.log.said.some((s) => /^~s /.test(s)));
+});
+
+test("go_farm skips when already smart_moving", async () => {
+  const env = loadScript("warrior.js", stocked({ name: "Jazwyn", ctype: "warrior", level: 1 }));
+  env.smart.moving = true;
+  env.last_farm_go = new Date(0);
+  await env.go_farm("goo");
+  assert.ok(!env.log.moved.some((d) => d && d.to === "goo"));
+});
+
+test("go_farm debounces rapid retries", async () => {
+  const env = loadScript("warrior.js", stocked({ name: "Jazwyn", ctype: "warrior", level: 1 }));
+  env.last_farm_go = new Date(0);
+  await env.go_farm("goo");
+  const n = env.log.moved.filter((d) => d && d.to === "goo").length;
+  await env.go_farm("goo");
+  assert.strictEqual(env.log.moved.filter((d) => d && d.to === "goo").length, n);
+});
+
+test("go_farm towns first when far from spider pack", async () => {
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", level: 46, max_hp: 3000,
+    real_x: 376, real_y: -89, x: 376, y: -89
+  }));
+  env.last_farm_go = new Date(0);
+  await env.go_farm("spider");
+  assert.ok(env.log.skills.indexOf("use:town") >= 0, "must town before long spider path");
+  assert.ok(env.log.moved.some((d) => d && d.to === "spider"));
+});
+
+test("go_farm towns when just outside spider box + FARM_NEAR", async () => {
+  // spider box [700,-282,1196,-6]; 560,-140 is 140 west of west edge (>120)
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", level: 46, max_hp: 3000,
+    real_x: 560, real_y: -140, x: 560, y: -140
+  }));
+  env.last_farm_go = new Date(0);
+  await env.go_farm("spider");
+  assert.ok(env.log.skills.indexOf("use:town") >= 0);
+});
+
+test("go_farm skips town when already near spider pack", async () => {
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", level: 46, max_hp: 3000,
+    real_x: 900, real_y: -140, x: 900, y: -140
+  }));
+  env.last_farm_go = new Date(0);
+  await env.go_farm("spider");
+  assert.ok(env.log.skills.indexOf("use:town") < 0, "inside box must not town");
+  assert.ok(env.log.moved.some((d) => d && d.to === "spider"));
+});
+
+test("go_farm skips town just inside FARM_NEAR of spider box", async () => {
+  // 640,-140 is 60 west of west edge (<=120)
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", level: 46, max_hp: 3000,
+    real_x: 640, real_y: -140, x: 640, y: -140
+  }));
+  env.last_farm_go = new Date(0);
+  await env.go_farm("spider");
+  assert.ok(env.log.skills.indexOf("use:town") < 0);
+});
+
+test("solo 45 stays on spider not scorpion", () => {
+  const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior", level: 45, max_hp: 2500 });
+  assert.strictEqual(env.desired(), "spider");
 });
 
 const CLASSES = [
@@ -298,7 +412,7 @@ test("Jazwyn forwards puppygirl hunt/grind into party chat", () => {
 eachClass("desired() uses lowest party member", (spec) => {
   const env = loadClass(spec, { level: 40, max_hp: 2000 });
   env.parent.party = lowestOther(spec.name);
-  assert.strictEqual(env.desired(), "bee");
+  assert.strictEqual(env.desired(), "crab");
 });
 
 eachClass("farmable() false for target*, true for goo", (spec) => {
@@ -320,11 +434,82 @@ eachClass("needs_pots false when broke", (spec) => {
   assert.strictEqual(env.needs_pots(), false);
 });
 
-eachClass("is_keep keeps pots, banks other loot", (spec) => {
+eachClass("is_keep keeps pots scrolls gifts, not leveled junk", (spec) => {
   const env = loadClass(spec);
   assert.strictEqual(env.is_keep({ name: "hpot0", q: 40 }), true);
+  assert.strictEqual(env.is_keep({ name: "scroll0", q: 1 }), true);
+  assert.strictEqual(env.is_keep({ name: "cscroll0", q: 1 }), true);
+  env.character.slots.helmet = { name: "helmet", level: 5 };
   assert.strictEqual(env.is_keep({ name: "helmet", level: 0 }), false);
+  assert.strictEqual(env.is_keep({ name: "gem0", q: 1 }), false);
 });
+
+eachClass("equip_pending equips better ringsj into empty ring", async (spec) => {
+  const env = loadClass(spec);
+  env.character.items[0] = { name: "ringsj", level: 0 };
+  env.character.slots.ring1 = null;
+  env.character.slots.ring2 = null;
+  await env.equip_pending();
+  assert.ok(env.character.slots.ring1 && env.character.slots.ring1.name === "ringsj");
+  assert.ok(env.log.equipped.some((e) => e && e.slot === "ring1"));
+});
+
+eachClass("bank_dump stores junk but keeps pots scrolls ttl gifts", async (spec) => {
+  const env = loadClass(spec, { map: "bank" });
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.items[0] = { name: "hpot0", q: 10 };
+  env.character.items[1] = { name: "scroll0", q: 1 };
+  env.character.items[2] = { name: "gem0", q: 1 };
+  env.character.slots.helmet = { name: "helmet", level: 5 };
+  env.character.items[3] = { name: "helmet", level: 0 };
+  env.gift_ttl.offer1 = { name: "ringsj", expire_ms: Date.now() + 60000 };
+  env.character.items[4] = { name: "ringsj", level: 0 };
+  await env.bank_dump();
+  assert.ok(env.character.items[0] && env.character.items[0].name === "hpot0");
+  assert.ok(env.character.items[1] && env.character.items[1].name === "scroll0");
+  assert.ok(env.log.stored.some((s) => s.item === "gem0"));
+  assert.ok(env.log.stored.some((s) => s.item === "helmet"));
+  assert.ok(!env.log.stored.some((s) => s.item === "ringsj"));
+  assert.ok((env.character.items[4] && env.character.items[4].name === "ringsj") ||
+    (env.character.slots.ring1 && env.character.slots.ring1.name === "ringsj"));
+});
+
+eachClass("is_keep false for leveled junk coat after TTL", (spec) => {
+  const env = loadClass(spec);
+  env.character.slots.chest = { name: "coat", level: 5 };
+  env.gift_ttl.x = { name: "coat", expire_ms: Date.now() - 1 };
+  assert.strictEqual(env.is_keep({ name: "coat", level: 3 }), false);
+});
+
+eachClass("hear_cmd hold object still sets hold", (spec) => {
+  const env = loadClass(spec);
+  env.emitCm("puppygirl", { hold: 1 });
+  assert.strictEqual(env.hold, true);
+});
+
+eachClass("hear_cmd gear_offer equips and replies gear_got", async (spec) => {
+  const env = loadClass(spec);
+  env.character.items[0] = { name: "ringsj", level: 0 };
+  env.character.slots.ring1 = null;
+  env.emitCm("puppygirl", { gear_offer: 1, name: "ringsj", level: 0, slot: "ring1", id: "o1" });
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setTimeout(r, 20));
+  const got = env.log.cm.find((c) => c.name === "puppygirl" && c.data && c.data.gear_got === 1 && c.data.id === "o1");
+  assert.ok(got, "gear_got reply");
+  assert.strictEqual(got.data.ok, 1);
+  assert.ok(env.character.slots.ring1 && env.character.slots.ring1.name === "ringsj");
+});
+
+eachClass("gear_ad includes character.esize field", (spec) => {
+  const env = loadClass(spec, { esize: 7 });
+  env.send_gear_ad();
+  const ad = env.log.cm.find((c) => c.data && c.data.gear_ad);
+  assert.ok(ad);
+  assert.strictEqual(ad.data.esize, 7);
+  assert.ok(ad.data.slots);
+});
+
 
 eachClass("use_pots does not fire at 80% hp / 50% mp", (spec) => {
   const env = loadClass(spec, { hp: 256, max_hp: 320, mp: 40, max_mp: 80 });
@@ -369,12 +554,9 @@ eachClass("on_party_invite accepts party, not strangers", (spec) => {
   assert.deepStrictEqual(env.log.accepted, ["Zarook", "Jazwyn"]);
 });
 
-eachClass("on_magiport accepts party, not strangers", (spec) => {
+eachClass("do not register on_magiport", (spec) => {
   const env = loadClass(spec);
-  const from = spec.name === "Sarene" ? "Zarook" : "Sarene";
-  env.on_magiport(from);
-  env.on_magiport("Bandit");
-  assert.deepStrictEqual(env.log.magiport, [from]);
+  assert.strictEqual(typeof env.on_magiport, "undefined");
 });
 
 eachClass("chat Ok! does not set rally", (spec) => {
@@ -429,14 +611,14 @@ eachClass("post-death level 1 blip does not send the party to goo", (spec) => {
     Jazwyn: { name: "Jazwyn", level: spec.name === "Zarook" ? 22 : 40, max_hp: spec.name === "Zarook" ? 800 : 2000, hp: 800, map: "main", x: 0, y: 0 },
     Zarook: { name: "Zarook", level: spec.name === "Zarook" ? 40 : 22, max_hp: spec.name === "Zarook" ? 2000 : 800, hp: 800, map: "main", x: 0, y: 0 }
   };
-  assert.strictEqual(env.desired(), "armadillo");
+  assert.strictEqual(env.desired(), "arcticbee");
   env.parent.party = {
     Sarene: { name: "Sarene", level: 1, max_hp: 50, hp: 50, map: "main", x: 0, y: 0 },
     Jazwyn: { name: "Jazwyn", level: 1, max_hp: 40, hp: 40, map: "main", x: 0, y: 0 },
     Zarook: { name: "Zarook", level: 1, max_hp: 40, hp: 40, map: "main", x: 0, y: 0 }
   };
   env.character.max_hp = 80;
-  assert.strictEqual(env.desired(), "armadillo");
+  assert.strictEqual(env.desired(), "arcticbee");
 });
 
 eachClass("max_hp dip after death does not collapse a solo 40 to goo", (spec) => {
@@ -446,22 +628,24 @@ eachClass("max_hp dip after death does not collapse a solo 40 to goo", (spec) =>
   assert.strictEqual(env.desired(), "bat");
 });
 
-test("dedicated scripts travel to the lowest member's pack, not bats", async () => {
+test("dedicated scripts: leader travels to pack; followers form on leader", async () => {
   const party = mixedParty();
-  const jazwyn = loadScript("warrior.js", stocked({ name: "Jazwyn", ctype: "warrior", level: 40, max_hp: 2000, hp: 2000 }));
-  const sarene = loadScript("mage.js", stocked({ name: "Sarene", ctype: "mage", level: 22, max_hp: 800, hp: 800 }));
-  const zarook = loadScript("priest.js", stocked({ name: "Zarook", ctype: "priest", level: 8, max_hp: 320, hp: 320 }));
+  const jazwyn = loadScript("warrior.js", stocked({ name: "Jazwyn", ctype: "warrior", level: 40, max_hp: 2000, hp: 2000, real_x: 0, real_y: 0, map: "main" }));
+  const sarene = loadScript("mage.js", stocked({ name: "Sarene", ctype: "mage", level: 22, max_hp: 800, hp: 800, real_x: 0, real_y: 0, map: "main" }));
+  const zarook = loadScript("priest.js", stocked({ name: "Zarook", ctype: "priest", level: 8, max_hp: 320, hp: 320, real_x: 0, real_y: 0, map: "main" }));
+  const leadEnt = { name: "Jazwyn", type: "character", rip: false, map: "main", real_x: 100, real_y: 0, angle: 0, level: 40, max_hp: 2000 };
   jazwyn.parent.party = party;
   sarene.parent.party = party;
   zarook.parent.party = party;
+  sarene.parent.entities.Jazwyn = leadEnt;
+  zarook.parent.entities.Jazwyn = leadEnt;
   await jazwyn.logistics();
   await sarene.logistics();
   await zarook.logistics();
-  assert.ok(wentTo(jazwyn, "bee"), "leader should travel to bee");
-  assert.ok(wentTo(sarene, "bee"), "mage should travel to bee");
-  assert.ok(wentTo(zarook, "bee"), "priest should travel to bee");
-  assert.ok(!wentTo(jazwyn, "bat"));
-  assert.ok(!wentTo(sarene, "snake"));
+  assert.ok(wentTo(jazwyn, "crab"), "leader should travel to crab");
+  assert.ok(sarene.log.moved.some((d) => d && d.x != null), "mage should move toward formation");
+  assert.ok(zarook.log.moved.some((d) => d && d.x != null), "priest should move toward formation");
+  assert.ok(!wentTo(sarene, "crab"), "mage must not independently go_farm while leader_ok");
 });
 
 test("warrior.js skips dummy even as nearest on main", () => {
@@ -473,9 +657,11 @@ test("warrior.js skips dummy even as nearest on main", () => {
   assert.strictEqual(env.log.attacked.length, 0);
 });
 
-test("mage.js invite_party is not on the mage script", () => {
+test("mage.js invite_party is a no-op without do_invite", () => {
   const env = loadScript("mage.js", { name: "Sarene", ctype: "mage" });
-  assert.strictEqual(typeof env.invite_party, "undefined");
+  env.parent.party = { Sarene: { map: "main", x: 0, y: 0 } };
+  env.invite_party();
+  assert.deepStrictEqual(env.log.invited, []);
 });
 
 test("warrior.js invite_party from leader invites missing members", () => {
@@ -492,14 +678,15 @@ test("potion restock banks loot and does not sell it", async () => {
   const items = new Array(42).fill(null);
   items[0] = { name: "hpot0", q: 5 };
   items[1] = { name: "mpot0", q: 5 };
-  items[2] = { name: "helmet", q: 1 };
+  items[2] = { name: "gem0", q: 1 };
   const env = loadScript("warrior.js", {
     name: "Jazwyn", ctype: "warrior", items, gold: 50000, esize: 39, map: "main", level: 12
   });
+  env.character.slots.helmet = { name: "helmet", level: 5 };
   await env.restock("potions");
   assert.ok(wentTo(env, "bank"));
   assert.ok(wentTo(env, "potions"));
-  assert.ok(env.log.stored.some((s) => s.item === "helmet"));
+  assert.ok(env.log.stored.some((s) => s.item === "gem0"));
   assert.ok(!env.log.stored.some((s) => s.item === "hpot0"));
   assert.deepStrictEqual(env.log.sold, []);
   assert.ok(env.log.bought.some((b) => b.name === "hpot0"));
@@ -552,10 +739,11 @@ test("merchant hold CM restocks, announces states, and waits until resume", asyn
   const items = new Array(42).fill(null);
   items[0] = { name: "hpot0", q: 5 };
   items[1] = { name: "mpot0", q: 5 };
-  items[2] = { name: "helmet", q: 1 };
+  items[2] = { name: "gem0", q: 1 };
   const env = loadScript("warrior.js", stocked({
     name: "Jazwyn", ctype: "warrior", items, gold: 50000, esize: 39, level: 12
   }));
+  env.character.slots.helmet = { name: "helmet", level: 5 };
   env.emitCm("puppygirl", { hold: 1 });
   assert.strictEqual(env.hold, true);
   assert.ok(env.log.said.some((s) => s === "Hold: restocking"));
@@ -744,7 +932,7 @@ test("warrior.js steps to the far side of the mob from the backline", () => {
     assert.strictEqual(env.log.attacked[0].mtype, "goo");
   });
 
-  test(file + ": steps off the warrior instead of stacking", () => {
+  test(file + ": unsticks when stacked on the warrior", () => {
     const env = loadClass(spec, { real_x: 5, real_y: 0, range: 200, level: 1, max_hp: 800 });
     env.parent.entities.goo1 = { id: "goo1", type: "monster", mtype: "goo", dead: false, attack: 5, real_x: 80, real_y: 0 };
     env.parent.entities.Jazwyn = {
@@ -752,8 +940,6 @@ test("warrior.js steps to the far side of the mob from the backline", () => {
     };
     fight(env, spec, "goo");
     assert.ok(env.log.moved.length >= 1);
-    const pos = env.log.moved[0];
-    assert.ok(Math.sqrt(pos.x * pos.x + pos.y * pos.y) >= 70);
     assert.strictEqual(env.log.attacked.length, 0);
   });
 });
@@ -792,7 +978,7 @@ test("priest.js heals injured Sarene in range without partyheal", () => {
   env.parent.entities.Jazwyn = {
     name: "Jazwyn", type: "character", hp: 300, max_hp: 320, rip: false, real_x: 10, real_y: 0
   };
-  const acted = env.priest_tick();
+  const acted = env.pre_combat();
   assert.strictEqual(acted, true);
   assert.deepStrictEqual(env.log.healed, ["Sarene"]);
   assert.ok(env.log.skills.indexOf("partyheal") < 0);
@@ -806,7 +992,7 @@ test("priest.js does not beeline to heal out of range", () => {
   env.parent.entities.Sarene = {
     name: "Sarene", type: "character", hp: 160, max_hp: 320, rip: false, real_x: 200, real_y: 0
   };
-  assert.strictEqual(env.priest_tick(), false);
+  assert.strictEqual(env.pre_combat(), false);
   assert.deepStrictEqual(env.log.healed, []);
   assert.strictEqual(env.log.moved.length, 0);
 });
@@ -819,7 +1005,7 @@ test("priest.js skips healing while smart_moving to destination", () => {
   env.parent.entities.Sarene = {
     name: "Sarene", type: "character", hp: 160, max_hp: 320, rip: false, real_x: 10, real_y: 0
   };
-  assert.strictEqual(env.priest_tick(), false);
+  assert.strictEqual(env.pre_combat(), false);
   assert.deepStrictEqual(env.log.healed, []);
 });
 
@@ -830,7 +1016,7 @@ test("priest.js yields when mp is too low to cast", () => {
   env.parent.entities.Sarene = {
     name: "Sarene", type: "character", hp: 160, max_hp: 320, rip: false, real_x: 10, real_y: 0
   };
-  assert.strictEqual(env.priest_tick(), false);
+  assert.strictEqual(env.pre_combat(), false);
   assert.deepStrictEqual(env.log.healed, []);
 });
 

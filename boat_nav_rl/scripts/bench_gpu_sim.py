@@ -31,28 +31,35 @@ def bench_env(env, n_envs: int, steps: int = 500) -> float:
 
 
 def main() -> None:
-    n_envs = int(os.environ.get("BENCH_N_ENVS", "64"))
-    steps = int(os.environ.get("BENCH_STEPS", "200"))
+    subproc_n = int(os.environ.get("BENCH_SUBPROC_ENVS", "32"))
+    gpu_n = int(os.environ.get("BENCH_GPU_ENVS", os.environ.get("BENCH_N_ENVS", "1024")))
+    steps = int(os.environ.get("BENCH_STEPS", "100"))
     mode = os.environ.get("BENCH_MODE", "navigate")
-    print(f"Benchmark n_envs={n_envs} steps={steps} mode={mode}")
+    gpu_only = os.environ.get("BENCH_GPU_ONLY", "").strip().lower() in ("1", "true", "yes")
+    print(f"Benchmark subproc_n={subproc_n} gpu_n={gpu_n} steps={steps} mode={mode} plant={P.PLANT_MODEL}")
 
     if not P.TRAIN_SEEDS_PATH.exists():
         P.write_scenario_splits()
 
-    factories = [make_env(mode, i) for i in range(n_envs)]
-    cpu_env = make_vec_env(factories, n_envs, backend="subproc")
-    cpu_sps = bench_env(cpu_env, n_envs, steps)
-    print(f"  SubprocVecEnv: {cpu_sps:,.0f} env-steps/s")
+    cpu_sps = None
+    if not gpu_only:
+        factories = [make_env(mode, i) for i in range(subproc_n)]
+        cpu_env = make_vec_env(factories, subproc_n, backend="subproc")
+        cpu_sps = bench_env(cpu_env, subproc_n, steps)
+        print(f"  SubprocVecEnv ({subproc_n} envs): {cpu_sps:,.0f} env-steps/s")
 
     gpu_env = make_gpu_vec_env(
-        n_envs=n_envs,
+        n_envs=gpu_n,
         mode=mode,
         device=os.environ.get("BENCH_DEVICE", "cuda"),
         current_enabled=False,
     )
-    gpu_sps = bench_env(gpu_env, n_envs, steps)
-    print(f"  BatchedBoatVecEnv: {gpu_sps:,.0f} env-steps/s")
-    print(f"  Speedup: {gpu_sps / max(cpu_sps, 1):.1f}x")
+    gpu_sps = bench_env(gpu_env, gpu_n, steps)
+    print(f"  BatchedBoatVecEnv ({gpu_n} envs): {gpu_sps:,.0f} env-steps/s")
+    if cpu_sps is not None:
+        per_env_cpu = cpu_sps / subproc_n
+        per_env_gpu = gpu_sps / gpu_n
+        print(f"  Per-env throughput: subproc {per_env_cpu:,.0f}  gpu {per_env_gpu:,.0f}  ({per_env_gpu / max(per_env_cpu, 1):.1f}x)")
 
 
 if __name__ == "__main__":

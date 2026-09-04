@@ -22,30 +22,34 @@ from vecenv_util import (
 
 class TestVecenvUtil(unittest.TestCase):
     def test_recommended_n_envs_scales_with_cores(self):
-        with mock.patch("vecenv_util._cuda_available", return_value=False):
-            with mock.patch("vecenv_util.cpu_count", return_value=8):
-                self.assertEqual(recommended_n_envs(), 32)
-            with mock.patch("vecenv_util.cpu_count", return_value=16):
-                self.assertEqual(recommended_n_envs(), 64)
+        with mock.patch("vecenv_util.VECENV_BACKEND", "auto"):
+            with mock.patch("vecenv_util._cuda_available", return_value=False):
+                with mock.patch("vecenv_util.cpu_count", return_value=8):
+                    self.assertEqual(recommended_n_envs(), 32)
+                with mock.patch("vecenv_util.cpu_count", return_value=16):
+                    self.assertEqual(recommended_n_envs(), 64)
 
     def test_recommended_n_envs_gpu_when_cuda(self):
-        with mock.patch("vecenv_util._cuda_available", return_value=True):
-            self.assertEqual(recommended_n_envs(), 256)
+        with mock.patch("vecenv_util.VECENV_BACKEND", "auto"):
+            with mock.patch("vecenv_util._cuda_available", return_value=True):
+                self.assertEqual(recommended_n_envs(), 512)
 
     def test_rollout_steps_scales_with_env_count(self):
-        self.assertGreaterEqual(rollout_steps_total(32), 4096)
+        self.assertGreaterEqual(rollout_steps_total(32), 2048)
         self.assertEqual(steps_per_env(32), rollout_steps_total(32) // 32)
 
     def test_ppo_batch_size_larger_on_cuda(self):
-        cpu_batch = ppo_batch_size("cpu", 4096)
-        gpu_batch = ppo_batch_size("cuda", 4096)
+        rollout = 512 * 32  # default-ish GPU rollout size
+        cpu_batch = ppo_batch_size("cpu", rollout)
+        gpu_batch = ppo_batch_size("cuda", rollout)
         self.assertEqual(cpu_batch, 256)
-        self.assertGreaterEqual(gpu_batch, 512)
+        self.assertGreater(gpu_batch, cpu_batch)
 
     def test_resolve_vecenv_backend(self):
-        with mock.patch("vecenv_util._cuda_available", return_value=False):
-            self.assertEqual(resolve_vecenv_backend(1), "dummy")
-            self.assertEqual(resolve_vecenv_backend(8), "subproc")
+        with mock.patch("vecenv_util.VECENV_BACKEND", "auto"):
+            with mock.patch("vecenv_util._cuda_available", return_value=False):
+                self.assertEqual(resolve_vecenv_backend(1), "dummy")
+                self.assertEqual(resolve_vecenv_backend(8), "subproc")
         self.assertEqual(resolve_vecenv_backend(8, "dummy"), "dummy")
         self.assertEqual(resolve_vecenv_backend(8, "gpu"), "gpu")
 

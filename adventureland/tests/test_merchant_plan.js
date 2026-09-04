@@ -21,85 +21,70 @@ function envOf(extra) {
   }, extra || {}));
 }
 
-test("merchant_plan.js / merchant_ops.js stay within 176 CODE lines", () => {
-  ["merchant_plan.js", "merchant_ops.js", "merchant_combine.js", "merchant.js"].forEach((f) => {
+test("merchant_ops.js / gear_ops.js / merchant.js stay within 176 CODE lines", () => {
+  ["merchant_ops.js", "gear_ops.js", "merchant.js"].forEach((f) => {
     const n = lines(f);
     assert.ok(n <= 176, f + " has " + n + " lines");
   });
 });
 
-test("plan_item armorring expands vitring+2, lotus, fang, and scrolls", () => {
-  const env = envOf();
-  const p = env.plan_item("armorring", 0);
-  assert.ok(!p.failed);
-  assert.strictEqual(p.tree.via, "craft");
-  const bom = {};
-  p.bom.forEach((b) => { bom[b.name + "@" + b.level] = b.qty; });
-  assert.strictEqual(bom["snakefang@0"], 1);
-  assert.strictEqual(bom["lotusf@0"], 1);
-  assert.strictEqual(bom["vitring@0"], 9);
-  assert.strictEqual(bom["cscroll0@0"], 4);
-  assert.ok(p.ops.some((o) => o.op === "craft" && o.name === "armorring" && o.npc === "mcollector"));
-  assert.ok(p.ops.filter((o) => o.op === "compound" && o.name === "vitring" && o.to === 1).length >= 1);
-  assert.ok(p.ops.some((o) => o.op === "compound" && o.name === "vitring" && o.to === 2));
+test("deploy UPLOADS has gear_ops not merchant_plan", () => {
+  const src = fs.readFileSync(path.join(__dirname, "..", "deploy_mcp.js"), "utf8");
+  assert.ok(src.indexOf("gear_ops.js") >= 0);
+  assert.ok(src.indexOf("merchant_plan.js") < 0);
+  const m = src.match(/const UPLOADS = \[([\s\S]*?)\];/);
+  assert.ok(m);
+  const files = m[1].match(/file:\s*"([^"]+)"/g) || [];
+  assert.strictEqual(files.length, 7);
 });
 
-test("plan_item vitring+2 is 9 rings and 4 compound scrolls", () => {
-  const env = envOf();
-  const p = env.plan_item("vitring", 2);
-  assert.strictEqual(p.tree.via, "compound");
-  const rings = p.bom.find((b) => b.name === "vitring");
-  const scrolls = p.bom.find((b) => b.name === "cscroll0");
-  assert.strictEqual(rings.qty, 9);
-  assert.strictEqual(scrolls.qty, 4);
+test("hold_item protects maxQty highest-level copies lists lower surplus", () => {
+  const env = envOf({ esize: 40, map: "bank" });
+  env.HOLD = [["ringsj", 2]];
+  const a = { name: "ringsj", level: 2 }, b = { name: "ringsj", level: 1 }, c = { name: "ringsj", level: 0 };
+  env.character.items[1] = a;
+  env.character.items[2] = b;
+  env.character.items[3] = c;
+  assert.strictEqual(env.hold_item(a), true);
+  assert.strictEqual(env.hold_item(b), true);
+  assert.strictEqual(env.hold_item(c), false);
 });
 
-test("plan_item detects craft cycles", () => {
-  const env = envOf();
-  env.G.craft.loopa = { items: [[1, "loopb"]], cost: 0 };
-  env.G.craft.loopb = { items: [[1, "loopa"]], cost: 0 };
-  const p = env.plan_item("loopa", 0);
-  assert.strictEqual(p.failed, true);
-  assert.strictEqual(p.reason, "cycle");
+test("list_sale and bank_sellable use hold_item not held_set map", async () => {
+  const env = envOf({ esize: 40, map: "bank" });
+  env.HOLD = [["helmet", 1]];
+  const keep = { name: "helmet", level: 2 }, junk = { name: "helmet", level: 0 };
+  env.character.items[1] = keep;
+  env.character.items[2] = junk;
+  env.character.items[3] = { name: "coat", q: 1 };
+  await env.list_sale();
+  assert.ok(!env.log.traded.some((t) => t.i === 1));
+  assert.ok(env.log.traded.some((t) => t.i === 2));
+  assert.strictEqual(typeof env.held_set, "undefined");
 });
 
-test("plan_item does not compound upgrade-only gear", () => {
+test("list_sale skips explicit vitring HOLD quota", async () => {
   const env = envOf();
-  const p = env.plan_item("helmet", 1);
-  assert.strictEqual(p.tree.via, "ponty");
-  assert.ok(p.ops.every((o) => o.op === "ponty"));
-  assert.ok(!p.ops.some((o) => o.op === "compound"));
+  env.HOLD = [["armorring", 1], ["vitring", 9]];
+  env.character.items[1] = { name: "helmet", q: 1 };
+  env.character.items[2] = { name: "vitring", q: 1 };
+  await env.list_sale();
+  assert.ok(env.log.traded.some((t) => t.i === 1));
+  assert.ok(!env.log.traded.some((t) => t.i === 2));
 });
 
-test("pick_ponty rejects listings above fair Ponty price * PONTY_MAX", () => {
-  const env = envOf();
-  env.PONTY_MAX = 1.25;
-  const fair = env.G.items.snakefang.g * 2;
-  const cap = fair * 1.25;
-  const pick = env.pick_ponty([
-    { name: "snakefang", rid: "hi", price: cap + 1 },
-    { name: "snakefang", rid: "ok", price: cap }
-  ], "snakefang", 0);
-  assert.strictEqual(pick.rid, "ok");
-  assert.strictEqual(env.pick_ponty([{ name: "snakefang", rid: "x", price: cap + 1 }], "snakefang", 0), null);
-});
-
-test("pick_ponty prefers the cheapest in-cap listing", () => {
-  const env = envOf();
-  env.PONTY_MAX = 1.25;
-  const pick = env.pick_ponty([
-    { name: "lotusf", rid: "b", price: 11000 },
-    { name: "lotusf", rid: "a", price: 9000 },
-    { name: "snakefang", rid: "z", price: 100 }
-  ], "lotusf", 0);
-  assert.strictEqual(pick.rid, "a");
-  assert.strictEqual(pick.price, 9000);
-});
-
-test("pick_ponty rejects level mismatch", () => {
-  const env = envOf();
-  env.PONTY_MAX = 1.25;
-  assert.strictEqual(env.pick_ponty([{ name: "vitring", rid: "p2", price: 24000, level: 2 }], "vitring", 0), null);
+test("combine_step prefers ringsj over vitring when both triples exist", async () => {
+  const env = envOf({ gold: 400000, esize: 30 });
+  env.GOLD_FLOAT = 0;
+  env.COMBINE_MAX = 5;
+  env.HOLD = [];
+  const items = env.character.items;
+  items[1] = { name: "cscroll0", q: 4 };
+  for (let i = 0; i < 3; i++) items[2 + i] = { name: "vitring", q: 1 };
+  for (let i = 0; i < 3; i++) items[5 + i] = { name: "ringsj", q: 1 };
+  const r = await env.combine_step();
+  assert.strictEqual(r, "ok");
+  assert.strictEqual(env.log.compound[0].name, "ringsj");
 });
 
 test("park_bag strips equipped gear before banking", async () => {
@@ -123,7 +108,7 @@ test("park_bag strips equipped gear before banking", async () => {
 
 test("park_bag strips rings even when bag is clogged with HOLD BOM", async () => {
   const env = envOf({ esize: 0, map: "bank" });
-  env.HOLD = [["armorring", 1]];
+  env.HOLD = [["armorring", 1], ["vitring", 9]];
   env.character.items = new Array(42).fill(null).map(() => ({ name: "vitring", q: 1 }));
   env.character.slots.ring1 = { name: "vitring", q: 1 };
   env.character.slots.ring2 = { name: "armorring", q: 1 };
@@ -250,15 +235,6 @@ test("list_sale prices at SALE_MULT * item_value", async () => {
   assert.strictEqual(env.character.slots.trade1.price, 1140);
 });
 
-test("list_sale skips HOLD bill-of-material names", async () => {
-  const env = envOf();
-  env.character.items[1] = { name: "helmet", q: 1 };
-  env.character.items[2] = { name: "vitring", q: 1 };
-  await env.list_sale();
-  assert.ok(env.log.traded.some((t) => t.i === 1));
-  assert.ok(!env.log.traded.some((t) => t.i === 2));
-});
-
 test("list_sale fills scarce slots expensive-first", async () => {
   const env = envOf({ esize: 39 });
   env.HOLD = [];
@@ -301,7 +277,7 @@ test("restock_sale skips a stuck bank slot and keeps filling", async () => {
 
 test("stock_store empties stand then restocks bank loot expensive-first skipping HOLD", async () => {
   const env = envOf({ gold: 100000, esize: 40, map: "bank" });
-  env.HOLD = [["armorring", 1]];
+  env.HOLD = [["armorring", 1], ["vitring", 9]];
   env.character.slots.trade1 = { name: "shoes", q: 1, price: 100 };
   env.character.slots.trade2 = { name: "gloves", q: 1, price: 100 };
   env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
@@ -362,7 +338,6 @@ test("stock_store refuses to restock until the stand is fully cleared", async ()
   env.HOLD = [];
   env.character.items = new Array(42).fill(null).map((_, i) => (i === 0 ? { name: "stand0", q: 1 } : { name: "shoes", q: 1 }));
   for (let s = 1; s <= 16; s++) env.character.slots["trade" + s] = { name: "gloves", q: 1, price: 1 };
-  // Extra pack so bag + trade clear can park honestly before restock.
   env.character.bank = {
     gold: 0,
     items0: new Array(42).fill(null),
@@ -429,7 +404,7 @@ test("boot snaps bank without dumping loot into the bag", async () => {
 test("run_econ will not spend the reserved gold float", async () => {
   const env = envOf({ gold: 100000, esize: 30 });
   env.GOLD_FLOAT = 100000;
-  env.HOLD = [["armorring", 1]];
+  env.HOLD = [["armorring", 1], ["vitring", 9]];
   const items = env.character.items;
   for (let i = 0; i < 3; i++) items[1 + i] = { name: "vitring", q: 1 };
   await env.run_econ();
@@ -528,7 +503,6 @@ test("run_combine ignores upgrade-only duplicates", async () => {
   for (let i = 0; i < 3; i++) items[2 + i] = { name: "helmet", q: 1 };
   await env.run_combine();
   assert.deepStrictEqual(env.log.compound, []);
-  assert.deepStrictEqual(env.log.upgraded, []);
 });
 
 test("run_combine does not compound at or above COMBINE_MAX", async () => {
@@ -632,19 +606,22 @@ test("compound path via run_combine walks to the upgrade NPC", async () => {
   assert.ok(env.log.moved.some((d) => d && d.to === "upgrade"));
 });
 
-test("boot PLAN_OK is true with plan/ops/combine helpers only", () => {
+test("boot PLAN_OK is true with ops/gear/combine helpers", () => {
   const env = envOf();
   assert.strictEqual(env.PLAN_OK, true);
   assert.strictEqual(typeof env.run_combine, "function");
   assert.strictEqual(typeof env.stock_store, "function");
   assert.strictEqual(typeof env.park_bag, "function");
   assert.strictEqual(typeof env.buy_scroll, "function");
+  assert.strictEqual(typeof env.hold_item, "function");
+  assert.strictEqual(typeof env.upgrade_one, "function");
+  assert.strictEqual(typeof env.plan_item, "undefined");
   assert.strictEqual(typeof env.run_craft, "undefined");
   assert.strictEqual(typeof env.buy_leaf, "undefined");
 });
 
-test("happy cycle never crafts or buys Ponty secondhands", async () => {
-  const env = envOf({ gold: 100000, esize: 40 });
+test("happy cycle never crafts or buys non-whitelist Ponty", async () => {
+  const env = envOf({ gold: 400000, esize: 40 });
   env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
   env.character.bank.items0[0] = { name: "coat", q: 1 };
   env.character._bank = env.character.bank;
@@ -653,7 +630,6 @@ test("happy cycle never crafts or buys Ponty secondhands", async () => {
   await env.logistics();
   assert.deepStrictEqual(env.log.crafted, []);
   assert.deepStrictEqual(env.log.secondhand, []);
-  assert.ok(!(env.log.ponty && env.log.ponty.length));
 });
 
 test("run_cycle returns false when park_bag fails", async () => {

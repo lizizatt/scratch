@@ -38,23 +38,23 @@ function test(name, fn) { tests.push({ name, fn }); }
 test("ladder: level 1 is goo", () => {
   assert.strictEqual(core.desired(1, 320, Gmon), "goo");
 });
-test("ladder: 8 bee, 12 crab, 16 snake", () => {
-  assert.strictEqual(core.desired(8, 400, Gmon), "bee");
-  assert.strictEqual(core.desired(12, 500, Gmon), "crab");
-  assert.strictEqual(core.desired(16, 600, Gmon), "snake");
+test("ladder: 4 bee, 8 crab, 12 snake", () => {
+  assert.strictEqual(core.desired(4, 400, Gmon), "bee");
+  assert.strictEqual(core.desired(8, 500, Gmon), "crab");
+  assert.strictEqual(core.desired(12, 600, Gmon), "snake");
 });
 test("ladder: mid packs through bats", () => {
-  assert.strictEqual(core.desired(20, 800, Gmon), "armadillo");
-  assert.strictEqual(core.desired(24, 1000, Gmon), "arcticbee");
-  assert.strictEqual(core.desired(28, 1200, Gmon), "porcupine");
-  assert.strictEqual(core.desired(32, 1400, Gmon), "croc");
-  assert.strictEqual(core.desired(34, 1600, Gmon), "tortoise");
-  assert.strictEqual(core.desired(36, 1800, Gmon), "bat");
-  assert.strictEqual(core.desired(40, 2000, Gmon), "bat");
+  assert.strictEqual(core.desired(16, 800, Gmon), "armadillo");
+  assert.strictEqual(core.desired(20, 1000, Gmon), "arcticbee");
+  assert.strictEqual(core.desired(24, 1200, Gmon), "porcupine");
+  assert.strictEqual(core.desired(28, 1400, Gmon), "croc");
+  assert.strictEqual(core.desired(30, 1600, Gmon), "tortoise");
+  assert.strictEqual(core.desired(32, 1800, Gmon), "bat");
+  assert.strictEqual(core.desired(36, 2000, Gmon), "bat");
 });
 test("ladder: late packs through dryad", () => {
   assert.strictEqual(core.desired(42, 2800, Gmon), "spider");
-  assert.strictEqual(core.desired(48, 3200, Gmon), "scorpion");
+  assert.strictEqual(core.desired(50, 3200, Gmon), "scorpion");
   assert.strictEqual(core.desired(54, 4000, Gmon), "boar");
   assert.strictEqual(core.desired(60, 5000, Gmon), "bigbird");
   assert.strictEqual(core.desired(66, 6000, Gmon), "gscorpion");
@@ -66,7 +66,7 @@ test("ladder: caps at 90 even if level 99", () => {
 });
 test("ladder: falls back when pack attack exceeds hp ratio", () => {
   // arcticbee att 64, cap at max_hp 100 is 28, so fall back
-  const pick = core.desired(24, 100, Gmon);
+  const pick = core.desired(20, 100, Gmon);
   assert.notStrictEqual(pick, "arcticbee");
   assert.ok(["goo", "bee", "crab", "snake", "armadillo"].indexOf(pick) >= 0);
 });
@@ -87,19 +87,19 @@ test("party farm: everyone uses the lowest member's ladder pick", () => {
     { name: "Jazwyn", level: 22, max_hp: 800 },
     { name: "Zarook", level: 8, max_hp: 320 }
   ];
-  assert.strictEqual(core.partyFarmTarget(self, party, Gmon), "bee");
-  assert.strictEqual(core.partyFarmTarget({ level: 8, max_hp: 320 }, party, Gmon), "bee");
-  assert.strictEqual(core.partyFarmTarget({ level: 22, max_hp: 800 }, party, Gmon), "bee");
+  assert.strictEqual(core.partyFarmTarget(self, party, Gmon), "crab");
+  assert.strictEqual(core.partyFarmTarget({ level: 8, max_hp: 320 }, party, Gmon), "crab");
+  assert.strictEqual(core.partyFarmTarget({ level: 22, max_hp: 800 }, party, Gmon), "crab");
 });
-test("party farm: Jazwyn lowest at 22 -> armadillo for all", () => {
+test("party farm: Jazwyn lowest at 22 -> arcticbee for all", () => {
   const party = [
     { name: "Sarene", level: 50, max_hp: 2500 },
     { name: "Jazwyn", level: 22, max_hp: 800 }
   ];
-  assert.strictEqual(core.partyFarmTarget({ level: 50, max_hp: 2500 }, party, Gmon), "armadillo");
+  assert.strictEqual(core.partyFarmTarget({ level: 50, max_hp: 2500 }, party, Gmon), "arcticbee");
 });
 test("party farm: lowest member's hp gates the pack, not the leader's", () => {
-  const party = [{ name: "Zarook", level: 24, max_hp: 100 }];
+  const party = [{ name: "Zarook", level: 20, max_hp: 100 }];
   const pick = core.partyFarmTarget({ level: 40, max_hp: 2000 }, party, Gmon);
   assert.notStrictEqual(pick, "arcticbee");
   assert.notStrictEqual(pick, "bat");
@@ -107,8 +107,8 @@ test("party farm: lowest member's hp gates the pack, not the leader's", () => {
 test("party farm: death blip to level 1 does not collapse to goo", () => {
   const peaks = {};
   const self = { name: "Sarene", level: 40, max_hp: 2000 };
-  assert.strictEqual(core.partyFarmTarget(self, [{ name: "Jazwyn", level: 22, max_hp: 800 }], Gmon, null, peaks), "armadillo");
-  assert.strictEqual(core.partyFarmTarget(self, [{ name: "Jazwyn", level: 1, max_hp: 50 }], Gmon, null, peaks), "armadillo");
+  assert.strictEqual(core.partyFarmTarget(self, [{ name: "Jazwyn", level: 22, max_hp: 800 }], Gmon, null, peaks), "arcticbee");
+  assert.strictEqual(core.partyFarmTarget(self, [{ name: "Jazwyn", level: 1, max_hp: 50 }], Gmon, null, peaks), "arcticbee");
 });
 test("party farm: rip member is ignored until we have a peak", () => {
   assert.strictEqual(core.partyFarmTarget(
@@ -288,8 +288,8 @@ test("priest: skipped for warrior", () => {
 });
 
 test("chat: ding from other -> gratz, not self", () => {
-  assert.deepStrictEqual(core.classifyChat("Jazwyn", "Ding!", "Sarene", core.PARTY), { gratz: true, rally: false, ok: false, summon: false });
-  assert.deepStrictEqual(core.classifyChat("Sarene", "Ding!", "Sarene", core.PARTY), { gratz: false, rally: false, ok: false, summon: false });
+  assert.deepStrictEqual(core.classifyChat("Jazwyn", "Ding!", "Sarene", core.PARTY), { cmd: null, gratz: true, rally: false, ok: false, status: null });
+  assert.deepStrictEqual(core.classifyChat("Sarene", "Ding!", "Sarene", core.PARTY), { cmd: null, gratz: false, rally: false, ok: false, status: null });
 });
 test("chat: Gratz! does not retrigger ding", () => {
   const r = core.classifyChat("Zarook", "Gratz!", "Sarene", core.PARTY);
@@ -321,14 +321,21 @@ test("chat: stranger potions and upgrades ignored", () => {
   assert.strictEqual(core.classifyChat("Random", "I need some potions!", "Sarene", core.PARTY).rally, false);
   assert.strictEqual(core.classifyChat("Random", "I need a gear upgrade!", "Sarene", core.PARTY).rally, false);
 });
-test("chat: I need a summon! from party -> summon, not a town rally", () => {
-  const r = core.classifyChat("Sarene", "I need a summon!", "Jazwyn", core.PARTY);
-  assert.strictEqual(r.summon, true);
-  assert.strictEqual(r.rally, false);
-  assert.strictEqual(r.ok, false);
+test("chat: !hold / !hunt / !grind are commands", () => {
+  assert.deepStrictEqual(core.classifyChat("Sarene", "!hold", "Sarene", core.PARTY).cmd, { type: "hold" });
+  assert.deepStrictEqual(core.classifyChat("Jazwyn", "!resume", "Sarene", core.PARTY).cmd, { type: "resume" });
+  assert.deepStrictEqual(core.classifyChat("Zarook", "!grind", "Sarene", core.PARTY).cmd, { type: "grind" });
+  assert.deepStrictEqual(core.classifyChat("Jazwyn", "!hunt spider", "Sarene", core.PARTY).cmd, { type: "hunt", mtype: "spider" });
 });
-test("chat: stranger summon ignored", () => {
-  assert.strictEqual(core.classifyChat("Random", "I need a summon!", "Jazwyn", core.PARTY).summon, false);
+test("chat: summon text is not a special command", () => {
+  const r = core.classifyChat("Sarene", "I need a summon!", "Jazwyn", core.PARTY);
+  assert.strictEqual(r.cmd, null);
+  assert.strictEqual(r.rally, false);
+});
+test("chat: ~s status parses h/f", () => {
+  const r = core.classifyChat("Jazwyn", "~s h=1 f=spider", "Sarene", core.PARTY);
+  assert.deepStrictEqual(r.status, { h: "1", f: "spider" });
+  assert.strictEqual(r.cmd, null);
 });
 test("warrior skills: taunt off-tank, charge to gap, cleave in range", () => {
   const can = (s) => true;
@@ -363,30 +370,37 @@ test("skillReady: can_use is not enough, MP and level must match G.skills", () =
   assert.strictEqual(core.skillReady("curse", 80, skills, yes, 10), false);
   assert.strictEqual(core.skillReady("cleave", 720, skills, () => false, 52), false);
 });
-test("mage magiport only while at the pack, not traveling", () => {
-  const can = () => true;
-  assert.strictEqual(core.magePortOk(true, false, false, can), true);
-  assert.strictEqual(core.magePortOk(false, false, false, can), false);
-  assert.strictEqual(core.magePortOk(true, true, false, can), false);
-  assert.strictEqual(core.magePortOk(true, false, true, can), false);
+test("formation_pos face-relative rotates offset", () => {
+  const lead = { map: "main", x: 100, y: 200 };
+  const world = core.formationPos(lead, { dx: 10, dy: 0, face: 0 }, 0);
+  assert.strictEqual(world.x, 110);
+  assert.strictEqual(world.y, 200);
+  const face0 = core.formationPos(lead, { dx: 10, dy: 0, face: 1 }, 0);
+  assert.ok(Math.abs(face0.x - 110) < 1e-9);
+  assert.ok(Math.abs(face0.y - 200) < 1e-9);
+  const face90 = core.formationPos(lead, { dx: 10, dy: 0, face: 1 }, Math.PI / 2);
+  assert.ok(Math.abs(face90.x - 100) < 1e-9);
+  assert.ok(Math.abs(face90.y - 210) < 1e-9);
+});
+test("formAction hysteresis: idle near, move mid, smart far/off-map", () => {
+  const self = { map: "main", x: 0, y: 0 };
+  assert.strictEqual(core.formAction(self, { map: "main", x: 10, y: 0 }), "idle");
+  assert.strictEqual(core.formAction(self, { map: "main", x: 50, y: 0 }), "move");
+  assert.strictEqual(core.formAction(self, { map: "main", x: 300, y: 0 }), "smart");
+  assert.strictEqual(core.formAction(self, { map: "cave", x: 0, y: 0 }), "smart");
+});
+test("formNeedsReanchor when lead walks away from anchor", () => {
+  const anchor = { map: "main", x: 0, y: 0 };
+  assert.strictEqual(core.formNeedsReanchor(null, { map: "main", x: 0, y: 0 }, 70), true);
+  assert.strictEqual(core.formNeedsReanchor(anchor, { map: "main", x: 20, y: 0 }, 70), false);
+  assert.strictEqual(core.formNeedsReanchor(anchor, { map: "main", x: 80, y: 0 }, 70), true);
+  assert.strictEqual(core.formNeedsReanchor(anchor, { map: "cave", x: 0, y: 0 }, 70), true);
 });
 test("priest revive picks a dead ally if essence is ready", () => {
   const dead = { name: "Sarene", rip: true };
   assert.strictEqual(core.priestReviveTarget([dead], true, true), dead);
   assert.strictEqual(core.priestReviveTarget([dead], false, true), null);
   assert.strictEqual(core.priestReviveTarget([{ name: "Sarene", rip: false }], true, true), null);
-});
-
-test("follow: priest 80, others 180", () => {
-  assert.strictEqual(core.followDistance("priest"), 80);
-  assert.strictEqual(core.followDistance("warrior"), 180);
-});
-test("follow: different map always", () => {
-  assert.strictEqual(core.shouldFollow({ map: "main", x: 0, y: 0 }, { map: "halloween", x: 0, y: 0 }, "mage"), true);
-});
-test("follow: priest stays close", () => {
-  assert.strictEqual(core.shouldFollow({ map: "main", x: 0, y: 0 }, { map: "main", x: 100, y: 0 }, "priest"), true);
-  assert.strictEqual(core.shouldFollow({ map: "main", x: 0, y: 0 }, { map: "main", x: 50, y: 0 }, "priest"), false);
 });
 
 test("warrior: blade/helmet are gear, staff/bow are not", () => {

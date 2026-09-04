@@ -4,6 +4,7 @@ import json
 import socket
 import sys
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -23,16 +24,37 @@ def free_port() -> int:
 
 
 def get_json(base: str, path: str, expect_ok: bool = True) -> dict:
+    # `expect_ok` is documentation only: urlopen() raises HTTPError for 4xx/5xx
+    # responses before this function ever sees them, so callers that expect a
+    # non-2xx status handle it via try/except urllib.error.HTTPError instead.
     req = urllib.request.Request(base + path)
     with urllib.request.urlopen(req, timeout=5) as resp:
         body = resp.read().decode("utf-8")
         ctype = resp.headers.get("Content-Type", "")
-        self_check = "application/json" in ctype, f"Non-JSON response for {path}: {ctype}\n{body[:200]}"
-        assert self_check[0], self_check[1]
-        data = json.loads(body)
-        if expect_ok and resp.status >= 400:
-            raise AssertionError(f"{path} -> {resp.status}: {data}")
-        return data
+        assert "application/json" in ctype, f"Non-JSON response for {path}: {ctype}\n{body[:200]}"
+        return json.loads(body)
+
+
+def wait_for_idle(base: str, timeout: float = 180.0, interval: float = 0.5) -> None:
+    """Poll /api/train/status until no training job is running.
+
+    Used to leave the server idle after tests that start/cancel a training
+    subprocess, so later tests (e.g. test_train_cancel_when_idle) don't race
+    against a still-alive subprocess regardless of test execution order.
+
+    Cancelling right after start races the subprocess's own startup (it
+    clears any pre-existing cancel flag once it finishes importing/loading),
+    so a cancel requested in that window can be silently dropped and the job
+    runs to its full budget_sec plus eval/checkpoint overhead. The timeout
+    here allows for that worst case rather than only a fast cancel.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        data = get_json(base, "/api/train/status")
+        if not data.get("running"):
+            return
+        time.sleep(interval)
+    raise AssertionError(f"Training did not become idle within {timeout}s")
 
 
 def get_response_headers(base: str, path: str) -> dict:
@@ -90,6 +112,7 @@ class TestHttpApi(unittest.TestCase):
         self.assertIn("live_metrics", data)
 
     def test_train_cancel_when_idle(self):
+        wait_for_idle(self.base)
         try:
             post_json(self.base, "/api/train/cancel", {})
             self.fail("Expected 409")
@@ -145,6 +168,7 @@ class TestHttpApi(unittest.TestCase):
                     post_json(self.base, "/api/train/cancel", {})
                 except urllib.error.HTTPError:
                     pass
+                wait_for_idle(self.base)
         except urllib.error.HTTPError as e:
             body = json.loads(e.read().decode("utf-8"))
             if e.code == 409:
@@ -152,6 +176,36 @@ class TestHttpApi(unittest.TestCase):
                 return
             self.assertEqual(e.code, 400, body)
             self.assertNotIn("must be <= 64", body.get("error", ""))
+
+    def test_train_accepts_curriculum_phase_4(self):
+        payload = {"curriculum_phase": 4, "mode": "avoid", "budget_sec": 60}
+        try:
+            status, body = post_json(self.base, "/api/train", payload)
+            self.assertTrue(body.get("ok"))
+            try:
+                post_json(self.base, "/api/train/cancel", {})
+            except urllib.error.HTTPError:
+                pass
+            wait_for_idle(self.base)
+        except urllib.error.HTTPError as e:
+            body = json.loads(e.read().decode("utf-8"))
+            self.assertEqual(e.code, 409, body)
+            self.assertIn("running", body.get("error", "").lower())
+
+    def test_train_rejects_invalid_curriculum_phase(self):
+        req = urllib.request.Request(
+            self.base + "/api/train",
+            data=json.dumps({"curriculum_phase": 99}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                self.fail(f"Expected 400, got {resp.status}")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+            body = json.loads(e.read().decode("utf-8"))
+            self.assertIn("curriculum_phase", body.get("error", ""))
 
     def test_train_rejects_invalid_budget(self):
         req = urllib.request.Request(

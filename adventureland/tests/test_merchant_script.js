@@ -29,9 +29,10 @@ test("merchant.js stays within 176 CODE lines", () => {
 test("idle merchant opens stand and lists loot with trade slot arity", async () => {
   const items = new Array(42).fill(null);
   items[0] = { name: "stand0", q: 1 };
-  items[1] = { name: "helmet", q: 1 };
+  items[1] = { name: "gem0", q: 1 };
   items[2] = { name: "hpot0", q: 10 };
   const env = merchant({ items, gold: 50000 });
+  env.HOLD = [["armorring", 1]];
   await env.logistics();
   assert.ok(env.log.merchant.some((m) => m.open != null));
   assert.ok(env.log.traded.some((t) => t.i === 1 && t.slot === 1 && t.gold > 0));
@@ -53,6 +54,7 @@ test("merchant skips locked loot and stand0 when listing", async () => {
   items[1] = { name: "helmet", q: 1, l: "l" };
   items[2] = { name: "coat", q: 1 };
   const env = merchant({ items });
+  env.HOLD = [];
   await env.logistics();
   assert.ok(!env.log.traded.some((t) => t.i === 0 || t.i === 1));
   assert.ok(env.log.traded.some((t) => t.i === 2 && t.slot === 1 && t.q === 1));
@@ -63,6 +65,7 @@ test("merchant lists at most 16 trade slots", async () => {
   items[0] = { name: "stand0", q: 1 };
   for (let i = 1; i <= 20; i++) items[i] = { name: "helmet", q: 1 };
   const env = merchant({ items });
+  env.HOLD = [];
   await env.logistics();
   assert.strictEqual(env.log.traded.length, 16);
   assert.strictEqual(env.log.traded[15].slot, 16);
@@ -74,6 +77,7 @@ test("merchant does not re-list into occupied trade slots", async () => {
   items[1] = { name: "helmet", q: 1 };
   items[2] = { name: "coat", q: 1 };
   const env = merchant({ items, gold: 50000, pulled: true, real_x: 40, real_y: -20 });
+  env.HOLD = [];
   env.pulled = true;
   await env.logistics();
   assert.strictEqual(env.log.traded.length, 2);
@@ -97,6 +101,7 @@ test("boot snaps bank and restocks sale without dumping the bag", async () => {
     esize: 40,
     bank: { gold: 0, items0: bag, items1: [{ name: "coat", q: 1 }] }
   });
+  env.HOLD = [];
   await env.logistics();
   assert.ok(env.log.moved.some((d) => d && d.to === "bank"));
   assert.ok(env.log.moved.some((d) => d && d.map === "main" && d.x === 40 && d.y === -20));

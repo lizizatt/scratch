@@ -1,13 +1,23 @@
 import { tuning } from "../data/tuning";
-import type { MetaState } from "../sim/meta";
 import type { RunSnapshot } from "../sim/run";
 import { TEST_AI_OPTIONS } from "../sim/testAi";
 import type { SkinId, WeaponClass } from "../sim/types";
 import {
-  bladeAngleForStyle,
+  clawSwingAngle,
   drawGenericBlade,
+  drawPlayerWeapon,
   drawShardblade,
+  drawShardspear,
+  weaponPoseForStyle,
 } from "./blade";
+import {
+  drawAlethiGuard,
+  drawBarracks,
+  drawChasmfiend,
+  drawDroppedClaw,
+  drawMainCharacter,
+  drawSnail,
+} from "./characters";
 import { type Rect } from "./hitTest";
 import { layoutCombat } from "./layout";
 
@@ -17,7 +27,6 @@ export type UiRects = {
   spear: Rect | null;
   skinA: Rect | null;
   skinB: Rect | null;
-  unlockSpear: Rect | null;
   advance: Rect | null;
   backToSelect: Rect | null;
   aiButtons: Array<{ kind: import("../sim/testAi").TestAiKind; rect: Rect }>;
@@ -26,7 +35,6 @@ export type UiRects = {
 export type FrameModel = {
   snap: RunSnapshot | null;
   screen: "select" | "run";
-  meta: MetaState;
   selectedClass: WeaponClass;
   selectedSkin: SkinId;
   message: string | null;
@@ -38,10 +46,6 @@ export type FrameModel = {
   };
 };
 
-function skinColor(skin: SkinId): string {
-  return skin === "skin_a" ? "#c5d4ff" : "#ffd4a8";
-}
-
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -50,7 +54,7 @@ export function drawFrame(
 ): UiRects {
   ctx.clearRect(0, 0, width, height);
 
-  // Sky / storm gradient
+  // Sky / storm gradient — chasm stays dark; storm only deepens it slightly
   const storm = model.snap?.stormLevel ?? 0;
   const g = ctx.createLinearGradient(0, 0, 0, height);
   g.addColorStop(0, storm > 0 ? "#1a2238" : "#243150");
@@ -77,8 +81,9 @@ function drawSelect(
   ctx.font = "36px Georgia";
   ctx.fillText("Shardblade", 48, 64);
 
-  ctx.font = "18px Georgia";
-  ctx.fillText(`Stormlight: ${model.meta.stormlight}`, 48, 100);
+  ctx.font = "16px Georgia";
+  ctx.fillStyle = "#a8b8d8";
+  ctx.fillText("Scene 0 — choose your blade, then enter the chasm.", 48, 100);
 
   if (model.message) {
     ctx.fillStyle = "#ffb4b4";
@@ -90,14 +95,7 @@ function drawSelect(
   drawButton(ctx, rects.greatsword, "Greatsword", model.selectedClass === "greatsword");
 
   rects.spear = { x: 248, y: 160, w: 180, h: 48 };
-  const spearUnlocked = model.meta.unlockedClasses.includes("spear");
-  drawButton(
-    ctx,
-    rects.spear,
-    spearUnlocked ? "Spear" : "Spear (locked)",
-    model.selectedClass === "spear",
-    !spearUnlocked,
-  );
+  drawButton(ctx, rects.spear, "Spear", model.selectedClass === "spear");
 
   rects.skinA = { x: 48, y: 240, w: 120, h: 40 };
   rects.skinB = { x: 184, y: 240, w: 120, h: 40 };
@@ -109,29 +107,14 @@ function drawSelect(
   ctx.font = "14px Georgia";
   ctx.fillText("Sword building — coming later", 48, 320);
 
-  if (!spearUnlocked) {
-    rects.unlockSpear = { x: 48, y: 350, w: 260, h: 40 };
-    drawButton(
-      ctx,
-      rects.unlockSpear,
-      `Unlock Spear (${tuning.SPEAR_UNLOCK_COST} stormlight)`,
-      false,
-    );
-  }
-
-  rects.start = { x: 48, y: 420, w: 200, h: 52 };
+  rects.start = { x: 48, y: 420, w: 400, h: 104 };
   drawButton(ctx, rects.start, "Enter the chasm", false);
 
-  // Preview blade
-  ctx.fillStyle = skinColor(model.selectedSkin);
+  // Preview weapon — tip up, full hilt/pommel visible
   if (model.selectedClass === "spear") {
-    ctx.fillRect(width - 210, 160, 8, 180);
-    ctx.fillStyle = "#8a96b0";
-    ctx.fillRect(width - 220, 330, 28, 14);
+    drawShardspear(ctx, width - 208, 355, -Math.PI / 2, model.selectedSkin, 190);
   } else {
-    ctx.fillRect(width - 220, 180, 24, 160);
-    ctx.fillStyle = "#8a96b0";
-    ctx.fillRect(width - 230, 330, 44, 18);
+    drawShardblade(ctx, width - 208, 355, -Math.PI / 2, model.selectedSkin, 170);
   }
 
   return rects;
@@ -148,7 +131,21 @@ function drawRun(
   const layout = layoutCombat(width, height, snap);
   const { groundY, playerX, enemyX, entityY, slope } = layout;
 
-  drawChasmBackdrop(ctx, width, height, groundY, slope, snap.distance, snap.stormLevel);
+  drawChasmBackdrop(
+    ctx,
+    width,
+    height,
+    groundY,
+    slope,
+    snap.distance,
+    snap.stormLevel,
+    snap.waterHeight,
+    snap.time,
+  );
+
+  if (snap.barracksScreenX !== null) {
+    drawBarracks(ctx, width, height, groundY, snap.barracksScreenX);
+  }
 
   // Ground / slope
   ctx.fillStyle = '#2c3a2e';
@@ -189,41 +186,101 @@ function drawRun(
     ctx.fillRect(0, 0, width, height);
   }
 
-  // Player body
-  ctx.fillStyle = '#4a5568';
-  ctx.fillRect(playerX - 12, entityY + 8, 24, 62);
-  ctx.fillStyle = '#c4a882';
-  ctx.beginPath();
-  ctx.arc(playerX, entityY + 4, 10, 0, Math.PI * 2);
-  ctx.fill();
+  const feetY = entityY + 64;
 
-  {
-    const progress = snap.phase === 'combat' ? snap.playerProgress : 0;
-    const angle = bladeAngleForStyle(snap.playerStyle, progress, 1);
-    drawShardblade(ctx, playerX + 6, entityY + 22, angle, snap.skin ?? 'skin_a');
+  // Corpse scrolls away behind the MC while stormlight is absorbed
+  if (snap.corpseVisual && snap.corpseScreenX !== null) {
+    drawEnemySprite(
+      ctx,
+      snap.corpseVisual,
+      snap.corpseScreenX,
+      entityY,
+      {
+        progress: 0,
+        style: "fast",
+        combat: false,
+        fallT: snap.enemyFallT,
+        feetY,
+      },
+    );
   }
 
-  const showEnemy =
-    (snap.phase === 'approach' || snap.phase === 'combat') && snap.enemyHp !== null;
-  if (showEnemy) {
-    const approach = snap.enemyApproach ?? 1;
-    const drawX = lerp(width + 120, enemyX, smoothstep(approach));
-    const boss = snap.enemyKind === 'boss';
-    const ew = boss ? 48 : 32;
-    const eh = boss ? 90 : 70;
-    const bodyTop = entityY - (boss ? 20 : 0);
-    ctx.fillStyle = boss ? '#6b2d3c' : '#4a5568';
-    ctx.fillRect(drawX - ew / 2, bodyTop, ew, eh);
-    ctx.fillStyle = boss ? '#8a4050' : '#c4a882';
-    ctx.beginPath();
-    ctx.arc(drawX, bodyTop + 6, boss ? 14 : 10, 0, Math.PI * 2);
-    ctx.fill();
+  // Boss flee: body without claw runs off; claw stays and sheds light
+  if (snap.fleeScreenX !== null) {
+    drawChasmfiend(ctx, snap.fleeScreenX, entityY - 8, {
+      showClaw: false,
+      clawAngle: -Math.PI * 0.85,
+      scale: 2,
+    });
+  }
+  if (snap.clawScreenX !== null) {
+    drawDroppedClaw(
+      ctx,
+      snap.clawScreenX,
+      entityY + 40,
+      snap.clawDropT,
+      2,
+    );
+  }
 
-    const angle =
-      snap.phase === 'combat'
-        ? bladeAngleForStyle(snap.enemyStyle ?? 'fast', snap.enemyProgress ?? 0, -1)
-        : bladeAngleForStyle('fast', 0, -1);
-    drawGenericBlade(ctx, drawX - 6, bodyTop + 28, angle);
+  // Player
+  drawMainCharacter(ctx, playerX, entityY);
+  if (snap.playerAbsorbGlow > 0) {
+    drawAbsorbAura(ctx, playerX, entityY + 20, snap.playerAbsorbGlow, snap.time);
+  }
+
+  {
+    const weaponClass = snap.weaponClass ?? "greatsword";
+    const progress = snap.phase === "combat" ? snap.playerProgress : 0;
+    drawPlayerWeapon(
+      ctx,
+      playerX + 8,
+      entityY + 22,
+      weaponClass,
+      snap.playerStyle,
+      progress,
+      snap.skin ?? "skin_a",
+      1,
+    );
+  }
+
+  const showEnemy = snap.enemyScreenX !== null && snap.enemyVisual !== null;
+  const drawEnemyX = snap.enemyScreenX ?? enemyX;
+  if (showEnemy) {
+    const visual = snap.enemyVisual!;
+    const progress = snap.phase === "combat" ? (snap.enemyProgress ?? 0) : 0;
+    const style = snap.enemyStyle ?? "fast";
+    drawEnemySprite(ctx, visual, drawEnemyX, entityY, {
+      progress,
+      style,
+      combat: snap.phase === "combat",
+      fallT: 0,
+      feetY,
+    });
+
+    if (snap.tauntLine && snap.tauntAlpha > 0) {
+      drawSpeechBubble(
+        ctx,
+        drawEnemyX + (visual === "chasmfiend" ? 36 : visual === "snail" ? 28 : 22),
+        entityY - (visual === "chasmfiend" ? 20 : 8),
+        snap.tauntLine,
+        snap.tauntAlpha,
+      );
+    }
+  }
+
+  // Stormlight spheres zipping from corpse/claw → MC
+  const sphereFromX = snap.clawScreenX ?? snap.corpseScreenX ?? drawEnemyX;
+  for (const s of snap.spheres) {
+    if (!s.visible) continue;
+    const fromX = sphereFromX + s.jitterX;
+    const fromY = entityY + 18 + s.jitterY;
+    const toX = playerX;
+    const toY = entityY + 16;
+    const u = s.flyT * s.flyT * (3 - 2 * s.flyT);
+    const sx = fromX + (toX - fromX) * u;
+    const sy = fromY + (toY - fromY) * u - Math.sin(u * Math.PI) * 18;
+    drawStormlightSphere(ctx, sx, sy, 1 - u * 0.15);
   }
 
   // HUD stormlight
@@ -252,10 +309,15 @@ function drawRun(
       drawButton(ctx, rect, opt.label, model.combatTest!.aiKind === opt.kind);
     });
   } else {
-    ctx.fillText(`Stormlight: ${snap.stormlightRun} (bank ${model.meta.stormlight})`, 16, 28);
+    ctx.fillText(`Stormlight: ${snap.stormlightRun}`, 16, 28);
+    if (snap.godMode) {
+      ctx.fillStyle = '#ffd28a';
+      ctx.font = '14px Georgia';
+      ctx.fillText('GOD MODE — invincible · one-shot', 16, 50);
+    }
   }
 
-  if (snap.phase === 'intro') {
+  if (snap.phase === 'intro' || snap.phase === 'barracks') {
     const line = snap.dialogueLines[Math.min(snap.dialogueIndex, snap.dialogueLines.length - 1)];
     ctx.fillStyle = 'rgba(10, 14, 28, 0.75)';
     ctx.fillRect(40, height - 120, width - 80, 80);
@@ -266,16 +328,45 @@ function drawRun(
     drawButton(ctx, rects.advance, 'Continue', false);
   }
 
-  if (snap.phase === 'walk' || snap.phase === 'storm' || snap.phase === 'approach') {
+  if (snap.phase === 'barracks') {
+    const gx =
+      snap.barracksScreenX !== null
+        ? snap.barracksScreenX + snap.guardScreenOffsetX
+        : width * 0.62;
+    drawAlethiGuard(ctx, gx, entityY);
+  } else if (
+    snap.phase === 'exit' &&
+    snap.barracksScreenX !== null &&
+    snap.barracksScreenX < width * 0.7
+  ) {
+    drawAlethiGuard(ctx, snap.barracksScreenX + snap.guardScreenOffsetX, entityY);
+  }
+
+  if (snap.phase === 'walk' || snap.phase === 'exit') {
     ctx.fillStyle = '#a8b8d8';
     ctx.font = '16px Georgia';
-    const label =
-      snap.phase === 'storm'
-        ? 'The storm grows…'
-        : snap.phase === 'approach'
-          ? 'An enemy approaches…'
-          : 'Walking the chasm…';
-    ctx.fillText(label, 16, 56);
+    ctx.fillText(
+      snap.phase === 'exit'
+        ? 'Climbing out…'
+        : snap.corpseVisual || snap.clawScreenX
+          ? 'Stormlight gathers…'
+          : 'Walking the chasm…',
+      16,
+      56,
+    );
+  }
+
+  if (snap.fadeAlpha > 0) {
+    ctx.fillStyle = `rgba(0, 0, 0, ${snap.fadeAlpha})`;
+    ctx.fillRect(0, 0, width, height);
+    if (snap.epilogueText) {
+      ctx.fillStyle = '#e8eefc';
+      ctx.font = '28px Georgia';
+      const tw = ctx.measureText(snap.epilogueText).width;
+      ctx.globalAlpha = Math.min(1, snap.fadeAlpha * 1.4);
+      ctx.fillText(snap.epilogueText, (width - tw) / 2, height * 0.48);
+      ctx.globalAlpha = 1;
+    }
   }
 
   if (snap.phase === 'combat' && snap.enemyHp !== null) {
@@ -303,7 +394,7 @@ function drawRun(
     drawBar(ctx, playerX - 40, entityY - 92, 80, 8, snap.playerHp / snap.playerMaxHp, '#6dffa8');
     drawBar(
       ctx,
-      enemyX - 40,
+      drawEnemyX - 40,
       entityY - 92,
       80,
       8,
@@ -315,7 +406,7 @@ function drawRun(
     drawAttackProgress(ctx, playerX - 40, entityY - 78, 80, 7, snap.playerProgress, hitT, '#9db7ff');
     drawAttackProgress(
       ctx,
-      enemyX - 40,
+      drawEnemyX - 40,
       entityY - 78,
       80,
       7,
@@ -326,7 +417,7 @@ function drawRun(
 
     ctx.fillStyle = '#e8eefc';
     ctx.font = '14px Georgia';
-    ctx.fillText(snap.enemyStyle ?? '', enemyX - 20, entityY - 100);
+    ctx.fillText(snap.enemyStyle ?? '', drawEnemyX - 20, entityY - 100);
 
     ctx.globalAlpha = 1;
   }
@@ -337,7 +428,7 @@ function drawRun(
     const rise = t * 48;
     ctx.globalAlpha = Math.max(0, alpha);
     ctx.font = 'bold 18px Georgia';
-    ctx.fillStyle = f.kind === 'heal' ? '#5dff8a' : '#ff6b6b';
+    ctx.fillStyle = f.kind === 'heal' ? '#5dff8a' : '#6db0ff';
     ctx.fillText(f.text, f.xN * width, f.yN * height - rise);
   }
   ctx.globalAlpha = 1;
@@ -349,7 +440,7 @@ function drawRun(
     ctx.font = '32px Georgia';
     ctx.fillText(snap.phase === 'won' ? 'You won' : 'Game over', width / 2 - 80, height / 2 - 40);
     ctx.font = '18px Georgia';
-    ctx.fillText(`Stormlight banked: ${model.meta.stormlight}`, width / 2 - 100, height / 2);
+    ctx.fillText(`Stormlight gathered: ${snap.stormlightRun}`, width / 2 - 100, height / 2);
     rects.backToSelect = { x: width / 2 - 90, y: height / 2 + 30, w: 180, h: 44 };
     drawButton(ctx, rects.backToSelect, 'Continue', false);
   }
@@ -357,13 +448,8 @@ function drawRun(
   return rects;
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-function smoothstep(t: number): number {
-  const x = Math.min(1, Math.max(0, t));
-  return x * x * (3 - 2 * x);
+function stormMood(stormLevel: number, waterHeight: number): number {
+  return Math.min(1, Math.max(stormLevel * 0.18, waterHeight / 0.88));
 }
 
 function drawChasmBackdrop(
@@ -374,10 +460,13 @@ function drawChasmBackdrop(
   slope: number,
   distance: number,
   stormLevel: number,
+  waterHeight: number,
+  time: number,
 ): void {
   const scrollFar = distance * 0.25;
   const scrollNear = distance * 0.55;
   const wallTop = 40;
+  const mood = stormMood(stormLevel, waterHeight);
   void height;
 
   for (let i = -1; i < 10; i++) {
@@ -387,6 +476,11 @@ function drawChasmBackdrop(
     ctx.fillRect(x, wallTop, 70, groundY - wallTop - 20);
     ctx.fillStyle = `rgb(${shade},${shade + 4},${shade + 14})`;
     ctx.fillRect(x + 12, wallTop + 30, 18, groundY - wallTop - 80);
+  }
+
+  // God-rays + a touch of orange — sunny cue without brightening the chasm
+  if (mood < 0.72) {
+    drawGodRays(ctx, width, groundY, time, 1 - mood / 0.72);
   }
 
   for (let i = -1; i < 8; i++) {
@@ -421,6 +515,43 @@ function drawChasmBackdrop(
   }
 }
 
+/** Soft shafts of sunlight pouring into the dark chasm from the rim above. */
+function drawGodRays(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  groundY: number,
+  time: number,
+  alpha: number,
+): void {
+  if (alpha <= 0.02) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const cx = width * 0.48;
+  const top = -20;
+  for (let i = 0; i < 7; i++) {
+    const sway = Math.sin(time * 0.7 + i * 0.9) * 12;
+    const mid = cx + (i - 3) * 56 + sway;
+    const halfTop = 8 + (i % 3) * 3;
+    const halfBot = 28 + (i % 4) * 12;
+    const a = alpha * (0.028 + (i % 3) * 0.008);
+    ctx.fillStyle = `rgba(255, 170, 90, ${a})`;
+    ctx.beginPath();
+    ctx.moveTo(mid - halfTop, top);
+    ctx.lineTo(mid + halfTop, top);
+    ctx.lineTo(mid + halfBot + sway * 0.3, groundY + 20);
+    ctx.lineTo(mid - halfBot + sway * 0.3, groundY + 20);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Subtle orange rim-light wash — keeps the scene dark
+  const wash = ctx.createRadialGradient(cx, groundY * 0.35, 10, cx, groundY * 0.45, width * 0.38);
+  wash.addColorStop(0, `rgba(255, 140, 60, ${0.045 * alpha})`);
+  wash.addColorStop(1, "rgba(255, 140, 60, 0)");
+  ctx.fillStyle = wash;
+  ctx.fillRect(0, 0, width, groundY + 20);
+  ctx.restore();
+}
+
 function drawChasmFloorDetail(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -438,6 +569,178 @@ function drawChasmFloorDetail(
   }
 }
 
+function drawEnemySprite(
+  ctx: CanvasRenderingContext2D,
+  visual: import("../sim/encounters").EnemyVisual,
+  x: number,
+  entityY: number,
+  opts: {
+    progress: number;
+    style: import("../sim/types").Style;
+    combat: boolean;
+    fallT: number;
+    feetY: number;
+  },
+): void {
+  const drawBody = () => {
+    if (visual === "chasmfiend") {
+      const clawAngle =
+        opts.combat && opts.style !== "defend"
+          ? clawSwingAngle(opts.progress, -1)
+          : -Math.PI * 0.85;
+      drawChasmfiend(ctx, x, entityY - 8, {
+        clawAngle,
+        style: opts.style,
+        attackProgress: opts.progress,
+        scale: 2,
+        showClaw: true,
+      });
+    } else if (visual === "snail") {
+      drawSnail(ctx, x, entityY, {
+        style: opts.style,
+        attackProgress: opts.combat ? opts.progress : 0,
+      });
+    } else {
+      drawAlethiGuard(ctx, x, entityY);
+      if (opts.combat) {
+        const pose = weaponPoseForStyle("greatsword", opts.style, opts.progress, -1);
+        drawGenericBlade(
+          ctx,
+          x - 8 + pose.offsetX,
+          entityY + 22 + pose.offsetY,
+          pose.angle,
+        );
+      }
+    }
+  };
+
+  if (opts.fallT > 0) {
+    ctx.save();
+    ctx.translate(x, opts.feetY);
+    ctx.rotate(opts.fallT * (Math.PI / 2));
+    ctx.translate(-x, -opts.feetY);
+    drawBody();
+    ctx.restore();
+  } else {
+    drawBody();
+  }
+}
+
+/** Soft stormlight glow + fog wisps around the MC while absorbing. */
+function drawAbsorbAura(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  glow: number,
+  time: number,
+): void {
+  const a = Math.min(1, glow);
+  ctx.save();
+  ctx.globalAlpha = a * 0.55;
+  const g = ctx.createRadialGradient(x, y, 4, x, y, 48);
+  g.addColorStop(0, "rgba(180, 220, 255, 0.9)");
+  g.addColorStop(0.45, "rgba(120, 180, 255, 0.35)");
+  g.addColorStop(1, "rgba(120, 180, 255, 0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, 48, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalAlpha = a * 0.4;
+  ctx.strokeStyle = "rgba(200, 230, 255, 0.7)";
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 5; i++) {
+    const ang = time * 1.4 + i * 1.3;
+    const r = 18 + (i % 3) * 6;
+    const fx = x + Math.cos(ang) * r;
+    const fy = y - 8 - ((time * 22 + i * 11) % 28);
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, 5, 9, ang * 0.2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawStormlightSphere(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  alpha: number,
+): void {
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.fillStyle = "rgba(160, 210, 255, 0.35)";
+  ctx.beginPath();
+  ctx.arc(x, y, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#d8ecff";
+  ctx.beginPath();
+  ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(x - 1, y - 1.2, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Small flavor speech bubble to the right of an NPC. */
+function drawSpeechBubble(
+  ctx: CanvasRenderingContext2D,
+  anchorX: number,
+  anchorY: number,
+  text: string,
+  alpha: number,
+): void {
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, alpha) * 0.9;
+  ctx.font = "12px Georgia";
+  const padX = 8;
+  const padY = 5;
+  const tw = ctx.measureText(text).width;
+  const bw = tw + padX * 2;
+  const bh = 18 + padY;
+  const bx = anchorX;
+  const by = anchorY - bh;
+
+  ctx.fillStyle = "rgba(18, 22, 34, 0.72)";
+  ctx.strokeStyle = "rgba(180, 190, 210, 0.35)";
+  ctx.lineWidth = 1;
+  roundRect(ctx, bx, by, bw, bh, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  // Tail pointing left toward the speaker
+  ctx.beginPath();
+  ctx.moveTo(bx, by + bh * 0.55);
+  ctx.lineTo(bx - 7, by + bh * 0.7);
+  ctx.lineTo(bx + 2, by + bh * 0.78);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#b8c2d4";
+  ctx.fillText(text, bx + padX, by + padY + 12);
+  ctx.restore();
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
 function emptyRects(): UiRects {
   return {
     start: null,
@@ -445,7 +748,6 @@ function emptyRects(): UiRects {
     spear: null,
     skinA: null,
     skinB: null,
-    unlockSpear: null,
     advance: null,
     backToSelect: null,
     aiButtons: [],
@@ -464,8 +766,14 @@ function drawButton(
   ctx.strokeStyle = active ? "#9db7ff" : "#4a5a78";
   ctx.strokeRect(r.x, r.y, r.w, r.h);
   ctx.fillStyle = disabled ? "#6a7a9a" : "#e8eefc";
-  ctx.font = r.h < 24 ? "12px Georgia" : "16px Georgia";
-  ctx.fillText(label, r.x + 10, r.y + r.h / 2 + 4);
+  const fontSize = r.h >= 80 ? 28 : r.h < 24 ? 12 : 16;
+  ctx.font = `${fontSize}px Georgia`;
+  const metrics = ctx.measureText(label);
+  ctx.fillText(
+    label,
+    r.x + (r.w - metrics.width) / 2,
+    r.y + r.h / 2 + fontSize * 0.35,
+  );
 }
 
 function drawBar(

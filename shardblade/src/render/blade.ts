@@ -1,16 +1,27 @@
-import type { SkinId } from "../sim/types";
+import type { SkinId, Style, WeaponClass } from "../sim/types";
 import { tuning } from "../data/tuning";
 
 /** Shared blade length so layout spacing matches drawn tips. */
 export const COMBAT_BLADE_LENGTH = 110;
 
 /** Horizontal tip reach from body center (grip offset + blade). */
-export const COMBAT_TIP_REACH = 6 + COMBAT_BLADE_LENGTH;
+export const COMBAT_TIP_REACH = tuning.COMBAT_TIP_REACH;
+
+export type WeaponPose = {
+  angle: number;
+  /** Extra grip translation along the strike (thrust). */
+  offsetX: number;
+  offsetY: number;
+};
+
+function smooth01(t: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return x * x * (3 - 2 * x);
+}
 
 /**
  * Overhead swing: ~30° past vertical (behind) → horizontal (front) at impact.
- * Impact / horizontal lands at `hitWindowT` (default: end of swing).
- * `facing` 1 = right (player), -1 = left (enemy).
+ * Used for light / fast greatsword.
  */
 export function overheadSwingAngle(
   progress: number,
@@ -19,22 +30,119 @@ export function overheadSwingAngle(
 ): number {
   const start = -Math.PI / 2 - facing * (Math.PI / 6);
   const end = facing > 0 ? 0 : -Math.PI;
-  const t = Math.min(1, Math.max(0, progress / Math.max(1e-6, hitWindowT)));
-  const s = t * t * (3 - 2 * t); // smoothstep
-  return start + (end - start) * s;
+  const t = smooth01(progress / Math.max(1e-6, hitWindowT));
+  return start + (end - start) * t;
 }
 
-/** Blade angle for the active style (defend holds a high guard). */
+/**
+ * Heavy greatsword: one continuous arc — full revolution that flows straight
+ * into the downswing (no ease-out pause at the top).
+ */
+export function heavySwordPose(
+  progress: number,
+  facing: 1 | -1,
+  hitWindowT: number = tuning.HIT_WINDOW_T,
+): WeaponPose {
+  const t = smooth01(progress / Math.max(1e-6, hitWindowT));
+  const start = -Math.PI / 2 - facing * (Math.PI / 6);
+  const end = facing > 0 ? 0 : -Math.PI;
+  const angle = start + (facing * Math.PI * 2 + (end - start)) * t;
+  return { angle, offsetX: 0, offsetY: 0 };
+}
+
+/** Light spear: quick horizontal stab, no flourish. */
+export function stabPose(
+  progress: number,
+  facing: 1 | -1,
+  hitWindowT: number = tuning.HIT_WINDOW_T,
+): WeaponPose {
+  const t = smooth01(progress / Math.max(1e-6, hitWindowT));
+  const rest = facing > 0 ? 0 : -Math.PI;
+  const pullBack = 20;
+  const extend = 42;
+  return {
+    angle: rest,
+    offsetX: facing * (-pullBack + t * (pullBack + extend)),
+    offsetY: 2 - t * 4,
+  };
+}
+
+/**
+ * Heavy spear kata: starts horizontal at idle, full 360° spin, lands tip-forward at impact.
+ */
+export function thrustPose(
+  progress: number,
+  facing: 1 | -1,
+  hitWindowT: number = tuning.HIT_WINDOW_T,
+): WeaponPose {
+  const t = smooth01(progress / Math.max(1e-6, hitWindowT));
+  const rest = facing > 0 ? 0 : -Math.PI;
+  const spin = facing * Math.PI * 2;
+  const angle = rest + spin * t;
+
+  const pullBack = 18;
+  const extend = 40;
+  const thrustT = smooth01(Math.max(0, (t - 0.15) / 0.85));
+  return {
+    angle,
+    offsetX: facing * (-pullBack + thrustT * (pullBack + extend)),
+    offsetY: 2 - thrustT * 4 + Math.sin(t * Math.PI * 2) * 5,
+  };
+}
+
+/** Blade / spear pose for the active style. */
+export function weaponPoseForStyle(
+  weaponClass: WeaponClass,
+  style: Style,
+  progress: number,
+  facing: 1 | -1,
+): WeaponPose {
+  if (style === "defend") {
+    if (weaponClass === "spear") {
+      return {
+        angle: -Math.PI / 2 + facing * (Math.PI / 16),
+        offsetX: facing * 4,
+        offsetY: -6,
+      };
+    }
+    return {
+      angle: -Math.PI / 2 + facing * (Math.PI / 12),
+      offsetX: 0,
+      offsetY: 0,
+    };
+  }
+  if (weaponClass === "spear") {
+    return style === "heavy" ? thrustPose(progress, facing) : stabPose(progress, facing);
+  }
+  if (style === "heavy") {
+    return heavySwordPose(progress, facing);
+  }
+  return {
+    angle: overheadSwingAngle(progress, facing),
+    offsetX: 0,
+    offsetY: 0,
+  };
+}
+
+/** @deprecated prefer weaponPoseForStyle — kept for tests / callers that only need angle. */
 export function bladeAngleForStyle(
-  style: import("../sim/types").Style,
+  style: Style,
   progress: number,
   facing: 1 | -1,
 ): number {
-  if (style === "defend") {
-    // High guard: nearly vertical, tipped slightly forward
-    return -Math.PI / 2 + facing * (Math.PI / 12);
-  }
-  return overheadSwingAngle(progress, facing);
+  return weaponPoseForStyle("greatsword", style, progress, facing).angle;
+}
+
+/** Chasmfiend claw arc (high behind → sweeping forward). */
+export function clawSwingAngle(
+  progress: number,
+  facing: 1 | -1 = -1,
+  hitWindowT: number = tuning.HIT_WINDOW_T,
+): number {
+  const start = -Math.PI / 2 - facing * (Math.PI / 5);
+  const end = facing > 0 ? Math.PI / 10 : -Math.PI - Math.PI / 10;
+  const t = smooth01(progress / Math.max(1e-6, hitWindowT));
+  return start + (end - start) * t;
 }
 
 function skinMetal(skin: SkinId): { blade: string; glow: string; edge: string } {
@@ -58,7 +166,6 @@ export function drawShardblade(
   ctx.translate(gripX, gripY);
   ctx.rotate(angle);
 
-  // Soft glow
   ctx.strokeStyle = colors.glow;
   ctx.lineWidth = 14;
   ctx.lineCap = "round";
@@ -67,7 +174,6 @@ export function drawShardblade(
   ctx.lineTo(length, 0);
   ctx.stroke();
 
-  // Blade body
   ctx.fillStyle = colors.blade;
   ctx.beginPath();
   ctx.moveTo(16, -5);
@@ -78,7 +184,6 @@ export function drawShardblade(
   ctx.closePath();
   ctx.fill();
 
-  // Bright edge line
   ctx.strokeStyle = colors.edge;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -86,16 +191,73 @@ export function drawShardblade(
   ctx.lineTo(length - 6, 0);
   ctx.stroke();
 
-  // Crossguard
   ctx.fillStyle = "#9aa8c4";
   ctx.fillRect(10, -12, 8, 24);
-  // Grip
   ctx.fillStyle = "#3a3040";
   ctx.fillRect(-6, -4, 18, 8);
-  // Pommel
   ctx.beginPath();
   ctx.arc(-8, 0, 5, 0, Math.PI * 2);
   ctx.fillStyle = "#c5d4ff";
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** Living shardspear — shaft + glowing tip along local +X. */
+export function drawShardspear(
+  ctx: CanvasRenderingContext2D,
+  gripX: number,
+  gripY: number,
+  angle: number,
+  skin: SkinId,
+  length = COMBAT_BLADE_LENGTH + 18,
+): void {
+  const colors = skinMetal(skin);
+  ctx.save();
+  ctx.translate(gripX, gripY);
+  ctx.rotate(angle);
+
+  // Soft shaft glow
+  ctx.strokeStyle = colors.glow;
+  ctx.lineWidth = 8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-8, 0);
+  ctx.lineTo(length - 10, 0);
+  ctx.stroke();
+
+  // Wooden / bone shaft
+  ctx.strokeStyle = "#5a4638";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(length * 0.62, 0);
+  ctx.stroke();
+
+  // Living metal tip
+  ctx.fillStyle = colors.blade;
+  ctx.beginPath();
+  ctx.moveTo(length * 0.55, -3.5);
+  ctx.lineTo(length - 4, -1.5);
+  ctx.lineTo(length + 6, 0);
+  ctx.lineTo(length - 4, 1.5);
+  ctx.lineTo(length * 0.55, 3.5);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = colors.edge;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(length * 0.6, 0);
+  ctx.lineTo(length + 2, 0);
+  ctx.stroke();
+
+  // Grip wrap
+  ctx.fillStyle = "#2a2430";
+  ctx.fillRect(-4, -5, 16, 10);
+  ctx.fillStyle = "#c5d4ff";
+  ctx.beginPath();
+  ctx.arc(-8, 0, 4, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
@@ -133,4 +295,24 @@ export function drawGenericBlade(
   ctx.fill();
 
   ctx.restore();
+}
+
+export function drawPlayerWeapon(
+  ctx: CanvasRenderingContext2D,
+  gripX: number,
+  gripY: number,
+  weaponClass: WeaponClass,
+  style: Style,
+  progress: number,
+  skin: SkinId,
+  facing: 1 | -1 = 1,
+): void {
+  const pose = weaponPoseForStyle(weaponClass, style, progress, facing);
+  const x = gripX + pose.offsetX;
+  const y = gripY + pose.offsetY;
+  if (weaponClass === "spear") {
+    drawShardspear(ctx, x, y, pose.angle, skin);
+  } else {
+    drawShardblade(ctx, x, y, pose.angle, skin);
+  }
 }

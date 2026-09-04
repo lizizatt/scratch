@@ -1,14 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { GREATSWORD, SPEAR, movesetFor, stubWeaponBuild } from "../src/data/weapons";
 import { tuning } from "../src/data/tuning";
-import { MemoryStorage } from "../src/persist/storage";
 import { encounterDef } from "../src/sim/encounters";
-import {
-  addStormlight,
-  isClassUnlocked,
-  loadMeta,
-  purchaseSpear,
-} from "../src/sim/meta";
+import { isClassAvailable } from "../src/sim/meta";
 import { RunSim } from "../src/sim/run";
 import { attackDamage } from "../src/sim/styles";
 
@@ -24,13 +18,8 @@ describe("Phase 7 content", () => {
     expect(a.player.cooldown.moveset.fastDamage).toBe(b.player.cooldown.moveset.fastDamage);
   });
 
-  it("spear is selectable only when unlocked", () => {
-    const storage = new MemoryStorage();
-    let meta = loadMeta(storage);
-    expect(isClassUnlocked(meta, "spear")).toBe(false);
-    meta = addStormlight(meta, tuning.SPEAR_UNLOCK_COST);
-    meta = purchaseSpear(meta);
-    expect(isClassUnlocked(meta, "spear")).toBe(true);
+  it("spear is always available (no unlock economy)", () => {
+    expect(isClassAvailable("spear")).toBe(true);
   });
 
   it("spear moveset exists and matches greatsword MVP numbers", () => {

@@ -66,6 +66,13 @@ export function createCombatant(
   };
 }
 
+export type ResolveHitOptions = {
+  /** Ignore incoming damage (god mode on the defender). */
+  invincible?: boolean;
+  /** Bypass parry and deal enough to kill (god mode on the attacker). */
+  oneShot?: boolean;
+};
+
 /**
  * Resolve a hit against a defender.
  * Same-style attacks are parried when PARRY_SAME_STYLE is enabled.
@@ -75,17 +82,42 @@ export function resolveHit(
   attacker: Combatant,
   defender: Combatant,
   hit: HitEvent,
+  opts: ResolveHitOptions = {},
 ): AttackResult {
+  if (opts.invincible || defender.dead) {
+    return {
+      attacker: attacker.id,
+      defender: defender.id,
+      style: hit.style,
+      damage: 0,
+      parried: false,
+      lethal: false,
+    };
+  }
+
+  if (opts.oneShot && hit.damage > 0) {
+    const damage = defender.hp;
+    defender.hp = 0;
+    defender.dead = true;
+    return {
+      attacker: attacker.id,
+      defender: defender.id,
+      style: hit.style,
+      damage,
+      parried: false,
+      lethal: true,
+    };
+  }
+
   const defending = defender.cooldown.style === "defend";
   const sameStyle = hit.style === defender.cooldown.style;
   const parried =
-    !defender.dead &&
     hit.damage > 0 &&
     (defending || (tuning.PARRY_SAME_STYLE && sameStyle));
   let damage = 0;
   let lethal = false;
 
-  if (!parried && !defender.dead) {
+  if (!parried) {
     damage = hit.damage;
     defender.hp = Math.max(0, defender.hp - damage);
     if (defender.hp <= 0) {

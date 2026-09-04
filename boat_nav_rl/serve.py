@@ -19,7 +19,7 @@ from colregs.evaluate import enrich_trace_file
 from colregs.frame_series import frame_score_series
 from device_util import torch_device_info
 from runs_util import InvalidRunIdError, latest_run_id, safe_run_dir, score_from_metrics, validate_run_id
-from curriculum import list_ui_training_presets
+from curriculum import PHASES, list_ui_training_presets
 from rewards import gated_hold_enabled, reward_weights_dict
 from vecenv_util import recommended_n_envs, training_perf_defaults
 
@@ -202,7 +202,10 @@ class Handler(BaseHTTPRequestHandler):
                     gated_hold=body.get("gated_hold"),
                     scenario_category_prefixes=body.get("scenario_category_prefixes") or None,
                     curriculum_phase=parse_optional_int(
-                        body.get("curriculum_phase"), name="curriculum_phase", minimum=0, maximum=3
+                        body.get("curriculum_phase"),
+                        name="curriculum_phase",
+                        minimum=0,
+                        maximum=PHASES[-1].phase_id,
                     ),
                     snapshot_interval_min=parse_int(
                         body.get("snapshot_interval_min"), 0, name="snapshot_interval_min", minimum=0

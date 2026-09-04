@@ -91,8 +91,11 @@ YAW_RATE_SCALE_RPS = MAX_YAW_RATE_RPS
 
 REL_VEL_SCALE_MPS = 2.0 * V_MAX_MPS  # max |relative ground speed| for normalization
 
+# Plant model: "3dof" (Fossen-style planar dynamics) or "tf" (legacy first-order lag).
+PLANT_MODEL = os.environ.get("PLANT_MODEL", "3dof").strip().lower()
+
 # Flat observation layout — must match interface/boat_nav_rl_interface.h (BNRL_SCHEMA_VERSION).
-OBS_SCHEMA_VERSION = 4
+OBS_SCHEMA_VERSION = 5
 OBS_OWN_DIM = 6
 OBS_CURRENT_DIM = 3
 OBS_CONTACT_DIM = 8
@@ -139,10 +142,13 @@ def radius_for_class(vessel_class: str) -> float:
 
 
 def own_velocity(own: VesselState, current: Optional[WaterCurrent] = None) -> Tuple[float, float]:
-    """Ground velocity (m/s east, north) including water current."""
+    """Ground velocity (m/s east, north) including sway and water current."""
     cur = current or WaterCurrent()
-    vx = own.speed_mps * math.sin(own.heading_rad) + cur.vx_mps
-    vy = own.speed_mps * math.cos(own.heading_rad) + cur.vy_mps
+    sway = getattr(own, "sway_mps", 0.0)
+    sh = math.sin(own.heading_rad)
+    ch = math.cos(own.heading_rad)
+    vx = own.speed_mps * sh + sway * ch + cur.vx_mps
+    vy = own.speed_mps * ch - sway * sh + cur.vy_mps
     return vx, vy
 
 
@@ -187,7 +193,8 @@ class VesselState:
     x_m: float = 0.0
     y_m: float = 0.0
     heading_rad: float = 0.0
-    speed_mps: float = 3.0
+    speed_mps: float = 3.0  # surge (along bow)
+    sway_mps: float = 0.0  # positive to starboard (3-DOF plant only)
     yaw_rate_rps: float = 0.0
     cmd_heading_rad: float = 0.0
     cmd_speed_mps: float = 3.0
@@ -198,6 +205,7 @@ class VesselState:
             y_m=self.y_m,
             heading_rad=self.heading_rad,
             speed_mps=self.speed_mps,
+            sway_mps=self.sway_mps,
             yaw_rate_rps=self.yaw_rate_rps,
             cmd_heading_rad=self.cmd_heading_rad,
             cmd_speed_mps=self.cmd_speed_mps,
@@ -216,7 +224,16 @@ class PlantParams:
     def max_yaw_rate_rps(self) -> float:
         return math.radians(self.max_yaw_rate_deg_s)
 
-    def to_plant(self) -> "TransferFunctionPlant":
+    def to_plant(self):
+        """Instantiate the active plant model (PLANT_MODEL: 3dof | tf)."""
+        if PLANT_MODEL == "3dof":
+            from dynamics import PlanarDynamicsPlant
+
+            return PlanarDynamicsPlant(
+                tau_heading_s=self.tau_heading_s,
+                tau_speed_s=self.tau_speed_s,
+                max_yaw_rate_rps=self.max_yaw_rate_rps,
+            )
         return TransferFunctionPlant(
             tau_heading_s=self.tau_heading_s,
             tau_speed_s=self.tau_speed_s,
@@ -443,7 +460,7 @@ def pack_observation(
     obs[2] = own.yaw_rate_rps / YAW_RATE_SCALE_RPS
     obs[3] = (own.x_m - origin_x) / POS_SCALE_M
     obs[4] = (own.y_m - origin_y) / POS_SCALE_M
-    obs[5] = 0.0  # reserved
+    obs[5] = getattr(own, "sway_mps", 0.0) / SPEED_SCALE_MPS  # schema v5 (was reserved)
 
     # Water current (3) — uses wind slots: speed, sin(dir), cos(dir)
     cur = current or WaterCurrent()

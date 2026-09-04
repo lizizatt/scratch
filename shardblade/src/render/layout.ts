@@ -15,6 +15,14 @@ export type CombatLayout = {
  * Shared combat positions for draw + click hit-tests.
  * Fighters stand so horizontal blade tips meet the opponent's chest.
  */
+export function combatStanceX(width: number): { playerX: number; enemyX: number } {
+  const mid = width * 0.5;
+  return {
+    playerX: mid - COMBAT_TIP_REACH / 2,
+    enemyX: mid + COMBAT_TIP_REACH / 2,
+  };
+}
+
 export function layoutCombat(
   width: number,
   height: number,
@@ -22,9 +30,7 @@ export function layoutCombat(
 ): CombatLayout {
   const groundY = height * 0.72;
   const slope = snap.stormLevel * 18;
-  const mid = width * 0.5;
-  const playerX = mid - COMBAT_TIP_REACH / 2;
-  const enemyX = mid + COMBAT_TIP_REACH / 2;
+  const { playerX, enemyX } = combatStanceX(width);
   const entityY = groundY - 70 - (snap.stormLevel > 2 ? slope * 0.3 : 0);
   return {
     groundY,

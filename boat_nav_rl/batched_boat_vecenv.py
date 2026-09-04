@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, VecEnvStepReturn
 
+import prepare as P
+from rewards import RewardConfig
 from sim_torch import BatchedBoatSim, BatchedBoatSimConfig
 
 
@@ -20,6 +22,13 @@ def make_gpu_vec_env(
     max_episode_steps: Optional[int] = None,
     current_enabled: bool = False,
     seed: Optional[int] = None,
+    train_seeds: Optional[List[P.ScenarioSeed]] = None,
+    nominal_plant: Optional[P.PlantParams] = None,
+    dynamics_jitter: bool = False,
+    contact_obs_noise_m: float = 0.0,
+    contact_obs_noise_bearing_rad: float = 0.0,
+    train_max_contacts: int = 4,
+    reward_config: Optional[RewardConfig] = None,
 ) -> "BatchedBoatVecEnv":
     cfg = BatchedBoatSimConfig(
         mode=mode,
@@ -27,6 +36,13 @@ def make_gpu_vec_env(
         max_episode_steps=max_episode_steps or 600,
         goal_hold_sec=goal_hold_sec,
         current_enabled=current_enabled,
+        train_seeds=train_seeds,
+        nominal_plant=nominal_plant,
+        dynamics_jitter=dynamics_jitter,
+        contact_obs_noise_m=contact_obs_noise_m,
+        contact_obs_noise_bearing_rad=contact_obs_noise_bearing_rad,
+        train_max_contacts=train_max_contacts,
+        reward_config=reward_config,
     )
     return BatchedBoatVecEnv(cfg, device=device, seed=seed)
 
@@ -42,6 +58,9 @@ class BatchedBoatVecEnv(VecEnv):
     ) -> None:
         self.sim = BatchedBoatSim(cfg, device=device)
         self._seed = seed
+        self._action_buf = torch.empty(
+            (cfg.n_envs, 2), device=self.sim.device, dtype=torch.float32
+        )
         super().__init__(cfg.n_envs, self.sim.observation_space, self.sim.action_space)
         self.reset()
 
@@ -53,10 +72,29 @@ class BatchedBoatVecEnv(VecEnv):
         self._actions = np.asarray(actions, dtype=np.float32)
 
     def step_wait(self) -> VecEnvStepReturn:
-        act = torch.as_tensor(self._actions, device=self.sim.device, dtype=torch.float32)
-        obs, rewards, terminated, truncated = self.sim.step(act)
-        dones = (terminated | truncated).cpu().numpy()
-        infos: List[dict] = [{} for _ in range(self.num_envs)]
+        self._action_buf.copy_(torch.as_tensor(self._actions, dtype=torch.float32))
+        obs, rewards, terminated, truncated = self.sim.step(self._action_buf)
+        term = terminated.cpu().numpy()
+        trunc = truncated.cpu().numpy()
+        dones = term | trunc
+        infos: List[Dict[str, Any]] = [{} for _ in range(self.num_envs)]
+        if dones.any():
+            done_idx = np.nonzero(dones)[0]
+            terminal_obs = (
+                self.sim.last_terminal_obs.cpu().numpy()
+                if self.sim.last_terminal_obs is not None
+                else None
+            )
+            success = self.sim.last_success.cpu().numpy()
+            ep_ret = self.sim.last_ep_return.cpu().numpy()
+            ep_len = self.sim.last_ep_length.cpu().numpy()
+            for pos, i in enumerate(done_idx):
+                info = infos[i]
+                if terminal_obs is not None:
+                    info["terminal_observation"] = terminal_obs[pos]
+                info["TimeLimit.truncated"] = bool(trunc[i] and not term[i])
+                info["is_success"] = bool(success[i])
+                info["episode"] = {"r": float(ep_ret[i]), "l": int(ep_len[i])}
         return obs.cpu().numpy(), rewards.cpu().numpy(), dones, infos
 
     def close(self) -> None:

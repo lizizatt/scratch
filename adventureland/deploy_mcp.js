@@ -21,9 +21,9 @@ const UPLOADS = [
   { file: "mage.js", name: "Sarene", match: /sarene/i },
   { file: "priest.js", name: "Zarook", match: /zarook/i },
   { file: "merchant.js", name: "Puppygirl", match: /puppygirl/i },
-  { file: "merchant_plan.js", name: "merchant_plan", match: /merchant_plan/i },
   { file: "merchant_ops.js", name: "merchant_ops", match: /merchant_ops/i },
-  { file: "merchant_combine.js", name: "merchant_combine", match: /merchant_combine/i },
+  { file: "gear_ops.js", name: "gear_ops", match: /gear_ops/i },
+  { file: "fighter_core.js", name: "fighter_core", match: /fighter_core/i },
 ];
 
 function readToken() {

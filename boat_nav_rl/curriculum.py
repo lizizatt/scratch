@@ -40,7 +40,7 @@ PHASES: Tuple[PhaseSpec, ...] = (
             "success_rate_min": 0.75,
             "mean_speed_mps_min": 4.0,
             "mean_speed_mps_max": 6.5,
-            "mean_goal_zone_speed_mps_max": 0.35,
+            "mean_goal_zone_speed_mps_max": 0.40,  # 3-DOF sway adds minor in-zone ground speed
             "pct_goal_zone_at_min_speed_min": 0.50,
         },
         notes_suffix="curriculum phase0 navigate hold + exercise waypoints",
@@ -85,7 +85,7 @@ PHASES: Tuple[PhaseSpec, ...] = (
         gated_hold=False,
         exit={
             "zone_entry_rate_min": 0.45,
-            "mean_approach_speed_mps_max": 3.0,
+            "mean_approach_speed_mps_max": 3.2,  # 3-DOF decel slightly slower than kinematic plant
             "collision_rate_max": 0.12,
         },
         notes_suffix="curriculum phase2 approach decel",
@@ -101,7 +101,7 @@ PHASES: Tuple[PhaseSpec, ...] = (
         exit={
             "zone_entry_rate_min": 0.4,
             "pct_goal_zone_at_min_speed_min": 0.5,
-            "mean_goal_zone_speed_mps_max": 0.5,
+            "mean_goal_zone_speed_mps_max": 0.55,
             "success_rate_min": 0.10,
         },
         notes_suffix="curriculum phase3 literal stop",
@@ -117,7 +117,7 @@ PHASES: Tuple[PhaseSpec, ...] = (
         exit={
             "success_rate_min": 0.15,
             "collision_rate_max": 0.05,
-            "mean_goal_zone_speed_mps_max": 0.25,
+            "mean_goal_zone_speed_mps_max": 0.30,
             "zone_entry_rate_min": 0.5,
         },
         notes_suffix="curriculum phase4 polish",
@@ -165,11 +165,11 @@ def list_ui_training_presets() -> List[Dict[str, Any]]:
         {
             "id": "quick_start",
             "label": "Quick start (recommended)",
-            "description": "Navigate in clear water — 30 min, 15 s hold, phase-0 reward shaping.",
+            "description": "Navigate in clear water — 30 min, learn cruise speed first (hold off).",
             "mode": "navigate",
             "budget_sec": 1800,
             "goal_hold_sec": P.DEFAULT_GOAL_HOLD_SEC_UI,
-            "gated_hold": True,
+            "gated_hold": False,
             "current_enabled": False,
             "dynamics_jitter": False,
             "robust_eval_enabled": False,

@@ -27,7 +27,7 @@ export const GREATSWORD: WeaponMoveset = {
 };
 
 /**
- * Spear — unlocked with stormlight.
+ * Spear — always available on the select screen.
  * MVP: same numbers as greatsword (distinct art/feel later).
  */
 export const SPEAR: WeaponMoveset = {

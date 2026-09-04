@@ -2,7 +2,7 @@ param(
     [string]$Project = "ins_display",
     [ValidateSet("compile", "upload", "monitor", "flash", "list")]
     [string]$Action = "flash",
-    [string]$Port = "COM16",
+    [string]$Port = "COM17",
     [switch]$NoWifi
 )
 

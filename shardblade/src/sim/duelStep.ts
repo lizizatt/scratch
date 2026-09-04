@@ -8,6 +8,8 @@ export type TickCombatantsOptions = {
    * Defaults to encounter.beginSwing(playerStyle).
    */
   onEnemyNewSwing?: () => void;
+  /** Player one-shots; enemy hits deal no damage. */
+  godMode?: boolean;
 };
 
 /**
@@ -23,13 +25,18 @@ export function tickCombatants(
   const onEnemyNewSwing =
     opts.onEnemyNewSwing ??
     (() => encounter.beginSwing(player.cooldown.style));
+  const godMode = opts.godMode ?? false;
 
   const results: AttackResult[] = [];
 
   if (!player.dead) {
     const playerHit = player.cooldown.tick(dt);
     if (playerHit && !encounter.enemy.dead) {
-      results.push(resolveHit(player, encounter.enemy, playerHit));
+      results.push(
+        resolveHit(player, encounter.enemy, playerHit, {
+          oneShot: godMode,
+        }),
+      );
     }
   }
 
@@ -38,7 +45,11 @@ export function tickCombatants(
       onNewSwing: onEnemyNewSwing,
     });
     if (enemyHit) {
-      results.push(resolveHit(encounter.enemy, player, enemyHit));
+      results.push(
+        resolveHit(encounter.enemy, player, enemyHit, {
+          invincible: godMode,
+        }),
+      );
     }
   }
 

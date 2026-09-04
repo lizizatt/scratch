@@ -95,6 +95,10 @@ void apply_motor_b(uint8_t pct, bool forward = true) {
 }
 
 void apply_motors() {
+  if (g_test_on || (g_armed && (g_pct_a > 0 || g_pct_b > 0))) {
+    drv8833_wake();
+  }
+
   if (g_test_on) {
   const uint8_t pct = 100;
     if (g_test_channel == 1) {
@@ -162,19 +166,32 @@ bool begin_test_hold(const String& line) {
     apply_motor_a(pct, fwd);
     pin_coast(PIN_MOTOR_B1);
     pin_coast(PIN_MOTOR_B2);
+    reply(fwd ? "DIAG,GPIO16=HIGH,GPIO21=LOW,ribbon8=AIN1,ribbon11=AIN2"
+              : "DIAG,GPIO16=LOW,GPIO21=HIGH,ribbon8=AIN2,ribbon11=AIN1");
   } else if (g_test_channel == 2) {
     pin_coast(PIN_MOTOR_A1);
     pin_coast(PIN_MOTOR_A2);
     apply_motor_b(pct, fwd);
+    reply(fwd ? "DIAG,GPIO33=HIGH,GPIO15=LOW,ribbon12=BIN1,ribbon7=BIN2"
+              : "DIAG,GPIO33=LOW,GPIO15=HIGH,ribbon12=BIN2,ribbon7=BIN1");
   } else {
-    apply_motor_a(pct, fwd);
+    apply_motor_a(pct, true);
     apply_motor_b(pct, !g_motor_b_invert);
+    reply("DIAG,GPIO16=HIGH,GPIO21=LOW,GPIO33=HIGH,GPIO15=LOW");
   }
 
+  char buf[96];
+  snprintf(buf, sizeof(buf), "DIAG,READ,A1=%d,A2=%d,B1=%d,B2=%d,SLEEP=%d", digitalRead(PIN_MOTOR_A1),
+           digitalRead(PIN_MOTOR_A2), digitalRead(PIN_MOTOR_B1), digitalRead(PIN_MOTOR_B2),
+#if defined(PIN_DRV_SLEEP)
+           digitalRead(PIN_DRV_SLEEP)
+#else
+           -1
+#endif
+  );
+  reply(buf);
   reply(g_test_reverse ? "OK,TEST,HOLD,REV" : "OK,TEST,HOLD");
-  reply("HOLD,press_any_key_to_stop");
-  reply("DIAG,motor across OUT1-OUT2 not OUT-GND; meter OUT1 vs OUT2 ~7V");
-  reply("DIAG,J2 OPEN; EEP -> GPIO4; ULT high=fault if low");
+  reply("HOLD,meter ribbon pin8/11 vs GND (not module until ribbon OK)");
   while (g_test_on) {
     if (pg_link_input_pending()) {
       pg_link_consume_input();
@@ -265,6 +282,7 @@ void handle_line(String line) {
   }
   if (line.equalsIgnoreCase("ARM")) {
     g_armed = true;
+    drv8833_wake();
     reply("OK,ARMED");
     return;
   }

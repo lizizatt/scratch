@@ -35,15 +35,15 @@ function baseG() {
       hpot1: { g: 100, type: "pot" },
       mpot0: { g: 20, type: "pot" },
       mpot1: { g: 100, type: "pot" },
-      helmet: { g: 1200, type: "helmet", upgrade: true },
-      coat: { g: 2400, type: "chest", upgrade: true },
-      pants: { g: 1600, type: "pants", upgrade: true },
-      shoes: { g: 800, type: "shoes", upgrade: true },
-      gloves: { g: 800, type: "gloves", upgrade: true },
-      blade: { g: 2400, type: "weapon", wtype: "short_sword", upgrade: true },
-      staff: { g: 2400, type: "weapon", wtype: "staff", upgrade: true },
-      wand: { g: 2400, type: "weapon", wtype: "wand", upgrade: true },
-      bow: { g: 2400, type: "weapon", wtype: "bow", upgrade: true },
+      helmet: { g: 1200, type: "helmet", upgrade: true, armor: 8, grades: [7, 9, 10, 12] },
+      coat: { g: 2400, type: "chest", upgrade: true, armor: 12, grades: [7, 9, 10, 12] },
+      pants: { g: 1600, type: "pants", upgrade: true, armor: 10, grades: [7, 9, 10, 12] },
+      shoes: { g: 800, type: "shoes", upgrade: true, armor: 4, grades: [7, 9, 10, 12] },
+      gloves: { g: 800, type: "gloves", upgrade: true, armor: 4, grades: [7, 9, 10, 12] },
+      blade: { g: 2400, type: "weapon", wtype: "short_sword", upgrade: true, attack: 20, grades: [7, 9, 10, 12] },
+      staff: { g: 2400, type: "weapon", wtype: "staff", upgrade: true, attack: 20, grades: [7, 9, 10, 12] },
+      wand: { g: 2400, type: "weapon", wtype: "wand", upgrade: true, attack: 18 },
+      bow: { g: 2400, type: "weapon", wtype: "bow", upgrade: true, attack: 18 },
       scroll0: { g: 1000 },
       scroll1: { g: 40000 },
       tracker: { g: 1 },
@@ -58,6 +58,24 @@ function baseG() {
       stonekey: { g: 50000, type: "dungeon_key" },
       armorring: { g: 180000, type: "ring", compound: { armor: 9 } },
       vitring: { g: 24000, type: "ring", compound: { armor: 1 }, grades: [2, 5] },
+      ringsj: { g: 24000, type: "ring", compound: { str: 2 }, grades: [2, 5] },
+      hpbelt: { g: 12000, type: "belt", compound: { hp: 60 }, grades: [2, 5] },
+      hpamulet: { g: 12000, type: "amulet", compound: { hp: 60 }, grades: [2, 5] },
+      stramulet: { g: 12000, type: "amulet", compound: { str: 2 }, grades: [2, 5] },
+      intbelt: { g: 12000, type: "belt", compound: { int: 2 }, grades: [2, 5] },
+      rednose: { g: 12000, type: "helmet" },
+      candycanesword: { g: 2400, type: "weapon", wtype: "short_sword", upgrade: true, attack: 21, grades: [0, 8, 10, 12] },
+      carrotsword: { g: 2400, type: "weapon", wtype: "short_sword", upgrade: true, attack: 21, grades: [0, 7, 10, 12] },
+      mushroomstaff: { g: 2400, type: "weapon", wtype: "staff", upgrade: true, attack: 27, grades: [5, 8, 10, 12] },
+      xmashat: { g: 800, type: "helmet", upgrade: true, grades: [4, 8, 10, 12] },
+      eears: { g: 800, type: "helmet", upgrade: true, grades: [6, 9, 10, 12] },
+      epyjamas: { g: 800, type: "chest", upgrade: true, grades: [5, 8, 10, 12] },
+      eslippers: { g: 800, type: "shoes", upgrade: true, grades: [7, 9, 10, 12] },
+      wshoes: { g: 800, type: "shoes", upgrade: true, grades: [7, 9, 10, 12] },
+      wcap: { g: 800, type: "helmet", upgrade: true, grades: [7, 9, 10, 12] },
+      wattire: { g: 800, type: "chest", upgrade: true, grades: [7, 9, 10, 12] },
+      wbook0: { g: 12000, type: "source", grades: [4, 5, 6, 7] },
+      shield: { g: 24000, type: "shield", upgrade: true, grades: [4, 8, 10, 12] },
       lotusf: { g: 12000 },
       snakefang: { g: 1200 }
     },
@@ -76,6 +94,15 @@ function baseG() {
       partyheal: { mp: 400, cooldown: 200 },
       revive: { mp: 500, cooldown: 200 },
       mluck: { mp: 10, cooldown: 100, level: 40, range: 320 }
+    },
+    maps: {
+      main: {
+        monsters: [
+          { type: "goo", boundary: [-80, 100, 80, 260] },
+          { type: "spider", boundary: [700, -282, 1196, -6] },
+          { type: "scorpion", boundary: [1485, -390, 1670, 54] }
+        ]
+      }
     }
   };
 }
@@ -185,7 +212,13 @@ function makeEnv(charOver) {
     },
     in_arr: (v, arr) => Array.isArray(arr) && arr.indexOf(v) >= 0,
     quantity, locate_item,
-    item_grade: (it) => (it && (it.level || 0) >= 7 ? 1 : 0),
+    item_grade: (it) => {
+      if (!it || !G.items[it.name]) return -1;
+      const grades = G.items[it.name].grades || [7, 9];
+      let gl = 0;
+      for (let i = 0; i < grades.length; i++) if ((it.level || 0) >= grades[i]) gl = i + 1;
+      return gl;
+    },
     mssince: (t) => Date.now() - (t instanceof Date ? t.getTime() : t),
     min: Math.min, max: Math.max,
     sleep: (ms) => {
@@ -265,17 +298,27 @@ function makeEnv(charOver) {
       log.retrieved.push({ pack, i, item: it.name, q: it.q || 1 });
       if (character.bank) character._bank = character.bank;
     },
-    send_item: (name, i, q) => {
+    send_item: async (name, i, q) => {
       const it = character.items[i];
       const t = name === character.name ? character : parent.entities[name];
-      if (!it) return;
-      if (!t) { log.sendFail.push({ kind: "item", name, reason: "no_target" }); return; }
-      if (t.map && t.map !== character.map) { log.sendFail.push({ kind: "item", name, reason: "map" }); return; }
-      if (parent.distance(character, t) > 400) { log.sendFail.push({ kind: "item", name, reason: "distance" }); return; }
-      if (t.esize === 0) { log.sendFail.push({ kind: "item", name, reason: "no_space" }); return; }
-      log.sent.push({ name, item: it.name, q: q || 1, i });
-      const left = (it.q || 1) - (q || 1);
+      if (!it) return { failed: true, reason: "no_item" };
+      if (!t) { log.sendFail.push({ kind: "item", name, reason: "no_target" }); return { failed: true, reason: "no_target" }; }
+      if (t.map && t.map !== character.map) { log.sendFail.push({ kind: "item", name, reason: "map" }); return { failed: true, reason: "map" }; }
+      if (parent.distance(character, t) > 320) { log.sendFail.push({ kind: "item", name, reason: "distance" }); return { failed: true, reason: "distance" }; }
+      if (t.esize === 0) { log.sendFail.push({ kind: "item", name, reason: "no_space" }); return { failed: true, reason: "no_space" }; }
+      const qty = q || 1;
+      const left = (it.q || 1) - qty;
+      const piece = left > 0 ? Object.assign({}, it, { q: qty }) : it;
       character.items[i] = left > 0 ? Object.assign({}, it, { q: left }) : null;
+      if (left <= 0) character.esize = (character.esize || 0) + 1;
+      if (t.items) {
+        const slot = t.items.findIndex((x) => !x);
+        if (slot < 0) { log.sendFail.push({ kind: "item", name, reason: "no_space" }); return { failed: true, reason: "no_space" }; }
+        t.items[slot] = piece;
+        t.esize = Math.max(0, (t.esize || 1) - 1);
+      }
+      log.sent.push({ name, item: piece.name, q: qty, i });
+      return { success: true };
     },
     send_gold: (name, amount) => {
       const t = (name && name.name) ? name : (name === character.name ? character : parent.entities[name]);
@@ -292,7 +335,17 @@ function makeEnv(charOver) {
     heal: (t) => log.healed.push(t && t.name),
     move: (x, y) => log.moved.push({ x, y }),
     use_skill: (s, t) => { log.skills.push(s); log.skillArgs = log.skillArgs || []; log.skillArgs.push({ name: s, target: t && (t.name || t.id || t) }); },
-    use: (s) => log.skills.push("use:" + s),
+    use: (s) => {
+      log.skills.push("use:" + s);
+      if (s === "town") {
+        character.map = "main";
+        character.real_x = 0;
+        character.real_y = 0;
+        character.x = 0;
+        character.y = 0;
+        character.bank = null;
+      }
+    },
     loot: () => {},
     change_target: (t) => { character.target = t && t.id; },
     set_message: (m) => { env.lastMessage = m; },
@@ -369,7 +422,30 @@ function makeEnv(charOver) {
     accept_party_invite: (n) => log.accepted.push(n),
     accept_party_request: (n) => { log.acceptedReq = log.acceptedReq || []; log.acceptedReq.push(n); },
     accept_magiport: (n) => { log.magiport = log.magiport || []; log.magiport.push(n); },
-    equip: async (n) => { log.equipped.push(n); },
+    equip: async (n, slot) => {
+      const it = character.items[n];
+      if (!it) { log.equipped.push(n); return; }
+      if (slot) {
+        const prev = character.slots[slot];
+        character.slots[slot] = it;
+        character.items[n] = prev || null;
+        if (!prev) character.esize = (character.esize || 0) + 1;
+        log.equipped.push({ i: n, slot });
+      } else log.equipped.push(n);
+    },
+    item_properties: (it) => {
+      if (!it || !G.items[it.name]) return null;
+      const g = G.items[it.name], lv = it.level || 0, mul = 1 + 0.08 * lv;
+      return {
+        attack: g.attack != null ? g.attack * mul : undefined,
+        armor: g.armor != null ? g.armor * mul : (g.compound && g.compound.armor) || undefined,
+        resistance: g.resistance != null ? g.resistance * mul : undefined,
+        hp: g.hp != null ? g.hp * mul : (g.compound && g.compound.hp) || undefined,
+        str: g.str != null ? g.str * mul : (g.compound && g.compound.str) || undefined,
+        int: g.int != null ? g.int * mul : (g.compound && g.compound.int) || undefined,
+        vit: g.vit != null ? g.vit * mul : (g.compound && g.compound.vit) || undefined
+      };
+    },
     unequip: async (slot) => {
       await Promise.resolve();
       if (("" + slot).indexOf("trade") === 0 && !character.stand) {
@@ -386,7 +462,20 @@ function makeEnv(charOver) {
       character.items[i] = it;
       character.esize = Math.max(0, (character.esize || 1) - 1);
     },
-    upgrade: async (item, scroll) => { log.upgraded.push({ item, scroll }); const it = character.items[item]; if (it) it.level = (it.level || 0) + 1; },
+    upgrade: async (item, scroll, offering, calc) => {
+      if (calc) return { chance: 0.95 };
+      log.upgraded.push({ item, scroll });
+      const it = character.items[item];
+      if (it) it.level = (it.level || 0) + 1;
+      const sc = character.items[scroll];
+      if (sc) {
+        const left = (sc.q || 1) - 1;
+        character.items[scroll] = left > 0 ? Object.assign({}, sc, { q: left }) : null;
+        if (left <= 0) character.esize = (character.esize || 0) + 1;
+      }
+      character.q = Object.assign(character.q || {}, { upgrade: { ms: 400 } });
+      return { success: true };
+    },
     is_character_local: () => true,
     load_code: (name) => {
       const file = /\.js$/.test(name) ? name : name + ".js";

@@ -1,10 +1,72 @@
 var busy = false, PLAN_OK = false, CYCLE_MS = 300000, cycle_at = 0;
 var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "II"];
-var HOLD = [["armorring", 1]], GOLD_FLOAT = 100000, COMBINE_MAX = 5, SALE_MULT = 0.95;
+var HOLD = [["armorring", 1], ["vitring", 9], ["blade", 1], ["staff", 1], ["helmet", 1], ["coat", 1], ["pants", 1], ["shoes", 3], ["gloves", 3], ["ringsj", 6], ["hpbelt", 3], ["hpamulet", 3], ["wshoes", 2], ["wcap", 1], ["wbook0", 1], ["shield", 1]], GOLD_FLOAT = 100000, COMBINE_MAX = 5, SALE_MULT = 0.95;
 try {
-  load_code("merchant_plan"); load_code("merchant_ops"); load_code("merchant_combine");
-  if (typeof run_combine === "function" && typeof stock_store === "function" && typeof park_bag === "function" && typeof buy_scroll === "function") PLAN_OK = true; else throw 1;
+  load_code("merchant_ops"); load_code("gear_ops");
+  if (typeof stock_store !== "function" || typeof park_bag !== "function") throw 1;
 } catch (e) { game_log("plan load fail"); set_message("No plan"); }
+async function buy_scroll(name) {
+  var spend = character.gold - (GOLD_FLOAT || 0), cost = vg(name);
+  if (!(spend > 0) || !(cost > 0) || spend < cost) return "fail";
+  if (!(await go_npc("upgrade"))) return "fail";
+  try { await buy_with_gold(name, 1); return "bought"; } catch (e) { game_log("scroll buy fail"); return "fail"; }
+}
+async function pull_combine(name, level) {
+  var need, e, r;
+  need = 3 - cnt(name, level, "bag");
+  if (need <= 0) return "have";
+  if (typeof ensure_bag === "function" && !(await ensure_bag(need))) return "fail";
+  while (cnt(name, level, "bag") < 3) {
+    e = find_ent(name, level, "bank") || find_ent(name, level, "sale") || find_ent(name, level, "gear");
+    if (!e) return "fail";
+    r = await move_ent(e, "bag");
+    if (r === "fail") return "fail";
+  }
+  return "have";
+}
+function prio_i(name) {
+  var p = typeof COMBINE_PRIORITY !== "undefined" ? COMBINE_PRIORITY : null, i;
+  if (!p) return 99;
+  i = p.indexOf(name); return i < 0 ? 99 : i;
+}
+async function combine_step() {
+  var a = idx(), cand = [], seen = {}, i, name, lv0, three, sc, sci, r;
+  for (i = 0; i < a.length; i++) {
+    name = a[i].name; lv0 = a[i].level || 0;
+    if (seen[name + "@" + lv0] || !(G.items[name] && G.items[name].compound) || lv0 >= (COMBINE_MAX || 5)) continue;
+    seen[name + "@" + lv0] = 1;
+    if (cnt(name, lv0) >= 3) cand.push({ name: name, level: lv0 });
+  }
+  cand.sort(function (x, y) { var px = prio_i(x.name), py = prio_i(y.name); return px !== py ? px - py : y.level - x.level; });
+  for (i = 0; i < cand.length; i++) {
+    name = cand[i].name; lv0 = cand[i].level;
+    r = await pull_combine(name, lv0);
+    if (r !== "have") continue;
+    three = bag_three(name, lv0); sc = cscroll(name, lv0); sci = locate_item(sc);
+    if (!three) continue;
+    if (sci < 0) {
+      r = await buy_scroll(sc);
+      if (r !== "bought") continue;
+      sci = locate_item(sc);
+      if (sci < 0) continue;
+      three = bag_three(name, lv0);
+      if (!three) continue;
+    }
+    if (!(await go_npc("upgrade"))) return "fail";
+    try { await compound(three[0], three[1], three[2], sci); await wait_q("compound"); return "ok"; } catch (err) { return "fail"; }
+  }
+  return null;
+}
+async function run_combine() {
+  var n, r;
+  for (n = 0; n < 24; n++) {
+    r = await combine_step();
+    if (r === "ok") continue;
+    return;
+  }
+}
+PLAN_OK = typeof stock_store === "function" && typeof park_bag === "function" && typeof run_combine === "function" && typeof buy_scroll === "function";
+if (!PLAN_OK) { game_log("plan load fail"); set_message("No plan"); }
 function go_home() { if (parent.server_region === HOME[0] && parent.server_identifier === HOME[1]) return false; try { change_server(HOME[0], HOME[1]); } catch (e) {} return true; }
 function is_pot(it) { return it && (it.name.indexOf("hpot") === 0 || it.name.indexOf("mpot") === 0); }
 function stand_i() { return locate_item("stand0"); }
@@ -29,20 +91,16 @@ function hunt(mob) {
   try { send_cm("Jazwyn", { hunt: k }); } catch (e) {}
   set_message("Hunt " + k); game_log("Hunt " + k);
 }
-function grind() {
-  try { pm("Jazwyn", "grind"); } catch (e) {}
-  try { send_cm("Jazwyn", { grind: 1 }); } catch (e) {}
-  set_message("Grind"); game_log("Grind sent");
-}
+function grind() { try { pm("Jazwyn", "grind"); } catch (e) {} try { send_cm("Jazwyn", { grind: 1 }); } catch (e) {} set_message("Grind"); game_log("Grind sent"); }
 function next_trade() { for (var s = 1; s <= 16; s++) if (!character.slots["trade" + s]) return s; return -1; }
 function sale_clear() { for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) return false; return true; }
 async function list_sale() {
-  var cand = [], i, it, g, slot, skip = typeof held_set === "function" ? held_set() : {};
+  var cand = [], i, it, g, slot;
   await ensure_stand(true);
   for (i = 0; i < character.items.length; i++) {
     it = character.items[i];
     if (!it || it.price != null || is_pot(it) || it.name === "stand0" || it.l) continue;
-    if (skip[it.name] || (typeof keep_combine === "function" && keep_combine(it))) continue;
+    if ((typeof hold_item === "function" && hold_item(it)) || (typeof keep_combine === "function" && keep_combine(it))) continue;
     g = G.items[it.name]; if (!g) continue;
     cand.push({ i: i, name: it.name, g: typeof rank_val === "function" ? rank_val(it) : (g.g || 20), q: it.q || 1 });
   }
@@ -88,7 +146,10 @@ function mluck_near() {
   }
 }
 async function run_econ() {
+  if (typeof start_gear_session === "function") { set_message("Gear"); await start_gear_session(); }
   set_message("Combine"); if (typeof run_combine === "function") await run_combine();
+  if (typeof upgrade_one === "function") { set_message("Upgrade"); await upgrade_one(); }
+  if (typeof ponty_buy === "function") { set_message("Ponty"); await ponty_buy(); }
   set_message("Stock"); return !!(await stock_store());
 }
 async function run_cycle() {

@@ -58,6 +58,35 @@ describe("resolveHit", () => {
     expect(defender.dead).toBe(true);
     expect(defender.hp).toBe(0);
   });
+
+  it("oneShot bypasses same-style parry and kills", () => {
+    const attacker = createCombatant("player", 15, "fast");
+    const defender = createCombatant("enemy", 15, "fast");
+    const result = resolveHit(
+      attacker,
+      defender,
+      { style: "fast", damage: 3, hitAt: 1 },
+      { oneShot: true },
+    );
+    expect(result.parried).toBe(false);
+    expect(result.lethal).toBe(true);
+    expect(result.damage).toBe(15);
+    expect(defender.dead).toBe(true);
+  });
+
+  it("invincible ignores incoming damage", () => {
+    const attacker = createCombatant("enemy", 15, "heavy");
+    const defender = createCombatant("player", 15, "fast");
+    const result = resolveHit(
+      attacker,
+      defender,
+      { style: "heavy", damage: 5, hitAt: 1 },
+      { invincible: true },
+    );
+    expect(result.damage).toBe(0);
+    expect(defender.hp).toBe(15);
+    expect(defender.dead).toBe(false);
+  });
 });
 
 describe("CombatDuel", () => {

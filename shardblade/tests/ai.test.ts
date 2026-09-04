@@ -5,7 +5,7 @@ import { ENCOUNTER_ORDER, encounterDef, spawnEncounter } from "../src/sim/encoun
 import { attackPeriod } from "../src/sim/styles";
 
 describe("demo encounter ladder", () => {
-  it("walks through five swing-cycle modes ending in oppose chasmfiend", () => {
+  it("walks through snails, soldiers, then oppose chasmfiend", () => {
     expect(ENCOUNTER_ORDER).toEqual([
       "fight1",
       "fight2",
@@ -14,22 +14,32 @@ describe("demo encounter ladder", () => {
       "boss",
     ]);
     expect(encounterDef("fight1")).toMatchObject({
-      aiKind: "alwaysFast",
-      tutorial: "fast (q) parries fast",
-    });
-    expect(encounterDef("fight2")).toMatchObject({
+      visual: "snail",
       aiKind: "alwaysHeavy",
+      hp: Math.floor(tuning.BASE_ENEMY_HP / 2),
+      taunt: "Squeak?!",
       tutorial: "heavy (e) parries heavy",
     });
+    expect(encounterDef("fight2")).toMatchObject({
+      visual: "snail",
+      aiKind: "alwaysFast",
+      hp: Math.floor(tuning.BASE_ENEMY_HP / 2),
+      taunt: "Squeak?!",
+      tutorial: "fast (q) parries fast",
+    });
     expect(encounterDef("fight3")).toMatchObject({
+      visual: "guard",
       aiKind: "alternate",
+      hp: tuning.BASE_ENEMY_HP,
       tutorial: "defend (s) parries everything",
     });
     expect(encounterDef("fight4")).toMatchObject({
+      visual: "guard",
       aiKind: "mirror",
       tutorial: "escape the chasm",
     });
     expect(encounterDef("boss")).toMatchObject({
+      visual: "chasmfiend",
       aiKind: "oppose",
       tutorial: null,
       hp: tuning.BASE_ENEMY_HP * 2,
@@ -38,25 +48,24 @@ describe("demo encounter ladder", () => {
 });
 
 describe("swing-cycle encounter AI", () => {
-  it("fight1 stays fast across swings", () => {
+  it("fight1 snail stays heavy across swings", () => {
     const enc = spawnEncounter("fight1");
+    expect(enc.enemy.cooldown.style).toBe("heavy");
+    enc.beginSwing("fast");
+    expect(enc.enemy.cooldown.style).toBe("heavy");
+    enc.beginSwing("defend");
+    expect(enc.enemy.cooldown.style).toBe("heavy");
+  });
+
+  it("fight2 snail stays fast across swings", () => {
+    const enc = spawnEncounter("fight2");
     expect(enc.enemy.cooldown.style).toBe("fast");
     enc.beginSwing("heavy");
     expect(enc.enemy.cooldown.style).toBe("fast");
-    enc.beginSwing("defend");
-    expect(enc.enemy.cooldown.style).toBe("fast");
   });
 
-  it("fight2 stays heavy across swings", () => {
-    const enc = spawnEncounter("fight2");
-    expect(enc.enemy.cooldown.style).toBe("heavy");
-    enc.beginSwing("fast");
-    expect(enc.enemy.cooldown.style).toBe("heavy");
-  });
-
-  it("fight3 alternates each swing", () => {
+  it("fight3 guard alternates each swing", () => {
     const enc = spawnEncounter("fight3");
-    // spawn already called beginSwing once → fast, alternateNext=heavy
     expect(enc.enemy.cooldown.style).toBe("fast");
     enc.beginSwing("fast");
     expect(enc.enemy.cooldown.style).toBe("heavy");
@@ -64,7 +73,7 @@ describe("swing-cycle encounter AI", () => {
     expect(enc.enemy.cooldown.style).toBe("fast");
   });
 
-  it("fight4 mirrors the player at swing start", () => {
+  it("fight4 guard mirrors the player at swing start", () => {
     const enc = spawnEncounter("fight4");
     enc.beginSwing("heavy");
     expect(enc.enemy.cooldown.style).toBe("heavy");
@@ -83,10 +92,9 @@ describe("swing-cycle encounter AI", () => {
   });
 
   it("applies switch penalty on AI fast → heavy, not heavy → fast", () => {
-    const enc = spawnEncounter("fight4");
+    const enc = spawnEncounter("fight3");
     enc.enemy.cooldown.progress = 0.4;
-    enc.beginSwing("heavy"); // mirror → heavy from previous fast spawn; was fast, now heavy
-    // After spawn beginSwing("fast") enemy was fast. beginSwing heavy: decide mirror→heavy, setStyle fast→heavy penalized
+    enc.beginSwing("heavy"); // alternate → heavy from previous fast spawn
     const expected = 0.4 - tuning.STYLE_SWITCH_PENALTY_S / attackPeriod("heavy");
     expect(enc.enemy.cooldown.style).toBe("heavy");
     expect(enc.enemy.cooldown.progress).toBeCloseTo(expected, 5);

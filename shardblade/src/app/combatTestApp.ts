@@ -1,9 +1,7 @@
-import type { MetaState } from "../sim/meta";
 import type { CombatTestSim } from "../sim/combatTest";
 import { drawFrame, type FrameModel, type UiRects } from "../render/draw";
 import { layoutCombat } from "../render/layout";
 import { hitTestStyle, pointInRect } from "../render/hitTest";
-import { DEFAULT_META } from "../sim/meta";
 import type { Style } from "../sim/types";
 import type { TestAiKind } from "../sim/testAi";
 
@@ -14,10 +12,6 @@ export class CombatTestApp {
   private uiRects: UiRects | null = null;
   private readonly width: number;
   private readonly height: number;
-  private readonly meta: MetaState = {
-    ...DEFAULT_META,
-    unlockedClasses: [...DEFAULT_META.unlockedClasses],
-  };
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -45,7 +39,6 @@ export class CombatTestApp {
     const model: FrameModel = {
       snap: this.sim.snapshot(),
       screen: "run",
-      meta: this.meta,
       selectedClass: this.sim.weaponClass,
       selectedSkin: this.sim.skin,
       message: null,

@@ -1,9 +1,9 @@
 "use strict";
 
 const LADDER = [
-  [1, "goo"], [8, "bee"], [12, "crab"], [16, "snake"], [20, "armadillo"],
-  [24, "arcticbee"], [28, "porcupine"], [32, "croc"], [34, "tortoise"], [36, "bat"],
-  [42, "spider"], [48, "scorpion"], [54, "boar"], [60, "bigbird"], [66, "gscorpion"],
+  [1, "goo"], [4, "bee"], [8, "crab"], [12, "snake"], [16, "armadillo"],
+  [20, "arcticbee"], [24, "porcupine"], [28, "croc"], [30, "tortoise"], [32, "bat"],
+  [42, "spider"], [50, "scorpion"], [54, "boar"], [60, "bigbird"], [66, "gscorpion"],
   [72, "wolf"], [78, "dryad"]
 ];
 const PARTY = ["Jazwyn", "Sarene", "Zarook"];
@@ -11,7 +11,7 @@ const LEADER = "Jazwyn";
 const TANK = "Jazwyn";
 const POTION_TARGET = 500;
 const POTION_MIN = 40;
-const MAX_ATTACK_RATIO = 0.28;
+const MAX_ATTACK_RATIO = 0.24;
 const MAX_SCRIPT_LEVEL = 90;
 const MAX_GEAR_LEVEL = 5;
 const MIN_GOLD = 8000;
@@ -186,14 +186,37 @@ function priestDecision(self, members, canHealId, canPartyheal) {
 }
 
 function classifyChat(from, message, selfName, party) {
-  if (!from || from === selfName) return { gratz: false, rally: false, ok: false, summon: false };
-  var m = ("" + message).toLowerCase();
-  var gratz = m.indexOf("ding") >= 0;
-  if (party.indexOf(from) < 0) return { gratz: gratz, rally: false, ok: false, summon: false };
-  if (m.indexOf("potion") >= 0) return { gratz: gratz, rally: "potions", ok: true, summon: false };
-  if (m.indexOf("upgrade") >= 0) return { gratz: gratz, rally: "upgrade", ok: true, summon: false };
-  if (m.indexOf("summon") >= 0) return { gratz: gratz, rally: false, ok: false, summon: true };
-  return { gratz: gratz, rally: false, ok: false, summon: false };
+  var m = ("" + (message || "")).trim(), low = m.toLowerCase(), cmd = null, k, gratz, inParty;
+  if (low === "!hold") cmd = { type: "hold" };
+  else if (low === "!resume") cmd = { type: "resume" };
+  else if (low === "!grind") cmd = { type: "grind" };
+  else if (low.indexOf("!hunt ") === 0) {
+    k = low.slice(6).replace(/[^a-z0-9_]/g, "");
+    if (k) cmd = { type: "hunt", mtype: k };
+  } else if (low.indexOf("let's kill ") === 0 || low.indexOf("lets kill ") === 0) {
+    k = low.replace(/^let'?s kill /, "").replace(/!+$/, "").replace(/[^a-z0-9_]/g, "");
+    if (k) cmd = { type: "hunt", mtype: k };
+  } else if (low.indexOf("back to the grind") >= 0) cmd = { type: "grind" };
+  if (cmd) return { cmd: cmd, gratz: false, rally: false, ok: false, status: null };
+  if (low.indexOf("~s ") === 0 || low.indexOf("~s") === 0) {
+    return { cmd: null, gratz: false, rally: false, ok: false, status: parseStatus(m) };
+  }
+  if (!from || from === selfName) return { cmd: null, gratz: false, rally: false, ok: false, status: null };
+  gratz = low.indexOf("ding") >= 0;
+  inParty = party && party.indexOf(from) >= 0;
+  if (!inParty) return { cmd: null, gratz: gratz, rally: false, ok: false, status: null };
+  if (low.indexOf("potion") >= 0) return { cmd: null, gratz: gratz, rally: "potions", ok: true, status: null };
+  if (low.indexOf("upgrade") >= 0) return { cmd: null, gratz: gratz, rally: "upgrade", ok: true, status: null };
+  return { cmd: null, gratz: gratz, rally: false, ok: false, status: null };
+}
+
+function parseStatus(message) {
+  var out = {}, parts = ("" + message).replace(/^~s\s*/i, "").split(/\s+/), i, kv;
+  for (i = 0; i < parts.length; i++) {
+    kv = parts[i].split("=");
+    if (kv.length === 2) out[kv[0]] = kv[1];
+  }
+  return out;
 }
 
 function skillReady(name, mp, skills, canUse, level) {
@@ -222,10 +245,6 @@ function peelTauntTarget(mobs, selfName, party, maxRange) {
     return m;
   }
   return null;
-}
-
-function magePortOk(atPack, moving, busy, canUse) {
-  return !!(atPack && !moving && !busy && canUse("magiport"));
 }
 
 function priestReviveTarget(members, hasEssence, canRevive) {
@@ -296,24 +315,50 @@ function canBuyBasic(gold, name, items) {
   return gold >= itemPrice(name, items, 1000) + MIN_GOLD;
 }
 
-function followDistance(ctype) {
-  return ctype === "priest" ? 80 : 180;
+const FORM_NEAR = 18, FORM_FAR = 40, FORM_SMART = 220;
+const FORM_MAGE = { dx: -45, dy: 55, face: 1 };
+const FORM_PRIEST = { dx: 45, dy: 55, face: 1 };
+
+function formationPos(lead, form, angle) {
+  var dx = form.dx || 0, dy = form.dy || 0, x = lead.x, y = lead.y, c, s;
+  if (form.face && angle != null && !isNaN(angle)) {
+    c = Math.cos(angle); s = Math.sin(angle);
+    return { map: lead.map, x: x + dx * c - dy * s, y: y + dx * s + dy * c };
+  }
+  return { map: lead.map, x: x + dx, y: y + dy };
 }
 
-function shouldFollow(self, leader, ctype) {
-  if (!leader) return false;
-  if (self.map !== leader.map) return true;
-  var dx = self.x - leader.x, dy = self.y - leader.y;
-  return Math.sqrt(dx * dx + dy * dy) > followDistance(ctype);
+function formDist(self, slot) {
+  if (!self || !slot) return 1e9;
+  if (self.map !== slot.map) return 1e9;
+  var dx = self.x - slot.x, dy = self.y - slot.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/** @returns {"idle"|"move"|"smart"} */
+function formAction(self, slot) {
+  var d = formDist(self, slot);
+  if (!slot || self.map !== slot.map || d > FORM_SMART) return "smart";
+  if (d > FORM_FAR) return "move";
+  return "idle";
+}
+
+function formNeedsReanchor(anchor, lead, thresh) {
+  if (!anchor || !lead) return true;
+  if (anchor.map !== lead.map) return true;
+  var lx = lead.x != null ? lead.x : lead.real_x, ly = lead.y != null ? lead.y : lead.real_y;
+  var dx = lx - anchor.x, dy = ly - anchor.y;
+  return Math.sqrt(dx * dx + dy * dy) > (thresh == null ? 70 : thresh);
 }
 
 module.exports = {
   LADDER, PARTY, LEADER, TANK, POTION_TARGET, POTION_MIN, MAX_ATTACK_RATIO,
   MAX_SCRIPT_LEVEL, MAX_GEAR_LEVEL, MIN_GOLD, SCROLL_BUY, WTYPES, ARMOR, BASICS,
+  FORM_NEAR, FORM_FAR, FORM_SMART, FORM_MAGE, FORM_PRIEST,
   pot, attCap, desired, partyFarmTarget, itemPrice, affordable, buyPotCounts, restockCost,
   isKeep, hasJunk, needsPots, needsVendor, usePotSkill,
-  farmable, pickCombatTarget, priestDecision, classifyChat, shouldCallPots,
-  skillReady, warriorSkillPlan, peelTauntTarget, magePortOk, priestReviveTarget,
+  farmable, pickCombatTarget, priestDecision, classifyChat, parseStatus, shouldCallPots,
+  skillReady, warriorSkillPlan, peelTauntTarget, priestReviveTarget,
   classWtypes, isGear, isClassGear, scrollName, findUpgrade, hasPiece, canBuyScrolls, canBuyBasic,
-  followDistance, shouldFollow, tankAnchor, tooClose, stepAway
+  formationPos, formDist, formAction, formNeedsReanchor, tankAnchor, tooClose, stepAway
 };
