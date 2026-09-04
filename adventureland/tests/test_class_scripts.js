@@ -180,10 +180,14 @@ test("formation ignores lead micro-moves until FORM_REANCHOR", async () => {
 });
 
 test("!hold from self applies hold on that character", () => {
-  const env = loadScript("mage.js", { name: "Sarene", ctype: "mage" });
-  env.hear({ from: "Sarene", message: "!hold" });
-  assert.strictEqual(env.hold, true);
-  assert.ok(env.log.said.some((s) => /Hold: restocking/i.test(s)));
+  const follower = loadScript("mage.js", { name: "Sarene", ctype: "mage" });
+  follower.hear({ from: "Sarene", message: "!hold" });
+  assert.strictEqual(follower.hold, true);
+  assert.ok(!(follower.log.game || []).some((s) => /Hold: restocking/i.test(s)), "followers stay quiet on hold");
+  const lead = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
+  lead.hear({ from: "Jazwyn", message: "!hold" });
+  assert.strictEqual(lead.hold, true);
+  assert.ok((lead.log.game || []).some((s) => /Hold: restocking/i.test(s)));
 });
 
 test("!hunt from another party member updates farm_ovr quietly", () => {
@@ -224,7 +228,11 @@ test("!resume from self clears hold", () => {
   assert.strictEqual(env.hold, true);
   env.hear({ from: "Zarook", message: "!resume" });
   assert.strictEqual(env.hold, false);
-  assert.ok(env.log.said.some((s) => /Resuming/i.test(s)));
+  assert.ok(!(env.log.game || []).some((s) => /Resuming/i.test(s)), "followers stay quiet on resume");
+  const lead = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
+  lead.hear({ from: "Jazwyn", message: "!hold" });
+  lead.hear({ from: "Jazwyn", message: "!resume" });
+  assert.ok((lead.log.game || []).some((s) => /Resuming/i.test(s)));
 });
 
 test("psay rate-limits party chat", () => {
@@ -402,10 +410,10 @@ eachClass("party Let's kill overrides the ladder", (spec) => {
 test("Jazwyn forwards puppygirl hunt/grind into party chat", () => {
   const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior", level: 40, max_hp: 2000 });
   env.emitCm("puppygirl", { hunt: "boar" });
-  assert.ok(env.log.said.some((s) => /Let's kill boar!/i.test(s)));
+  assert.ok((env.log.game || []).some((s) => /Let's kill boar!/i.test(s)));
   assert.strictEqual(env.farm_ovr, "boar");
   env.emitCm("puppygirl", { grind: 1 });
-  assert.ok(env.log.said.some((s) => /Back to the grind/i.test(s)));
+  assert.ok((env.log.game || []).some((s) => /Back to the grind/i.test(s)));
   assert.strictEqual(env.farm_ovr, null);
 });
 
@@ -429,9 +437,9 @@ eachClass("pot() gated at 30", (spec) => {
   assert.strictEqual(env.pot("hp"), "hpot1");
 });
 
-eachClass("needs_pots false when broke", (spec) => {
+eachClass("needs_pots true when low even if broke", (spec) => {
   const env = loadClass(spec, { gold: 0, items: [{ name: "hpot0", q: 2 }, ...new Array(41).fill(null)] });
-  assert.strictEqual(env.needs_pots(), false);
+  assert.strictEqual(env.needs_pots(), true);
 });
 
 eachClass("is_keep keeps pots scrolls gifts, not leveled junk", (spec) => {
@@ -572,20 +580,19 @@ eachClass("chat stranger upgrade is ignored", (spec) => {
   assert.deepStrictEqual(env.log.said, []);
 });
 
-eachClass("potions chat rallies to potions NPC", async (spec) => {
+eachClass("potions chat replies without town rally", async (spec) => {
   const env = loadClass(spec, stocked({ level: 12 }));
   env.emitChat("Zarook", "I need some potions!");
   if (spec.name === "Zarook") {
     assert.strictEqual(env.rally, false);
     return;
   }
-  assert.strictEqual(env.rally, "potions");
+  assert.strictEqual(env.rally, false);
   replied(env);
   noGlobal(env);
   await env.logistics();
-  assert.ok(wentTo(env, "bank"));
-  assert.ok(wentTo(env, "potions"));
-  assert.strictEqual(env.rally, false);
+  assert.ok(!wentTo(env, "bank"));
+  assert.ok(!wentTo(env, "potions"));
 });
 
 eachClass("upgrade chat rallies to upgrade NPC", async (spec) => {
@@ -703,8 +710,43 @@ test("warrior needs_vendor when esize is 0 drives restock", async () => {
   });
   assert.strictEqual(env.needs_vendor(), true);
   await env.logistics();
-  assert.ok(env.log.said.some((s) => s === "I need some potions!"));
   assert.ok(wentTo(env, "bank") || wentTo(env, "potions"));
+});
+
+test("low pots requests field delivery without towning", async () => {
+  const items = new Array(42).fill(null);
+  items[0] = { name: "hpot0", q: 5 };
+  items[1] = { name: "mpot0", q: 5 };
+  const env = loadScript("warrior.js", {
+    name: "Jazwyn", ctype: "warrior", items, gold: 50000, esize: 20, map: "main", level: 12,
+    _server: ["US", "III"], real_x: 800, real_y: -100
+  });
+  env.POTION_MIN = 40;
+  await env.logistics();
+  assert.ok(env.log.cm.some((c) => c.name === "puppygirl" && c.data && c.data.dlv_req && c.data.kind === "pots"));
+  assert.ok((env.log.game || []).some((s) => /dlv:req id=/.test(s)));
+  assert.ok(!wentTo(env, "bank"));
+  assert.ok(!wentTo(env, "potions"));
+  assert.ok(env.dlv_pending);
+});
+
+test("fighter hear_dlv ack/sent/got/done handshake", async () => {
+  const items = new Array(42).fill(null);
+  items[0] = { name: "hpot0", q: 5 };
+  items[1] = { name: "mpot0", q: 5 };
+  const env = loadScript("warrior.js", {
+    name: "Jazwyn", ctype: "warrior", items, gold: 1000, esize: 20, map: "main", level: 12,
+    _server: ["US", "III"]
+  });
+  env.dlv_pending = { id: "hx1", kind: "pots", t0: Date.now(), acked: 0 };
+  env.emitCm("puppygirl", { v: 1, dlv_ack: 1, id: "hx1", ok: 1 });
+  assert.strictEqual(env.dlv_pending.acked, 1);
+  env.character.items[0] = { name: "hpot0", q: 80 };
+  env.emitCm("puppygirl", { v: 1, dlv_sent: 1, id: "hx1", items: [{ name: "hpot0", q: 40 }] });
+  await env.sleep(50);
+  assert.ok(env.log.cm.some((c) => c.data && c.data.dlv_got && c.data.ok === 1));
+  env.emitCm("puppygirl", { v: 1, dlv_done: 1, id: "hx1", ok: 1 });
+  assert.strictEqual(env.dlv_pending, null);
 });
 
 test("upgrade rally skips the bank dump", async () => {
@@ -746,7 +788,7 @@ test("merchant hold CM restocks, announces states, and waits until resume", asyn
   env.character.slots.helmet = { name: "helmet", level: 5 };
   env.emitCm("puppygirl", { hold: 1 });
   assert.strictEqual(env.hold, true);
-  assert.ok(env.log.said.some((s) => s === "Hold: restocking"));
+  assert.ok((env.log.game || []).some((s) => s === "Hold: restocking"));
   assert.deepStrictEqual(env.log.server[0], ["US", "II"]);
   assert.strictEqual(env.parent.server_identifier, "II");
   assert.strictEqual(env.localStorage.getItem("hold_Jazwyn"), "1");
@@ -756,9 +798,9 @@ test("merchant hold CM restocks, announces states, and waits until resume", asyn
   await env.logistics();
   assert.ok(wentTo(env, "bank"));
   assert.ok(wentTo(env, "potions"));
-  assert.ok(env.log.said.some((s) => s === "Hold: banking"));
-  assert.ok(env.log.said.some((s) => s === "Hold: buying pots"));
-  assert.ok(env.log.said.some((s) => s === "Hold: ready"));
+  assert.ok((env.log.game || []).some((s) => s === "Hold: banking"));
+  assert.ok((env.log.game || []).some((s) => s === "Hold: buying pots"));
+  assert.ok((env.log.game || []).some((s) => s === "Hold: ready"));
   assert.strictEqual(env.hold_done, true);
   env.log.moved = [];
   env.log.said = [];
@@ -775,7 +817,7 @@ test("merchant hold CM restocks, announces states, and waits until resume", asyn
   assert.strictEqual(env.hold, true);
   env.emitCm("puppygirl", { hold: 0 });
   assert.strictEqual(env.hold, false);
-  assert.ok(env.log.said.some((s) => s === "Resuming"));
+  assert.ok((env.log.game || []).some((s) => s === "Resuming"));
   assert.deepStrictEqual(env.log.server[env.log.server.length - 1], ["US", "III"]);
   assert.strictEqual(env.localStorage.getItem("hold_Jazwyn"), "0");
 });
@@ -823,19 +865,19 @@ test("merchant hold CM accepts stringified payload", () => {
   const env = loadScript("mage.js", stocked({ name: "Sarene", ctype: "mage" }));
   env.emitCm("puppygirl", JSON.stringify({ hold: 1 }));
   assert.strictEqual(env.hold, true);
-  assert.ok(env.log.said.some((s) => s === "Hold: restocking"));
+  assert.ok(!env.log.said.some((s) => s === "Hold: restocking"));
 });
 
 test("merchant hold PM restocks when whispered hold:1", async () => {
   const env = loadScript("priest.js", stocked({ name: "Zarook", ctype: "priest", gold: 50000, level: 12 }));
   env.emitPm("puppygirl", "hold:1");
   assert.strictEqual(env.hold, true);
-  assert.ok(env.log.said.some((s) => s === "Hold: restocking"));
+  assert.ok(!env.log.said.some((s) => s === "Hold: restocking"));
   await env.logistics();
   assert.ok(wentTo(env, "bank"));
   env.emitPm("puppygirl", "hold:0");
   assert.strictEqual(env.hold, false);
-  assert.ok(env.log.said.some((s) => s === "Resuming"));
+  assert.ok(!env.log.said.some((s) => s === "Resuming"));
 });
 
 test("merchant hold CM ignores non-merchant senders", () => {
@@ -1041,21 +1083,17 @@ test("FLOW dedicated: Ding! -> others Gratz in party, speaker silent, Gratz does
   assert.strictEqual(p.Zarook.log.said.length, 1);
 });
 
-test("FLOW dedicated: I need some potions! -> others Ok in party and rally potions", () => {
+test("FLOW dedicated: I need some potions! -> others Ok in party without rally", () => {
   const p = loadDedicatedParty();
   sendToAll(p, "Zarook", "I need some potions!");
   assert.strictEqual(p.Zarook.rally, false);
   assert.deepStrictEqual(p.Zarook.log.said, []);
-  assert.strictEqual(p.Sarene.rally, "potions");
-  assert.strictEqual(p.Jazwyn.rally, "potions");
+  assert.strictEqual(p.Sarene.rally, false);
+  assert.strictEqual(p.Jazwyn.rally, false);
   replied(p.Sarene);
   replied(p.Jazwyn);
   noGlobal(p.Sarene);
   noGlobal(p.Jazwyn);
-  sendToAll(p, "Sarene", p.Sarene.log.said[0]);
-  sendToAll(p, "Jazwyn", p.Jazwyn.log.said[0]);
-  assert.strictEqual(p.Zarook.rally, false);
-  assert.deepStrictEqual(p.Zarook.log.said, []);
 });
 
 test("FLOW dedicated: I need a gear upgrade! -> others Ok in party and rally upgrade", () => {

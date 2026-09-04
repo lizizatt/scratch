@@ -151,39 +151,38 @@ test("mluck casts at level 40 when in range", () => {
   assert.ok(env.log.skills.indexOf("mluck") >= 0);
 });
 
-test("hold() DMs every fighter with {hold:1}", async () => {
+test("hold() CMs every fighter with {hold:1}", async () => {
   const env = merchant();
   env.hold();
   const names = env.log.cm.map((c) => c.name).sort();
   assert.deepStrictEqual(names, ["Jazwyn", "Sarene", "Zarook"]);
   assert.ok(env.log.cm.every((c) => c.data && c.data.hold === 1));
-  assert.ok(env.log.pm && env.log.pm.length === 3);
-  assert.ok(env.log.pm.every((p) => p.message === "hold:1"));
+  assert.ok(!(env.log.pm && env.log.pm.length), "hold must not PM (chat throttle)");
   assert.strictEqual(env.lastMessage, "Hold");
 });
 
-test("resume() DMs every fighter with {hold:0}", async () => {
+test("resume() CMs every fighter with {hold:0}", async () => {
   const env = merchant();
   env.resume();
   assert.strictEqual(env.log.cm.length, 3);
   assert.ok(env.log.cm.every((c) => c.data && c.data.hold === 0));
-  assert.ok(env.log.pm.every((p) => p.message === "hold:0"));
+  assert.ok(!(env.log.pm && env.log.pm.length), "resume must not PM");
   assert.strictEqual(env.lastMessage, "Stand");
 });
 
 test("hunt() tells Jazwyn to kill a mob", () => {
   const env = merchant();
   env.hunt("Spider");
-  assert.ok(env.log.pm.some((p) => p.name === "Jazwyn" && p.message === "hunt:spider"));
   assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.hunt === "spider"));
+  assert.ok(!(env.log.pm && env.log.pm.some((p) => p.message === "hunt:spider")));
   assert.strictEqual(env.lastMessage, "Hunt spider");
 });
 
 test("grind() tells Jazwyn to resume the ladder", () => {
   const env = merchant();
   env.grind();
-  assert.ok(env.log.pm.some((p) => p.name === "Jazwyn" && p.message === "grind"));
   assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.grind === 1));
+  assert.ok(!(env.log.pm && env.log.pm.some((p) => p.message === "grind")));
   assert.strictEqual(env.lastMessage, "Grind");
 });
 

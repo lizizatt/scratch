@@ -78,20 +78,17 @@ async function ensure_stand(on) {
   await sleep(200);
 }
 function tell(on) {
-  var i, msg = "hold:" + (on ? 1 : 0), data = { hold: on ? 1 : 0 };
-  for (i = 0; i < FIGHTERS.length; i++) try { pm(FIGHTERS[i], msg); } catch (e) {}
-  try { send_cm(FIGHTERS, data); } catch (e) {}
+  try { send_cm(FIGHTERS, { hold: on ? 1 : 0 }); } catch (e) {}
 }
 function hold() { tell(1); set_message("Hold"); game_log("Hold sent"); }
 function resume() { tell(0); set_message("Stand"); game_log("Resume sent"); }
 function hunt(mob) {
   var k = ("" + (mob || "")).toLowerCase().replace(/[^a-z0-9_]/g, "");
   if (!k) return;
-  try { pm("Jazwyn", "hunt:" + k); } catch (e) {}
   try { send_cm("Jazwyn", { hunt: k }); } catch (e) {}
   set_message("Hunt " + k); game_log("Hunt " + k);
 }
-function grind() { try { pm("Jazwyn", "grind"); } catch (e) {} try { send_cm("Jazwyn", { grind: 1 }); } catch (e) {} set_message("Grind"); game_log("Grind sent"); }
+function grind() { try { send_cm("Jazwyn", { grind: 1 }); } catch (e) {} set_message("Grind"); game_log("Grind sent"); }
 function next_trade() { for (var s = 1; s <= 16; s++) if (!character.slots["trade" + s]) return s; return -1; }
 function sale_clear() { for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) return false; return true; }
 async function list_sale() {
@@ -146,28 +143,32 @@ function mluck_near() {
   }
 }
 async function run_econ() {
-  if (typeof start_gear_session === "function") { set_message("Gear"); await start_gear_session(); }
   set_message("Combine"); if (typeof run_combine === "function") await run_combine();
   if (typeof upgrade_one === "function") { set_message("Upgrade"); await upgrade_one(); }
   if (typeof ponty_buy === "function") { set_message("Ponty"); await ponty_buy(); }
   set_message("Stock"); return !!(await stock_store());
 }
 async function run_cycle() {
-  set_message("Bank");
-  close_stand();
+  set_message("Bank"); close_stand();
   if (!(await go_npc("bank"))) return false;
   if (typeof park_bag === "function" && !(await park_bag())) { game_log("park fail"); return false; }
   if (typeof snap_bank === "function") snap_bank(); await sleep(400);
   return await run_econ();
 }
 async function logistics() {
+  var r;
   if (busy || character.rip) return;
   if (!PLAN_OK) { set_message("No plan"); return; }
-  if (go_home()) return;
   if (character.map === "jail") { await leave(); return; }
+  if (typeof dlv_has_work === "function" && dlv_has_work() && (typeof dlv_batch === "undefined" || dlv_batch < (DLV_BATCH_MAX || 3))) {
+    busy = true;
+    try { r = await deliver_tick(); if (r === "done" || r === "fail") dlv_batch = (dlv_batch || 0) + 1; } catch (e) { game_log("dlv tick fail"); }
+    busy = false; return;
+  }
+  if (go_home()) return;
   if (cycle_at && Date.now() - cycle_at < (CYCLE_MS || 300000)) return;
   busy = true;
-  try { if (await run_cycle()) { cycle_at = Date.now(); set_message("Stand"); } } catch (e) { game_log("cycle fail"); }
+  try { if (await run_cycle()) { cycle_at = Date.now(); dlv_batch = 0; set_message("Stand"); } } catch (e) { game_log("cycle fail"); }
   busy = false;
 }
 try { performance_trick(); } catch (e) {}

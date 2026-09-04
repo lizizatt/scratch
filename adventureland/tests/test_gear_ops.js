@@ -5,6 +5,7 @@ const { loadScript } = require("./al_env");
 
 const tests = [];
 function test(name, fn) { tests.push({ name, fn }); }
+function flush(ms) { return new Promise((r) => setTimeout(r, ms == null ? 20 : ms)); }
 
 function merchant(extra) {
   const items = new Array(42).fill(null);
@@ -23,17 +24,15 @@ function placeFighter(env, name, over) {
   return env.parent.entities[name];
 }
 
-async function sessionWithFreshAd(env, who, ad, queue) {
-  env.READY_MS = 3000;
-  env.OFFER_MS = 50;
-  let ticks = 0;
-  const sleep = env.sleep.bind(env);
-  env.sleep = async (ms) => {
-    ticks++;
-    if (ticks === 1) env.emitCm(who, Object.assign({ gear_ad: 1, name: who }, ad));
-    return sleep(ms);
+function wireGot(env) {
+  const real = env.send_cm.bind(env);
+  env.send_cm = async (name, data) => {
+    const r = await real(name, data);
+    if (data && data.dlv_sent && env.dlv_active) {
+      env.dlv_active._got = { v: 1, dlv_got: 1, id: data.id, ok: 1 };
+    }
+    return r;
   };
-  return env.start_gear_session(queue);
 }
 
 test("merchant hear_gear stores gear_ad esize from CM not vision", () => {
@@ -125,16 +124,6 @@ test("ponty_buy rejects overpriced whitelist", async () => {
   assert.deepStrictEqual(env.log.secondhand, []);
 });
 
-test("build_gear_queue offers Zarook empty offhand from bank wbook0", () => {
-  const env = merchant({ gold: 100000, map: "bank", esize: 40 });
-  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
-  env.character.bank.items0[0] = { name: "wbook0", level: 0 };
-  env.character._bank = env.character.bank;
-  env.gear_ads.Zarook = { gear_ad: 1, esize: 2, slots: { offhand: "-" }, _t: Date.now() };
-  const q = env.build_gear_queue();
-  assert.ok(q.some((g) => g.who === "Zarook" && g.name === "wbook0" && g.slot === "offhand"));
-});
-
 test("upgrade_one pulls eligible coat from bank after park", async () => {
   const env = merchant({ gold: 400000, esize: 40, map: "bank" });
   env.GOLD_FLOAT = 0;
@@ -148,136 +137,155 @@ test("upgrade_one pulls eligible coat from bank after park", async () => {
   assert.ok(env.log.upgraded.length >= 1);
 });
 
-test("delivery aborts without fresh HOME ad (stale farm ad cleared)", async () => {
-  const env = merchant({ gold: 100000, esize: 38 });
-  env.READY_MS = 800;
-  env.OFFER_MS = 10;
-  env.character.items[1] = { name: "ringsj", level: 0 };
-  env.gear_ads.Sarene = { gear_ad: 1, esize: 2, slots: { ring1: "-" }, _t: Date.now() - 99999 };
-  placeFighter(env, "Sarene", { map: "winterland", real_x: 0, real_y: 0 });
-  const r = await env.start_gear_session([{ who: "Sarene", name: "ringsj", level: 0, slot: "ring1", id: "x" }]);
-  assert.strictEqual(r, "not_ready");
-  assert.ok(!env.log.sent.length);
-  assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 0));
-});
-
-test("delivery requires in-range fighter on main with fresh ad", async () => {
-  const env = merchant({ gold: 100000, esize: 38 });
-  env.character.items[1] = { name: "ringsj", level: 0 };
-  const sarene = placeFighter(env, "Sarene", { esize: 3, items: new Array(42).fill(null) });
-  const r = await sessionWithFreshAd(env, "Sarene", { esize: 3, slots: { ring1: "-", ring2: "-" } }, [
-    { who: "Sarene", name: "ringsj", level: 0, slot: "ring1", id: "r1" }
-  ]);
-  assert.ok(env.log.sent.length >= 1);
-  assert.ok(env.log.cm.some((c) => c.data && c.data.gear_incoming));
-  assert.ok(env.log.cm.some((c) => c.data && c.data.gear_offer && c.data.id === "r1"));
-  assert.ok(sarene.items.some((it) => it && it.name === "ringsj"));
-  assert.ok(r === "done" || r === "fail");
-});
-
-test("send_item failure does not emit gear_offer", async () => {
-  const env = merchant({ gold: 100000, esize: 38 });
-  env.character.items[1] = { name: "ringsj", level: 0 };
-  placeFighter(env, "Sarene", { esize: 0, items: new Array(42).fill(null) });
-  env.READY_MS = 3000;
-  env.OFFER_MS = 10;
-  let ticks = 0;
-  const sleep = env.sleep.bind(env);
-  env.sleep = async (ms) => {
-    ticks++;
-    if (ticks === 1) env.emitCm("Sarene", { gear_ad: 1, name: "Sarene", esize: 3, slots: { ring1: "-" } });
-    return sleep(ms);
-  };
-  await env.start_gear_session([{ who: "Sarene", name: "ringsj", level: 0, slot: "ring1", id: "nospace" }]);
-  assert.ok(!env.log.cm.some((c) => c.data && c.data.gear_offer && c.data.id === "nospace"));
-});
-
-test("build_gear_queue queues both empty ring slots", () => {
+test("dlv_req queues job and acks ok", async () => {
   const env = merchant();
-  env.gear_ads.Sarene = { gear_ad: 1, esize: 4, slots: { ring1: "-", ring2: "-" }, _t: Date.now() };
-  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
-  env.character.bank.items0[0] = { name: "ringsj", level: 0 };
-  env.character.bank.items0[1] = { name: "ringsj", level: 0 };
-  env.character._bank = env.character.bank;
-  const q = env.build_gear_queue();
-  assert.ok(q.filter((g) => g.who === "Sarene" && g.name === "ringsj").length >= 2);
+  env.emitCm("Jazwyn", {
+    v: 1, dlv_req: 1, id: "p1", kind: "pots",
+    items: [{ name: "hpot1", q: 40 }], map: "main", x: 40, y: -20,
+    server: ["US", "III"], esize: 4
+  });
+  await flush();
+  assert.ok(env.dlv_has_work());
+  assert.ok(env.log.cm.some((c) => c.data && c.data.dlv_ack && c.data.ok === 1 && c.data.id === "p1"));
+  assert.ok((env.log.game || []).some((s) => /dlv:req id=p1/.test(s)));
+  assert.ok((env.log.game || []).some((s) => /dlv:ack id=p1 ok=1/.test(s)));
 });
 
-test("offer timeout does not double-send same id", async () => {
-  const env = merchant({ gold: 100000, esize: 38 });
-  env.character.items[1] = { name: "ringsj", level: 0 };
-  placeFighter(env, "Sarene", { esize: 2, items: new Array(42).fill(null) });
-  const ids = [];
-  const realCm = env.send_cm.bind(env);
-  env.send_cm = async (name, data) => {
-    if (data && data.gear_offer) ids.push(data.id);
-    return realCm(name, data);
+test("dlv_req rejects no_space", async () => {
+  const env = merchant();
+  env.emitCm("Jazwyn", {
+    v: 1, dlv_req: 1, id: "full1", kind: "pots",
+    items: [{ name: "hpot1", q: 40 }], map: "main", x: 0, y: 0,
+    server: ["US", "III"], esize: 0
+  });
+  await flush();
+  assert.ok(!env.dlv_has_work());
+  assert.ok(env.log.cm.some((c) => c.data && c.data.dlv_ack && c.data.ok === 0 && c.data.reason === "no_space"));
+});
+
+test("duplicate dlv_req re-acks without double queue", async () => {
+  const env = merchant();
+  const req = {
+    v: 1, dlv_req: 1, id: "dup1", kind: "pots",
+    items: [{ name: "hpot1", q: 10 }], map: "main", x: 0, y: 0,
+    server: ["US", "III"], esize: 3
   };
-  await sessionWithFreshAd(env, "Sarene", { esize: 2, slots: { ring1: "-" } }, [
-    { who: "Sarene", name: "ringsj", level: 0, slot: "ring1", id: "same1" }
-  ]);
-  assert.strictEqual(ids.filter((id) => id === "same1").length, 1);
+  env.emitCm("Jazwyn", req);
+  await flush();
+  env.emitCm("Jazwyn", req);
+  await flush();
+  assert.strictEqual(env.dlv_q.filter((j) => j.id === "dup1").length, 1);
+  assert.ok(env.log.cm.filter((c) => c.data && c.data.dlv_ack && c.data.id === "dup1").length >= 2);
 });
 
-test("resume sent when gear session ends", async () => {
-  const env = merchant({ gold: 100000, esize: 38 });
-  env.READY_MS = 500;
-  env.character.items[1] = { name: "ringsj", level: 0 };
-  await env.start_gear_session([{ who: "Sarene", name: "ringsj", level: 0, slot: "ring1", id: "r1" }]);
-  assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 0));
-  assert.strictEqual(env.gear_session, false);
-});
-
-test("bank-only rings: session returns to plaza before send_item", async () => {
-  const env = merchant({ gold: 100000, esize: 40, map: "main" });
-  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
-  env.character.bank.items0[0] = { name: "ringsj", level: 0 };
-  env.character._bank = env.character.bank;
-  placeFighter(env, "Sarene", { esize: 3, items: new Array(42).fill(null) });
-  env.gear_ads.Sarene = { gear_ad: 1, name: "Sarene", esize: 3, slots: { ring1: "-" }, _t: Date.now() };
-  const maps = [];
-  const sm = env.smart_move.bind(env);
-  env.smart_move = async (dest) => {
-    maps.push(dest && dest.map || dest && dest.to || dest);
-    return sm(dest);
-  };
-  await sessionWithFreshAd(env, "Sarene", { esize: 3, slots: { ring1: "-" } }, [
-    { who: "Sarene", name: "ringsj", level: 0, slot: "ring1", id: "bank1" }
-  ]);
-  assert.ok(env.log.retrieved.length >= 1, "pulled from bank");
-  assert.ok(env.log.sent.length >= 1, "sent after return");
-  assert.ok(maps.filter((m) => m === "main").length >= 2, "returned to main meet");
-  assert.strictEqual(env.character.map, "main");
-});
-
-test("run_econ delivers before combine when rings needed", async () => {
-  const env = merchant({ gold: 400000, esize: 38, map: "main" });
-  env.HOLD = [];
+test("deliver_tick buys pots, walks, send_item, handshake done", async () => {
+  const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
   env.GOLD_FLOAT = 0;
-  env.character.items[1] = { name: "ringsj", level: 0 };
-  env.character.items[2] = { name: "ringsj", level: 0 };
-  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
-  env.character._bank = env.character.bank;
-  placeFighter(env, "Sarene", { esize: 4, items: new Array(42).fill(null) });
-  env.gear_ads.Sarene = { gear_ad: 1, name: "Sarene", esize: 4, slots: { ring1: "-", ring2: "-" }, _t: Date.now() };
-  env.READY_MS = 3000;
-  env.OFFER_MS = 20;
-  let ticks = 0;
-  const sleep = env.sleep.bind(env);
-  env.sleep = async (ms) => {
-    ticks++;
-    if (ticks === 1) env.emitCm("Sarene", { gear_ad: 1, name: "Sarene", esize: 4, slots: { ring1: "-", ring2: "-" } });
-    return sleep(ms);
-  };
-  const order = [];
-  const rc = env.run_combine.bind(env);
-  env.run_combine = async () => { order.push("combine"); return rc(); };
-  const ss = env.stock_store.bind(env);
-  env.stock_store = async () => { order.push("stock"); return true; };
-  await env.run_econ();
-  assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 1), "should hold for delivery first");
-  assert.ok(order[0] === "combine" || order.indexOf("combine") >= 0);
-  assert.ok(env.log.sent.length >= 1 || env.log.cm.some((c) => c.data && c.data.gear_offer));
+  placeFighter(env, "Jazwyn", { map: "main", real_x: 700, real_y: -100, esize: 4 });
+  wireGot(env);
+  env.emitCm("Jazwyn", {
+    v: 1, dlv_req: 1, id: "job1", kind: "pots",
+    items: [{ name: "hpot1", q: 40 }, { name: "mpot1", q: 40 }],
+    map: "main", x: 700, y: -100, server: ["US", "III"], esize: 4
+  });
+  await flush();
+  const r = await env.deliver_tick();
+  assert.strictEqual(r, "done");
+  assert.ok(env.log.bought.some((b) => b.name === "hpot1"));
+  assert.ok(env.log.sent.some((s) => s.item === "hpot1"));
+  assert.ok(env.log.cm.some((c) => c.data && c.data.dlv_here));
+  assert.ok(env.log.cm.some((c) => c.data && c.data.dlv_sent));
+  assert.ok(env.log.cm.some((c) => c.data && c.data.dlv_done && c.data.ok === 1));
+  assert.ok((env.log.game || []).some((s) => /dlv:done id=job1 ok=1/.test(s)));
+  assert.ok(!env.dlv_has_work());
+});
+
+test("deliver_tick hops when fighter server differs", async () => {
+  const env = merchant({ gold: 400000, esize: 38, _server: ["US", "II"] });
+  env.emitCm("Jazwyn", {
+    v: 1, dlv_req: 1, id: "hop1", kind: "pots",
+    items: [{ name: "hpot1", q: 10 }], map: "main", x: 10, y: 10,
+    server: ["US", "III"], esize: 3
+  });
+  await flush();
+  const r = await env.deliver_tick();
+  assert.strictEqual(r, "hop");
+  assert.deepStrictEqual(env.log.server[env.log.server.length - 1], ["US", "III"]);
+  assert.ok((env.log.game || []).some((s) => /dlv:hop US\/III/.test(s)));
+  assert.ok(env.dlv_has_work());
+});
+
+test("localStorage resume after hop keeps queue", () => {
+  const key = "dlv_q_puppygirl";
+  const env1 = merchant({ _storage: {} });
+  env1.dlv_q = [{ id: "persist1", who: "Jazwyn", kind: "pots", items: [{ name: "hpot1", q: 5 }], map: "main", x: 1, y: 2, server: ["US", "III"], esize: 3, state: "active", t0: Date.now() }];
+  env1.dlv_active = env1.dlv_q[0];
+  env1.dlv_save();
+  const raw = env1.localStorage.getItem(key);
+  assert.ok(raw);
+  const env2 = merchant({ _storage: { [key]: raw } });
+  assert.ok(env2.dlv_has_work());
+  assert.strictEqual(env2.dlv_active.id, "persist1");
+});
+
+test("cm_send enforces CM_GAP_MS", async () => {
+  const env = merchant();
+  env.CM_GAP_MS = 700;
+  env.last_cm_t = Date.now();
+  const sleeps = [];
+  const real = env.sleep.bind(env);
+  env.sleep = async (ms) => { sleeps.push(ms); return real(ms); };
+  await env.cm_send("Jazwyn", { v: 1, ping: 1 });
+  assert.ok(sleeps.some((ms) => ms > 0 && ms <= 700));
+});
+
+test("deliver_tick rip fails without send", async () => {
+  const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
+  env.GOLD_FLOAT = 0;
+  placeFighter(env, "Jazwyn", { map: "main", real_x: 40, real_y: -20, esize: 4, rip: true });
+  env.emitCm("Jazwyn", {
+    v: 1, dlv_req: 1, id: "rip1", kind: "pots",
+    items: [{ name: "hpot1", q: 10 }], map: "main", x: 40, y: -20,
+    server: ["US", "III"], esize: 4
+  });
+  await flush();
+  const r = await env.deliver_tick();
+  assert.strictEqual(r, "fail");
+  assert.ok(env.log.cm.some((c) => c.data && c.data.dlv_done && c.data.ok === 0 && c.data.reason === "rip"));
+  assert.ok(!env.log.sent.length);
+});
+
+test("dlv_loc updates active job coordinates", async () => {
+  const env = merchant();
+  env.emitCm("Jazwyn", {
+    v: 1, dlv_req: 1, id: "loc1", kind: "pots",
+    items: [{ name: "hpot1", q: 5 }], map: "main", x: 0, y: 0,
+    server: ["US", "III"], esize: 2
+  });
+  await flush();
+  env.emitCm("Jazwyn", { v: 1, dlv_loc: 1, id: "loc1", map: "main", x: 900, y: -50, server: ["US", "III"] });
+  const j = env.dlv_find("loc1");
+  assert.strictEqual(j.x, 900);
+  assert.strictEqual(j.y, -50);
+});
+
+test("logistics prefers deliver_tick over econ when queue non-empty", async () => {
+  const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
+  env.GOLD_FLOAT = 0;
+  env.cycle_at = 0;
+  placeFighter(env, "Jazwyn", { map: "main", real_x: 40, real_y: -20, esize: 4 });
+  wireGot(env);
+  env.emitCm("Jazwyn", {
+    v: 1, dlv_req: 1, id: "prio1", kind: "pots",
+    items: [{ name: "hpot1", q: 10 }], map: "main", x: 40, y: -20,
+    server: ["US", "III"], esize: 4
+  });
+  await flush();
+  let combined = false;
+  env.run_combine = async () => { combined = true; };
+  await env.logistics();
+  assert.ok(!combined);
+  assert.ok(env.log.sent.some((s) => s.item === "hpot1") || (env.log.game || []).some((s) => /dlv:done/.test(s)));
 });
 
 module.exports = { tests };

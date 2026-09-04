@@ -16,7 +16,7 @@ Use the Adventure Land MCP token (Mainframe → **Connect an AI** → Reveal tok
 node adventureland/deploy_mcp.js
 ```
 
-That uploads fighter + merchant CODE (including `fighter_core`, `merchant_plan`, `merchant_ops`). Saving does **not** restart running CODE — Stop/Run (or `load_code`) on each character after deploy.
+That uploads fighter + merchant CODE (including `fighter_core`, `gear_ops`, `merchant_ops`). Saving does **not** restart running CODE — Stop/Run (or `load_code`) on each character after deploy.
 
 Do **not** paste the MCP token into chat or character CODE; rotate it in Mainframe if it leaks.
 
@@ -30,7 +30,7 @@ Keep the browser tab focused, or call `performance_trick()` once. Puppygirl alre
 
 Shared logic lives in `fighter_core.js` (loaded by each class). See `FIGHTER_PLAN.md`.
 
-**puppygirl** (merchant) stays out of the combat party. On a ~5‑minute cycle she banks, parks the bag, combines compoundables (gold float reserved), clears the stand, then lists the most expensive unheld bank loot in town (`trade` 1–16). She mlucks passersby at level 40+. See `MERCHANT_PLAN.md`.
+**puppygirl** (merchant) stays out of the combat party. Delivery jobs preempt econ: fighters CM `dlv_req` for pots in the field; she hops/walks, `send_item`, handshake (`FIELD_DELIVERY_PLAN.md`). When the queue is empty she runs a ~5‑minute bank/combine/stand cycle. She mlucks passersby at level 40+. See `MERCHANT_PLAN.md`.
 
 ### Commands (party chat — works from any fighter, including the speaker)
 
@@ -50,7 +50,7 @@ Hold survives reload via `localStorage`. On a potion run fighters bank non-pots 
 
 Everyone farms the **lowest member's** ladder pack (HP gates the pull). After death, remembered levels/HP are kept so town goos don't steal the pull.
 
-Other party chat: Ding / Gratz, potions (town rally), gear upgrade rally.
+Other party chat: Ding / Gratz; potion mentions get a social Ok (field CM restock, not town); gear upgrade rally still towns.
 
 ## Ladder (from [data.js](https://adventure.land/data.js) XP, attack-gated)
 

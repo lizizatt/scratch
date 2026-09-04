@@ -230,6 +230,55 @@ Critical HP + zero HP pots: still allow emergency town (safety exception). Docum
 
 **Plan verdict: ACCEPT** (phase 1 scope). Remaining risk accepted: bag-full pickup deferred; upgrade-in-field is phase 2; coalesce is best-effort.
 
+## Implementation review (adversary, post-code)
+
+### Verified against plan + coding guide
+
+| Constraint | Evidence in code |
+| --- | --- |
+| `send_item` nearby only | `dlv_send_all` checks `get_player` + `SEND_RANGE` 320 |
+| `get_player` vision-only | Meet uses req/beacon `map/x/y`; never assumes entity exists off-map |
+| `send_cm` capacity | `cm_send` gap `CM_GAP_MS=700`; unicast; no PM protocol |
+| `change_server` wipes heap | `dlv_save` before hop; `dlv_load` on boot + tick |
+| Stand blocks travel | `ensure_stand(false)` / `close_stand` at tick start |
+| Merchant pays pots | `dlv_ensure_items` buys; fighters request while broke |
+| Not in party | Merchant never `send_party_invite` for delivery |
+
+### Pass — MUST-FIX status
+
+| ID | Status |
+| --- | --- |
+| hop-wipes-queue | **fixed** — `localStorage` `dlv_q_<name>` |
+| cm-capacity | **fixed** — gap + unicast |
+| invisible-target | **fixed** — coords + beacons |
+| fighter-moves | **fixed** — `dlv_loc` |
+| full-bag | **fixed** — ack `no_space`; fighter skip |
+| multi-req | **fixed** — FIFO, cap 8 |
+| econ-starvation | **fixed** — `DLV_BATCH_MAX=3` then one econ |
+| emergency-death | **fixed** — critical HP + 0 hp pots → town |
+| dup-id | **fixed** — re-ack, no double queue |
+| false-success | **fixed** — bag delta on send; `dlv_got`; clear `_got` *before* `dlv_sent` |
+| stand-blocks-move | **fixed** |
+| buy-on-wrong-map | **fixed** — buy after hop on current server |
+| stack-qty | **fixed** — loop `send_item` until qty |
+| fighter-rip | **fixed** — `dlv_done reason:rip` |
+
+### Pass — REJECT checks
+
+- [x] Potion path does **not** `set_hold` / HOME hop for normal low pots  
+- [x] Merchant not required in party  
+- [x] Greppable `dlv:` logs at req/ack/hop/buy/move/here/send/sent/got/done  
+- [x] Tests: handshake, no_space, timeout/rip, dup id, CM gap, localStorage resume, no town on low pots  
+
+### Accepted residual risks
+
+- Coalesce multi-fighter same map: not implemented (line budget).  
+- Bag-full pickup: still rare town dump when `esize===0`.  
+- Orphan pots if hop mid-buy: next tick finishes active job (items already in bag count toward need).  
+- Fighter `dlv_got` absolute qty check (not pre/post delta): OK while requesting from low stock.
+
+**Implementation verdict: ACCEPT** (phase 1 potion demo).
+
 ## Implementation phases
 
 ### P0 — Plan commit
