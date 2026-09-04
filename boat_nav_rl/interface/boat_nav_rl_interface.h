@@ -2,8 +2,10 @@
  * boat_nav_rl_interface.h
  *
  * Stable C ABI between RL training (Python) and the vehicle control stack.
- * Must match prepare.pack_observation() flat layout (schema v4).
+ * Must match prepare.pack_observation() flat layout (schema v5).
  * Version bumps require BNRL_SCHEMA_VERSION increment and ONNX re-export.
+ * v5: obs index 5 (previously reserved) now carries normalized sway velocity
+ *     (starboard-positive, / V_MAX) from the 3-DOF planar dynamics model.
  */
 #ifndef BOAT_NAV_RL_INTERFACE_H
 #define BOAT_NAV_RL_INTERFACE_H
@@ -16,7 +18,7 @@ extern "C" {
 #endif
 
 #define BNRL_MAX_CONTACTS 8
-#define BNRL_SCHEMA_VERSION 4
+#define BNRL_SCHEMA_VERSION 5
 
 /** Per-contact: bearing(2) + range(1) + rel_cog(2) + rel_vel_body(2) + radius(1) = 8 */
 #define BNRL_CONTACT_OBS_DIM 8
@@ -25,7 +27,7 @@ extern "C" {
  * Flat obs row-major layout (matches prepare.pack_observation):
  *   own(6) + water_current(3) + contacts(8*8) + mask(8) + goal(3) + has_goal(1) = 85
  *
- * own[0..5]:   heading/pi, speed/V_MAX, yaw_rate/YAW_MAX, pos_x/POS_SCALE, pos_y/POS_SCALE, reserved(0)
+ * own[0..5]:   heading/pi, speed/V_MAX, yaw_rate/YAW_MAX, pos_x/POS_SCALE, pos_y/POS_SCALE, sway/V_MAX
  * current[6..8]: speed/CURRENT_MAX, sin(direction), cos(direction)
  * contact i base 9+i*8:
  *   bearing_sin, bearing_cos, range/RANGE_SCALE,
@@ -51,11 +53,11 @@ extern "C" {
 typedef struct {
     double timestamp_s;
     double heading_rad;       /* true heading, 0 = north, +CW */
-    double speed_mps;         /* through-water speed at own ship */
+    double speed_mps;         /* surge (through-water, along bow) */
     double yaw_rate_rps;
     double pos_x_m;           /* local frame, origin at episode reset */
     double pos_y_m;
-    double reserved_own;      /* flat obs index 5 — always 0.0 in training */
+    double sway_mps;          /* flat obs index 5 — starboard-positive sway */
     double current_speed_mps;
     double current_sin;
     double current_cos;

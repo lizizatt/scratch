@@ -47,7 +47,7 @@ def send_test_on(ser: serial.Serial) -> None:
 
 def main() -> int:
     p = argparse.ArgumentParser(description="DRV8833 motor test on ESP32")
-    p.add_argument("-p", "--port", default="COM16")
+    p.add_argument("-p", "--port", default="COM17")
     p.add_argument(
         "command",
         nargs="?",
@@ -60,6 +60,7 @@ def main() -> int:
     time.sleep(1.5)
     ser.reset_input_buffer()
     send(ser, "STOP", wait=0.3)
+    send(ser, "WAKE", wait=0.2)
 
     if args.script:
         steps = BENCH_SCRIPT_STEPS

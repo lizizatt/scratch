@@ -10,7 +10,7 @@ import prepare as P
 
 class TestObservationAbi(unittest.TestCase):
     def test_schema_version_matches_header(self):
-        self.assertEqual(P.OBS_SCHEMA_VERSION, 4)
+        self.assertEqual(P.OBS_SCHEMA_VERSION, 5)
         self.assertEqual(P.OBS_DIM, 85)
 
     def test_flat_layout_offsets_match_header(self):
@@ -44,7 +44,7 @@ class TestObservationAbi(unittest.TestCase):
         self.assertAlmostEqual(obs[2], 0.05 / P.YAW_RATE_SCALE_RPS, places=5)
         self.assertAlmostEqual(obs[3], 0.0, places=5)
         self.assertAlmostEqual(obs[4], 0.0, places=5)
-        self.assertAlmostEqual(obs[5], 0.0, places=5)
+        self.assertAlmostEqual(obs[5], 0.0, places=5)  # zero sway
         self.assertAlmostEqual(obs[6], current.speed_mps / P.CURRENT_MAX_MPS, places=5)
         self.assertAlmostEqual(obs[7], math.sin(current.direction_rad), places=5)
         self.assertAlmostEqual(obs[8], math.cos(current.direction_rad), places=5)
@@ -56,6 +56,18 @@ class TestObservationAbi(unittest.TestCase):
             obs[P.OBS_GOAL_OFFSET + 2], min(g_rng / P.RANGE_SCALE_M, 1.0), places=5
         )
         self.assertAlmostEqual(obs[P.OBS_HAS_GOAL_OFFSET], 1.0, places=5)
+
+    def test_sway_slot_5(self):
+        own = P.VesselState(heading_rad=0.0, speed_mps=4.0, sway_mps=-0.8)
+        obs = P.pack_observation(own, 100.0, 0.0, True, [], 0.0, 0.0)
+        self.assertAlmostEqual(obs[5], -0.8 / P.SPEED_SCALE_MPS, places=5)
+
+    def test_own_velocity_includes_sway(self):
+        own = P.VesselState(heading_rad=0.0, speed_mps=3.0, sway_mps=1.0)
+        vx, vy = P.own_velocity(own)
+        # heading north: surge -> +y, sway (starboard) -> +x
+        self.assertAlmostEqual(vx, 1.0, places=6)
+        self.assertAlmostEqual(vy, 3.0, places=6)
 
     def test_golden_vector_one_contact_relative_motion(self):
         own = P.VesselState(x_m=0.0, y_m=0.0, heading_rad=0.0, speed_mps=3.0)

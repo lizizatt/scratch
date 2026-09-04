@@ -23,6 +23,9 @@ LIVE_METRICS_PATH = JOB_DIR / "live_metrics.json"
 LIVE_METRICS_MAX_POINTS = int(os.environ.get("LIVE_METRICS_MAX_POINTS", "500"))
 
 
+CANCEL_FLAG_CLEARED_ENV = "BOAT_NAV_CANCEL_FLAG_CLEARED"
+
+
 def is_cancel_requested() -> bool:
     return CANCEL_FLAG_PATH.exists()
 
@@ -30,6 +33,20 @@ def is_cancel_requested() -> bool:
 def clear_cancel_flag() -> None:
     if CANCEL_FLAG_PATH.exists():
         CANCEL_FLAG_PATH.unlink()
+
+
+def clear_stale_cancel_flag() -> None:
+    """Clear a leftover cancel flag at training startup — CLI runs only.
+
+    The UI launcher (training_job.start_training) clears the flag immediately
+    before spawning train.py and sets CANCEL_FLAG_CLEARED_ENV in the child's
+    environment. In that case clearing again here would silently wipe a
+    genuine cancel requested while the subprocess was still importing
+    torch/SB3, forcing the job to run its full budget.
+    """
+    if os.environ.get(CANCEL_FLAG_CLEARED_ENV):
+        return
+    clear_cancel_flag()
 
 
 def live_eval_extras(metrics: Dict[str, Any]) -> Dict[str, Any]:

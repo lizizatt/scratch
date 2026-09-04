@@ -1,6 +1,17 @@
 # Session memory — ESP32 INS display + motor bring-up
 
-Last updated: 2026-06-22. Board **#1 destroyed** (thermal runaway on USB after motor/battery shorts). Firmware and docs survive in **`esp32_playground/`** (renamed from `esp32_ins_display`).
+Last updated: 2026-07-05. Board **#2** flashed and responding on **COM17** (CH343). Board #1 destroyed.
+
+## Board #2 (current)
+
+| Item | Value |
+|------|--------|
+| Port | **COM17** (USB-Enhanced-SERIAL CH343) — not COM7 (that is a different USB device) |
+| Chip | ESP32-S3, 2 MB PSRAM, MAC `80:b5:4e:81:5a:50` |
+| Flash | `ins_display` via `.\build.ps1 -Port COM17` |
+| Onboard IMU | QMI8658 **OK** |
+| External MPU | Not wired yet |
+| Motors | Not tested yet (disarmed) |
 
 ## Project location
 
@@ -16,7 +27,7 @@ Custom firmware on **Waveshare ESP32-S3-Touch-LCD-1.28** (round 240×240, QMI865
 |------|--------|
 | FQBN | `esp32:esp32:waveshare_esp32s3_touch_lcd_128:PSRAM=enabled` |
 | Serial fix | `build.cdc_on_boot=0` → Serial on CH343 UART (GPIO43/44), not USB-CDC |
-| Port | **COM16** (CH343) |
+| Port | **COM17** (CH343) |
 | Build | `.\build.ps1` in `esp32_playground/` |
 | Python test | `tools/motor_app.py` @ 115200, `tools/motor_app_wifi.py` UDP |
 | WiFi | AP `ESP32-Playground`, IP `192.168.4.1`, cmd `4242`, tlm `4243` — see [WIFI.md](WIFI.md) |

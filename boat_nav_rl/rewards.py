@@ -29,6 +29,9 @@ W_COLLISION = 100.0
 W_HOLD_OVERSPEED = 3.0
 W_CROSS_TRACK = 0.65
 CROSS_TRACK_SCALE_M = 60.0
+# Progress is per metre closed; scale keeps step rewards O(1) vs hold bonuses.
+PROGRESS_DISTANCE_SCALE_M = 10.0
+W_EN_ROUTE_SPEED = 1.2  # reward maintaining SOG while en route (not in goal zone)
 HOLD_STATIONARY_SPEED_MPS = 0.15
 HOLD_AT_STOP_EPS_MPS = 0.1
 REWARD_CLIP = 400.0
@@ -36,6 +39,7 @@ REWARD_CLIP = 400.0
 # Keys emitted in step reward breakdown (order for dashboards).
 REWARD_BREAKDOWN_KEYS: Tuple[str, ...] = (
     "progress",
+    "en_route_speed",
     "cross_track",
     "approach_slow",
     "goal_arrival",
@@ -91,6 +95,7 @@ _REWARD_FIELD_MAP: Dict[str, str] = {
     "hold_overspeed": "w_hold_overspeed",
     "cross_track": "w_cross_track",
     "cross_track_scale_m": "cross_track_scale_m",
+    "en_route_speed": "w_en_route_speed",
     "hold_stationary_speed_mps": "hold_stationary_speed_mps",
     "hold_at_stop_eps_mps": "hold_at_stop_eps_mps",
 }
@@ -116,6 +121,7 @@ class RewardConfig:
     w_hold_overspeed: float = W_HOLD_OVERSPEED
     w_cross_track: float = W_CROSS_TRACK
     cross_track_scale_m: float = CROSS_TRACK_SCALE_M
+    w_en_route_speed: float = W_EN_ROUTE_SPEED
     hold_stationary_speed_mps: float = HOLD_STATIONARY_SPEED_MPS
     hold_at_stop_eps_mps: float = HOLD_AT_STOP_EPS_MPS
     w_smooth: float = W_SMOOTH
@@ -141,6 +147,7 @@ class RewardConfig:
             "hold_overspeed": self.w_hold_overspeed,
             "cross_track": self.w_cross_track,
             "cross_track_scale_m": self.cross_track_scale_m,
+            "en_route_speed": self.w_en_route_speed,
             "hold_stationary_speed_mps": self.hold_stationary_speed_mps,
             "hold_at_stop_eps_mps": self.hold_at_stop_eps_mps,
         }
@@ -151,7 +158,7 @@ class RewardConfig:
         global W_HOLD_BASE, W_HOLD_SPEED, W_HOLD_CENTER, W_APPROACH_SLOW
         global APPROACH_SLOW_RANGE_M, W_CPA, W_CPA_SOFT, CPA_WARNING_MULT
         global W_GOAL_THREAT_STAY, W_COLLISION, W_HOLD_OVERSPEED, W_CROSS_TRACK
-        global CROSS_TRACK_SCALE_M, HOLD_STATIONARY_SPEED_MPS, HOLD_AT_STOP_EPS_MPS
+        global CROSS_TRACK_SCALE_M, W_EN_ROUTE_SPEED, HOLD_STATIONARY_SPEED_MPS, HOLD_AT_STOP_EPS_MPS
         global W_SMOOTH, THREAT_PROGRESS_THRESH, REWARD_CLIP
         W_GOAL_PROGRESS = self.w_goal_progress
         W_GOAL_ARRIVAL = self.w_goal_arrival
@@ -169,6 +176,7 @@ class RewardConfig:
         W_HOLD_OVERSPEED = self.w_hold_overspeed
         W_CROSS_TRACK = self.w_cross_track
         CROSS_TRACK_SCALE_M = self.cross_track_scale_m
+        W_EN_ROUTE_SPEED = self.w_en_route_speed
         HOLD_STATIONARY_SPEED_MPS = self.hold_stationary_speed_mps
         HOLD_AT_STOP_EPS_MPS = self.hold_at_stop_eps_mps
         W_SMOOTH = self.w_smooth
@@ -198,6 +206,7 @@ def get_reward_config() -> RewardConfig:
         w_hold_overspeed=W_HOLD_OVERSPEED,
         w_cross_track=W_CROSS_TRACK,
         cross_track_scale_m=CROSS_TRACK_SCALE_M,
+        w_en_route_speed=W_EN_ROUTE_SPEED,
         hold_stationary_speed_mps=HOLD_STATIONARY_SPEED_MPS,
         hold_at_stop_eps_mps=HOLD_AT_STOP_EPS_MPS,
         w_smooth=W_SMOOTH,
@@ -501,16 +510,23 @@ def compute_step_reward(
     )
     retreat_m = max(0.0, inp.curr_goal_range - inp.prev_goal_range)
     approach_m = max(0.0, inp.prev_goal_range - inp.curr_goal_range)
+    prog_scale = max(PROGRESS_DISTANCE_SCALE_M, 1e-6)
 
     if inp.in_goal_zone and (inp.cpa_unsafe or inp.threat >= cfg.threat_progress_thresh):
         threat_mult = 1.0 + max(inp.threat, 1.0 if inp.cpa_unsafe else 0.0)
-        prog = cfg.w_goal_progress * retreat_m * progress_scale * threat_mult / 100.0
+        prog = cfg.w_goal_progress * retreat_m * progress_scale * threat_mult / prog_scale
         reward += prog
         breakdown["progress"] = prog
     else:
-        prog = cfg.w_goal_progress * (approach_m - retreat_m) * progress_scale / 100.0
+        prog = cfg.w_goal_progress * (approach_m - retreat_m) * progress_scale / prog_scale
         reward += prog
         breakdown["progress"] = prog
+
+    if not inp.in_goal_zone and cfg.w_en_route_speed > 0.0:
+        speed_norm = inp.own.speed_mps / max(P.V_MAX_MPS, 1e-6)
+        en_route = cfg.w_en_route_speed * speed_norm
+        reward += en_route
+        breakdown["en_route_speed"] = en_route
 
     if not inp.in_goal_zone:
         cross = cross_track_step_penalty(

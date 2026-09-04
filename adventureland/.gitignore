@@ -1,0 +1,9 @@
+# Adventure Land auth cookie — do not commit
+.al_auth
+.al_auth.*
+.al_mcp_token
+.al_mcp_token.*
+*.secret
+code_hashes.json
+_mcp_*.json
+_log_*.json

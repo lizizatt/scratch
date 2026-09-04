@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from vecenv_util import recommended_n_envs
 import prepare as P
 from runs_util import safe_run_dir, score_from_metrics, validate_run_id
+from train_job_state import CANCEL_FLAG_CLEARED_ENV
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "runs"
@@ -259,6 +260,9 @@ def start_training(
         log_fp = open(LOG_PATH, "a", encoding="utf-8")
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
+        # The flag was cleared above (pre-spawn); tell train.py not to clear it
+        # again, so a cancel requested during subprocess startup is honored.
+        env[CANCEL_FLAG_CLEARED_ENV] = "1"
         _process = subprocess.Popen(
             cmd,
             cwd=str(ROOT),
@@ -293,7 +297,9 @@ def cancel_training() -> Dict[str, Any]:
 
     with _lock:
         if _process is None or _process.poll() is not None:
-            return {"ok": False, "error": "No training run in progress"}
+            pid = _read_pid_file()
+            if pid is None or not _pid_alive(pid):
+                return {"ok": False, "error": "No training run in progress"}
 
         JOB_DIR.mkdir(parents=True, exist_ok=True)
         CANCEL_FLAG_PATH.write_text("1", encoding="utf-8")

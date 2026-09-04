@@ -1,6 +1,6 @@
 # Boat Navigation RL
 
-Reinforcement-learning stack for training a marine navigation policy that outputs **desired heading** and **desired speed** `(ψ*, V*)` for an autonomous surface vessel. The policy learns to reach waypoints, hold station, avoid traffic, and decelerate for goal-zone stops — evaluated in a Python simulator with a transfer-function plant, dense step rewards, and optional COLREGS protocol scoring.
+Reinforcement-learning stack for training a marine navigation policy that outputs **desired heading** and **desired speed** `(ψ*, V*)` for an autonomous surface vessel. The policy learns to reach waypoints, hold station, avoid traffic, and decelerate for goal-zone stops — trained on a GPU-batched torch simulator with a 3-DOF planar dynamics plant, dense step rewards, and optional COLREGS protocol scoring.
 
 Pure Python today (Stable-Baselines3 PPO). A C++/ONNX deployment path is scoped in [`SCOPE.md`](SCOPE.md); the observation ABI is defined in [`interface/boat_nav_rl_interface.h`](interface/boat_nav_rl_interface.h).
 
@@ -11,8 +11,8 @@ Pure Python today (Stable-Baselines3 PPO). A C++/ONNX deployment path is scoped 
 ```powershell
 cd boat_nav_rl
 pip install -r requirements.txt
-python prepare.py          # generate scenario seeds (739 train / 395 eval)
-python run_tests.py        # 167 tests — should all pass
+python prepare.py          # generate scenario seeds (train/eval split)
+python run_tests.py        # the full pytest suite (plus Node viz tests) — should all pass
 python train.py            # train until TRAIN_BUDGET_SEC (default 10 min), then eval
 python serve.py            # viz + API at http://127.0.0.1:8765
 ```
@@ -34,24 +34,31 @@ GPU: `pip install -r requirements-gpu.txt` (CUDA PyTorch).
 
 ```mermaid
 flowchart TB
-  subgraph train_loop [Training loop]
-    SEEDS[prepare.py scenarios]
-    ENV[BoatNavEnv in env.py]
-    PPO[PPO policy]
-    PLANT[Transfer-function plant]
-    RWD[rewards.py shaping]
-    SEEDS --> ENV
-    ENV --> PPO
-    PPO -->|ψ*, V*| PLANT
-    PLANT --> ENV
-    RWD --> ENV
+  subgraph shared [Shared plant]
+    DYN[dynamics.py 3-DOF planar model]
   end
 
-  subgraph eval [Eval]
+  subgraph train_loop [Training loop — GPU]
+    SEEDS[prepare.py scenarios]
+    SIM[BatchedBoatSim in sim_torch.py]
+    VE[BatchedBoatVecEnv]
+    PPO[PPO policy on CUDA]
+    RWD[rewards.py shaping]
+    SEEDS --> SIM
+    DYN --> SIM
+    SIM --> VE --> PPO
+    PPO -->|ψ*, V*| SIM
+    RWD --> SIM
+  end
+
+  subgraph eval [Eval / serving — CPU]
+    ENV[BoatNavEnv in env.py]
     ROLL[eval_parallel.py rollouts]
     MET[aggregate_eval_metrics]
     COL[colregs/ — navigate mode skips]
+    DYN --> ENV
     PPO --> ROLL
+    ENV --> ROLL
     ROLL --> MET
     ROLL --> COL
   end
@@ -65,12 +72,16 @@ flowchart TB
   MET --> SRV
 ```
 
+Training rollouts run as one torch batch on CUDA (`VECENV_BACKEND=auto` picks the GPU backend when available; `subproc` remains a fallback). Eval, COLREGS, the exercise sandbox, and viz all use the single-env CPU `BoatNavEnv` — both consume the same 3-DOF plant from `dynamics.py`, so train/eval dynamics match. See [`SIM_GPU_SPEC.md`](SIM_GPU_SPEC.md) for feature status and benchmarks (~6–13x PPO wall-clock speedup on an RTX 3060).
+
 **Division of labor**
 
 | Layer | Module | Role |
 |-------|--------|------|
-| Fixed sim contract | `prepare.py` | Obs layout (77 floats), plant dynamics, scenario seeds, world bounds |
-| Environment | `env.py`, `env_factory.py` | `BoatNavEnv`, `make_env()` |
+| Fixed sim contract | `prepare.py` | Obs layout (85 floats, schema v5), plant params, scenario seeds, world bounds |
+| Plant dynamics | `dynamics.py` | 3-DOF planar model + inner-loop autopilot (torch batch + scalar mirror) |
+| GPU training sim | `sim_torch.py`, `batched_boat_vecenv.py` | `BatchedBoatSim` (N envs on CUDA), SB3 `VecEnv` wrapper |
+| Environment (CPU) | `env.py`, `env_factory.py` | `BoatNavEnv` for eval/serving, `make_env()` |
 | Training CLI | `train.py`, `train_config.py` | PPO loop, CONFIG, CLI |
 | Eval | `eval_runner.py` | `run_eval()`, robust eval |
 | Mission / waypoints | `mission.py` | Multi-leg goals, hold timers, Exercise-aligned triggers |
@@ -106,7 +117,10 @@ boat_nav_rl/
 ├── prepare.py                ← fixed obs/plant/seeds (do not edit during reward experiments)
 ├── train.py                  ← thin CLI entry point
 ├── train_config.py           ← CONFIG globals, CLI / run-config parsing
-├── env.py                    ← BoatNavEnv (Gymnasium environment)
+├── dynamics.py               ← 3-DOF planar plant + autopilot (shared GPU/CPU)
+├── sim_torch.py              ← BatchedBoatSim: GPU-batched training sim
+├── batched_boat_vecenv.py    ← SB3 VecEnv wrapper for BatchedBoatSim
+├── env.py                    ← BoatNavEnv (Gymnasium environment, eval/serving)
 ├── env_factory.py            ← make_env() for vectorized training
 ├── scenario_seeds.py         ← train/eval seed loading and filters
 ├── eval_runner.py            ← run_eval(), run_robust_eval()
@@ -129,7 +143,7 @@ boat_nav_rl/
 ├── checkpoint_util.py        ← best-model save / resume resolution
 ├── runs_util.py              ← nav_score / avoid_score helpers, latest run id
 ├── run_analysis.py           ← post-run diagnostics (zone speed, approach speed, …)
-├── vecenv_util.py            ← SubprocVecEnv sizing, rollout batch math
+├── vecenv_util.py            ← backend selection (gpu/subproc/dummy), env sizing, rollout batch math
 ├── api_parse.py              ← strict JSON body parsing for serve API
 ├── eval_parallel.py          ← parallel eval rollouts + metric aggregation
 ├── async_eval.py             ← background eval thread during training
@@ -166,7 +180,7 @@ boat_nav_rl/
 │   ├── chart.js, draw.js, api.js, colregs_panel.js, style.css
 │   └── …
 │
-├── tests/                    ← pytest suite (167 tests)
+├── tests/                    ← the full pytest suite (plus Node viz tests)
 ├── runs/                     ← gitignored experiment outputs
 ├── interface/                ← C ABI header for future C++ integration
 ├── render_montage.py         ← optional eval trace image grid
@@ -195,8 +209,8 @@ boat_nav_rl/
 
 Defines what the policy sees and how the plant responds:
 
-- **77-dim observation**: own state (6), water current (3), up to 8 contacts × 7 fields, contact mask, goal bearing/range, `has_goal`
-- **Transfer-function plant**: heading/speed lag, yaw-rate limits; agile ↔ freighter envelope for domain randomization
+- **85-dim observation** (schema v5): own state (6, incl. normalized sway in slot 5), water current (3), up to 8 contacts × 8 fields, contact mask, goal bearing/range, `has_goal`
+- **Plant parameters**: heading/speed lag, yaw-rate limits; agile ↔ freighter envelope for domain randomization. `PlantParams.to_plant()` builds the 3-DOF `PlanarDynamicsPlant` from `dynamics.py` by default (`PLANT_MODEL=tf` selects the legacy first-order plant)
 - **Scenario seeds**: written to `runs/train_seeds.json` and `runs/eval_seeds.json` via `python prepare.py`
 - **World bounds** shared with Exercise (`WORLD_BOUNDS`)
 
@@ -353,6 +367,8 @@ All routes return JSON. Training pages poll these endpoints.
 | Variable | Purpose |
 |----------|---------|
 | `TRAIN_BUDGET_SEC`, `N_ENVS`, `TRAIN_DEVICE` | Training overrides |
+| `VECENV_BACKEND` | `auto` (default; GPU when CUDA available) \| `gpu` \| `subproc` \| `dummy` |
+| `PLANT_MODEL` | `3dof` (default) \| `tf` legacy first-order plant |
 | `EVAL_WORKERS`, `EVAL_ASYNC`, `EVAL_PARALLEL_MIN_SCENARIOS` | Eval performance |
 | `CURRICULUM_PHASE` | Activate curriculum phase in `train_config.py` |
 | `SCENARIO_CATEGORY_PREFIX` | Filter training scenarios (comma-separated) |
@@ -403,7 +419,7 @@ python run_tests.py
 python -m pytest tests/ -v
 ```
 
-**167 tests** covering: observation layout, plant dynamics, rewards, mission controller, COLREGS geometry/eval, API JSON responses, vecenv sizing, curriculum gates, parallel/async eval, checkpoint resolution, scenario collision audits.
+The full pytest suite (plus Node viz tests) covers: observation layout, plant dynamics, rewards, mission controller, COLREGS geometry/eval, API JSON responses, vecenv sizing, curriculum gates, parallel/async eval, checkpoint resolution, scenario collision audits.
 
 See [`TESTING.md`](TESTING.md) for manual smoke steps.
 
@@ -411,7 +427,7 @@ See [`TESTING.md`](TESTING.md) for manual smoke steps.
 
 ## Deployment path (future)
 
-[`interface/boat_nav_rl_interface.h`](interface/boat_nav_rl_interface.h) defines `BNRL_OBS_FLAT_LEN = 77` and the C struct layout matching `prepare.pack_observation()`. Production plan (ONNX export, C++ `bnrl_step`, authoritative COLREGs in vehicle stack) is in [`SCOPE.md`](SCOPE.md).
+[`interface/boat_nav_rl_interface.h`](interface/boat_nav_rl_interface.h) defines `BNRL_OBS_FLAT_LEN = 85` and the C struct layout matching `prepare.pack_observation()`. Production plan (ONNX export, C++ `bnrl_step`, authoritative COLREGs in vehicle stack) is in [`SCOPE.md`](SCOPE.md).
 
 ---
 

@@ -90,5 +90,64 @@ class TestTrainingHistoryResilience(unittest.TestCase):
             self.assertEqual(data["runs"][0]["run_id"], "20260101_000001")
 
 
+class TestClearStaleCancelFlag(unittest.TestCase):
+    def test_cli_run_clears_leftover_flag(self):
+        import os
+
+        import train_job_state as TJS
+
+        with tempfile.TemporaryDirectory() as tmp:
+            flag = Path(tmp) / "cancel.flag"
+            flag.write_text("1", encoding="utf-8")
+            env = {k: v for k, v in os.environ.items() if k != TJS.CANCEL_FLAG_CLEARED_ENV}
+            with mock.patch.object(TJS, "CANCEL_FLAG_PATH", flag), mock.patch.dict(
+                os.environ, env, clear=True
+            ):
+                TJS.clear_stale_cancel_flag()
+            self.assertFalse(flag.exists())
+
+    def test_ui_launched_run_preserves_cancel_requested_during_startup(self):
+        import os
+
+        import train_job_state as TJS
+
+        with tempfile.TemporaryDirectory() as tmp:
+            flag = Path(tmp) / "cancel.flag"
+            flag.write_text("1", encoding="utf-8")
+            with mock.patch.object(TJS, "CANCEL_FLAG_PATH", flag), mock.patch.dict(
+                os.environ, {TJS.CANCEL_FLAG_CLEARED_ENV: "1"}
+            ):
+                TJS.clear_stale_cancel_flag()
+                self.assertTrue(flag.exists())
+                self.assertTrue(TJS.is_cancel_requested())
+
+
+class TestCancelTrainingPidFallback(unittest.TestCase):
+    def test_cancel_training_falls_back_to_pid_file(self):
+        import training_job as TJ
+
+        with tempfile.TemporaryDirectory() as tmp:
+            job_dir = Path(tmp)
+            cancel_flag = job_dir / "cancel.flag"
+            status_path = job_dir / "status.json"
+            with mock.patch.object(TJ, "_process", None), mock.patch.object(
+                TJ, "JOB_DIR", job_dir
+            ), mock.patch.object(TJ, "CANCEL_FLAG_PATH", cancel_flag), mock.patch.object(
+                TJ, "STATUS_PATH", status_path
+            ), mock.patch.object(
+                TJ, "_read_pid_file", return_value=12345
+            ), mock.patch.object(
+                TJ, "_pid_alive", return_value=True
+            ):
+                result = TJ.cancel_training()
+
+            self.assertTrue(result.get("ok"))
+            self.assertTrue(cancel_flag.exists())
+            self.assertEqual(
+                json.loads(status_path.read_text(encoding="utf-8"))["state"],
+                "cancelling",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

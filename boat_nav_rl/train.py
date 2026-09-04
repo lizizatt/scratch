@@ -37,7 +37,14 @@ from runs_util import score_key_for_mode
 from scenario_seeds import eval_seeds_for_mode, filter_seeds_for_mode, train_seeds_for_mode
 import train_config as C
 from train_config import apply_args, parse_args
-from train_job_state import LIVE_METRICS_PATH, RUNS_DIR, clear_cancel_flag, is_cancel_requested, update_job_status
+from train_job_state import (
+    LIVE_METRICS_PATH,
+    RUNS_DIR,
+    clear_cancel_flag,
+    clear_stale_cancel_flag,
+    is_cancel_requested,
+    update_job_status,
+)
 
 # Re-exported for tests and scripts that import from train
 from rewards import (  # noqa: E402, F401
@@ -98,7 +105,7 @@ def main() -> None:
         P.write_scenario_splits()
 
     parent_metrics = load_parent_metrics(resume_run_id) if resume_run_id else {}
-    clear_cancel_flag()
+    clear_stale_cancel_flag()
     LIVE_METRICS_PATH.unlink(missing_ok=True)
     run_dir = create_run_dir()
     train_start = time.time()
@@ -164,6 +171,12 @@ def main() -> None:
         goal_hold_sec=C.GOAL_HOLD_SEC,
         max_episode_steps=C.MAX_EPISODE_STEPS,
         current_enabled=C.CURRENT_ENABLED,
+        train_seeds=train_seeds,
+        nominal_plant=C.NOMINAL_PLANT,
+        dynamics_jitter=C.DYNAMICS_JITTER,
+        contact_obs_noise_m=C.CONTACT_OBS_NOISE_M,
+        contact_obs_noise_bearing_rad=C.CONTACT_OBS_NOISE_BEARING_RAD,
+        train_max_contacts=C.TRAIN_MAX_CONTACTS,
     )
 
     model_holder: Dict[str, Any] = {}
