@@ -77,7 +77,7 @@ test("plan_gifts skips wrong-class weapons and full bags", () => {
   assert.ok(!gifts.some((g) => g.who === "Sarene" && g.it.name === "fireblade"));
 });
 
-test("run_gear_session hops with saved gifts when targets not visible", async () => {
+test("run_gear_session hops to GEAR_HOME even if fighters visible on farm", async () => {
   const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20 });
   env.parent.server_region = "US";
   env.parent.server_identifier = "III";
@@ -86,6 +86,7 @@ test("run_gear_session hops with saved gifts when targets not visible", async ()
   env.character.bank.items0[0] = { name: "sshield", level: 1, q: 1 };
   env.character._bank = env.character.bank;
   env.snap_bank();
+  placeFighter(env, "Jazwyn", { real_x: 50, real_y: -20, esize: 5 });
   env.gear_ads.Jazwyn = {
     gear_ad: 1, name: "Jazwyn", esize: 5, _t: Date.now(),
     slots: { offhand: "-", mainhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
@@ -97,7 +98,7 @@ test("run_gear_session hops with saved gifts when targets not visible", async ()
   assert.ok(saved && saved.active && saved.gifts.length >= 1);
 });
 
-test("run_gear_session holds, offers, waits got, resumes", async () => {
+test("run_gear_session holds, waits, offers, waits got, resumes", async () => {
   const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20 });
   env.CYCLE_MS = 1;
   env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
@@ -121,6 +122,7 @@ test("run_gear_session holds, offers, waits got, resumes", async () => {
   assert.strictEqual(r, "ok");
   assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 1));
   assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 0));
+  assert.ok(env.log.game.some((g) => /gear:wait|gear:here/.test("" + g)));
   assert.ok(env.log.cm.some((c) => c.data && c.data.gear_offer === 1 && c.data.name === "sshield"));
   assert.ok(env.log.sent.some((s) => s && s.name === "Jazwyn"));
   assert.strictEqual(env.gear_session, false);

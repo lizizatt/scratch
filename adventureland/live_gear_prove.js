@@ -29,7 +29,7 @@ const SLOT = "CH_q7h90Mhg5era0mD5DBIMAKFcLp9xe";
 const MERCH = path.join(ROOT, "merchant.js");
 const GEAROPS = path.join(ROOT, "gear_ops.js");
 const MARK = "\n/*LIVE_GEAR*/\n";
-const INJECT = MARK + `setInterval(function(){if(character._lgBusy||(typeof busy!=="undefined"&&busy)||gear_session)return;character._lgBusy=1;(async function(){try{GEAR_HOME=[parent.server_region||"US",parent.server_identifier||"III"];if(typeof cycle_at!=="undefined")cycle_at=Date.now();if(!character.bank&&typeof go_npc==="function"){await go_npc("bank");if(typeof snap_bank==="function")snap_bank()}var empty={mainhand:"-",offhand:"-",helmet:"-",chest:"-",pants:"-",shoes:"-",gloves:"-",cape:"-",belt:"-",amulet:"-",ring1:"-",ring2:"-"};["Jazwyn","Sarene","Zarook"].forEach(function(n){gear_ads[n]={gear_ad:1,name:n,esize:5,_t:Date.now(),slots:Object.assign({},empty,n==="Jazwyn"?{offhand:"shield@0"}:{})}});var g=plan_gifts();game_log("LIVE_GEAR_PLAN "+g.length+(g[0]?" "+g[0].it.name+"->"+g[0].who:""));if(!g.length){if(!character._lgWait)character._lgWait=Date.now();if(Date.now()-character._lgWait>60000){game_log("LIVE_GEAR_NOGIFT");character._lg=1}return}if(character._lg)return;character._lg=1;if(typeof busy!=="undefined")busy=true;game_log("LIVE_GEAR_START");game_log("LIVE_GEAR "+(await run_gear_session()));if(typeof busy!=="undefined")busy=false}catch(e){game_log("LIVE_GEAR_FAIL "+((e&&e.message)||e));if(typeof busy!=="undefined")busy=false}finally{character._lgBusy=0}})()},5000);\n`;
+const INJECT = MARK + `setInterval(function(){if(character._lgBusy||(typeof busy!=="undefined"&&busy)||gear_session)return;character._lgBusy=1;(async function(){try{if(typeof cycle_at!=="undefined")cycle_at=Date.now();if(!character.bank&&typeof go_npc==="function"){await go_npc("bank");if(typeof snap_bank==="function")snap_bank()}var empty={mainhand:"-",offhand:"-",helmet:"-",chest:"-",pants:"-",shoes:"-",gloves:"-",cape:"-",belt:"-",amulet:"-",ring1:"-",ring2:"-"};["Jazwyn","Sarene","Zarook"].forEach(function(n){gear_ads[n]={gear_ad:1,name:n,esize:5,_t:Date.now(),slots:Object.assign({},empty,n==="Jazwyn"?{offhand:"shield@0"}:{})}});var g=plan_gifts();game_log("LIVE_GEAR_PLAN "+g.length+(g[0]?" "+g[0].it.name+"->"+g[0].who:""));if(!g.length){if(!character._lgWait)character._lgWait=Date.now();if(Date.now()-character._lgWait>60000){game_log("LIVE_GEAR_NOGIFT");character._lg=1}return}if(character._lg)return;character._lg=1;if(typeof busy!=="undefined")busy=true;game_log("LIVE_GEAR_START");game_log("LIVE_GEAR "+(await run_gear_session()));if(typeof busy!=="undefined")busy=false}catch(e){game_log("LIVE_GEAR_FAIL "+((e&&e.message)||e));if(typeof busy!=="undefined")busy=false}finally{character._lgBusy=0}})()},5000);\n`;
 
 function strip() {
   let s = fs.readFileSync(GEAROPS, "utf8");
@@ -55,9 +55,10 @@ async function main() {
     await rpc("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "al-gear", version: "1" } });
     await post({ jsonrpc: "2.0", method: "notifications/initialized" }).catch(() => {});
     try { await tool("mainframe_disconnect_character", { character: "Puppygirl" }); } catch (e) {}
-    await sleep(15000);
+    await sleep(55000);
     const stamp = Date.now(), cut = Date.now() - 2000;
-    const link = await tool("mainframe_link_character", { character: "Puppygirl", request_id: "gear-" + stamp, code_slot: SLOT, server: "US III" });
+    // Meet on GEAR_HOME: hold pulls Steam fighters from farm US/III → US/II plaza
+    const link = await tool("mainframe_link_character", { character: "Puppygirl", request_id: "gear-" + stamp, code_slot: SLOT, server: "US II" });
     console.log("link", JSON.stringify(link).slice(0, 160));
     for (let i = 0; i < 40; i++) {
       const ch = await tool("mainframe_get_character", { character: "Puppygirl" });
@@ -65,12 +66,11 @@ async function main() {
       console.log("waiting", (ch.runtime && ch.runtime.phase) || "?");
       await sleep(5000);
     }
-    // Keep merchant on US III with Steam fighters for this prove
     const seen = {};
-    let start = false, offer = false, got = false, done = false, fail = false, planN = -1, planDetail = "";
-    const deadline = Date.now() + 360000;
+    let start = false, offer = false, got = false, done = false, fail = false, here = false, planN = -1, planDetail = "";
+    const deadline = Date.now() + 480000;
     while (Date.now() < deadline) {
-      const logs = await tool("mainframe_get_logs", { character: "Puppygirl", limit: 100 });
+      const logs = await tool("mainframe_get_logs", { character: "Puppygirl", limit: 120 });
       for (const e of logs.logs || []) {
         const at = Date.parse(e.at || 0); if (!(at >= cut)) continue;
         const s = Array.isArray(e.values) ? e.values.join(" ") : String(e.message || e);
@@ -78,28 +78,29 @@ async function main() {
         if (/LIVE_GEAR|gear:|Hold sent|Resume/i.test(s)) console.log("LOG", s.slice(0, 220));
         const m = s.match(/LIVE_GEAR_PLAN (\d+)(.*)$/);
         if (m) { planN = +m[1]; planDetail = (m[2] || "").trim(); }
-        if (/LIVE_GEAR_START|gear:start/.test(s)) start = true;
+        if (/LIVE_GEAR_START|gear:start|gear:resume/.test(s)) start = true;
+        if (/gear:here/.test(s)) here = true;
         if (/gear:offer/.test(s)) offer = true;
         if (/gear:got id=.*ok=1/.test(s)) got = true;
-        if (/gear:done|LIVE_GEAR ok|LIVE_GEAR null/.test(s)) done = true;
-        if (/LIVE_GEAR_FAIL|LIVE_GEAR_NOGIFT|gear:server|gear:send fail|gear:far|gear:pull fail/i.test(s)) fail = true;
+        if (/gear:done|LIVE_GEAR ok|LIVE_GEAR hop|LIVE_GEAR null/.test(s)) done = true;
+        if (/LIVE_GEAR_FAIL|LIVE_GEAR_NOGIFT|gear:send fail|gear:pull fail/i.test(s)) fail = true;
       }
       const pup = await tool("mainframe_get_character", { character: "Puppygirl" });
-      console.log("pup", (pup.runtime && pup.runtime.message) || "", "map", obs(pup).map, "srv", pup.runtime && pup.runtime.server, "plan", planN, planDetail);
-      if (done) break;
+      console.log("pup", (pup.runtime && pup.runtime.message) || "", "map", obs(pup).map, "srv", pup.runtime && pup.runtime.server, "plan", planN, planDetail, "here", here, "offer", offer);
+      if (done && (offer || got || here)) break;
       const blob = Object.keys(seen).join("\n");
       if (/LIVE_GEAR_NOGIFT/.test(blob)) break;
-      if (/gear:far|gear:offer|gear:done|gear:pull fail|gear:try/.test(blob) && /gear:done|LIVE_GEAR /.test(blob)) break;
+      if (/gear:offer|gear:got/.test(blob) && /gear:done|LIVE_GEAR /.test(blob)) break;
       await sleep(8000);
     }
     const blob = Object.keys(seen).join("\n");
-    const result = { start, offer, got, done, fail, planN, planDetail, far: /gear:far/.test(blob), tried: /gear:try/.test(blob), at: new Date().toISOString() };
+    const result = { start, offer, got, done, fail, here, planN, planDetail, far: /gear:far/.test(blob), tried: /gear:try/.test(blob), wait: /gear:wait/.test(blob), at: new Date().toISOString() };
     fs.writeFileSync(path.join(ROOT, "_live_gear.json"), JSON.stringify(result, null, 2));
     console.log("RESULT", result);
     if (!start && planN === 0) throw new Error("FAIL: no upgrades to gift from bank/bag");
     if (!start) throw new Error("FAIL: gear session never started");
-    if (!(offer || got || result.far || result.tried)) throw new Error("FAIL: no try/offer/far after start");
-    console.log("SUCCESS gear session loop observed");
+    if (!(offer || got)) throw new Error("FAIL: no offer/got — fighters never met for handoff");
+    console.log("SUCCESS gear handoff observed");
   } finally {
     strip();
     deploy();
