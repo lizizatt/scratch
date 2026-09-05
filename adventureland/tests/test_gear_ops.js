@@ -42,6 +42,83 @@ test("merchant hear_gear stores gear_ad esize from CM not vision", () => {
   assert.strictEqual(env.gear_ads.Sarene.esize, 3);
 });
 
+test("plan_gifts prefers spiked shield over plain via dreturn score", () => {
+  const env = merchant({ gold: 400000, esize: 30, map: "bank" });
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "sshield", level: 0, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  env.gear_ads.Jazwyn = {
+    gear_ad: 1, name: "Jazwyn", esize: 4, _t: Date.now(),
+    slots: { offhand: "shield@0", mainhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  const gifts = env.plan_gifts();
+  assert.ok(gifts.some((g) => g.who === "Jazwyn" && g.slot === "offhand" && g.it.name === "sshield"));
+});
+
+test("plan_gifts skips wrong-class weapons and full bags", () => {
+  const env = merchant({ gold: 400000, esize: 30, map: "bank" });
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "staff", level: 0, q: 1 };
+  env.character.bank.items0[1] = { name: "fireblade", level: 0, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  env.gear_ads.Jazwyn = {
+    gear_ad: 1, name: "Jazwyn", esize: 0, _t: Date.now(),
+    slots: { mainhand: "-", offhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  env.gear_ads.Sarene = {
+    gear_ad: 1, name: "Sarene", esize: 3, _t: Date.now(),
+    slots: { mainhand: "-", offhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  const gifts = env.plan_gifts();
+  assert.ok(!gifts.some((g) => g.who === "Jazwyn"), "no space");
+  assert.ok(gifts.some((g) => g.who === "Sarene" && g.it.name === "staff"));
+  assert.ok(!gifts.some((g) => g.who === "Sarene" && g.it.name === "fireblade"));
+});
+
+test("run_gear_session holds, offers, waits got, resumes", async () => {
+  const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20 });
+  env.CYCLE_MS = 1;
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "sshield", level: 1, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  placeFighter(env, "Jazwyn", { real_x: 50, real_y: -20, esize: 5 });
+  env.gear_ads.Jazwyn = {
+    gear_ad: 1, name: "Jazwyn", esize: 5, _t: Date.now(),
+    slots: { offhand: "-", mainhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  const realCm = env.send_cm.bind(env);
+  env.send_cm = async (name, data) => {
+    const r = await realCm(name, data);
+    if (data && data.gear_offer && data.id) {
+      env.gear_offer_ids[data.id] = { gear_got: 1, id: data.id, ok: 1, name: data.name, slot: data.slot };
+    }
+    return r;
+  };
+  const r = await env.run_gear_session();
+  assert.strictEqual(r, "ok");
+  assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 1));
+  assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 0));
+  assert.ok(env.log.cm.some((c) => c.data && c.data.gear_offer === 1 && c.data.name === "sshield"));
+  assert.ok(env.log.sent.some((s) => s && s.name === "Jazwyn"));
+  assert.strictEqual(env.gear_session, false);
+});
+
+test("run_cycle skips stock_store while gear_session is sticky", async () => {
+  const env = merchant({ gold: 400000, esize: 38 });
+  env.gear_session = true;
+  env.stock_store = async () => { env._stocked = true; return true; };
+  env.run_combine = async () => {};
+  env.upgrade_one = async () => null;
+  env.ponty_buy = async () => null;
+  env.run_gear_session = async () => "ok";
+  const r = await env.run_econ();
+  assert.strictEqual(r, true);
+  assert.ok(!env._stocked, "stock must wait out gear_session");
+});
+
 test("pick_upgrade skips candycanesword grade>0", () => {
   const env = merchant();
   env.GEAR_RISK = 1;

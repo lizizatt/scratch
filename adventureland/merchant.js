@@ -132,10 +132,11 @@ function mluck_near() {
   }
 }
 async function run_econ() {
-  var steps = [["Combine", typeof run_combine === "function" && run_combine], ["Upgrade", typeof upgrade_one === "function" && upgrade_one], ["Ponty", typeof ponty_buy === "function" && ponty_buy]], i, r;
+  var steps = [["Combine", typeof run_combine === "function" && run_combine], ["Upgrade", typeof upgrade_one === "function" && upgrade_one], ["Ponty", typeof ponty_buy === "function" && ponty_buy], ["Gear", typeof run_gear_session === "function" && run_gear_session]], i, r;
   for (i = 0; i < steps.length; i++) {
     if (steps[i][1]) { set_message(steps[i][0]); r = await steps[i][1](); if (r === "dlv") return "dlv"; }
     if (typeof dlv_has_work === "function" && dlv_has_work()) return "dlv";
+    if (typeof gear_session !== "undefined" && gear_session) return true;
   }
   set_message("Stock");
   if (!(await stock_store())) game_log("stock soft");
@@ -154,6 +155,7 @@ async function logistics() {
   var ok;
   if (busy || character.rip) return;
   if (!PLAN_OK) { set_message("No plan"); return; }
+  if (typeof gear_session !== "undefined" && gear_session) return;
   if (character.map === "jail") { await leave(); return; }
   if ((character.map === "winter_inn" || character.map === "winter_cave") && typeof ensure_main === "function") { await ensure_main(); return; }
   busy = true;

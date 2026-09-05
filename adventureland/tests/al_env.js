@@ -580,7 +580,8 @@ function makeEnv(charOver) {
         hp: g.hp != null ? g.hp * mul : (g.compound && g.compound.hp) || undefined,
         str: g.str != null ? g.str * mul : (g.compound && g.compound.str) || undefined,
         int: g.int != null ? g.int * mul : (g.compound && g.compound.int) || undefined,
-        vit: g.vit != null ? g.vit * mul : (g.compound && g.compound.vit) || undefined
+        vit: g.vit != null ? g.vit * mul : (g.compound && g.compound.vit) || undefined,
+        dreturn: g.dreturn != null ? g.dreturn * mul : undefined
       };
     },
     unequip: async (slot) => {

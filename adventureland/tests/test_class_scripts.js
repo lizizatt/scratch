@@ -509,11 +509,18 @@ eachClass("equip_pending swaps bag item when score beats worn slot", async (spec
   if (spec.ctype !== "warrior") return;
   const env = loadClass(spec);
   env.character.slots.offhand = { name: "shield", level: 0 };
-  env.character.items[1] = { name: "sshield", level: 2, q: 1 };
-  assert.ok(env.score(env.character.items[1], "offhand") > env.score(env.character.slots.offhand, "offhand"));
+  env.character.items[1] = { name: "sshield", level: 0, q: 1 };
+  assert.ok(env.score(env.character.items[1], "offhand") > env.score(env.character.slots.offhand, "offhand"), "dreturn should beat plain shield");
   await env.equip_pending();
   assert.strictEqual(env.character.slots.offhand.name, "sshield");
-  assert.strictEqual(env.character.slots.offhand.level, 2);
+});
+
+eachClass("score weights dreturn heavily for armor slots", (spec) => {
+  if (spec.ctype !== "warrior") return;
+  const env = loadClass(spec);
+  const plain = env.score({ name: "shield", level: 0 }, "offhand");
+  const spiked = env.score({ name: "sshield", level: 0 }, "offhand");
+  assert.ok(spiked - plain >= 100, "40*dreturn should dominate equal armor");
 });
 
 eachClass("bank_dump stores junk but keeps pots scrolls ttl gifts", async (spec) => {
