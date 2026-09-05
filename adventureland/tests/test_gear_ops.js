@@ -77,6 +77,26 @@ test("plan_gifts skips wrong-class weapons and full bags", () => {
   assert.ok(!gifts.some((g) => g.who === "Sarene" && g.it.name === "fireblade"));
 });
 
+test("run_gear_session hops with saved gifts when targets not visible", async () => {
+  const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20 });
+  env.parent.server_region = "US";
+  env.parent.server_identifier = "III";
+  env.GEAR_HOME = ["US", "II"];
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "sshield", level: 1, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  env.gear_ads.Jazwyn = {
+    gear_ad: 1, name: "Jazwyn", esize: 5, _t: Date.now(),
+    slots: { offhand: "-", mainhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  const r = await env.run_gear_session();
+  assert.strictEqual(r, "hop");
+  assert.ok(env.log.server.some((s) => s[0] === "US" && s[1] === "II"));
+  const saved = JSON.parse(env.localStorage.getItem(env.GEAR_SK));
+  assert.ok(saved && saved.active && saved.gifts.length >= 1);
+});
+
 test("run_gear_session holds, offers, waits got, resumes", async () => {
   const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20 });
   env.CYCLE_MS = 1;

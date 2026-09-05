@@ -134,7 +134,7 @@ function mluck_near() {
 async function run_econ() {
   var steps = [["Combine", typeof run_combine === "function" && run_combine], ["Upgrade", typeof upgrade_one === "function" && upgrade_one], ["Ponty", typeof ponty_buy === "function" && ponty_buy], ["Gear", typeof run_gear_session === "function" && run_gear_session]], i, r;
   for (i = 0; i < steps.length; i++) {
-    if (steps[i][1]) { set_message(steps[i][0]); r = await steps[i][1](); if (r === "dlv") return "dlv"; }
+    if (steps[i][1]) { set_message(steps[i][0]); r = await steps[i][1](); if (r === "dlv" || r === "hop") return r === "dlv" ? "dlv" : true; }
     if (typeof dlv_has_work === "function" && dlv_has_work()) return "dlv";
     if (typeof gear_session !== "undefined" && gear_session) return true;
   }
