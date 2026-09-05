@@ -1,6 +1,6 @@
 var busy = false, PLAN_OK = false, CYCLE_MS = 300000, cycle_at = 0;
 var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "III"];
-var HOLD = [["armorring", 1], ["vitring", 9], ["blade", 1], ["staff", 1], ["helmet", 1], ["coat", 1], ["pants", 1], ["shoes", 3], ["gloves", 3], ["ringsj", 6], ["hpbelt", 3], ["hpamulet", 3], ["wshoes", 2], ["wcap", 1], ["wbook0", 1], ["shield", 1]], GOLD_FLOAT = 100000, COMBINE_MAX = 5, SALE_MULT = 0.95;
+var HOLD = [["armorring", 1], ["vitring", 9], ["fireblade", 1], ["staff", 1], ["ringsj", 6], ["hpbelt", 3], ["hpamulet", 3], ["wbook0", 1], ["sshield", 1]], SELL = ["strearring", "intearring", "dexearring", "vitearring", "stramulet", "intamulet", "dexamulet", "rednose", "shoes", "gloves", "pants", "coat", "helmet", "wattire", "wcap", "wshoes", "wgloves"], GOLD_FLOAT = 100000, COMBINE_MAX = 5, SALE_MULT = 0.95;
 try {
   load_code("merchant_ops"); load_code("gear_ops");
   if (typeof stock_store !== "function" || typeof park_bag !== "function") throw 1;
@@ -77,14 +77,10 @@ async function ensure_stand(on) { if (!!character.stand === !!on) return; if (on
 function tell(on) { try { send_cm(FIGHTERS, { hold: on ? 1 : 0 }); } catch (e) {} }
 function hold() { tell(1); set_message("Hold"); game_log("Hold sent"); }
 function resume() { tell(0); set_message("Stand"); game_log("Resume sent"); }
-function hunt(mob) {
-  var k = ("" + (mob || "")).toLowerCase().replace(/[^a-z0-9_]/g, ""), ban = ["spider", "scorpion", "bigbird"];
-  if (!k) return;
-  if (ban.indexOf(k) >= 0) { set_message("Skip " + k); game_log("Hunt skipped " + k); return; }
-  try { send_cm("Jazwyn", { hunt: k }); } catch (e) {}
-  set_message("Hunt " + k); game_log("Hunt " + k);
-}
+function hunt(mob) { var k = ("" + (mob || "")).toLowerCase().replace(/[^a-z0-9_]/g, ""), ban = ["spider", "scorpion", "bigbird"]; if (!k) return; if (ban.indexOf(k) >= 0) { set_message("Skip " + k); game_log("Hunt skipped " + k); return; } try { send_cm("Jazwyn", { hunt: k }); } catch (e) {} set_message("Hunt " + k); game_log("Hunt " + k); }
 function grind() { try { send_cm("Jazwyn", { grind: 1 }); } catch (e) {} set_message("Grind"); game_log("Grind sent"); }
+function parse_world(raw) { var p = ("" + (raw || "")).trim().replace(/[!/,]+/g, " ").replace(/\s+/g, " ").toUpperCase().split(" ").filter(Boolean); if (p[0] === "WORLD") p = p.slice(1); if (p.length === 1 && /^(I|II|III|IV|V|PVP)$/.test(p[0])) return ["US", p[0]]; if (p.length >= 2 && /^(US|EU|ASIA)$/.test(p[0]) && /^[A-Z0-9]+$/.test(p[1])) return [p[0], p[1]]; return null; }
+function world(spec) { var s = parse_world(spec); if (!s) { game_log("World bad"); return; } HOME = s; try { send_cm("Jazwyn", { world: s }); } catch (e) {} set_message("W " + s[0] + "/" + s[1]); game_log("World " + s[0] + "/" + s[1]); }
 function next_trade() { for (var s = 1; s <= 16; s++) if (!character.slots["trade" + s]) return s; return -1; }
 function sale_clear() { for (var s = 1; s <= 16; s++) if (character.slots["trade" + s]) return false; return true; }
 async function list_sale() {
@@ -93,6 +89,7 @@ async function list_sale() {
   for (i = 0; i < character.items.length; i++) {
     it = character.items[i];
     if (!it || it.price != null || is_pot(it) || it.name === "stand0" || it.l) continue;
+    if (typeof sell_ok === "function" && !sell_ok(it)) continue;
     if ((typeof hold_item === "function" && hold_item(it)) || (typeof keep_combine === "function" && keep_combine(it))) continue;
     g = G.items[it.name]; if (!g) continue;
     cand.push({ i: i, name: it.name, g: typeof rank_val === "function" ? rank_val(it) : (g.g || 20), q: it.q || 1 });

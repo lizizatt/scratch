@@ -323,6 +323,15 @@ test("chat: !hold / !hunt / !grind are commands", () => {
   assert.deepStrictEqual(core.classifyChat("Jazwyn", "!resume", "Sarene", core.PARTY).cmd, { type: "resume" });
   assert.deepStrictEqual(core.classifyChat("Zarook", "!grind", "Sarene", core.PARTY).cmd, { type: "grind" });
   assert.deepStrictEqual(core.classifyChat("Jazwyn", "!hunt spider", "Sarene", core.PARTY).cmd, { type: "hunt", mtype: "spider" });
+  assert.deepStrictEqual(core.classifyChat("Jazwyn", "!world EU I", "Sarene", core.PARTY).cmd, { type: "world", server: ["EU", "I"] });
+  assert.deepStrictEqual(core.classifyChat("Jazwyn", "!world US/III", "Sarene", core.PARTY).cmd, { type: "world", server: ["US", "III"] });
+  assert.deepStrictEqual(core.classifyChat("Jazwyn", "!world III", "Sarene", core.PARTY).cmd, { type: "world", server: ["US", "III"] });
+});
+
+test("parseWorld accepts common world forms", () => {
+  assert.deepStrictEqual(core.parseWorld("eu i"), ["EU", "I"]);
+  assert.deepStrictEqual(core.parseWorld("US/II"), ["US", "II"]);
+  assert.strictEqual(core.parseWorld("nope"), null);
 });
 test("chat: summon text is not a special command", () => {
   const r = core.classifyChat("Sarene", "I need a summon!", "Jazwyn", core.PARTY);

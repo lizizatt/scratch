@@ -25,7 +25,11 @@ function combat(mtype) {
   if (n) {
     dx = t.real_x - cx / n; dy = t.real_y - cy / n; d = Math.sqrt(dx * dx + dy * dy) || 1;
     cx = t.real_x + dx / d * 30; cy = t.real_y + dy / d * 30;
-    if (parent.distance(character, { real_x: cx, real_y: cy }) > 20) { move(cx, cy); return; }
+    if (parent.distance(character, { real_x: cx, real_y: cy }) > 20) {
+      if (can_attack(t)) attack(t);
+      move(cx, cy);
+      return;
+    }
   }
   if (character.mp / character.max_mp >= 0.75 && ready("cleave")) use_skill("cleave");
   if (can_attack(t)) attack(t);

@@ -19,7 +19,7 @@ const SCROLL_BUY = 10;
 const WTYPES = ["sword", "short_sword", "wblade", "basher", "axe", "mace", "spear"];
 const ARMOR = ["helmet", "chest", "pants", "shoes", "gloves", "cape", "shield"];
 const BASICS = [
-  ["mainhand", "blade"], ["helmet", "helmet"], ["chest", "coat"],
+  ["mainhand", "fireblade"], ["offhand", "sshield"], ["helmet", "helmet"], ["chest", "coat"],
   ["pants", "pants"], ["shoes", "shoes"], ["gloves", "gloves"]
 ];
 
@@ -185,6 +185,14 @@ function priestDecision(self, members, canHealId, canPartyheal) {
   return { action: "none" };
 }
 
+function parseWorld(raw) {
+  var p = ("" + (raw || "")).trim().replace(/[!/,]+/g, " ").replace(/\s+/g, " ").toUpperCase().split(" ").filter(Boolean);
+  if (p[0] === "WORLD") p = p.slice(1);
+  if (p.length === 1 && /^(I|II|III|IV|V|PVP)$/.test(p[0])) return ["US", p[0]];
+  if (p.length >= 2 && /^(US|EU|ASIA)$/.test(p[0]) && /^[A-Z0-9]+$/.test(p[1])) return [p[0], p[1]];
+  return null;
+}
+
 function classifyChat(from, message, selfName, party) {
   var m = ("" + (message || "")).trim(), low = m.toLowerCase(), cmd = null, k, gratz, inParty;
   if (low === "!hold") cmd = { type: "hold" };
@@ -193,6 +201,9 @@ function classifyChat(from, message, selfName, party) {
   else if (low.indexOf("!hunt ") === 0) {
     k = low.slice(6).replace(/[^a-z0-9_]/g, "");
     if (k) cmd = { type: "hunt", mtype: k };
+  } else if (low.indexOf("!world ") === 0) {
+    k = parseWorld(m.slice(7));
+    if (k) cmd = { type: "world", server: k };
   } else if (low.indexOf("let's kill ") === 0 || low.indexOf("lets kill ") === 0) {
     k = low.replace(/^let'?s kill /, "").replace(/!+$/, "").replace(/[^a-z0-9_]/g, "");
     if (k) cmd = { type: "hunt", mtype: k };
@@ -357,7 +368,7 @@ module.exports = {
   FORM_NEAR, FORM_FAR, FORM_SMART, FORM_MAGE, FORM_PRIEST,
   pot, attCap, desired, partyFarmTarget, itemPrice, affordable, buyPotCounts, restockCost,
   isKeep, hasJunk, needsPots, needsVendor, usePotSkill,
-  farmable, pickCombatTarget, priestDecision, classifyChat, parseStatus, shouldCallPots,
+  farmable, pickCombatTarget, priestDecision, classifyChat, parseStatus, parseWorld, shouldCallPots,
   skillReady, warriorSkillPlan, peelTauntTarget, priestReviveTarget,
   classWtypes, isGear, isClassGear, scrollName, findUpgrade, hasPiece, canBuyScrolls, canBuyBasic,
   formationPos, formDist, formAction, formNeedsReanchor, tankAnchor, tooClose, stepAway

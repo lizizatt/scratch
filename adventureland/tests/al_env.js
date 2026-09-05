@@ -42,6 +42,8 @@ function baseG() {
       shoes: { g: 800, type: "shoes", upgrade: true, armor: 4, grades: [7, 9, 10, 12] },
       gloves: { g: 800, type: "gloves", upgrade: true, armor: 4, grades: [7, 9, 10, 12] },
       blade: { g: 2400, type: "weapon", wtype: "short_sword", upgrade: true, attack: 20, grades: [7, 9, 10, 12] },
+      fireblade: { g: 96000, type: "weapon", wtype: "short_sword", upgrade: true, attack: 21, grades: [0, 8, 10, 12] },
+      sshield: { g: 24000, type: "shield", upgrade: true, grades: [4, 8, 10, 12] },
       staff: { g: 2400, type: "weapon", wtype: "staff", upgrade: true, attack: 20, grades: [7, 9, 10, 12] },
       wand: { g: 2400, type: "weapon", wtype: "wand", upgrade: true, attack: 18 },
       bow: { g: 2400, type: "weapon", wtype: "bow", upgrade: true, attack: 18 },
@@ -55,6 +57,9 @@ function baseG() {
       essenceoflife: { g: 100 },
       gem0: { g: 240000, type: "gem", e: 1 },
       gem1: { g: 24000, type: "gem" },
+      seashell: { g: 120, type: "quest" },
+      reefglass: { g: 400, type: "material" },
+      bwing: { g: 1200, type: "material" },
       cryptkey: { g: 50000, type: "dungeon_key" },
       stonekey: { g: 50000, type: "dungeon_key" },
       armorring: { g: 180000, type: "ring", compound: { armor: 9 } },
@@ -280,6 +285,47 @@ function makeEnv(charOver) {
       log.cm = log.cm || [];
       const names = Array.isArray(name) ? name : [name];
       names.forEach((n) => log.cm.push({ name: n, data }));
+      if (data && data.dlv_need_q) {
+        await Promise.resolve();
+        for (const n of names) {
+          const ent = parent.entities[n];
+          const items =
+            (ent && ent.needItems) ||
+            (env.dlv_active && env.dlv_active.who === n && env.dlv_active.items) ||
+            [];
+          env.emitCm(n, {
+            v: 1,
+            dlv_need: 1,
+            id: data.id,
+            items: items,
+            map: (ent && ent.map) || "main",
+            x: ent ? ent.real_x : 0,
+            y: ent ? ent.real_y : 0,
+            esize: ent ? ent.esize : 5,
+          });
+        }
+      }
+      if (data && data.dlv_loot_q) {
+        await Promise.resolve();
+        for (const n of names) {
+          const ent = parent.entities[n];
+          if (ent && ent.items) {
+            for (let i = 0; i < ent.items.length && (character.esize || 0) > 0; i++) {
+              const it = ent.items[i];
+              if (!it || /^hpot|^mpot/.test(it.name) || it.name === "stand0") continue;
+              const slot = character.items.findIndex((x) => !x);
+              if (slot < 0) break;
+              character.items[slot] = it;
+              ent.items[i] = null;
+              character.esize = (character.esize || 1) - 1;
+              if (ent.esize != null) ent.esize += 1;
+              log.looted = log.looted || [];
+              log.looted.push({ from: n, item: it.name });
+            }
+          }
+          env.emitCm(n, { v: 1, dlv_loot_done: 1, id: data.id });
+        }
+      }
       return { receivers: names, locals: names };
     },
     game_log: (m) => { log.game = log.game || []; log.game.push(m); },
@@ -460,7 +506,7 @@ function makeEnv(charOver) {
         place("bank", 0, -50);
         if (!character.bank) character.bank = character._bank || { gold: 0, items0: new Array(42).fill(null) };
       }
-      else if (dest && (dest.to === "secondhands" || dest.to === "mcollector" || dest.to === "craftsman")) place("main", 40, -120);
+      else if (dest && (dest.to === "secondhands" || dest.to === "mcollector" || dest.to === "craftsman")) place("main", 106, -47);
       else if (dest && dest.to && PACKS[dest.to]) place(PACKS[dest.to].map, PACKS[dest.to].x, PACKS[dest.to].y);
       else if (dest && (dest.x != null || dest.y != null)) {
         place(dest.map || character.map, dest.x != null ? dest.x : character.real_x, dest.y != null ? dest.y : character.real_y);

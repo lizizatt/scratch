@@ -29,7 +29,7 @@ test("merchant.js stays within 176 CODE lines", () => {
 test("idle merchant opens stand and lists loot with trade slot arity", async () => {
   const items = new Array(42).fill(null);
   items[0] = { name: "stand0", q: 1 };
-  items[1] = { name: "gem0", q: 1 };
+  items[1] = { name: "helmet", q: 1 };
   items[2] = { name: "hpot0", q: 10 };
   const env = merchant({ items, gold: 50000 });
   env.HOLD = [["armorring", 1]];
@@ -190,6 +190,21 @@ test("grind() tells Jazwyn to resume the ladder", () => {
   assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.grind === 1));
   assert.ok(!(env.log.pm && env.log.pm.some((p) => p.message === "grind")));
   assert.strictEqual(env.lastMessage, "Grind");
+});
+
+test("world() updates HOME and tells Jazwyn", () => {
+  const env = merchant();
+  env.world("EU I");
+  assert.deepStrictEqual(Array.from(env.HOME), ["EU", "I"]);
+  assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.world && c.data.world[0] === "EU"));
+  assert.strictEqual(env.lastMessage, "W EU/I");
+});
+
+test("merchant hear_gear world from fighter updates HOME", () => {
+  const env = merchant();
+  env.emitCm("Jazwyn", { world: ["ASIA", "I"] });
+  assert.deepStrictEqual(Array.from(env.HOME), ["ASIA", "I"]);
+  assert.ok((env.log.game || []).some((s) => /World ASIA\/I/i.test(s)));
 });
 
 test("merchant hops to HOME when elsewhere", async () => {

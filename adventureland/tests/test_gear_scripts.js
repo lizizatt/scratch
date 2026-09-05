@@ -7,7 +7,7 @@ const tests = [];
 function test(name, fn) { tests.push({ name, fn }); }
 
 const SPECS = [
-  { file: "warrior_upgrade.js", name: "Jazwyn", ctype: "warrior", weapon: "blade", badWeapon: "staff" },
+  { file: "warrior_upgrade.js", name: "Jazwyn", ctype: "warrior", weapon: "fireblade", badWeapon: "staff" },
   { file: "mage_upgrade.js", name: "Sarene", ctype: "mage", weapon: "staff", badWeapon: "blade" },
   { file: "priest_upgrade.js", name: "Zarook", ctype: "priest", weapon: "staff", badWeapon: "blade" }
 ];
@@ -60,8 +60,9 @@ SPECS.forEach((spec) => {
     const items = new Array(42).fill(null);
     items[0] = { name: spec.weapon, level: 0 };
     items[1] = { name: "scroll0", q: 20 };
+    items[2] = { name: "scroll1", q: 20 };
     const env = loadScript(spec.file, {
-      name: spec.name, ctype: spec.ctype, gold: 80000, map: "main", items
+      name: spec.name, ctype: spec.ctype, gold: 500000, map: "main", items
     });
     await env.tick();
     assert.ok(env.log.upgraded.length >= 1);
@@ -82,8 +83,9 @@ SPECS.forEach((spec) => {
     items[3] = { name: "pants", level: 5 };
     items[4] = { name: "shoes", level: 5 };
     items[5] = { name: "gloves", level: 5 };
+    items[6] = { name: "sshield", level: 5 };
     const env = loadScript(spec.file, {
-      name: spec.name, ctype: spec.ctype, gold: 80000, map: "main", items
+      name: spec.name, ctype: spec.ctype, gold: 500000, map: "main", items
     });
     await env.tick();
     assert.strictEqual(env.done, true);
@@ -152,6 +154,8 @@ SPECS.forEach((spec) => {
 test("warrior treats blade as short_sword gear", () => {
   const env = loadScript("warrior_upgrade.js", { name: "Jazwyn", ctype: "warrior" });
   assert.strictEqual(env.is_gear({ name: "blade", level: 0 }), true);
+  assert.strictEqual(env.is_gear({ name: "fireblade", level: 0 }), true);
+  assert.strictEqual(env.is_gear({ name: "sshield", level: 0 }), true);
 });
 
 test("mage accepts wand as mainhand gear", () => {

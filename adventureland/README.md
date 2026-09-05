@@ -36,15 +36,16 @@ Shared logic lives in `fighter_core.js` (loaded by each class). See `FIGHTER_PLA
 
 | Command | Effect |
 | --- | --- |
-| `!hold` / `!resume` | Hold restock on Americas II / resume grind on Americas III |
+| `!hold` / `!resume` | Hold restock on Americas II / resume grind on farm world |
 | `!hunt <mtype>` / `!grind` | Override pack / clear override |
+| `!world <REGION ID>` | Override farm server (e.g. `!world EU I`, `!world US/III`); leader CMs Puppygirl |
 | `Let's kill X!` / `Back to the grind` | Same as hunt/grind (legacy) |
 
-Status sync: leader-only `~s h=0|1 f=<mtype|->` every ~20s on change (rate-limited with other party chat). Social Ding/Gratz stay other-only.
+Status sync: leader-only `~s h=0|1 f=<mtype|-> w=US/III` every ~20s on change (rate-limited with other party chat). Social Ding/Gratz stay other-only.
 
 Formation: mage/priest hold face-relative flank slots. Slot is **re-anchored only after the leader moves ≥70** from the last anchor (stops combat jitter).
 
-Merchant console still has `hold()` / `resume()` / `hunt()` / `grind()` (CM/PM dual-path).
+Merchant console still has `hold()` / `resume()` / `hunt()` / `grind()` / `world()` (CM dual-path).
 
 Hold survives reload via `localStorage`. On a potion run fighters bank non-pots first. Walking past puppygirl sends gold down to a 1k float.
 

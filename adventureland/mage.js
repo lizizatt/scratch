@@ -13,4 +13,4 @@ function combat() {
   if (!is_in_range(t)) { move(character.real_x + (t.real_x - character.real_x) / 2, character.real_y + (t.real_y - character.real_y) / 2); return; }
   if (can_attack(t)) attack(t);
 }
-boot_fighter({ combat: combat, ding_line: "Ding! Spark.", form: { dx: -10, dy: 10, face: 1 } });
+boot_fighter({ combat: combat, ding_line: "Ding! Spark.", form: { dx: -45, dy: 55, face: 1 } });

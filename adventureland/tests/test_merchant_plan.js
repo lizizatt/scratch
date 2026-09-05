@@ -63,6 +63,25 @@ test("list_sale and bank_sellable use hold_item not held_set map", async () => {
   assert.strictEqual(typeof env.held_set, "undefined");
 });
 
+test("list_sale and bank_sellable require SELL whitelist", async () => {
+  const env = envOf({ esize: 40, map: "bank" });
+  env.HOLD = [];
+  env.character.items[1] = { name: "gem0", q: 1 };
+  env.character.items[2] = { name: "seashell", q: 1 };
+  env.character.items[3] = { name: "helmet", q: 1 };
+  await env.list_sale();
+  assert.ok(!env.log.traded.some((t) => t.i === 1), "gem0 not on SELL");
+  assert.ok(!env.log.traded.some((t) => t.i === 2), "seashell not on SELL");
+  assert.ok(env.log.traded.some((t) => t.i === 3), "helmet on SELL");
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "reefglass", q: 1 };
+  env.character.bank.items0[1] = { name: "bwing", q: 3 };
+  env.character.bank.items0[2] = { name: "coat", q: 1 };
+  env.character._bank = env.character.bank;
+  env.pulled = true;
+  assert.strictEqual(env.bank_sellable().name, "coat");
+});
+
 test("list_sale skips explicit vitring HOLD quota", async () => {
   const env = envOf();
   env.HOLD = [["armorring", 1], ["vitring", 9]];
@@ -179,7 +198,7 @@ test("restock_sale prices at or above SALE_MULT * vendor g", async () => {
   }
 });
 
-test("list_sale lists event valuables like gem0 and prefers them over junk", async () => {
+test("list_sale does not list non-SELL valuables like gem0", async () => {
   const env = envOf({ esize: 40 });
   env.HOLD = [];
   env.COMBINE_MAX = 5;
@@ -187,15 +206,15 @@ test("list_sale lists event valuables like gem0 and prefers them over junk", asy
   env.character.items[2] = { name: "gem0", q: 1 };
   env.character.items[3] = { name: "cryptkey", q: 1 };
   await env.list_sale();
-  assert.ok(env.log.traded.some((t) => t.i === 2), "gem0 (e:1) must list");
-  assert.ok(env.log.traded.some((t) => t.i === 3), "cryptkey must list");
-  assert.ok(env.log.traded[0].i === 2 || env.character.slots.trade1.name === "gem0");
-  assert.ok(env.character.slots.trade1.price >= Math.floor(240000 * 0.95));
+  assert.ok(env.log.traded.some((t) => t.i === 1), "helmet on SELL");
+  assert.ok(!env.log.traded.some((t) => t.i === 2), "gem0 must stay");
+  assert.ok(!env.log.traded.some((t) => t.i === 3), "cryptkey must stay");
 });
 
 test("list_sale and bank_sellable skip compoundables below COMBINE_MAX", async () => {
   const env = envOf({ esize: 40, map: "bank" });
   env.HOLD = [];
+  env.SELL = ["helmet", "coat", "vitring"];
   env.COMBINE_MAX = 5;
   env.character.items[1] = { name: "vitring", level: 2, q: 1 };
   env.character.items[2] = { name: "helmet", q: 1 };
@@ -217,12 +236,13 @@ test("list_sale and bank_sellable skip compoundables below COMBINE_MAX", async (
 test("bank_sellable ranks by item_value not only catalog g", () => {
   const env = envOf({ map: "bank" });
   env.HOLD = [];
+  env.item_value = (it) => (it && it.name === "helmet" ? 50000 : (env.G.items[it.name] && env.G.items[it.name].g) || 0);
   env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
   env.character.bank.items0[0] = { name: "coat", q: 1 };
-  env.character.bank.items0[1] = { name: "gem0", q: 1 };
+  env.character.bank.items0[1] = { name: "helmet", q: 1 };
   env.character._bank = env.character.bank;
   env.pulled = true;
-  assert.strictEqual(env.bank_sellable().name, "gem0");
+  assert.strictEqual(env.bank_sellable().name, "helmet");
 });
 
 test("list_sale prices at SALE_MULT * item_value", async () => {
@@ -343,13 +363,13 @@ test("stock_store refuses to restock until the stand is fully cleared", async ()
     items0: new Array(42).fill(null),
     items1: new Array(42).fill(null)
   };
-  env.character.bank.items0[0] = { name: "gem0", q: 1 };
+  env.character.bank.items0[0] = { name: "coat", q: 1 };
   env.character._bank = env.character.bank;
   env.pulled = true;
   const ok = await env.stock_store();
   assert.ok(ok);
   assert.ok(!Object.keys(env.character.slots).some((k) => k.indexOf("trade") === 0 && env.character.slots[k] && env.character.slots[k].name === "gloves"));
-  assert.ok(env.character.slots.trade1 && env.character.slots.trade1.name === "gem0");
+  assert.ok(env.character.slots.trade1 && env.character.slots.trade1.name === "coat");
 });
 
 test("awaited unequip clears trade before restock (async bank ops)", async () => {
@@ -586,6 +606,19 @@ test("go_npc fails when smart_move reports failed", async () => {
   assert.deepStrictEqual(env.log.bought, []);
 });
 
+test("go_npc leaves bank before plaza NPCs like Ponty", async () => {
+  const env = envOf({ gold: 400000, map: "bank", x: 0, y: -50 });
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character._bank = env.character.bank;
+  assert.ok(await env.go_npc("secondhands"));
+  assert.strictEqual(env.character.map, "main");
+  assert.ok(env.log.moved.some((d) => d && d.map === "main" && d.x === 40));
+  assert.ok(
+    env.log.moved.some((d) => d && d.to === "secondhands") ||
+      env.log.moved.some((d) => d && d.map === "main" && d.x === 106 && d.y === -47)
+  );
+});
+
 test("stale bank retrieve does not report moved", async () => {
   const env = envOf({ gold: 400000, map: "bank" });
   env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
@@ -626,7 +659,7 @@ test("happy cycle never crafts or buys non-whitelist Ponty", async () => {
   env.character.bank.items0[0] = { name: "coat", q: 1 };
   env.character._bank = env.character.bank;
   env.HOLD = [];
-  env.ponty = [{ name: "snakefang", rid: "f1", price: 1200, level: 0 }];
+  env.ponty = [{ name: "gem0", rid: "f1", price: 1200, level: 0 }];
   await env.logistics();
   assert.deepStrictEqual(env.log.crafted, []);
   assert.deepStrictEqual(env.log.secondhand, []);

@@ -2,7 +2,7 @@ var MAX_LEVEL = 5, MIN_GOLD = 8000, SCROLL_BUY = 10, CTYPE = "warrior";
 var WTYPES = ["sword", "short_sword", "wblade", "basher", "axe", "mace", "spear"];
 var ARMOR = ["helmet", "chest", "pants", "shoes", "gloves", "cape", "shield"];
 var BASICS = [
-  ["mainhand", "blade"], ["helmet", "helmet"], ["chest", "coat"],
+  ["mainhand", "fireblade"], ["offhand", "sshield"], ["helmet", "helmet"], ["chest", "coat"],
   ["pants", "pants"], ["shoes", "shoes"], ["gloves", "gloves"]
 ];
 var SLOTS = ["mainhand", "offhand", "helmet", "chest", "pants", "shoes", "gloves", "cape", "belt"];

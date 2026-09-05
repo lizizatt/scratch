@@ -4,6 +4,7 @@ function keep_combine(it){var g=it&&G.items[it.name];return!!(g&&g.compound&&(it
 function sale_price(it){if(!it||!it.name)return 1;var vendor=vg(it.name)||20,v=rank_val(it)||vendor,m=SALE_MULT!=null?SALE_MULT:0.95;return Math.max(1,Math.floor(vendor*m),Math.floor(v*m))}
 function lv(it){return(it&&it.level)||0}
 function skip_it(it){return!it||is_pot(it)||it.name==="stand0"||it.l}
+function sell_ok(it){return!!(it&&it.name&&(SELL||[]).indexOf(it.name)>=0)}
 function cscroll(name,level){var g=G.items[name],grades=(g&&g.grades)||[2],gl=0,i;for(i=0;i<grades.length;i++)if((level||0)>=grades[i])gl=i+1;return gl<=0?"cscroll0":gl===1?"cscroll1":"cscroll2"}
 function snap_bank(){var b={},p;if(!character.bank)return;for(p in character.bank)b[p]=character.bank[p]&&character.bank[p].slice?character.bank[p].slice():character.bank[p];character._bank=b}
 function bank_obj(){return character.bank||character._bank}
@@ -32,7 +33,7 @@ function hold_item(it){
   return false;
 }
 async function ensure_main(){var r;if(character.map==="main"||character.map==="bank")return true;try{stop("smart")}catch(e0){}if(character.map==="jail"){try{await leave();await sleep(1000)}catch(e){}}if(character.map==="winter_inn"||character.map==="winter_cave"){try{r=await smart_move({map:"main",x:40,y:-20});if(r&&!r.failed&&(character.map==="main"||character.map==="bank"))return true}catch(e1){}}try{use("town");await sleep(2000)}catch(e2){}if(character.map==="main"||character.map==="bank")return true;try{r=await smart_move({map:"main",x:40,y:-20});return!!r&&!r.failed&&(character.map==="main"||character.map==="bank")}catch(e3){return false}}
-async function go_npc(to){var r;if(typeof ensure_stand==="function")await ensure_stand(false);else close_stand();if(to==="bank"&&character.map==="bank")return true;await ensure_main();try{r=await smart_move({to:to});if(r&&!r.failed)return true}catch(e){}try{use("town");await sleep(1500)}catch(eT){}if(typeof ensure_stand==="function")await ensure_stand(false);else close_stand();if(to==="bank"){try{r=await smart_move({map:"bank",x:0,y:-50});if(r&&!r.failed)return true}catch(eB){}game_log("bank fail @"+character.map+" "+Math.floor(character.real_x)+","+Math.floor(character.real_y));return false}if(to==="potions"){try{r=await smart_move({map:"main",x:56,y:-122});return!!r&&!r.failed}catch(e2){return false}}try{r=await smart_move({to:to});return!!r&&!r.failed}catch(e3){return false}}
+async function go_npc(to){var r;if(typeof ensure_stand==="function")await ensure_stand(false);else close_stand();if(to==="bank"&&character.map==="bank")return true;if(to!=="bank"&&character.map==="bank"){try{r=await smart_move({map:"main",x:40,y:-20});if(!r||r.failed)throw 1}catch(e0){try{use("town");await sleep(1500)}catch(eT0){}}if(character.map==="bank")return false}await ensure_main();try{r=await smart_move({to:to});if(r&&!r.failed)return true}catch(e){}try{use("town");await sleep(1500)}catch(eT){}if(typeof ensure_stand==="function")await ensure_stand(false);else close_stand();if(to==="bank"){try{r=await smart_move({map:"bank",x:0,y:-50});if(r&&!r.failed)return true}catch(eB){}game_log("bank fail @"+character.map+" "+Math.floor(character.real_x)+","+Math.floor(character.real_y));return false}if(to==="potions"){try{r=await smart_move({map:"main",x:56,y:-122});return!!r&&!r.failed}catch(e2){return false}}if(to==="secondhands"){try{r=await smart_move({map:"main",x:106,y:-47});return!!r&&!r.failed}catch(eS){return false}}try{r=await smart_move({to:to});return!!r&&!r.failed}catch(e3){return false}}
 async function move_ent(e,dest){
   if(e.where===dest)return"have";
   if(e.where==="gear"){if(!character.slots[e.loc])return"fail";try{await unequip(e.loc)}catch(err){return"fail"}if(character.slots[e.loc])return"fail";if(dest==="bag")return"moved";e=find_ent(e.name,e.level,"bag");return e?await move_ent(e,dest):"fail"}
@@ -49,7 +50,7 @@ async function wait_q(k){var n;for(n=0;n<200&&character.q&&character.q[k];n++)aw
 async function strip_gear(){var s;for(s in character.slots){if(!character.slots[s]||(""+s).indexOf("trade")===0)continue;try{await unequip(s)}catch(e){}}}
 function bank_sellable(bad){
   var i,a=idx(),best=null,key,it,val,bestv=-1,bank=bank_obj();
-  for(i=0;i<a.length;i++){if(a[i].where!=="bank")continue;key=a[i].loc[0]+":"+a[i].loc[1];if(bad&&bad[key])continue;it=bank&&bank[a[i].loc[0]]&&bank[a[i].loc[0]][a[i].loc[1]];if(!it||skip_it(it)||keep_combine(it)||hold_item(it))continue;val=rank_val(it);if(!best||val>bestv){best=a[i];bestv=val}}
+  for(i=0;i<a.length;i++){if(a[i].where!=="bank")continue;key=a[i].loc[0]+":"+a[i].loc[1];if(bad&&bad[key])continue;it=bank&&bank[a[i].loc[0]]&&bank[a[i].loc[0]][a[i].loc[1]];if(!it||skip_it(it)||!sell_ok(it)||keep_combine(it)||hold_item(it))continue;val=rank_val(it);if(!best||val>bestv){best=a[i];bestv=val}}
   return best;
 }
 async function park_bag(){

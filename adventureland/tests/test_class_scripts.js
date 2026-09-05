@@ -230,6 +230,19 @@ test("!hunt from another party member updates farm_ovr quietly", () => {
   assert.ok(!env.log.said.some((s) => /Let's kill boar/i.test(s)));
 });
 
+test("!world from party updates FARM and leader CMs merchant", () => {
+  const lead = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior", _server: ["US", "III"] });
+  lead.hear({ from: "Jazwyn", message: "!world EU I" });
+  assert.deepStrictEqual(Array.from(lead.FARM), ["EU", "I"]);
+  assert.ok((lead.log.game || []).some((s) => /World EU\/I/i.test(s)));
+  assert.ok(lead.log.cm.some((c) => c.name === "Puppygirl" && c.data && c.data.world && c.data.world[0] === "EU" && c.data.world[1] === "I"));
+  assert.ok(lead.log.server.some((s) => s[0] === "EU" && s[1] === "I"));
+  const follower = loadScript("mage.js", { name: "Sarene", ctype: "mage", _server: ["US", "III"] });
+  follower.hear({ from: "Jazwyn", message: "!world EU I" });
+  assert.deepStrictEqual(Array.from(follower.FARM), ["EU", "I"]);
+  assert.ok(!(follower.log.cm || []).some((c) => c.data && c.data.world));
+});
+
 test("summon chat does not start a potion rally", () => {
   const env = loadScript("priest.js", { name: "Zarook", ctype: "priest" });
   env.emitChat("Jazwyn", "I need a summon!");
@@ -381,7 +394,13 @@ function sendToAll(envs, from, msg) {
 }
 
 function wentTo(env, dest) {
-  return env.log.moved.some((d) => d && d.to === dest);
+  return env.log.moved.some((d) => {
+    if (!d) return false;
+    if (d.to === dest) return true;
+    if (dest === "potions" && d.map === "main" && d.x != null && Math.abs(d.x - 56) < 8 && Math.abs((d.y || 0) + 122) < 8) return true;
+    if (dest === "bank" && (d.map === "bank" || (d.to && d.to.map === "bank"))) return true;
+    return false;
+  });
 }
 
 function noGlobal(env) {
@@ -739,6 +758,21 @@ test("follow_formation interrupts solo smart_move toward leader", async () => {
   assert.ok(env.log.moved.some((d) => d && d.x != null && d.x > 200));
 });
 
+test("stale same-map party without leader vision falls back to go_farm", async () => {
+  const env = loadScript("priest.js", stocked({
+    name: "Zarook", ctype: "priest", level: 40, max_hp: 3000, real_x: 216, real_y: 944, map: "main",
+    _server: ["US", "III"]
+  }));
+  env.parent.party = {
+    Jazwyn: { name: "Jazwyn", map: "main", x: 216, y: 944 },
+    Zarook: { name: "Zarook", map: "main", x: 216, y: 944 }
+  };
+  env.lead_blind_since = Date.now() - 25000;
+  assert.strictEqual(env.leader_ok(), false);
+  await env.logistics();
+  assert.ok(wentTo(env, "bat") || wentTo(env, { map: "cave" }), "priest should go_farm bat/cave when leader coords are stale");
+});
+
 test("potion restock banks loot and does not sell it", async () => {
   const items = new Array(42).fill(null);
   items[0] = { name: "hpot0", q: 5 };
@@ -1060,7 +1094,7 @@ test("warrior.js steps to the far side of the mob from the backline", () => {
   env.combat("croc");
   assert.ok(env.log.moved.length >= 1);
   assert.ok(env.log.moved[0].x > 100, "tank should stand past the mob");
-  assert.strictEqual(env.log.attacked.length, 0);
+  assert.ok(env.log.attacked.length >= 1, "tank should still swing while repositioning");
 });
 
 ["priest.js", "mage.js"].forEach((file) => {

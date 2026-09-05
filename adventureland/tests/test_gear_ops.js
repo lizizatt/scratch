@@ -50,6 +50,21 @@ test("pick_upgrade skips candycanesword grade>0", () => {
   assert.strictEqual(env.pick_upgrade(), 2);
 });
 
+test("pick_upgrade allows fireblade UNIQUE scroll1", () => {
+  const env = merchant();
+  env.GEAR_RISK = 1;
+  env.character.items[1] = { name: "fireblade", level: 0 };
+  assert.strictEqual(env.pick_upgrade(), 1);
+  assert.strictEqual(env.scroll_for(env.character.items[1]), "scroll1");
+});
+
+test("pick_upgrade allows sshield on scroll0 list", () => {
+  const env = merchant();
+  env.GEAR_RISK = 0;
+  env.character.items[1] = { name: "sshield", level: 0 };
+  assert.strictEqual(env.pick_upgrade(), 1);
+});
+
 test("pick_upgrade skips UNIQUE when GEAR_RISK=0", () => {
   const env = merchant();
   env.GEAR_RISK = 0;
@@ -107,13 +122,38 @@ test("ponty_buy purchases whitelist wbook0 under fair cap", async () => {
   assert.ok(env.character.items.some((it) => it && it.name === "wbook0"));
 });
 
-test("ponty_buy skips when offhand already owned", async () => {
+test("ponty_buy still buys sshield when wbook0 already owned", async () => {
   const env = merchant({ gold: 400000, esize: 38 });
-  env.character.items[1] = { name: "shield", level: 0 };
-  env.ponty = [{ name: "wbook0", rid: "w1", price: 20000, level: 0 }];
+  env.GOLD_FLOAT = 100000;
+  env.character.items[1] = { name: "wbook0", q: 1 };
+  env.ponty = [
+    { name: "wbook0", rid: "w1", price: 20000, level: 0 },
+    { name: "sshield", rid: "s1", price: 40000, level: 0 }
+  ];
+  const r = await env.ponty_buy();
+  assert.strictEqual(r, "ok");
+  assert.ok(env.log.secondhand.some((s) => s.name === "sshield"));
+  assert.ok(env.character.items.some((it) => it && it.name === "sshield"));
+});
+
+test("ponty_buy skips sshield when quota filled", async () => {
+  const env = merchant({ gold: 400000, esize: 38 });
+  env.GOLD_FLOAT = 100000;
+  env.PONTY_WANT = [["sshield", 1], ["wbook0", 1]];
+  env.character.items[1] = { name: "sshield", q: 1 };
+  env.ponty = [{ name: "sshield", rid: "s1", price: 40000, level: 0 }];
   const r = await env.ponty_buy();
   assert.strictEqual(r, null);
   assert.deepStrictEqual(env.log.secondhand, []);
+});
+
+test("ponty_buy buys snakefang armorring mat under fair cap", async () => {
+  const env = merchant({ gold: 400000, esize: 38 });
+  env.GOLD_FLOAT = 100000;
+  env.ponty = [{ name: "snakefang", rid: "f1", price: 2000, level: 0 }];
+  const r = await env.ponty_buy();
+  assert.strictEqual(r, "ok");
+  assert.ok(env.log.secondhand.some((s) => s.name === "snakefang"));
 });
 
 test("ponty_buy rejects overpriced whitelist", async () => {
