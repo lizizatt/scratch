@@ -3,9 +3,9 @@
 const LADDER = [
   [1, "goo"], [4, "bee"], [8, "crab"], [12, "snake"], [16, "armadillo"],
   [20, "arcticbee"], [24, "porcupine"], [28, "croc"], [30, "tortoise"], [32, "bat"],
-  [42, "spider"], [50, "scorpion"], [54, "boar"], [60, "bigbird"], [66, "gscorpion"],
-  [72, "wolf"], [78, "dryad"]
+  [50, "gscorpion"], [58, "wolfie"], [66, "wolf"]
 ];
+const FARM_BAN = ["spider", "scorpion", "bigbird"];
 const PARTY = ["Jazwyn", "Sarene", "Zarook"];
 const LEADER = "Jazwyn";
 const TANK = "Jazwyn";
@@ -352,7 +352,7 @@ function formNeedsReanchor(anchor, lead, thresh) {
 }
 
 module.exports = {
-  LADDER, PARTY, LEADER, TANK, POTION_TARGET, POTION_MIN, MAX_ATTACK_RATIO,
+  LADDER, FARM_BAN, PARTY, LEADER, TANK, POTION_TARGET, POTION_MIN, MAX_ATTACK_RATIO,
   MAX_SCRIPT_LEVEL, MAX_GEAR_LEVEL, MIN_GOLD, SCROLL_BUY, WTYPES, ARMOR, BASICS,
   FORM_NEAR, FORM_FAR, FORM_SMART, FORM_MAGE, FORM_PRIEST,
   pot, attCap, desired, partyFarmTarget, itemPrice, affordable, buyPotCounts, restockCost,

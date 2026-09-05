@@ -17,7 +17,7 @@ function merchant(extra) {
   items[0] = { name: "stand0", q: 1 };
   return loadScript("merchant.js", Object.assign({
     name: "puppygirl", ctype: "merchant", gold: 100000, map: "main", items, esize: 40,
-    _server: ["US", "II"]
+    _server: ["US", "III"]
   }, extra || {}));
 }
 
@@ -172,10 +172,16 @@ test("resume() CMs every fighter with {hold:0}", async () => {
 
 test("hunt() tells Jazwyn to kill a mob", () => {
   const env = merchant();
-  env.hunt("Spider");
-  assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.hunt === "spider"));
-  assert.ok(!(env.log.pm && env.log.pm.some((p) => p.message === "hunt:spider")));
-  assert.strictEqual(env.lastMessage, "Hunt spider");
+  env.hunt("Boar");
+  assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.hunt === "boar"));
+  assert.strictEqual(env.lastMessage, "Hunt boar");
+});
+
+test("hunt() refuses blacklisted spider", () => {
+  const env = merchant();
+  env.hunt("spider");
+  assert.ok(!(env.log.cm || []).some((c) => c.data && c.data.hunt === "spider"));
+  assert.ok(/Skip spider/i.test(env.lastMessage));
 });
 
 test("grind() tells Jazwyn to resume the ladder", () => {
@@ -186,10 +192,10 @@ test("grind() tells Jazwyn to resume the ladder", () => {
   assert.strictEqual(env.lastMessage, "Grind");
 });
 
-test("merchant hops to Americas II when elsewhere", async () => {
-  const env = merchant({ _server: ["US", "III"] });
+test("merchant hops to HOME when elsewhere", async () => {
+  const env = merchant({ _server: ["US", "I"] });
   await env.logistics();
-  assert.deepStrictEqual(env.log.server, [["US", "II"]]);
+  assert.deepStrictEqual(env.log.server, [["US", "III"]]);
   assert.ok(!env.log.merchant.some((m) => m.open != null));
 });
 

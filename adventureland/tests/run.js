@@ -6,7 +6,8 @@ const suites = [
   require("./test_gear_scripts"),
   require("./test_merchant_script"),
   require("./test_merchant_plan"),
-  require("./test_gear_ops")
+  require("./test_gear_ops"),
+  require("./test_field_delivery")
 ];
 
 async function main() {

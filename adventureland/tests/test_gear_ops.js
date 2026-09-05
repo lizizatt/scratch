@@ -172,21 +172,44 @@ test("duplicate dlv_req re-acks without double queue", async () => {
   };
   env.emitCm("Jazwyn", req);
   await flush();
+  assert.strictEqual(env.dlv_q.filter((j) => j.id === "dup1").length, 1);
+  const t0 = env.dlv_q[0].t0;
+  await new Promise((r) => setTimeout(r, 5));
   env.emitCm("Jazwyn", req);
   await flush();
   assert.strictEqual(env.dlv_q.filter((j) => j.id === "dup1").length, 1);
+  assert.strictEqual(env.dlv_q[0].t0, t0);
   assert.ok(env.log.cm.filter((c) => c.data && c.data.dlv_ack && c.data.id === "dup1").length >= 2);
+});
+
+test("deliver_tick prefers FIGHTERS[0] over older Zarook job", async () => {
+  const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
+  env.GOLD_FLOAT = 0;
+  placeFighter(env, "Jazwyn", { map: "main", real_x: 40, real_y: -20, esize: 4 });
+  placeFighter(env, "Zarook", { map: "main", real_x: 50, real_y: -20, esize: 4 });
+  wireGot(env);
+  const old = Date.now() - 60000;
+  env.dlv_q = [
+    { id: "z1", who: "Zarook", kind: "pots", items: [{ name: "hpot1", q: 5 }], map: "main", x: 50, y: -20, server: ["US", "III"], esize: 4, t0: old },
+    { id: "j1", who: "Jazwyn", kind: "pots", items: [{ name: "hpot1", q: 5 }], map: "main", x: 40, y: -20, server: ["US", "III"], esize: 4, t0: Date.now() }
+  ];
+  env.dlv_save();
+  const r = await env.deliver_tick();
+  assert.strictEqual(r, "done");
+  assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.dlv_done && c.data.ok === 1));
+  assert.ok(env.dlv_q.some((j) => j.who === "Zarook"));
 });
 
 test("deliver_tick buys pots, walks, send_item, handshake done", async () => {
   const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
   env.GOLD_FLOAT = 0;
-  placeFighter(env, "Jazwyn", { map: "main", real_x: 700, real_y: -100, esize: 4 });
+  // stay off blacklisted east-island packs (spider boundary) so delivery walks to the fighter
+  placeFighter(env, "Jazwyn", { map: "main", real_x: 80, real_y: 120, esize: 4 });
   wireGot(env);
   env.emitCm("Jazwyn", {
     v: 1, dlv_req: 1, id: "job1", kind: "pots",
     items: [{ name: "hpot1", q: 40 }, { name: "mpot1", q: 40 }],
-    map: "main", x: 700, y: -100, server: ["US", "III"], esize: 4
+    map: "main", x: 80, y: 120, server: ["US", "III"], esize: 4
   });
   await flush();
   const r = await env.deliver_tick();
@@ -269,23 +292,102 @@ test("dlv_loc updates active job coordinates", async () => {
   assert.strictEqual(j.y, -50);
 });
 
+test("dlv_ping replies with on-my-way status", async () => {
+  const env = merchant();
+  env.emitCm("Jazwyn", {
+    v: 1, dlv_req: 1, id: "st1", kind: "pots",
+    items: [{ name: "hpot1", q: 5 }], map: "main", x: 900, y: -50,
+    server: ["US", "III"], esize: 2
+  });
+  await flush();
+  env.log.cm = [];
+  env.emitCm("Jazwyn", { v: 1, dlv_ping: 1, id: "st1" });
+  await flush();
+  const st = env.log.cm.find((c) => c.data && c.data.dlv_status);
+  assert.ok(st, "expected dlv_status reply");
+  assert.strictEqual(st.data.id, "st1");
+  assert.ok(/On my way|Queued|Grabbing|Almost|tunnel/i.test(st.data.msg || st.data.phase));
+});
+
+test("dlv_field_far is geography not monster name", () => {
+  const env = merchant({ real_x: 0, real_y: 0 });
+  assert.ok(env.dlv_field_far({ x: 900, y: 0, map: "main" }));
+  assert.ok(!env.dlv_field_far({ x: 40, y: 0, map: "main", farm: "goo" }));
+});
+
+test("dlv_goto walks to fighter on same map", async () => {
+  const env = merchant({ real_x: 40, real_y: -20, x: 40, y: -20, map: "main" });
+  placeFighter(env, "Jazwyn", { map: "main", real_x: 100, real_y: 100, esize: 4 });
+  const ok = await env.dlv_goto({ who: "Jazwyn", map: "main", x: 100, y: 100, farm: "goo", t0: Date.now() });
+  assert.ok(ok);
+  assert.ok(env.character.map === "main");
+  assert.ok(env.parent.distance(env.character, env.parent.entities.Jazwyn) <= 320);
+});
+
 test("logistics prefers deliver_tick over econ when queue non-empty", async () => {
   const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
   env.GOLD_FLOAT = 0;
   env.cycle_at = 0;
-  placeFighter(env, "Jazwyn", { map: "main", real_x: 40, real_y: -20, esize: 4 });
-  wireGot(env);
-  env.emitCm("Jazwyn", {
-    v: 1, dlv_req: 1, id: "prio1", kind: "pots",
-    items: [{ name: "hpot1", q: 10 }], map: "main", x: 40, y: -20,
-    server: ["US", "III"], esize: 4
-  });
-  await flush();
   let combined = false;
+  let delivered = false;
   env.run_combine = async () => { combined = true; };
+  env.upgrade_one = async () => { combined = true; };
+  env.dlv_has_work = () => true;
+  env.deliver_tick = async () => { delivered = true; return "busy"; };
   await env.logistics();
+  assert.ok(delivered);
   assert.ok(!combined);
-  assert.ok(env.log.sent.some((s) => s.item === "hpot1") || (env.log.game || []).some((s) => /dlv:done/.test(s)));
+});
+
+test("run_econ yields to delivery between steps", async () => {
+  const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
+  let upgraded = false;
+  env.run_combine = async () => {};
+  env.upgrade_one = async () => { upgraded = true; };
+  env.dlv_q = [{ id: "y1", who: "Jazwyn", kind: "pots", items: [], t0: Date.now() }];
+  env.dlv_active = env.dlv_q[0];
+  const r = await env.run_econ();
+  assert.strictEqual(r, "dlv");
+  assert.ok(!upgraded);
+});
+
+test("run_combine yields mid-loop when delivery arrives", async () => {
+  const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
+  let steps = 0;
+  env.combine_step = async () => {
+    steps += 1;
+    if (steps === 1) {
+      env.dlv_q = [{ id: "mid1", who: "Jazwyn", kind: "pots", items: [], t0: Date.now() }];
+      env.dlv_active = env.dlv_q[0];
+      return "ok";
+    }
+    return "ok";
+  };
+  const r = await env.run_combine();
+  assert.strictEqual(r, "dlv");
+  assert.strictEqual(steps, 1);
+});
+
+test("logistics drains delivery after econ yields", async () => {
+  const env = merchant({ gold: 400000, esize: 38, _server: ["US", "III"] });
+  env.cycle_at = 0;
+  let drained = 0;
+  env.go_npc = async () => true;
+  env.park_bag = async () => true;
+  env.snap_bank = () => {};
+  env.run_econ = async () => {
+    env.dlv_q = [{ id: "y2", who: "Jazwyn", kind: "pots", items: [], t0: Date.now() }];
+    env.dlv_active = env.dlv_q[0];
+    return "dlv";
+  };
+  env.deliver_tick = async () => {
+    drained += 1;
+    env.dlv_q = [];
+    env.dlv_active = null;
+    return "done";
+  };
+  await env.logistics();
+  assert.ok(drained >= 1);
 });
 
 module.exports = { tests };

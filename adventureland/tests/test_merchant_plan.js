@@ -17,7 +17,7 @@ function envOf(extra) {
   items[0] = { name: "stand0", q: 1 };
   return loadScript("merchant.js", Object.assign({
     name: "puppygirl", ctype: "merchant", gold: 400000, map: "main", items, esize: 40,
-    real_x: 40, real_y: -20, _server: ["US", "II"], pulled: true
+    real_x: 40, real_y: -20, _server: ["US", "III"], pulled: true
   }, extra || {}));
 }
 
@@ -377,7 +377,7 @@ test("boot snapshot still sees bank after cycle returns to plaza", async () => {
     name: "puppygirl", ctype: "merchant", gold: 100000, map: "main", esize: 40,
     items: (() => { const it = new Array(42).fill(null); it[0] = { name: "stand0", q: 1 }; return it; })(),
     bank: { gold: 0, items0: bag },
-    _server: ["US", "II"]
+    _server: ["US", "III"]
   });
   await env.logistics();
   assert.strictEqual(env.character.map, "main");
@@ -393,7 +393,7 @@ test("boot snaps bank without dumping loot into the bag", async () => {
     name: "puppygirl", ctype: "merchant", gold: 100000, map: "main", esize: 40,
     items: (() => { const it = new Array(42).fill(null); it[0] = { name: "stand0", q: 1 }; return it; })(),
     bank: { gold: 0, items0: bag },
-    _server: ["US", "II"]
+    _server: ["US", "III"]
   });
   await env.logistics();
   assert.ok(env.character.esize >= 20, "boot must leave bag space, esize=" + env.character.esize);
@@ -632,10 +632,11 @@ test("happy cycle never crafts or buys non-whitelist Ponty", async () => {
   assert.deepStrictEqual(env.log.secondhand, []);
 });
 
-test("run_cycle returns false when park_bag fails", async () => {
+test("run_cycle soft-continues when park_bag fails", async () => {
   const env = envOf({ gold: 100000, map: "bank" });
   env.park_bag = async () => false;
-  assert.strictEqual(await env.run_cycle(), false);
+  env.run_econ = async () => true;
+  assert.strictEqual(await env.run_cycle(), true);
   assert.ok((env.log.game || []).includes("park fail"));
 });
 

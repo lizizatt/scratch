@@ -8,7 +8,7 @@ const Gmon = {
   armadillo: { attack: 20 }, arcticbee: { attack: 64 }, porcupine: { attack: 16 },
   croc: { attack: 48 }, bat: { attack: 50 }, tortoise: { attack: 36 }, spider: { attack: 80 },
   scorpion: { attack: 100 }, boar: { attack: 240 }, bigbird: { attack: 480 },
-  gscorpion: { attack: 120 }, wolf: { attack: 480 }, dryad: { attack: 400 },
+  gscorpion: { attack: 120 }, wolfie: { attack: 320 }, wolf: { attack: 480 }, dryad: { attack: 400 },
   mole: { attack: 480 },
   target: { attack: 0, unlist: true },
   target_a500: { attack: 0, unlist: true }
@@ -52,17 +52,14 @@ test("ladder: mid packs through bats", () => {
   assert.strictEqual(core.desired(32, 1800, Gmon), "bat");
   assert.strictEqual(core.desired(36, 2000, Gmon), "bat");
 });
-test("ladder: late packs through dryad", () => {
-  assert.strictEqual(core.desired(42, 2800, Gmon), "spider");
-  assert.strictEqual(core.desired(50, 3200, Gmon), "scorpion");
-  assert.strictEqual(core.desired(54, 4000, Gmon), "boar");
-  assert.strictEqual(core.desired(60, 5000, Gmon), "bigbird");
-  assert.strictEqual(core.desired(66, 6000, Gmon), "gscorpion");
-  assert.strictEqual(core.desired(72, 7000, Gmon), "wolf");
-  assert.strictEqual(core.desired(78, 8000, Gmon), "dryad");
+test("ladder: late packs through wolf", () => {
+  assert.strictEqual(core.desired(42, 2800, Gmon), "bat");
+  assert.strictEqual(core.desired(50, 4000, Gmon), "gscorpion");
+  assert.strictEqual(core.desired(58, 5000, Gmon), "wolfie");
+  assert.strictEqual(core.desired(66, 7000, Gmon), "wolf");
 });
 test("ladder: caps at 90 even if level 99", () => {
-  assert.strictEqual(core.desired(99, 12000, Gmon), "dryad");
+  assert.strictEqual(core.desired(99, 12000, Gmon), "wolf");
 });
 test("ladder: falls back when pack attack exceeds hp ratio", () => {
   // arcticbee att 64, cap at max_hp 100 is 28, so fall back

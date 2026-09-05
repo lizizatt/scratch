@@ -1,5 +1,5 @@
 var busy = false, PLAN_OK = false, CYCLE_MS = 300000, cycle_at = 0;
-var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "II"];
+var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "III"];
 var HOLD = [["armorring", 1], ["vitring", 9], ["blade", 1], ["staff", 1], ["helmet", 1], ["coat", 1], ["pants", 1], ["shoes", 3], ["gloves", 3], ["ringsj", 6], ["hpbelt", 3], ["hpamulet", 3], ["wshoes", 2], ["wcap", 1], ["wbook0", 1], ["shield", 1]], GOLD_FLOAT = 100000, COMBINE_MAX = 5, SALE_MULT = 0.95;
 try {
   load_code("merchant_ops"); load_code("gear_ops");
@@ -60,6 +60,7 @@ async function combine_step() {
 async function run_combine() {
   var n, r;
   for (n = 0; n < 24; n++) {
+    if (typeof dlv_has_work === "function" && dlv_has_work()) return "dlv";
     r = await combine_step();
     if (r === "ok") continue;
     return;
@@ -67,24 +68,19 @@ async function run_combine() {
 }
 PLAN_OK = typeof stock_store === "function" && typeof park_bag === "function" && typeof run_combine === "function" && typeof buy_scroll === "function";
 if (!PLAN_OK) { game_log("plan load fail"); set_message("No plan"); }
-function go_home() { if (parent.server_region === HOME[0] && parent.server_identifier === HOME[1]) return false; try { change_server(HOME[0], HOME[1]); } catch (e) {} return true; }
+function go_home() { if (!parent.server_region || !parent.server_identifier) return false; if (parent.server_region === HOME[0] && parent.server_identifier === HOME[1]) return false; try { change_server(HOME[0], HOME[1]); } catch (e) {} return true; }
 function is_pot(it) { return it && (it.name.indexOf("hpot") === 0 || it.name.indexOf("mpot") === 0); }
 function stand_i() { return locate_item("stand0"); }
 function open_stand() { var s = stand_i(); if (s >= 0) try { parent.open_merchant(s); } catch (e) {} }
 function close_stand() { try { parent.close_merchant(); } catch (e) {} }
-async function ensure_stand(on) {
-  if (!!character.stand === !!on) return;
-  if (on) open_stand(); else close_stand();
-  await sleep(200);
-}
-function tell(on) {
-  try { send_cm(FIGHTERS, { hold: on ? 1 : 0 }); } catch (e) {}
-}
+async function ensure_stand(on) { if (!!character.stand === !!on) return; if (on) open_stand(); else close_stand(); await sleep(200); }
+function tell(on) { try { send_cm(FIGHTERS, { hold: on ? 1 : 0 }); } catch (e) {} }
 function hold() { tell(1); set_message("Hold"); game_log("Hold sent"); }
 function resume() { tell(0); set_message("Stand"); game_log("Resume sent"); }
 function hunt(mob) {
-  var k = ("" + (mob || "")).toLowerCase().replace(/[^a-z0-9_]/g, "");
+  var k = ("" + (mob || "")).toLowerCase().replace(/[^a-z0-9_]/g, ""), ban = ["spider", "scorpion", "bigbird"];
   if (!k) return;
+  if (ban.indexOf(k) >= 0) { set_message("Skip " + k); game_log("Hunt skipped " + k); return; }
   try { send_cm("Jazwyn", { hunt: k }); } catch (e) {}
   set_message("Hunt " + k); game_log("Hunt " + k);
 }
@@ -127,48 +123,51 @@ async function empty_sale() {
   }
   return sale_clear();
 }
-function use_pots() {
-  if (safeties && mssince(last_potion) < min(200, character.ping * 3) || is_on_cooldown("use_hp")) return;
-  var skill = character.hp / character.max_hp < 0.5 ? "use_hp" : character.mp / character.max_mp < 0.5 ? "use_mp" : null;
-  if (skill) { last_potion = new Date(); use_skill(skill); }
-}
+function use_pots(){try{if(is_on_cooldown("use_hp"))return;var skill=character.hp/character.max_hp<0.5?"use_hp":character.mp/character.max_mp<0.5?"use_mp":null;if(skill)use_skill(skill)}catch(e){}}
 function mluck_near() {
-  var d = G.skills.mluck || {};
+  var d = G.skills.mluck || {}, id, p;
   if ((d.level && character.level < d.level) || character.mp < (d.mp || 0) || !can_use("mluck")) return;
-  for (var id in parent.entities) {
-    var p = parent.entities[id];
+  for (id in parent.entities) {
+    p = parent.entities[id];
     if (!p || p.type !== "character" || p.rip || (p.s && p.s.mluck && p.s.mluck.f === character.name)) continue;
     if (parent.distance(character, p) > (d.range || 320)) continue;
     use_skill("mluck", p); return;
   }
 }
 async function run_econ() {
-  set_message("Combine"); if (typeof run_combine === "function") await run_combine();
-  if (typeof upgrade_one === "function") { set_message("Upgrade"); await upgrade_one(); }
-  if (typeof ponty_buy === "function") { set_message("Ponty"); await ponty_buy(); }
-  set_message("Stock"); return !!(await stock_store());
+  var steps = [["Combine", typeof run_combine === "function" && run_combine], ["Upgrade", typeof upgrade_one === "function" && upgrade_one], ["Ponty", typeof ponty_buy === "function" && ponty_buy]], i, r;
+  for (i = 0; i < steps.length; i++) {
+    if (steps[i][1]) { set_message(steps[i][0]); r = await steps[i][1](); if (r === "dlv") return "dlv"; }
+    if (typeof dlv_has_work === "function" && dlv_has_work()) return "dlv";
+  }
+  set_message("Stock");
+  if (!(await stock_store())) game_log("stock soft");
+  return true;
 }
 async function run_cycle() {
   set_message("Bank"); close_stand();
   if (!(await go_npc("bank"))) return false;
-  if (typeof park_bag === "function" && !(await park_bag())) { game_log("park fail"); return false; }
-  if (typeof snap_bank === "function") snap_bank(); await sleep(400);
-  return await run_econ();
+  if (typeof park_bag === "function" && !(await park_bag())) game_log("park fail");
+  if (typeof snap_bank === "function") snap_bank(); await sleep(400); return await run_econ();
+}
+async function drain_dlv() {
+  var r; while (typeof dlv_has_work === "function" && dlv_has_work()) { r = await deliver_tick(); if (r === "busy" || r === "empty" || r === "hop") break; }
 }
 async function logistics() {
-  var r;
+  var ok;
   if (busy || character.rip) return;
   if (!PLAN_OK) { set_message("No plan"); return; }
   if (character.map === "jail") { await leave(); return; }
-  if (typeof dlv_has_work === "function" && dlv_has_work() && (typeof dlv_batch === "undefined" || dlv_batch < (DLV_BATCH_MAX || 3))) {
-    busy = true;
-    try { r = await deliver_tick(); if (r === "done" || r === "fail") dlv_batch = (dlv_batch || 0) + 1; } catch (e) { game_log("dlv tick fail"); }
-    busy = false; return;
-  }
-  if (go_home()) return;
-  if (cycle_at && Date.now() - cycle_at < (CYCLE_MS || 300000)) return;
+  if ((character.map === "winter_inn" || character.map === "winter_cave") && typeof ensure_main === "function") { await ensure_main(); return; }
   busy = true;
-  try { if (await run_cycle()) { cycle_at = Date.now(); dlv_batch = 0; set_message("Stand"); } } catch (e) { game_log("cycle fail"); }
+  try {
+    await drain_dlv();
+    if ((typeof dlv_has_work === "function" && dlv_has_work()) || go_home() || (cycle_at && Date.now() - cycle_at < (CYCLE_MS || 300000))) { busy = false; return; }
+    ok = await run_cycle();
+    if (ok === "dlv") { await drain_dlv(); set_message("Dlv"); }
+    else if (ok === true) { cycle_at = Date.now(); set_message("Stand"); }
+    else { game_log("cycle fail"); cycle_at = Date.now() - (CYCLE_MS || 300000) + 60000; set_message("Stand"); }
+  } catch (e) { game_log("cycle fail"); }
   busy = false;
 }
 try { performance_trick(); } catch (e) {}

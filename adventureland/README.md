@@ -54,27 +54,24 @@ Other party chat: Ding / Gratz; potion mentions get a social Ok (field CM restoc
 
 ## Ladder (from [data.js](https://adventure.land/data.js) XP, attack-gated)
 
-Commons only (no bosses / event nerfs). Early packs stay a bit early; spider+ delayed (scorpions were shredding ~45). HP gate uses `MAX_ATTACK_RATIO=0.24`.
+Commons only (no bosses / event nerfs). **Blacklisted:** `spider`, `scorpion`, `bigbird` (east-island / tunnel packs). HP gate uses `MAX_ATTACK_RATIO=0.24`.
 
-| Lowest level | Monster | XP | Attack |
-| ---: | --- | ---: | ---: |
-| 1–3 | `goo` | 100 | 5 |
-| 4–7 | `bee` | 400 | 16 |
-| 8–11 | `crab` | 500 | 24 |
-| 12–15 | `snake` | 960 | 24 |
-| 16–19 | `armadillo` | 1720 | 20 |
-| 20–23 | `arcticbee` | 1800 | 64 |
-| 24–27 | `porcupine` | 3200 | 16 |
-| 28–29 | `croc` | 3600 | 48 |
-| 30–31 | `tortoise` | 5200 | 36 |
-| 32–41 | `bat` | 8000 | 50 |
-| 42–49 | `spider` | 12000 | 80 |
-| 50–53 | `scorpion` | 20000 | 100 |
-| 54–59 | `boar` | 10800 | 240 |
-| 60–65 | `bigbird` | 30000 | 480 |
-| 66–71 | `gscorpion` | 48000 | 120 |
-| 72–77 | `wolf` | 48800 | 480 |
-| 78–90 | `dryad` | 60000 | 400 |
+| Lowest level | Monster | Map notes |
+| ---: | --- | --- |
+| 1–3 | `goo` | main |
+| 4–7 | `bee` | main |
+| 8–11 | `crab` | main |
+| 12–15 | `snake` | main |
+| 16–19 | `armadillo` | main |
+| 20–23 | `arcticbee` | winterland |
+| 24–27 | `porcupine` | desertland |
+| 28–29 | `croc` | main south |
+| 30–31 | `tortoise` | main south |
+| 32–41 | `bat` | cave |
+| 42–49 | `boar` | winterland |
+| 50–57 | `gscorpion` | desertland |
+| 58–65 | `wolfie` | winterland |
+| 66–90 | `wolf` | winterland |
 
 ## Tests
 

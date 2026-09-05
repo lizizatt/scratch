@@ -24,6 +24,7 @@ function baseG() {
       boar: { attack: 240, xp: 10800, unlist: false },
       bigbird: { attack: 480, xp: 30000, unlist: false },
       gscorpion: { attack: 120, xp: 48000, unlist: false },
+      wolfie: { attack: 320, xp: 16400, unlist: false },
       wolf: { attack: 480, xp: 48800, unlist: false },
       dryad: { attack: 400, xp: 60000, unlist: false },
       mole: { attack: 480, xp: 8000, unlist: false },
@@ -99,9 +100,47 @@ function baseG() {
       main: {
         monsters: [
           { type: "goo", boundary: [-80, 100, 80, 260] },
+          { type: "bee", boundary: [500, 1000, 580, 1100] },
+          { type: "crab", boundary: [-1240, -100, -1160, -30] },
+          { type: "snake", boundary: [-120, 1860, -40, 1940] },
+          { type: "armadillo", boundary: [480, 1800, 560, 1880] },
+          { type: "croc", boundary: [760, 1670, 840, 1750] },
+          { type: "tortoise", boundary: [-1160, 1080, -1080, 1160] },
           { type: "spider", boundary: [700, -282, 1196, -6] },
           { type: "scorpion", boundary: [1485, -390, 1670, 54] }
-        ]
+        ],
+        spawns: Array.from({ length: 20 }, (_, i) =>
+          i === 17 ? [968, -577] : i === 16 ? [294, -347] : i === 0 ? [0, 0] : [0, 0]
+        )
+      },
+      cave: {
+        monsters: [
+          { type: "bat", boundary: [-240, -500, -140, -420] },
+          { type: "bat", boundary: [1060, 20, 1160, 100] }
+        ],
+        spawns: [[0, 0], [-194, -461], [1108, 59]]
+      },
+      winterland: {
+        monsters: [
+          { type: "arcticbee", boundary: [1040, -900, 1120, -840] },
+          { type: "boar", boundary: [-20, -1140, 60, -1070] },
+          { type: "wolfie", boundary: [-200, -2060, -140, -1990] },
+          { type: "wolf", boundary: [400, -2780, 460, -2710] }
+        ],
+        spawns: [[0, 0], [20, -1109], [1082, -873]]
+      },
+      desertland: {
+        monsters: [
+          { type: "porcupine", boundary: [-860, 100, -800, 170] },
+          { type: "gscorpion", boundary: [360, -1460, 420, -1380] }
+        ],
+        spawns: [[0, 0], [-829, 135], [391, -1422]]
+      },
+      halloween: { monsters: [{ type: "snake", boundary: [-600, -540, -540, -480] }], spawns: [[0, 0]] },
+      bank: { monsters: [], spawns: [[0, -50]] },
+      mtunnel: {
+        monsters: [],
+        spawns: [[0, 8], [671, -225], [1169, -55]]
       }
     }
   };
@@ -333,7 +372,31 @@ function makeEnv(charOver) {
     },
     attack: (t) => log.attacked.push(t),
     heal: (t) => log.healed.push(t && t.name),
-    move: (x, y) => log.moved.push({ x, y }),
+    move: (x, y) => {
+      log.moved.push({ x, y });
+      character.real_x = x;
+      character.real_y = y;
+      character.x = x;
+      character.y = y;
+    },
+    can_move_to: (x, y) => !(x > 304 && x < 688 && y > -300 && y < 120 && character.map === "main"),
+    transport: (map, spawn) => {
+      log.moved.push({ transport: map, spawn });
+      character.map = map;
+      const sp = G.maps[map] && G.maps[map].spawns && G.maps[map].spawns[spawn || 0];
+      if (sp) {
+        character.real_x = sp[0];
+        character.real_y = sp[1];
+        character.x = sp[0];
+        character.y = sp[1];
+      }
+      if (map !== "bank") character.bank = null;
+    },
+    enter: async (map) => {
+      if (map === "mtunnel") env.transport("mtunnel", 0);
+      else if (map === "main") env.transport("main", 17);
+      else env.transport(map, 0);
+    },
     use_skill: (s, t) => { log.skills.push(s); log.skillArgs = log.skillArgs || []; log.skillArgs.push({ name: s, target: t && (t.name || t.id || t) }); },
     use: (s) => {
       log.skills.push("use:" + s);
@@ -357,34 +420,61 @@ function makeEnv(charOver) {
       parent.server_identifier = name;
     },
     smart_move: async (dest) => {
+      const PACKS = {
+        goo: { map: "main", x: 0, y: 180 },
+        bee: { map: "main", x: 546, y: 1059 },
+        crab: { map: "main", x: -1202, y: -66 },
+        snake: { map: "main", x: -82, y: 1901 },
+        armadillo: { map: "main", x: 526, y: 1846 },
+        croc: { map: "main", x: 801, y: 1710 },
+        tortoise: { map: "main", x: -1124, y: 1118 },
+        bat: { map: "cave", x: -194, y: -461 },
+        arcticbee: { map: "winterland", x: 1082, y: -873 },
+        boar: { map: "winterland", x: 20, y: -1109 },
+        wolfie: { map: "winterland", x: -169, y: -2026 },
+        wolf: { map: "winterland", x: 433, y: -2745 },
+        porcupine: { map: "desertland", x: -829, y: 135 },
+        gscorpion: { map: "desertland", x: 391, y: -1422 },
+        spider: { map: "main", x: 948, y: -144 },
+        scorpion: { map: "main", x: 1577, y: -168 }
+      };
       log.moved.push(dest);
       if (env.moveFail) return { failed: true };
-      if (dest && dest.to === "potions") { character.map = "main"; character.real_x = 56; character.real_y = -122; character.bank = null; }
-      if (dest && dest.to === "upgrade") { character.map = "main"; character.real_x = -204; character.real_y = -129; character.bank = null; }
-      if (dest && dest.to === "bank") {
-        character.map = "bank"; character.real_x = 0; character.real_y = 0;
+      smart.moving = true;
+      const from = { map: character.map, x: character.real_x, y: character.real_y };
+      function place(map, x, y) {
+        const dx = (x - (character.real_x || 0));
+        const dy = (y - (character.real_y || 0));
+        const cross = map && map !== character.map ? 2500 : 0;
+        log.path = log.path || [];
+        log.path.push({ from, to: { map: map || character.map, x, y }, dist: Math.sqrt(dx * dx + dy * dy) + cross });
+        if (map) character.map = map;
+        if (map && map !== "bank") character.bank = null;
+        character.real_x = x; character.x = x;
+        character.real_y = y; character.y = y;
+        smart.map = character.map; smart.x = x; smart.y = y;
+      }
+      if (dest && dest.to === "potions") place("main", 56, -122);
+      else if (dest && dest.to === "upgrade") place("main", -204, -129);
+      else if (dest && dest.to === "bank") {
+        place("bank", 0, -50);
         if (!character.bank) character.bank = character._bank || { gold: 0, items0: new Array(42).fill(null) };
       }
-      if (dest && dest.to === "goo") { character.map = "main"; character.real_x = 0; character.real_y = 0; character.bank = null; }
-      if (dest && dest.to === "upgrade") { character.map = "main"; character.real_x = -204; character.real_y = -129; character.bank = null; }
-      if (dest && (dest.to === "secondhands" || dest.to === "mcollector" || dest.to === "craftsman")) {
-        character.map = "main"; character.real_x = 40; character.real_y = -120; character.bank = null;
-      }
-      if (dest && (dest.x != null || dest.y != null)) {
-        if (dest.map) character.map = dest.map;
-        if (dest.map && dest.map !== "bank") character.bank = null;
-        if (dest.x != null) { character.real_x = dest.x; character.x = dest.x; }
-        if (dest.y != null) { character.real_y = dest.y; character.y = dest.y; }
+      else if (dest && (dest.to === "secondhands" || dest.to === "mcollector" || dest.to === "craftsman")) place("main", 40, -120);
+      else if (dest && dest.to && PACKS[dest.to]) place(PACKS[dest.to].map, PACKS[dest.to].x, PACKS[dest.to].y);
+      else if (dest && (dest.x != null || dest.y != null)) {
+        place(dest.map || character.map, dest.x != null ? dest.x : character.real_x, dest.y != null ? dest.y : character.real_y);
       } else if (dest && dest.map) {
-        character.map = dest.map;
-        if (dest.map !== "bank") character.bank = null;
-      }
-      if (typeof dest === "string" && parent.entities[dest]) {
+        const sp = G.maps[dest.map] && G.maps[dest.map].spawns && G.maps[dest.map].spawns[0];
+        place(dest.map, sp ? sp[0] : 0, sp ? sp[1] : 0);
+      } else if (typeof dest === "string" && parent.entities[dest]) {
         const p = parent.entities[dest];
-        character.map = p.map || character.map;
-        character.real_x = p.real_x != null ? p.real_x : p.x;
-        character.real_y = p.real_y != null ? p.real_y : p.y;
+        place(p.map || character.map, p.real_x != null ? p.real_x : p.x, p.real_y != null ? p.real_y : p.y);
+      } else if (typeof dest === "string" && PACKS[dest]) {
+        place(PACKS[dest].map, PACKS[dest].x, PACKS[dest].y);
       }
+      if (dest && dest.to) { smart.map = character.map; smart.x = character.real_x; smart.y = character.real_y; }
+      smart.moving = false;
       return { success: true };
     },
     get_party: () => parent.party,
