@@ -74,7 +74,7 @@ function stand_i() { return locate_item("stand0"); }
 function open_stand() { var s = stand_i(); if (s >= 0) try { parent.open_merchant(s); } catch (e) {} }
 function close_stand() { try { parent.close_merchant(); } catch (e) {} }
 async function ensure_stand(on) { if (!!character.stand === !!on) return; if (on) open_stand(); else close_stand(); await sleep(200); }
-function tell(on) { try { send_cm(FIGHTERS, { hold: on ? 1 : 0 }); } catch (e) {} }
+function tell(on) { for (var i = 0; i < FIGHTERS.length; i++) try { send_cm(FIGHTERS[i], { hold: on ? 1 : 0 }); } catch (e) {} }
 function hold() { tell(1); set_message("Hold"); game_log("Hold sent"); }
 function resume() { tell(0); set_message("Stand"); game_log("Resume sent"); }
 function hunt(mob) { var k = ("" + (mob || "")).toLowerCase().replace(/[^a-z0-9_]/g, ""), ban = ["spider", "scorpion", "bigbird"]; if (!k) return; if (ban.indexOf(k) >= 0) { set_message("Skip " + k); game_log("Hunt skipped " + k); return; } try { send_cm("Jazwyn", { hunt: k }); } catch (e) {} set_message("Hunt " + k); game_log("Hunt " + k); }
