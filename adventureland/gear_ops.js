@@ -4,7 +4,7 @@ var CM_GAP_MS=700,JOB_MS=300000,GOT_MS=20000,SURVEY_MS=12000,DLV_QK="dlv_q_"+cha
 var COMBINE_PRIORITY=["ringsj","hpbelt","hpamulet","stramulet","intbelt","rednose","vitring","armorring"];
 var SCROLL0_ALLOW=["pants","coat","gloves","shoes","helmet","staff","sshield","eears","epyjamas","eslippers","wattire","wshoes","wcap"];
 var SCROLL1_DENY=["candycanesword","carrotsword"],UNIQUE=["epyjamas","eears","eslippers","mushroomstaff","candycanesword","carrotsword","xmashat","fireblade"];
-var PONTY_WANT=[["sshield",4],["fireblade",2],["snakefang",4],["lotusf",4],["vitring",9],["wbook0",1]],PONTY_MULT=1.25;
+var PONTY_WANT=[["sshield",4],["fireblade",2],["blade",2],["essenceoffire",2],["shield",2],["staff",2],["snakefang",4],["lotusf",4],["vitring",9],["ringsj",6],["hpbelt",3],["hpamulet",3],["wbook0",1]],PONTY_MULT=1.25;
 var dlv_q=[],dlv_active=null,last_cm_t=0,dlv_busy=false,DLV_BOOT=Date.now();
 function dlv_load(){try{var r=JSON.parse(localStorage.getItem(DLV_QK)||"null"),now=Date.now(),keep=function(j){return j&&now-(j.t0||0)<(JOB_MS||300000)};if(r&&r.q){dlv_q=(r.q||[]).filter(keep);dlv_active=r.active&&keep(r.active)?r.active:null;if(dlv_active&&!dlv_q.some(function(j){return j.id===dlv_active.id}))dlv_q.unshift(dlv_active)}else{dlv_q=[];dlv_active=null}}catch(e){}}
 function dlv_save(){try{localStorage.setItem(DLV_QK,JSON.stringify({q:dlv_q,active:dlv_active}))}catch(e){}}

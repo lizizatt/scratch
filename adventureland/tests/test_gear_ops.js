@@ -156,6 +156,59 @@ test("ponty_buy buys snakefang armorring mat under fair cap", async () => {
   assert.ok(env.log.secondhand.some((s) => s.name === "snakefang"));
 });
 
+test("ponty_buy prefers cheapest needed among fireblade craft mats and combine fodder", async () => {
+  const env = merchant({ gold: 400000, esize: 38 });
+  env.GOLD_FLOAT = 100000;
+  env.ponty = [
+    { name: "essenceoffire", rid: "e1", price: 90000, level: 0 },
+    { name: "blade", rid: "b1", price: 12000, level: 0 },
+    { name: "ringsj", rid: "r1", price: 40000, level: 0 },
+    { name: "staff", rid: "st1", price: 20000, level: 0 },
+    { name: "shield", rid: "sh1", price: 40000, level: 0 },
+    { name: "hpbelt", rid: "hb1", price: 25000, level: 0 },
+    { name: "hpamulet", rid: "ha1", price: 25000, level: 0 }
+  ];
+  const r = await env.ponty_buy();
+  assert.strictEqual(r, "ok");
+  assert.ok(env.log.secondhand.some((s) => s.name === "blade"));
+  assert.strictEqual(env.log.secondhand.length, 1);
+});
+
+test("ponty_buy skips blade when blade+essence quotas filled but still buys shield", async () => {
+  const env = merchant({ gold: 400000, esize: 38 });
+  env.GOLD_FLOAT = 100000;
+  env.character.items[1] = { name: "blade", q: 2 };
+  env.character.items[2] = { name: "essenceoffire", q: 2 };
+  env.character.items[3] = { name: "staff", q: 2 };
+  env.character.items[4] = { name: "ringsj", q: 6 };
+  env.character.items[5] = { name: "hpbelt", q: 3 };
+  env.character.items[6] = { name: "hpamulet", q: 3 };
+  env.ponty = [
+    { name: "blade", rid: "b1", price: 10000, level: 0 },
+    { name: "shield", rid: "sh1", price: 40000, level: 0 }
+  ];
+  const r = await env.ponty_buy();
+  assert.strictEqual(r, "ok");
+  assert.ok(env.log.secondhand.some((s) => s.name === "shield"));
+  assert.ok(!env.log.secondhand.some((s) => s.name === "blade"));
+});
+
+test("HOLD protects Ponty craft mats and plain shield from sale listing", async () => {
+  const env = merchant({ gold: 400000, esize: 30 });
+  env.character.items[1] = { name: "blade", q: 1, level: 0 };
+  env.character.items[2] = { name: "essenceoffire", q: 1 };
+  env.character.items[3] = { name: "shield", q: 1, level: 0 };
+  env.character.items[4] = { name: "helmet", q: 1, level: 0 };
+  assert.strictEqual(env.hold_item(env.character.items[1]), true);
+  assert.strictEqual(env.hold_item(env.character.items[2]), true);
+  assert.strictEqual(env.hold_item(env.character.items[3]), true);
+  assert.strictEqual(env.sell_ok(env.character.items[1]), false);
+  assert.strictEqual(env.sell_ok(env.character.items[4]), true);
+  await env.list_sale();
+  assert.ok(!env.log.traded.some((t) => t.i === 1 || t.i === 2 || t.i === 3));
+  assert.ok(env.log.traded.some((t) => t.i === 4));
+});
+
 test("ponty_buy rejects overpriced whitelist", async () => {
   const env = merchant({ gold: 400000, esize: 38 });
   env.ponty = [{ name: "wbook0", rid: "w1", price: 999999, level: 0 }];

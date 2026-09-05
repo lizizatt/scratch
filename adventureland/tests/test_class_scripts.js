@@ -505,6 +505,17 @@ eachClass("equip_pending equips better ringsj into empty ring", async (spec) => 
   assert.ok(env.log.equipped.some((e) => e && e.slot === "ring1"));
 });
 
+eachClass("equip_pending swaps bag item when score beats worn slot", async (spec) => {
+  if (spec.ctype !== "warrior") return;
+  const env = loadClass(spec);
+  env.character.slots.offhand = { name: "shield", level: 0 };
+  env.character.items[1] = { name: "sshield", level: 2, q: 1 };
+  assert.ok(env.score(env.character.items[1], "offhand") > env.score(env.character.slots.offhand, "offhand"));
+  await env.equip_pending();
+  assert.strictEqual(env.character.slots.offhand.name, "sshield");
+  assert.strictEqual(env.character.slots.offhand.level, 2);
+});
+
 eachClass("bank_dump stores junk but keeps pots scrolls ttl gifts", async (spec) => {
   const env = loadClass(spec, { map: "bank" });
   env.character.bank = { gold: 0, items0: new Array(42).fill(null) };

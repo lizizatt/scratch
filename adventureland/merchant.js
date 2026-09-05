@@ -1,6 +1,6 @@
 var busy = false, PLAN_OK = false, CYCLE_MS = 300000, cycle_at = 0;
 var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"], HOME = ["US", "III"];
-var HOLD = [["armorring", 1], ["vitring", 9], ["fireblade", 1], ["staff", 1], ["ringsj", 6], ["hpbelt", 3], ["hpamulet", 3], ["wbook0", 1], ["sshield", 1]], SELL = ["strearring", "intearring", "dexearring", "vitearring", "stramulet", "intamulet", "dexamulet", "rednose", "shoes", "gloves", "pants", "coat", "helmet", "wattire", "wcap", "wshoes", "wgloves"], GOLD_FLOAT = 100000, COMBINE_MAX = 5, SALE_MULT = 0.95;
+var HOLD = [["armorring", 1], ["vitring", 9], ["fireblade", 1], ["blade", 2], ["essenceoffire", 2], ["staff", 2], ["ringsj", 6], ["hpbelt", 3], ["hpamulet", 3], ["wbook0", 1], ["sshield", 1], ["shield", 2]], SELL = ["strearring", "intearring", "dexearring", "vitearring", "stramulet", "intamulet", "dexamulet", "rednose", "shoes", "gloves", "pants", "coat", "helmet", "wattire", "wcap", "wshoes", "wgloves"], GOLD_FLOAT = 100000, COMBINE_MAX = 5, SALE_MULT = 0.95;
 try {
   load_code("merchant_ops"); load_code("gear_ops");
   if (typeof stock_store !== "function" || typeof park_bag !== "function") throw 1;
