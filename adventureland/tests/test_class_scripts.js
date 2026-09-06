@@ -947,6 +947,65 @@ test("offload sends gold only when merchant is in range", async () => {
   assert.ok(env.character.items[1] && env.character.items[1].name === "helmet");
 });
 
+test("duplicate hold CM does not reset hold_done or re-restock", async () => {
+  const items = new Array(42).fill(null);
+  items[0] = { name: "hpot0", q: 200 };
+  items[1] = { name: "mpot0", q: 200 };
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", items, gold: 50000, esize: 40, level: 12
+  }));
+  env.emitCm("puppygirl", { hold: 1 });
+  await env.logistics();
+  assert.strictEqual(env.hold_done, true);
+  env.log.moved = [];
+  env.log.bought = [];
+  env.log.game = [];
+  env.emitCm("puppygirl", { hold: 1 });
+  assert.strictEqual(env.hold, true);
+  assert.strictEqual(env.hold_done, true, "re-hold must not clear hold_done");
+  await env.logistics();
+  assert.ok(!wentTo(env, "bank"), "must not re-bank after duplicate hold");
+  assert.ok(!(env.log.game || []).some((s) => s === "Hold: buying pots"));
+});
+
+test("hold restock buys pots before offloading gold to merchant", async () => {
+  const items = new Array(42).fill(null);
+  items[0] = { name: "hpot0", q: 5 };
+  items[1] = { name: "mpot0", q: 5 };
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", items, gold: 200000, esize: 40, level: 12,
+    real_x: 56, real_y: -122, map: "main"
+  }));
+  env.parent.entities.puppygirl = {
+    name: "puppygirl", type: "character", rip: false, real_x: 60, real_y: -120, map: "main"
+  };
+  env.emitCm("puppygirl", { hold: 1 });
+  await env.logistics();
+  assert.ok((env.log.bought || []).length > 0, "must buy pots while gold is still available");
+  assert.ok((env.log.gold || []).length > 0, "offload leftover after buying");
+  assert.ok(env.character.gold <= 1000, "keeps only gold float after offload");
+});
+
+test("hold restock with no gold requests merchant pots instead of spinning", async () => {
+  const items = new Array(42).fill(null);
+  items[0] = { name: "hpot0", q: 5 };
+  items[1] = { name: "mpot0", q: 5 };
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", items, gold: 0, esize: 40, level: 12
+  }));
+  env.REQ_COOLDOWN_MS = 0;
+  env.emitCm("puppygirl", { hold: 1 });
+  await env.logistics();
+  assert.ok((env.log.game || []).some((s) => /buy_pots no gold|hold:need pots/i.test("" + s)));
+  assert.ok(env.log.cm.some((c) => c.name === "Puppygirl" && c.data && c.data.dlv_req === 1 && c.data.kind === "pots"));
+  assert.strictEqual(env.hold_done, true, "must not leave hold_done false when broke");
+  env.log.cm = [];
+  env.log.bought = [];
+  env.log.game = [];
+  await env.logistics();
+  assert.ok(!(env.log.game || []).some((s) => /buy_pots no gold/i.test("" + s)), "must not re-enter buy_pots loop");
+});
+
 test("merchant hold CM restocks, announces states, and waits until resume", async () => {
   const items = new Array(42).fill(null);
   items[0] = { name: "hpot0", q: 5 };
