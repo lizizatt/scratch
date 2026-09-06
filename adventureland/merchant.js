@@ -68,7 +68,7 @@ async function run_combine() {
 }
 PLAN_OK = typeof stock_store === "function" && typeof park_bag === "function" && typeof run_combine === "function" && typeof buy_scroll === "function";
 if (!PLAN_OK) { game_log("plan load fail"); set_message("No plan"); }
-function go_home() { if (!parent.server_region || !parent.server_identifier) return false; if (parent.server_region === HOME[0] && parent.server_identifier === HOME[1]) return false; try { change_server(HOME[0], HOME[1]); } catch (e) {} return true; }
+function go_home() { if (typeof gear_busy === "function" && gear_busy()) return false; if (!parent.server_region || !parent.server_identifier) return false; if (parent.server_region === HOME[0] && parent.server_identifier === HOME[1]) return false; try { change_server(HOME[0], HOME[1]); } catch (e) {} return true; }
 function is_pot(it) { return it && (it.name.indexOf("hpot") === 0 || it.name.indexOf("mpot") === 0); }
 function stand_i() { return locate_item("stand0"); }
 function open_stand() { var s = stand_i(); if (s >= 0) try { parent.open_merchant(s); } catch (e) {} }
@@ -136,7 +136,7 @@ async function run_econ() {
   for (i = 0; i < steps.length; i++) {
     if (steps[i][1]) { set_message(steps[i][0]); r = await steps[i][1](); if (r === "dlv" || r === "hop") return r === "dlv" ? "dlv" : true; }
     if (typeof dlv_has_work === "function" && dlv_has_work()) return "dlv";
-    if (typeof gear_session !== "undefined" && gear_session) return true;
+    if (typeof gear_busy === "function" ? gear_busy() : (typeof gear_session !== "undefined" && gear_session)) return true;
   }
   set_message("Stock");
   if (!(await stock_store())) game_log("stock soft");
@@ -155,7 +155,7 @@ async function logistics() {
   var ok;
   if (busy || character.rip) return;
   if (!PLAN_OK) { set_message("No plan"); return; }
-  if (typeof gear_session !== "undefined" && gear_session) return;
+  if (typeof gear_busy === "function" && gear_busy()) { busy = true; try { await run_gear_session(); } catch (eG) { game_log("gear:lg " + eG); } busy = false; return; }
   if (character.map === "jail") { await leave(); return; }
   if ((character.map === "winter_inn" || character.map === "winter_cave") && typeof ensure_main === "function") { await ensure_main(); return; }
   busy = true;

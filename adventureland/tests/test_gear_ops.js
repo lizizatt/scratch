@@ -128,6 +128,175 @@ test("run_gear_session holds, waits, offers, waits got, resumes", async () => {
   assert.strictEqual(env.gear_session, false);
 });
 
+test("go_home is blocked while gear pending after hop (no II↔III flip-flop)", async () => {
+  const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20, _server: ["US", "III"] });
+  env.HOME = ["US", "III"];
+  env.GEAR_HOME = ["US", "II"];
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "sshield", level: 1, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  env.gear_ads.Jazwyn = {
+    gear_ad: 1, name: "Jazwyn", esize: 5, _t: Date.now(),
+    slots: { offhand: "-", mainhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  assert.strictEqual(await env.run_gear_session(), "hop");
+  assert.deepStrictEqual(env.parent.server_region + "/" + env.parent.server_identifier, "US/II");
+  // Simulate CODE reload: heap clears, localStorage pending remains
+  env.gear_session = false;
+  assert.strictEqual(env.gear_busy(), true);
+  assert.strictEqual(env.go_home(), false, "must not chase idle HOME while gear pending");
+  placeFighter(env, "Jazwyn", { real_x: 56, real_y: -122, esize: 5 });
+  env.gear_wait = async () => true;
+  const realCm = env.send_cm.bind(env);
+  env.send_cm = async (name, data) => {
+    const r = await realCm(name, data);
+    if (data && data.gear_offer && data.id) {
+      env.gear_offer_ids[data.id] = { gear_got: 1, id: data.id, ok: 1, name: data.name, slot: data.slot };
+    }
+    return r;
+  };
+  env.cycle_at = Date.now();
+  env.log.server = [];
+  await env.logistics();
+  assert.ok(!env.log.server.some((s) => s[0] === "US" && s[1] === "III"), "logistics must not hop back to US/III");
+});
+
+test("gear hop→reboot loop does not oscillate servers", async () => {
+  const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20, _server: ["US", "III"] });
+  env.HOME = ["US", "III"];
+  env.GEAR_HOME = ["US", "II"];
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "sshield", level: 1, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  env.gear_ads.Jazwyn = {
+    gear_ad: 1, name: "Jazwyn", esize: 5, _t: Date.now(),
+    slots: { offhand: "-", mainhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  assert.strictEqual(await env.run_gear_session(), "hop");
+  for (let i = 0; i < 8; i++) {
+    // Each "reboot" clears heap but keeps pending gifts in localStorage
+    env.gear_session = false;
+    assert.strictEqual(env.gear_busy(), true, "pending survives reboot " + i);
+    assert.strictEqual(env.go_home(), false, "go_home blocked on reboot " + i);
+    env.log.server = [];
+    env.cycle_at = Date.now();
+    // Force the old bug path: logistics used to call go_home before gear resume
+    const hopped = env.go_home();
+    assert.strictEqual(hopped, false);
+    assert.deepStrictEqual(env.log.server, []);
+    assert.strictEqual(env.parent.server_identifier, "II");
+  }
+});
+
+test("stale gear pending clears and resumes fighters", () => {
+  const env = merchant({ _server: ["US", "II"] });
+  env.gear_save({ active: 1, gifts: [{ who: "Jazwyn", slot: "offhand", it: { name: "sshield", level: 1 } }], t0: Date.now() - 200000 });
+  // Re-run boot cleanup path explicitly (load-time IIFE already ran with empty store)
+  const p = env.gear_load();
+  assert.ok(p && p.active);
+  if (p && p.active && Date.now() - (p.t0 || 0) >= 180000) {
+    env.gear_clear();
+    env.resume();
+  }
+  assert.strictEqual(env.gear_load(), null);
+  assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 0));
+  assert.strictEqual(env.gear_busy(), false);
+  assert.strictEqual(env.go_home(), true, "after stale clear, idle HOME hop allowed");
+});
+
+test("logistics resumes pending gear on GEAR_HOME without hopping to idle HOME", async () => {
+  const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20, _server: ["US", "II"] });
+  env.HOME = ["US", "III"];
+  env.GEAR_HOME = ["US", "II"];
+  env.CYCLE_MS = 1;
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "sshield", level: 1, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  placeFighter(env, "Jazwyn", { real_x: 56, real_y: -122, esize: 5 });
+  env.gear_wait = async () => true;
+  env.gear_save({
+    active: 1,
+    gifts: [{ who: "Jazwyn", slot: "offhand", it: { name: "sshield", level: 1 } }],
+    t0: Date.now(),
+  });
+  const realCm = env.send_cm.bind(env);
+  env.send_cm = async (name, data) => {
+    const r = await realCm(name, data);
+    if (data && data.gear_offer && data.id) {
+      env.gear_offer_ids[data.id] = { gear_got: 1, id: data.id, ok: 1, name: data.name, slot: data.slot };
+    }
+    return r;
+  };
+  env.log.server = [];
+  await env.logistics();
+  assert.ok(!env.log.server.some((s) => s[1] === "III"), "must not flip to idle HOME mid-resume");
+  assert.ok(env.log.cm.some((c) => c.data && c.data.gear_offer === 1));
+  assert.ok(env.log.cm.some((c) => c.data && c.data.hold === 0));
+  assert.strictEqual(env.gear_busy(), false);
+});
+
+test("after gear completes, go_home to farm world works again", async () => {
+  const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20, _server: ["US", "II"] });
+  env.HOME = ["US", "III"];
+  env.GEAR_HOME = ["US", "II"];
+  env.CYCLE_MS = 1;
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "sshield", level: 1, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  placeFighter(env, "Jazwyn", { real_x: 50, real_y: -20, esize: 5 });
+  env.gear_ads.Jazwyn = {
+    gear_ad: 1, name: "Jazwyn", esize: 5, _t: Date.now(),
+    slots: { offhand: "-", mainhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  const realCm = env.send_cm.bind(env);
+  env.send_cm = async (name, data) => {
+    const r = await realCm(name, data);
+    if (data && data.gear_offer && data.id) {
+      env.gear_offer_ids[data.id] = { gear_got: 1, id: data.id, ok: 1, name: data.name, slot: data.slot };
+    }
+    return r;
+  };
+  assert.strictEqual(await env.run_gear_session(), "ok");
+  assert.strictEqual(env.gear_busy(), false);
+  env.log.server = [];
+  assert.strictEqual(env.go_home(), true);
+  assert.deepStrictEqual(env.log.server, [["US", "III"]]);
+});
+
+test("fighter hold reboot keeps hold; merchant resume after gear still clears", async () => {
+  const jaz = loadScript("warrior.js", {
+    name: "Jazwyn", ctype: "warrior", map: "main", real_x: 0, real_y: 0,
+    _server: ["US", "II"], _storage: { hold_Jazwyn: "1" },
+  });
+  assert.strictEqual(jaz.hold, true);
+  const env = merchant({ gold: 400000, esize: 30, map: "main", x: 40, y: -20, _server: ["US", "II"] });
+  env.GEAR_HOME = ["US", "II"];
+  env.CYCLE_MS = 1;
+  env.character.bank = { gold: 0, items0: new Array(42).fill(null) };
+  env.character.bank.items0[0] = { name: "sshield", level: 1, q: 1 };
+  env.character._bank = env.character.bank;
+  env.snap_bank();
+  placeFighter(env, "Jazwyn", { real_x: 50, real_y: -20, esize: 5 });
+  env.gear_ads.Jazwyn = {
+    gear_ad: 1, name: "Jazwyn", esize: 5, _t: Date.now(),
+    slots: { offhand: "-", mainhand: "-", helmet: "-", chest: "-", pants: "-", shoes: "-", gloves: "-", cape: "-", belt: "-", amulet: "-", ring1: "-", ring2: "-" }
+  };
+  const realCm = env.send_cm.bind(env);
+  env.send_cm = async (name, data) => {
+    const r = await realCm(name, data);
+    if (data && data.gear_offer && data.id) {
+      env.gear_offer_ids[data.id] = { gear_got: 1, id: data.id, ok: 1, name: data.name, slot: data.slot };
+    }
+    return r;
+  };
+  await env.run_gear_session();
+  assert.ok(env.log.cm.some((c) => c.name === "Jazwyn" && c.data && c.data.hold === 0));
+});
+
 test("run_cycle skips stock_store while gear_session is sticky", async () => {
   const env = merchant({ gold: 400000, esize: 38 });
   env.gear_session = true;
