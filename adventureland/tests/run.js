@@ -1,6 +1,6 @@
 "use strict";
 
-const suites = [require("./test_comms"), require("./test_scenarios")];
+const suites = [require("./test_comms"), require("./test_scenarios"), require("./test_adversarial")];
 
 async function main() {
   let passed = 0,

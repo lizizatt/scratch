@@ -20,6 +20,7 @@ const {
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
 const { createMotion } = require("./motion");
+const { packCenter } = require("../sim/world");
 
 /**
  * Boot a fighter into a sim (or real) API environment.
@@ -110,10 +111,9 @@ function bootFighter(api, opts) {
       await api.send_cm(MERCHANT, { job: "cancel_all", id: dlvPending.id, who: name });
       dlvPending = null;
     }
-    // Ensure gold float
     if (api.character.gold < GOLD_FLOAT_FIGHTER) {
       api.game_log("town_fallback low_gold");
-      // still try — may fail; instrumented
+      return; // never buy into debt (LESSONS #5)
     }
     await motion.goTo({ to: "potions" });
     await api.buy("hpot1", POTION_TARGET);
@@ -122,12 +122,22 @@ function bootFighter(api, opts) {
   }
 
   async function hopPrep(targetServer) {
+    const reg0 = api.parent.server_region;
+    const id0 = api.parent.server_identifier;
+    if (!reg0 || !id0) {
+      api.game_log("go_s:wait");
+      return;
+    }
     // Restock if low before hop (LESSONS #3)
     const b = refreshPots();
     if (b !== "ok") {
-      await motion.goTo({ to: "potions" });
-      await api.buy("hpot1", POTION_TARGET);
-      await api.buy("mpot1", POTION_TARGET);
+      if (api.character.gold < GOLD_FLOAT_FIGHTER) {
+        api.game_log("hop_prep low_gold");
+      } else {
+        await motion.goTo({ to: "potions" });
+        await api.buy("hpot1", POTION_TARGET);
+        await api.buy("mpot1", POTION_TARGET);
+      }
     }
     await api.send_cm(MERCHANT, { job: "cancel_all", who: name });
     if (isLead()) chat.enqueue("World " + targetServer[0] + "/" + targetServer[1], "echo");
@@ -162,23 +172,24 @@ function bootFighter(api, opts) {
   }
 
   function applyCmd(parsed, mine) {
+    const party = Object.keys(api.get_party() || {});
+    const present = party.length ? party : [name];
     const cmd = parsed.cmd;
     if (cmd === "hold") {
-      state.setIntent({ hold: 1, kind: "hold" });
+      state.setIntent({ hold: 1, kind: "hold" }, present);
       state.S.mode = "hold";
     } else if (cmd === "resume") {
-      state.setIntent({ hold: 0, kind: "farm" });
+      state.setIntent({ hold: 0, kind: "farm" }, present);
       state.S.mode = "farm";
       state.S.rare = null;
     } else if (cmd === "hunt" && parsed.args[0]) {
-      state.setIntent({ kind: "hunt", mtype: parsed.args[0], hold: 0 });
+      state.setIntent({ kind: "hunt", mtype: parsed.args[0], hold: 0 }, present);
       state.S.mode = "farm";
     } else if (cmd === "grind") {
-      state.setIntent({ kind: "farm", hold: 0 });
+      state.setIntent({ kind: "farm", hold: 0 }, present);
     } else if (cmd === "world" && parsed.args[0]) {
       const parts = parsed.args[0].split("/");
-      // handled async in tick via intent
-      state.setIntent({ world: parts });
+      state.setIntent({ world: parts }, present);
     }
     if (mine) chat.enqueue("!" + cmd + (parsed.args[0] ? " " + parsed.args[0] : ""), "echo");
   }
@@ -309,16 +320,22 @@ function bootFighter(api, opts) {
     const mon = api.get_nearest_monster({ type: mtype });
     if (!mon) {
       state.setSelf({ task: "moving" });
+      if (RARE_WHITELIST.indexOf(mtype) >= 0) {
+        // Never path by type for rares (LESSONS #6) — wait for spot / coords
+        api.game_log("farm:skip_rare_type " + mtype);
+        return;
+      }
       if (isLead()) {
         chat.enqueue("Transfer " + mtype, "echo");
         chat.tick(now);
         const ok = await motion.waitParty(now, 5000);
         if (!ok && Object.keys(api.get_party() || {}).length > 1) {
-          // aborted
           return;
         }
       }
-      await motion.goTo({ to: mtype });
+      const pc = packCenter(mtype);
+      if (pc) await motion.goTo({ map: pc.map, x: pc.x, y: pc.y });
+      else await motion.goTo({ to: mtype });
       return;
     }
     state.setSelf({ task: "farm" });

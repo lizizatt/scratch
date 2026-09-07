@@ -37,20 +37,21 @@ function gradeLogs(lines, opts) {
   for (const raw of lines) {
     const line = "" + raw;
     if (/can't chat this fast/i.test(line)) c.chat_throttle++;
-    if (/restock fail/i.test(line)) c.restock_fail++;
-    if (/town_fallback|buy_pots_here|Dry/i.test(line) && /fallback|town/i.test(line)) c.town_fallback++;
+    if (/restock fail|town_fallback/i.test(line)) c.restock_fail++;
+    if (/town_fallback/i.test(line)) c.town_fallback++;
     if (/dlv:done|LIVE_DLV_OK|dlv_done/i.test(line)) c.dlv_done++;
     if (/dlv:.*fail|dlv_fail/i.test(line)) c.dlv_fail++;
-    if (/~R |rare_spot|Transfer phoenix/i.test(line) && /phoenix|rare/i.test(line)) c.rare_spot++;
+    if (/~R |rare_spot|rare_kill/i.test(line)) c.rare_spot++;
     if (/Transfer phoenix/i.test(line)) transferPhoenix++;
     if (/Port town/i.test(line)) portTown++;
     if (/wait_timeout|go_farm:wait party/i.test(line)) c.wait_timeout++;
 
-    // fighter hop instrumentation: go_s:US/... from a fighter name prefix
     for (const f of fighters) {
-      if (line.indexOf(f) >= 0 && /go_s:US\//.test(line)) c.fighter_hop++;
+      if (line.indexOf(f) >= 0 && (/go_s:US\//.test(line) || /\bHOP\b/.test(line))) c.fighter_hop++;
     }
-    if (/Puppygirl/.test(line) && /go_s:US\/|change_server|hop/i.test(line)) c.merchant_hop++;
+    if (/Puppygirl/.test(line) && (/go_s:US\//.test(line) || /\bHOP\b/.test(line) || /change_server/i.test(line))) {
+      c.merchant_hop++;
+    }
   }
 
   if (transferPhoenix + portTown >= 10) c.path_storm = transferPhoenix + portTown;

@@ -319,9 +319,11 @@ function createCharacter(world, over) {
     },
 
     async buy(name, q) {
-      q = q || 1;
+      q = q == null ? 1 : q;
       const price = (world.G.items[name] && world.G.items[name].g) || 20;
-      c.gold -= price * q;
+      const cost = price * q;
+      if (c.gold < cost) return { failed: true, reason: "gold" };
+      c.gold -= cost;
       const i = c.items.findIndex((x) => !x);
       if (i >= 0) {
         c.items[i] = { name, q };
@@ -339,8 +341,9 @@ function createCharacter(world, over) {
       if (t.map !== c.map) return { failed: true, reason: "map" };
       if (dist(c, t) > SEND_ITEM_RANGE) return { failed: true, reason: "distance" };
       if ((t.esize || 0) < 1) return { failed: true, reason: "no_space" };
-      const qty = q || 1;
-      const left = (it.q || 1) - qty;
+      const qty = q == null ? 1 : q;
+      const have = it.q == null ? 1 : it.q;
+      const left = have - qty;
       const piece = left > 0 ? Object.assign({}, it, { q: qty }) : it;
       c.items[i] = left > 0 ? Object.assign({}, it, { q: left }) : null;
       if (left <= 0) c.esize = (c.esize || 0) + 1;

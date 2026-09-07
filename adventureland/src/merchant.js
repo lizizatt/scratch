@@ -107,9 +107,10 @@ function bootMerchant(api, opts) {
     if (!(await ensureFarmWorld())) return;
 
     if (job.kind === "meet_home") {
-      // hop to HOME — only on user hold
       const reg = api.parent.server_region;
-      if (reg && (reg !== HOME[0] || api.parent.server_identifier !== HOME[1])) {
+      const id = api.parent.server_identifier;
+      if (!reg || !id) return; // wait until region ready — do NOT clear active
+      if (reg !== HOME[0] || id !== HOME[1]) {
         api.change_server(HOME[0], HOME[1]);
         return;
       }
@@ -174,7 +175,7 @@ function bootMerchant(api, opts) {
       const it = api.character.items[i];
       if (!it) continue;
       if (it.name !== "hpot1" && it.name !== "mpot1") continue;
-      const sr = await api.send_item(job.who, i, it.q || 1);
+      const sr = await api.send_item(job.who, i, it.q == null ? 1 : it.q);
       if (sr && sr.success) api.game_log("dlv:send " + it.name);
     }
 

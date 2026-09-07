@@ -51,19 +51,22 @@ function createPartyState(selfName) {
     bump();
   }
 
-  function setIntent(intent) {
-    if (selfName !== S.lead && selfName !== currentLeader()) return;
+  function setIntent(intent, presentNames) {
+    const lead = currentLeader(presentNames);
+    if (selfName !== lead) return;
+    S.lead = lead;
     S.intent = Object.assign({}, S.intent, intent, { t: Date.now() });
     bump();
   }
 
   function currentLeader(presentNames) {
-    // Succession: first in LEADER_ORDER who is present (or always self if alone)
-    const names = presentNames || Object.keys(S.members);
+    // Succession: first in LEADER_ORDER who is *actually present* (party list).
+    // Never treat static members keys as online when presentNames omitted — require explicit list.
+    const names = presentNames && presentNames.length ? presentNames : [selfName];
     for (const n of LEADER_ORDER) {
       if (names.indexOf(n) >= 0 && !(S.members[n] && S.members[n].rip)) return n;
     }
-    return LEADER_ORDER[0];
+    return names[0] || selfName;
   }
 
   function applyHeartbeat(from, parsed) {
