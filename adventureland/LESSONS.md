@@ -2,7 +2,7 @@
 
 **Purpose:** everything we learned the hard way about how the real Adventure Land server / client / Mainframe behave, with evidence, so the V2 simulator reproduces the *same* invariants and friction. Reference code lives in [`legacy/`](legacy/); pointers are `legacy/<file>:<line>`. The conversation transcript is cited as `chat L<n>` — user reports of live behavior are primary evidence.
 
-**Confidence tags:** `LIVE` = observed on the real server (artifact / user report / Mainframe contract) · `CODE` = inferred from a workaround in legacy code · `ASSUMED` = believed, unverified — expose as a sim knob and let an explorer measure it.
+**Confidence tags:** `SRC` = read from the open-source server/client (`kaansoral/adventureland`) · `LIVE` = observed on the real server (artifact / user report / Mainframe contract) · `CODE` = inferred from a workaround in legacy code · `ASSUMED` = believed, unverified — expose as a sim knob and let an explorer measure it. **Check `SRC` before building an explorer** — several "unknowns" turned out to be readable.
 
 ---
 
@@ -97,10 +97,18 @@ Maps touched: `main, bank, cave, winterland, winter_inn, winter_cave, desertland
 
 ## 3. Chat & CM (the throttle)
 
-- **"You can't chat this fast."** is real; hit on all three fighters, never the merchant — `LIVE` chat L1190, L1354, L1367, L3092. First root cause: hold blasted 3 PMs + all fighters force-`party_say`ing — chat L1366. Also **`limitdc`** (server disconnect) from socket spam in the bank — `LIVE` chat L1092. **Sim: sustained spam must escalate to disconnect, not just drop a line.**
-- V1 mitigation: `PSAY_MS=5000` gap, `PSAY_Q_MAX=8` queue, `~s` status supersedes older `~s`, dup-suppress, re-queue on fail — `CODE` `fighter_core.js:29`. **Own party_say echo resets `last_psay`** (self-echo counts) — `fighter_core.js:82`. Clean run: `throttle:0, psayDrop:0` — `LIVE` `_live_farm_observe.json`.
-- Actual limit **unknown** (`ASSUMED` ≥5 s/char safe). Explorer item.
-- `send_cm` is capacity-limited too: `CM_GAP_MS=700` both sides — `CODE` `fighter_core.js:36`, `gear_ops.js:15`; gear ads at 250 ms caused throttle → 3 s/20 s — chat L1366.
+**Resolved from server source** (`github.com/kaansoral/adventureland`, verified 2026-09-07) — tag `SRC`:
+
+- **Code chat limit = 1 message per 15 s per character.** `socket.on("say")`: `if (data.code && player.last_say && ssince(player.last_say) < 15) return fail_response("chat_slowdown")`; plus a **400 ms** floor for any chat; `player.last_say` set on every successful say (party, PM, general, **human-typed included**) — `SRC` `node/server.js:4345-4354`. CODE's `party_say(message)` → `parent.party_say(message, safeties)` so it always carries `code=true` — `SRC` `js/runner_functions.js:1222-1228`. **V1's `PSAY_MS=5000` was 3× too fast — that is the root cause of every throttle we saw**, not "everyone announcing" per se.
+- **CM is same-server only.** `socket.on("cm")` resolves `players[name_to_id[name]]` on the local server; off-server names are silently omitted from the returned `receivers` (free reachability probe) — `SRC` `node/server.js:4324-4337`. **A merchant on another world cannot receive CM.**
+- **PM crosses servers** (`xserver` relay) and shares the 15 s code-chat budget — `SRC` `node/server.js:4368,4380`.
+- **`limitdc`** is the socket **call-count** limit (`limits.calls`), not chat — `SRC` `node/server.js:4147-4198`. Sim needs a separate call budget.
+
+Live history:
+
+- **"You can't chat this fast."** hit all three fighters, never the merchant — `LIVE` chat L1190, L1354, L1367, L3092. `limitdc` from socket spam in the bank — `LIVE` chat L1092.
+- V1 mitigation: `PSAY_MS=5000` gap, `PSAY_Q_MAX=8` queue, `~s` supersedes older `~s`, dup-suppress, re-queue on fail — `CODE` `fighter_core.js:29`. **Own party_say echo resets `last_psay`** (correct instinct; the constant was wrong) — `fighter_core.js:82`. Clean run: `throttle:0` — `LIVE` `_live_farm_observe.json`.
+- `send_cm` pacing `CM_GAP_MS=700` — `CODE` `fighter_core.js:36`, `gear_ops.js:15`. CM has no 15 s rule but counts toward the call budget.
 - `game_log` is local/free; used for ops logs. Party chat = humans + `~s` sync + `!cmd` — `CODE` `FIELD_DELIVERY_PLAN.md:141`.
 - Hooks: `character.on("partym")`, `on("cm")`, `on("pm")`, global `on_party_invite` — `CODE` `fighter_core.js:50,87`.
 - Commands: `!hold !resume !grind !hunt <m> !world <R/I>` applied **including speaker** — `fighter_core.js:78,82`. Status `~s h=0|1 f=<m> w=US/III` every `STATE_MS=20000` (leader) — `:76`.
@@ -235,7 +243,7 @@ Plan docs still cite `ACK 15s` / `JOB 180s` in places; **code values above are t
 
 ## 11. Open questions for explorers (numbers the sim needs)
 
-1. Chat rate limit (msgs/window) per character; does CM share the budget; what triggers `limitdc`.
+1. ~~Chat rate limit / CM budget / `limitdc`~~ — **resolved from server source, see §3.** Remaining: the numeric `limits.calls` value in production.
 2. `smart_move` duration + failure rate per route class (town↔bank, town↔pack, cross-map, interior exits, tunnel).
 3. Vision radius in px; party-list coordinate lag vs vision.
 4. `change_server` reconnect distribution; how long `server_region` stays unset; realm-hop debuff duration.
