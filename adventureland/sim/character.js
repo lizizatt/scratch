@@ -95,6 +95,11 @@ function createCharacter(world, over) {
     return Math.max(200, Math.floor((dist(from, to) / WALK_PX_PER_S) * 1000));
   }
 
+  function advanceTime(ms) {
+    if (typeof world.oweTime === "function") world.oweTime(ms);
+    else world.clock.advance(ms);
+  }
+
   const api = {
     character: c,
     smart,
@@ -224,7 +229,7 @@ function createCharacter(world, over) {
       log.skills.push("use:" + skill);
       if (skill === "town") {
         place("main", 0, 0);
-        world.clock.advance(TOWN_MS);
+        advanceTime(TOWN_MS);
       }
     },
 
@@ -300,7 +305,7 @@ function createCharacter(world, over) {
         return { failed: true, reason: "stalled" };
       }
 
-      world.clock.advance(ms);
+      advanceTime(ms);
       if (!smart.moving) return { failed: true, reason: "interrupted" };
       place(map, x, y);
       smart.moving = false;
@@ -331,6 +336,20 @@ function createCharacter(world, over) {
       }
       log.bought.push({ name, q });
       return { num: i };
+    },
+
+    async sell(slot, q) {
+      const it = c.items[slot];
+      if (!it) return { failed: true, reason: "no_item" };
+      const have = it.q == null ? 1 : it.q;
+      const qty = q == null ? have : Math.min(q, have);
+      const price = (world.G.items[it.name] && world.G.items[it.name].g) || 1;
+      c.gold += Math.floor(price * 0.6) * qty;
+      const left = have - qty;
+      c.items[slot] = left > 0 ? Object.assign({}, it, { q: left }) : null;
+      if (left <= 0) c.esize = (c.esize || 0) + 1;
+      log.bought.push({ sell: it.name, q: qty }); // reuse bought log channel lightly
+      return { success: true };
     },
 
     async send_item(name, i, q) {
@@ -380,6 +399,7 @@ function createCharacter(world, over) {
     },
 
     sleep(ms) {
+      // Sleep must advance immediately (waitParty loops); travel uses oweTime via smart_move.
       world.clock.advance(ms);
       return Promise.resolve();
     },

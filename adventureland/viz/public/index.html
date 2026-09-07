@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AL Sim Viz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="top">
+        <div class="brand">
+          <span class="brand-mark">AL</span>
+          <h1>Sim Viz</h1>
+        </div>
+        <p class="lede">Browse suite coverage, scrub recorded party timelines.</p>
+        <div class="tabs" role="tablist">
+          <button class="tab is-on" data-tab="tests" type="button">Tests</button>
+          <button class="tab" data-tab="coverage" type="button">Coverage</button>
+          <button class="tab" data-tab="scrub" type="button">Scrub</button>
+        </div>
+      </header>
+
+      <main>
+        <section id="panel-tests" class="panel is-on">
+          <div class="toolbar">
+            <input id="filter-q" type="search" placeholder="Filter tests…" autocomplete="off" />
+            <div id="tag-filters" class="tag-row"></div>
+          </div>
+          <div class="split">
+            <ul id="test-list" class="test-list"></ul>
+            <aside id="test-detail" class="detail">
+              <p class="muted">Select a test.</p>
+            </aside>
+          </div>
+        </section>
+
+        <section id="panel-coverage" class="panel">
+          <div class="cov-grid">
+            <div>
+              <h2>By tag</h2>
+              <div id="cov-tags" class="bars"></div>
+            </div>
+            <div>
+              <h2>V2_PLAN §6.6</h2>
+              <div id="cov-plan" class="bars"></div>
+            </div>
+          </div>
+          <p id="cov-meta" class="muted"></p>
+        </section>
+
+        <section id="panel-scrub" class="panel">
+          <div class="toolbar">
+            <label class="field">
+              Trace
+              <select id="trace-select"></select>
+            </label>
+            <div id="grade-pills" class="pills"></div>
+          </div>
+          <div class="scrub-layout">
+            <canvas id="map" width="720" height="480"></canvas>
+            <div class="scrub-side">
+              <div id="frame-meta" class="frame-meta"></div>
+              <ol id="event-log" class="event-log"></ol>
+            </div>
+          </div>
+          <div class="transport">
+            <button id="btn-play" type="button">Play</button>
+            <input id="scrub" type="range" min="0" max="0" value="0" />
+            <span id="time-label" class="mono">0.0s</span>
+          </div>
+        </section>
+      </main>
+
+      <footer class="foot">
+        <span class="mono">node tools/record_viz.js</span>
+        then
+        <span class="mono">node viz/serve.js</span>
+      </footer>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>

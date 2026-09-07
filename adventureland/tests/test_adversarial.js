@@ -150,11 +150,11 @@ test("invariants: HOP lines count as fighter_hop", async () => {
 test("hold: hop-prep emits cancel_all before server change", async () => {
   const p = bootParty({ pots: 200, gold: 50000 });
   p.bots.Jazwyn.ctrl.applyCmd({ cmd: "hold", args: [] });
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 400; i++) {
     await p.tickAll();
-    p.world.tickReconnects();
-    if (p.world.where("Jazwyn").key === "US/II") break;
+    if (p.world.where("Jazwyn").key === "US/II" && p.bots.Jazwyn.api.character.connected) break;
   }
+  assert.ok(p.bots.Jazwyn.api.character.connected);
   assert.ok(p.bots.Jazwyn.api.log.cm.some((c) => c.message && c.message.job === "cancel_all"));
   assert.ok(p.bots.Jazwyn.api.log.server.some((s) => s[0] === "US" && s[1] === "II"));
 });
@@ -176,6 +176,228 @@ test("delivery: status flowing prevents town_fallback", async () => {
     p.world.advance(250);
   }
   assert.ok(!p.bots.Jazwyn.api.log.game.some((g) => /town_fallback/.test(g.m)));
+});
+
+test("hop: heap wipe clears handlers; storage restores hold; party re-invite", async () => {
+  const p = bootParty({ pots: 200, gold: 50000 });
+  // Production path only: lead applyCmd → party !hold echo → followers apply locally
+  p.bots.Jazwyn.ctrl.applyCmd({ cmd: "hold", args: [] });
+  const ctrlBefore = p.bots.Jazwyn.ctrl;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    if (
+      ["Jazwyn", "Sarene", "Zarook"].every(
+        (n) => p.world.where(n).key === "US/II" && p.bots[n].api.character.connected
+      )
+    )
+      break;
+  }
+  assert.ok(p.bots.Jazwyn.api.character.connected, "Jazwyn should finish reconnect");
+  assert.ok(p.bots.Sarene.api.character.connected, "Sarene should finish reconnect");
+  assert.ok(p.bots.Zarook.api.character.connected, "Zarook should finish reconnect");
+  assert.strictEqual(p.world.where("Sarene").key, "US/II");
+  assert.strictEqual(p.bots.Sarene.ctrl.state.S.intent.hold, 1, "follower hold via !hold hear, not test cheat");
+  p.world.advance(5000);
+  assert.notStrictEqual(p.bots.Jazwyn.ctrl, ctrlBefore, "controller must reboot on reload");
+  assert.strictEqual(p.bots.Jazwyn.ctrl.state.S.intent.hold, 1, "hold must survive via storage");
+  const party = p.bots.Jazwyn.api.get_party() || {};
+  assert.ok(party.Jazwyn && party.Sarene && party.Zarook, "party re-invite after hop: " + Object.keys(party));
+});
+
+test("clock: smart_move owes time; tickAll is sole advancer", async () => {
+  const p = bootParty({ pots: 200 });
+  const t0 = p.world.clock.now();
+  await p.bots.Jazwyn.api.smart_move({ map: "main", x: 0, y: 0 });
+  assert.strictEqual(p.world.clock.now(), t0, "smart_move must not advance clock directly");
+  assert.ok(p.world.getOwedMs() > 0, "owed=" + p.world.getOwedMs());
+  await p.tickAll();
+  assert.ok(p.world.clock.now() > t0);
+  assert.strictEqual(p.world.getOwedMs(), 0);
+});
+
+test("clock: sleep advances immediately (waitParty must not hang)", async () => {
+  const w = createWorld();
+  const j = w.spawn({ name: "Jazwyn" });
+  const t0 = w.clock.now();
+  await j.sleep(500);
+  assert.strictEqual(w.clock.now(), t0 + 500);
+  assert.strictEqual(w.getOwedMs(), 0);
+});
+
+test("world intent survives go_s:wait until server_region ready", async () => {
+  const p = bootParty({ pots: 200, gold: 50000 });
+  p.bots.Jazwyn.api.character.serverRegionReadyAt = p.world.clock.now() + 100000;
+  p.bots.Jazwyn.ctrl.state.S.intent.world = ["US", "II"];
+  p.bots.Jazwyn.ctrl.persist();
+  await p.bots.Jazwyn.ctrl.tick();
+  assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /go_s:wait/.test(g.m)));
+  assert.deepStrictEqual(p.bots.Jazwyn.ctrl.state.S.intent.world, ["US", "II"]);
+});
+
+test("rare_gone: spotter loses phoenix → resume farm", async () => {
+  const p = bootParty({ pots: 200 });
+  const mon = p.world.spawnMonster("US/III", "main", "phoenix", { x: 526, y: 1846 }, "phx_gone");
+  for (let i = 0; i < 8; i++) await p.tickAll();
+  assert.ok(
+    p.bots.Jazwyn.ctrl.state.S.mode === "rare" || p.bots.Jazwyn.api.log.game.some((g) => /rare_spot/.test(g.m)),
+    "expected rare spot"
+  );
+  // Stretch assemble window so rare_gone wins over rare_timeout
+  p.bots.Jazwyn.api.storage.setItem(
+    "v2state_Jazwyn",
+    JSON.stringify({
+      intent: p.bots.Jazwyn.ctrl.state.S.intent,
+      mode: "rare",
+      lead: "Jazwyn",
+      seq: p.bots.Jazwyn.ctrl.state.S.seq,
+      rare: p.bots.Jazwyn.ctrl.state.S.rare || { mtype: "phoenix", by: "Jazwyn", t: 0 },
+      dlv: null,
+      assembleUntil: p.world.clock.now() + 300000,
+      rareGoneAt: 0,
+      lastStatusAt: 0,
+      lastHb: 0,
+    })
+  );
+  p.bots.Jazwyn.ctrl = bootFighter(p.bots.Jazwyn.api, { now: () => p.world.clock.now() });
+  mon.dead = true;
+  mon.hp = 0;
+  let gone = false;
+  for (let i = 0; i < 100; i++) {
+    await p.bots.Jazwyn.ctrl.tick();
+    p.world.drainOwedTime();
+    p.world.advance(500);
+    if (p.bots.Jazwyn.api.log.game.some((g) => /rare_gone/.test(g.m))) {
+      gone = true;
+      break;
+    }
+  }
+  assert.ok(gone, "expected rare_gone");
+  assert.notStrictEqual(p.bots.Jazwyn.ctrl.state.S.mode, "rare");
+});
+
+test("rare_timeout: assemble window expires without kill", async () => {
+  const p = bootParty({ pots: 200 });
+  p.bots.Jazwyn.api.storage.setItem(
+    "v2state_Jazwyn",
+    JSON.stringify({
+      intent: p.bots.Jazwyn.ctrl.state.S.intent,
+      mode: "rare",
+      lead: "Jazwyn",
+      seq: p.bots.Jazwyn.ctrl.state.S.seq,
+      rare: { mtype: "phoenix", by: "Sarene", t: 0 },
+      dlv: null,
+      assembleUntil: p.world.clock.now() + 1000,
+      rareGoneAt: 0,
+      lastStatusAt: 0,
+      lastHb: 0,
+    })
+  );
+  p.bots.Jazwyn.ctrl = bootFighter(p.bots.Jazwyn.api, { now: () => p.world.clock.now() });
+  let timed = false;
+  for (let i = 0; i < 40; i++) {
+    await p.bots.Jazwyn.ctrl.tick();
+    p.world.drainOwedTime();
+    p.world.advance(2000);
+    if (p.bots.Jazwyn.api.log.game.some((g) => /rare_timeout/.test(g.m))) {
+      timed = true;
+      break;
+    }
+  }
+  assert.ok(timed, "expected rare_timeout");
+});
+
+test("bag-full: dry fighter sells junk then requests pots", async () => {
+  const items = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) items[i] = { name: "gloves", level: 0, q: 1 };
+  const p = bootParty({ pots: 0, gold: 50000, esize: 0, items });
+  await p.bots.Jazwyn.ctrl.requestPots();
+  assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /bag:sell/.test(g.m)), "should sell junk");
+  assert.ok(p.bots.Jazwyn.ctrl.dlvPending || p.bots.Jazwyn.api.log.game.some((g) => /dlv:req/.test(g.m)));
+  assert.ok((p.bots.Jazwyn.api.character.esize || 0) >= 1);
+});
+
+test("bag-full: pot-only bag sells surplus hp pots when mp dry", async () => {
+  const items = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) items[i] = { name: "hpot1", q: 50 };
+  const p = bootParty({ pots: 0, gold: 50000, esize: 0, items });
+  await p.bots.Jazwyn.ctrl.requestPots();
+  assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /bag:sell hpot1/.test(g.m)));
+  assert.ok(p.bots.Jazwyn.ctrl.dlvPending);
+  assert.ok((p.bots.Jazwyn.api.character.esize || 0) >= 1);
+});
+
+test("bootFighter twice does not stack handlers", async () => {
+  const w = createWorld();
+  const j = w.spawn({ name: "Jazwyn" });
+  bootFighter(j, { now: () => w.clock.now() });
+  bootFighter(j, { now: () => w.clock.now() });
+  const r = w.roster.get("Jazwyn");
+  assert.strictEqual(r.partyHandlers.length, 1);
+  assert.strictEqual(r.cmHandlers.length, 1);
+});
+
+test("merchant queue survives hop + onReload", async () => {
+  const p = bootParty({ pots: 200 });
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "keep1",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [{ name: "hpot1", q: 10 }],
+    farm: "armadillo",
+    map: "main",
+    x: 526,
+    y: 1846,
+    t0: p.world.clock.now(),
+  });
+  assert.ok(p.bots.Puppygirl.ctrl.store.q.some((j) => j.id === "keep1"));
+  p.bots.Puppygirl.api.change_server("US", "II");
+  for (let i = 0; i < 300; i++) {
+    p.world.advance(250);
+    if (p.bots.Puppygirl.api.character.connected) break;
+  }
+  assert.ok(p.bots.Puppygirl.api.character.connected);
+  assert.ok(
+    p.bots.Puppygirl.ctrl.store.q.some((j) => j.id === "keep1") ||
+      (p.bots.Puppygirl.ctrl.store.active && p.bots.Puppygirl.ctrl.store.active.id === "keep1"),
+    "queue must reload from storage"
+  );
+});
+
+test("boot subset: Sarene+Zarook no Jazwyn — Sarene leads", async () => {
+  const w = createWorld();
+  const pc = packCenter("armadillo");
+  const s = w.spawn({
+    name: "Sarene",
+    map: pc.map,
+    real_x: pc.x,
+    real_y: pc.y,
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ].concat(new Array(40).fill(null)),
+  });
+  const z = w.spawn({
+    name: "Zarook",
+    map: pc.map,
+    real_x: pc.x + 20,
+    real_y: pc.y,
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ].concat(new Array(40).fill(null)),
+  });
+  w.formParty("US/III", ["Sarene", "Zarook"]);
+  w.spawnMonster("US/III", pc.map, "armadillo", pc);
+  const cs = bootFighter(s, { now: () => w.clock.now() });
+  const cz = bootFighter(z, { now: () => w.clock.now() });
+  for (let i = 0; i < 15; i++) {
+    await cs.tick();
+    await cz.tick();
+    w.drainOwedTime();
+    w.advance(250);
+  }
+  assert.strictEqual(cs.isLead(), true);
+  assert.strictEqual(cz.isLead(), false);
 });
 
 module.exports = { tests };

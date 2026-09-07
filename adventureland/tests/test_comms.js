@@ -108,6 +108,8 @@ test("smart_move to armadillo arrives with travel time", async () => {
   assert.strictEqual(r.success, true);
   assert.strictEqual(j.character.map, "main");
   assert.ok(Math.abs(j.character.real_x - 526) < 1);
+  assert.ok(w.getOwedMs() > 0, "travel should be owed");
+  w.drainOwedTime();
   assert.ok(w.clock.now() > t0);
 });
 

@@ -154,6 +154,9 @@ function createWorld(opts) {
       deliverCm: self.deliverCm,
       deliverPm: self.deliverPm,
       changeServer: self.changeServer,
+      oweTime(ms) {
+        oweTime(ms);
+      },
     };
 
     // Pre-register stub so region getters work during init
@@ -173,6 +176,13 @@ function createWorld(opts) {
       if (ev === "cm") r.cmHandlers.push(fn);
       else if (ev === "partym") r.partyHandlers.push(fn);
       else if (ev === "pm") r.pmHandlers.push(fn);
+    };
+    api.clearHandlers = function () {
+      const r = roster.get(api.character.name);
+      if (!r) return;
+      r.cmHandlers = [];
+      r.partyHandlers = [];
+      r.pmHandlers = [];
     };
 
     return api;
@@ -257,7 +267,6 @@ function createWorld(opts) {
         r.ident = ps.ident;
         const key = sk(ps.region, ps.ident);
         ensureServer(key).set(name, ch);
-        // Default spawn on new server
         const map = ch.map || "main";
         const sp = (G.maps[map] && G.maps[map].spawns && G.maps[map].spawns[0]) || [0, 0];
         ch.map = map;
@@ -265,9 +274,31 @@ function createWorld(opts) {
         ch.x = sp[0];
         ch.real_y = sp[1];
         ch.y = sp[1];
-        // storage already on api.storage — caller may have set items
+        // Heap wipe: drop CODE handlers; reload callback reboots controller from storage
+        r.cmHandlers = [];
+        r.partyHandlers = [];
+        r.pmHandlers = [];
+        ch._heapGen = (ch._heapGen || 0) + 1;
+        if (typeof r.onReload === "function") {
+          try {
+            r.onReload(r.api);
+          } catch (e) {
+            ch._reloadErr = String(e && e.message ? e.message : e);
+          }
+        }
       }
     }
+  }
+
+  let owedMs = 0;
+  function oweTime(ms) {
+    owedMs += Math.max(0, ms | 0);
+  }
+  function drainOwedTime() {
+    const n = owedMs;
+    owedMs = 0;
+    if (n > 0) clock.advance(n);
+    return n;
   }
 
   clock.onAdvance(() => tickReconnects());
@@ -281,6 +312,18 @@ function createWorld(opts) {
     formParty,
     refreshPartyCoords,
     tickReconnects,
+    oweTime,
+    drainOwedTime,
+    getOwedMs() {
+      return owedMs;
+    },
+    setOnReload(name, fn) {
+      const r = roster.get(name);
+      if (r) r.onReload = fn;
+    },
+    inviteAll(serverKey, members) {
+      return formParty(serverKey, members);
+    },
     roster,
     serverKey: sk,
     get(name) {

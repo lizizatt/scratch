@@ -217,6 +217,7 @@ function bootMerchant(api, opts) {
     }
   }
 
+  if (typeof api.clearHandlers === "function") api.clearHandlers();
   api.on("cm", (m) => {
     hearCm(m);
   });

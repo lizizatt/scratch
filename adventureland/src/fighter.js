@@ -26,10 +26,12 @@ const { packCenter } = require("../sim/world");
  * Boot a fighter into a sim (or real) API environment.
  * api must provide: character, party_say, send_cm, get_player, get_party,
  * smart_move, sleep, game_log, on, parent, buy, use, send_gold, items helpers.
+ * Heap wipes on change_server; intent/dlv restored from localStorage.
  */
 function bootFighter(api, opts) {
   opts = opts || {};
   const name = api.character.name;
+  const SK = "v2state_" + name;
   const state = createPartyState(name);
   const chat = createChatQueue(api);
   api._now = () => (opts.now ? opts.now() : Date.now());
@@ -40,7 +42,44 @@ function bootFighter(api, opts) {
   let lastStatusAt = 0;
   let assembleUntil = 0;
   let rareGoneAt = 0;
-  let farmWalking = false;
+
+  function persist() {
+    try {
+      api.storage.setItem(
+        SK,
+        JSON.stringify({
+          intent: state.S.intent,
+          mode: state.S.mode,
+          lead: state.S.lead,
+          seq: state.S.seq,
+          rare: state.S.rare,
+          dlv: dlvPending,
+          lastHb,
+          assembleUntil,
+          rareGoneAt,
+          lastStatusAt,
+        })
+      );
+    } catch (e) {}
+  }
+
+  function restore() {
+    try {
+      const raw = api.storage.getItem(SK);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.intent) state.S.intent = d.intent;
+      if (d.mode) state.S.mode = d.mode;
+      if (d.lead) state.S.lead = d.lead;
+      if (d.seq) state.S.seq = Object.assign(state.S.seq, d.seq);
+      if (d.rare) state.S.rare = d.rare;
+      if (d.dlv) dlvPending = d.dlv;
+      if (d.lastHb) lastHb = d.lastHb;
+      if (d.assembleUntil) assembleUntil = d.assembleUntil;
+      if (d.rareGoneAt) rareGoneAt = d.rareGoneAt;
+      if (d.lastStatusAt) lastStatusAt = d.lastStatusAt;
+    } catch (e) {}
+  }
 
   const motion = createMotion(api, {
     leadName: () => state.S.lead,
@@ -67,6 +106,35 @@ function bootFighter(api, opts) {
     return b;
   }
 
+  /** Free ≥1 bag slot by selling junk, then surplus pots if dry on the other type. */
+  async function freeBagSlot() {
+    if ((api.character.esize || 0) >= 1) return true;
+    async function sellAt(i, it) {
+      if (typeof api.sell !== "function") return false;
+      await api.sell(i, it.q == null ? 1 : it.q);
+      api.game_log("bag:sell " + it.name);
+      return (api.character.esize || 0) >= 1;
+    }
+    for (let i = 0; i < api.character.items.length; i++) {
+      const it = api.character.items[i];
+      if (!it) continue;
+      if (/^hpot|^mpot/.test(it.name)) continue;
+      if (await sellAt(i, it)) return true;
+    }
+    // Pot-only full bag: dry on one type while the other fills every slot
+    const c = countPots(api.character.items);
+    if (c.hp === 0 || c.mp === 0) {
+      const prefer = c.hp > c.mp ? /^hpot/ : /^mpot/;
+      for (let i = 0; i < api.character.items.length; i++) {
+        const it = api.character.items[i];
+        if (!it || !prefer.test(it.name)) continue;
+        if (await sellAt(i, it)) return true;
+      }
+    }
+    api.game_log("bag:full");
+    return (api.character.esize || 0) >= 1;
+  }
+
   async function requestPots() {
     if (dlvPending) {
       const age = api._now() - dlvPending.t0;
@@ -76,8 +144,10 @@ function bootFighter(api, opts) {
       } else return;
     }
     if ((api.character.esize || 0) < 1) {
-      api.game_log("dlv:skip no_space");
-      return;
+      if (!(await freeBagSlot())) {
+        api.game_log("dlv:skip no_space");
+        return;
+      }
     }
     const id = "p" + api._now() + "_" + name.slice(0, 3);
     dlvPending = { id, kind: "pots", t0: api._now(), acked: 0 };
@@ -88,6 +158,7 @@ function bootFighter(api, opts) {
     ];
     const farm = state.S.intent.mtype;
     api.game_log("dlv:req id=" + id);
+    persist();
     const r = await api.send_cm(MERCHANT, {
       v: 1,
       job: "dlv_pots",
@@ -113,12 +184,14 @@ function bootFighter(api, opts) {
     }
     if (api.character.gold < GOLD_FLOAT_FIGHTER) {
       api.game_log("town_fallback low_gold");
+      persist();
       return; // never buy into debt (LESSONS #5)
     }
     await motion.goTo({ to: "potions" });
     await api.buy("hpot1", POTION_TARGET);
     await api.buy("mpot1", POTION_TARGET);
     refreshPots();
+    persist();
   }
 
   async function hopPrep(targetServer) {
@@ -142,6 +215,7 @@ function bootFighter(api, opts) {
     await api.send_cm(MERCHANT, { job: "cancel_all", who: name });
     if (isLead()) chat.enqueue("World " + targetServer[0] + "/" + targetServer[1], "echo");
     chat.tick(api._now());
+    persist();
     api.change_server(targetServer[0], targetServer[1]);
   }
 
@@ -159,6 +233,7 @@ function bootFighter(api, opts) {
       state.applyRare(from, parsed.mtype);
       assembleUntil = api._now() + ASSEMBLE_TIMEOUT_MS;
       rareGoneAt = 0;
+      persist();
     } else if (parsed.type === "cmd") {
       applyCmd(parsed, from === name);
     }
@@ -175,23 +250,44 @@ function bootFighter(api, opts) {
     const party = Object.keys(api.get_party() || {});
     const present = party.length ? party : [name];
     const cmd = parsed.cmd;
+    // Lead owns intent broadcast; every fighter must apply hold/resume/hunt locally
+    // or followers never hop (adversarial: setIntent is lead-only).
     if (cmd === "hold") {
-      state.setIntent({ hold: 1, kind: "hold" }, present);
+      if (isLead()) state.setIntent({ hold: 1, kind: "hold" }, present);
+      else {
+        state.S.intent.hold = 1;
+        state.S.intent.kind = "hold";
+      }
       state.S.mode = "hold";
     } else if (cmd === "resume") {
-      state.setIntent({ hold: 0, kind: "farm" }, present);
+      if (isLead()) state.setIntent({ hold: 0, kind: "farm" }, present);
+      else {
+        state.S.intent.hold = 0;
+        state.S.intent.kind = "farm";
+      }
       state.S.mode = "farm";
       state.S.rare = null;
     } else if (cmd === "hunt" && parsed.args[0]) {
-      state.setIntent({ kind: "hunt", mtype: parsed.args[0], hold: 0 }, present);
+      if (isLead()) state.setIntent({ kind: "hunt", mtype: parsed.args[0], hold: 0 }, present);
+      else {
+        state.S.intent.kind = "hunt";
+        state.S.intent.mtype = parsed.args[0];
+        state.S.intent.hold = 0;
+      }
       state.S.mode = "farm";
     } else if (cmd === "grind") {
-      state.setIntent({ kind: "farm", hold: 0 }, present);
+      if (isLead()) state.setIntent({ kind: "farm", hold: 0 }, present);
+      else {
+        state.S.intent.kind = "farm";
+        state.S.intent.hold = 0;
+      }
     } else if (cmd === "world" && parsed.args[0]) {
       const parts = parsed.args[0].split("/");
-      state.setIntent({ world: parts }, present);
+      if (isLead()) state.setIntent({ world: parts }, present);
+      else state.S.intent.world = parts;
     }
     if (mine) chat.enqueue("!" + cmd + (parsed.args[0] ? " " + parsed.args[0] : ""), "echo");
+    persist();
   }
 
   async function hearCm(m) {
@@ -202,18 +298,22 @@ function bootFighter(api, opts) {
       lastStatusAt = api._now();
       api.game_log("dlv:ack ok=" + (d.ok ? 1 : 0));
       if (!d.ok) dlvPending = null;
+      persist();
     }
     if (d.status && dlvPending && (!d.id || d.id === dlvPending.id)) {
       lastStatusAt = api._now();
       dlvPending.phase = d.phase;
+      persist();
     }
     if (d.dlv_done && dlvPending && d.id === dlvPending.id) {
       api.game_log("dlv:done");
       dlvPending = null;
       refreshPots();
+      persist();
     }
     if (d.job === "meet_home" || d.hold === 1) {
       state.setIntent({ hold: 1, kind: "hold" });
+      persist();
     }
   }
 
@@ -225,6 +325,7 @@ function bootFighter(api, opts) {
         state.applyRare(name, seen.mtype);
         assembleUntil = now + ASSEMBLE_TIMEOUT_MS;
         api.game_log("rare_spot " + seen.mtype);
+        persist();
       }
       return false;
     }
@@ -244,6 +345,7 @@ function bootFighter(api, opts) {
           api.game_log("rare_kill " + m.mtype);
           state.S.rare = null;
           state.S.mode = "farm";
+          persist();
           return true;
         }
       } else {
@@ -252,6 +354,7 @@ function bootFighter(api, opts) {
           api.game_log("rare_gone");
           state.S.rare = null;
           state.S.mode = "farm";
+          persist();
         }
       }
     }
@@ -259,6 +362,7 @@ function bootFighter(api, opts) {
       api.game_log("rare_timeout");
       state.S.rare = null;
       state.S.mode = "farm";
+      persist();
     } else if (p && (p.map !== api.character.map || motion.dist(api.character, p) > 100)) {
       await motion.goTo({ map: p.map, x: p.real_x != null ? p.real_x : p.x, y: p.real_y != null ? p.real_y : p.y });
     }
@@ -278,14 +382,24 @@ function bootFighter(api, opts) {
       return;
     }
     if (state.S.intent.world) {
-      const w = state.S.intent.world;
+      const target = state.S.intent.world;
+      const reg = api.parent.server_region;
+      const id = api.parent.server_identifier;
+      if (!reg || !id) {
+        api.game_log("go_s:wait");
+        return; // keep intent.world until region is ready
+      }
       state.S.intent.world = null;
-      await hopPrep(w);
+      persist();
+      await hopPrep(target);
       return;
     }
 
     const pots = refreshPots();
     if (pots === "dry") {
+      if ((api.character.esize || 0) < 1) {
+        await freeBagSlot();
+      }
       if (dlvPending && lastStatusAt && now - lastStatusAt < FALLBACK_SILENCE_MS) {
         // wait for merchant
         if (now - lastBeacon > BEACON_MS) {
@@ -359,11 +473,18 @@ function bootFighter(api, opts) {
     }
     chat.tick(now);
 
-    if (await tickRare(now)) return;
+    if (await tickRare(now)) {
+      persist();
+      return;
+    }
     await tickFarm(now);
     chat.tick(now);
+    persist();
   }
 
+  restore();
+
+  if (typeof api.clearHandlers === "function") api.clearHandlers();
   api.on("partym", hearParty);
   api.on("cm", (m) => {
     hearCm(m);
@@ -380,6 +501,8 @@ function bootFighter(api, opts) {
     isLead,
     requestPots,
     hopPrep,
+    persist,
+    freeBagSlot,
     applyCmd: (c) => applyCmd(c, true),
     get dlvPending() {
       return dlvPending;
@@ -387,6 +510,7 @@ function bootFighter(api, opts) {
     _setDlv(p) {
       dlvPending = p;
       lastStatusAt = api._now();
+      persist();
     },
   };
 }

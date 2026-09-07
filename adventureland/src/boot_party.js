@@ -1,6 +1,7 @@
 "use strict";
 
 const { createWorld } = require("../sim");
+const { attachTrace } = require("../sim/trace");
 const { bootFighter } = require("./fighter");
 const { bootMerchant } = require("./merchant");
 const { FIGHTERS, FARM } = require("./constants");
@@ -8,6 +9,10 @@ const { packCenter } = require("../sim/world");
 
 /**
  * Spawn the party in sim and return controllers + world.
+ * On change_server reconnect: heap handlers wipe, controllers reboot from storage,
+ * and fighters on the same server are re-invited into a party.
+ *
+ * Pass opts.trace = { id, name, tags, sampleMs } to record a scrubbable timeline.
  */
 function bootParty(opts) {
   opts = opts || {};
@@ -18,6 +23,38 @@ function bootParty(opts) {
   const pc = packCenter(pack);
 
   const bots = {};
+  const tickMs = opts.tickMs || 250;
+  const trace = opts.trace ? attachTrace(w, opts.trace) : null;
+
+  function seedPots(n) {
+    const items = new Array(42).fill(null);
+    items[0] = { name: "hpot1", q: n };
+    items[1] = { name: "mpot1", q: n };
+    return items;
+  }
+
+  function reInviteIfNeeded(name) {
+    const here = w.where(name);
+    if (!here) return;
+    const members = FIGHTERS.filter((n) => {
+      const wh = w.where(n);
+      const api = w.get(n);
+      return wh && wh.key === here.key && api && api.character.connected;
+    });
+    if (members.length) w.inviteAll(here.key, members);
+  }
+
+  function wireReload(name, bootFn) {
+    w.setOnReload(name, (api) => {
+      const ctrl = bootFn(api, {
+        now: () => w.clock.now(),
+        burnPots: !!opts.burnPots,
+      });
+      bots[name].ctrl = ctrl;
+      bots[name].api = api;
+      reInviteIfNeeded(name);
+    });
+  }
 
   function mkFighter(name, ctype, xy) {
     const api = w.spawn(
@@ -31,8 +68,8 @@ function bootParty(opts) {
         x: xy.x,
         y: xy.y,
         gold: opts.gold != null ? opts.gold : 50000,
-        esize: 20,
-        items: seedPots(opts.pots != null ? opts.pots : 200),
+        esize: opts.esize != null ? opts.esize : 20,
+        items: opts.items || seedPots(opts.pots != null ? opts.pots : 200),
       },
       region,
       ident
@@ -42,14 +79,8 @@ function bootParty(opts) {
       burnPots: !!opts.burnPots,
     });
     bots[name] = { api, ctrl };
+    wireReload(name, bootFighter);
     return bots[name];
-  }
-
-  function seedPots(n) {
-    const items = new Array(42).fill(null);
-    items[0] = { name: "hpot1", q: n };
-    items[1] = { name: "mpot1", q: n };
-    return items;
   }
 
   mkFighter("Jazwyn", "warrior", { x: pc.x, y: pc.y });
@@ -72,16 +103,24 @@ function bootParty(opts) {
     ident
   );
   bots.Puppygirl = { api: mApi, ctrl: bootMerchant(mApi, { now: () => w.clock.now() }) };
+  wireReload("Puppygirl", bootMerchant);
 
   w.formParty(region + "/" + ident, FIGHTERS);
   w.spawnMonster(region + "/" + ident, pc.map, pack, pc);
 
   async function tickAll() {
-    w.refreshPartyCoords(region + "/" + ident);
-    // fighters first, then merchant
+    const keys = new Set();
+    for (const n of FIGHTERS.concat(["Puppygirl"])) {
+      const wh = w.where(n);
+      if (wh) keys.add(wh.key);
+    }
+    for (const key of keys) w.refreshPartyCoords(key);
+
     for (const n of FIGHTERS) await bots[n].ctrl.tick();
     await bots.Puppygirl.ctrl.tick();
-    w.advance(opts.tickMs || 250);
+    w.drainOwedTime();
+    w.advance(tickMs);
+    if (trace) trace.sample();
   }
 
   async function runFor(ms) {
@@ -89,7 +128,7 @@ function bootParty(opts) {
     while (w.clock.now() < end) await tickAll();
   }
 
-  return { world: w, bots, tickAll, runFor, pack };
+  return { world: w, bots, tickAll, runFor, pack, reInviteIfNeeded, trace };
 }
 
 module.exports = { bootParty };
