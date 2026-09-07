@@ -155,9 +155,10 @@ async function logistics() {
   var ok;
   if (busy || character.rip) return;
   if (!PLAN_OK) { set_message("No plan"); return; }
-  if (typeof gear_busy === "function" && gear_busy()) { busy = true; try { await run_gear_session(); } catch (eG) { game_log("gear:lg " + eG); } busy = false; return; }
   if (character.map === "jail") { await leave(); return; }
   if ((character.map === "winter_inn" || character.map === "winter_cave") && typeof ensure_main === "function") { await ensure_main(); return; }
+  if (typeof dlv_has_work === "function" && dlv_has_work()) { busy = true; try { await drain_dlv(); } catch (eD) { game_log("dlv:lg " + eD); } busy = false; return; }
+  if (typeof gear_busy === "function" && gear_busy()) { busy = true; try { await run_gear_session(); } catch (eG) { game_log("gear:lg " + eG); } busy = false; return; }
   busy = true;
   try {
     await drain_dlv();
@@ -170,5 +171,6 @@ async function logistics() {
   busy = false;
 }
 try { performance_trick(); } catch (e) {}
+setTimeout(function () { if (!(typeof gear_busy === "function" && gear_busy())) resume(); }, 3500);
 setInterval(function () { use_pots(); if (!smart.moving) mluck_near(); }, 250);
 setInterval(logistics, 10000); logistics();

@@ -1,0 +1,72 @@
+{
+  "started": "2026-09-07T16:27:43.648Z",
+  "hunt": {
+    "dispatched": true,
+    "huntingMsgs": 111,
+    "onPack": 3,
+    "allHunting": true,
+    "farmOk": true,
+    "statusOut": 0
+  },
+  "cohesion": {
+    "togetherPolls": 7,
+    "splitPolls": 3,
+    "maxSameMapSpread": 1334.4406754675053,
+    "attendanceMiss": 0,
+    "partyHere": 0,
+    "waitTimeout": 0,
+    "restockFail": 0,
+    "announces": 0,
+    "togetherRatio": 0.7
+  },
+  "worlds": {
+    "hops": [],
+    "byChar": {
+      "Puppygirl": [
+        {
+          "t": "2026-09-07T16:29:17.041Z",
+          "serverKey": "US/III",
+          "map": "main"
+        }
+      ],
+      "Sarene": [
+        {
+          "t": "2026-09-07T16:29:17.041Z",
+          "serverKey": "US/III",
+          "map": "desertland"
+        }
+      ],
+      "Zarook": [
+        {
+          "t": "2026-09-07T16:29:17.041Z",
+          "serverKey": "US/III",
+          "map": "desertland"
+        }
+      ],
+      "Jazwyn": [
+        {
+          "t": "2026-09-07T16:29:17.041Z",
+          "serverKey": "US/III",
+          "map": "desertland"
+        }
+      ]
+    },
+    "unnecessary": [],
+    "notes": []
+  },
+  "chat": {
+    "throttle": 0,
+    "psayOut": 0,
+    "psayDrop": 0,
+    "psayFail": 0,
+    "samples": []
+  },
+  "stuck": {},
+  "chatThrottle": 0,
+  "errs": [],
+  "finished": "2026-09-07T16:31:51.404Z",
+  "chatPass": true,
+  "worldPass": true,
+  "cohesionPass": true,
+  "pass": true
+}

@@ -1,0 +1,647 @@
+{
+  "success": true,
+  "active": false,
+  "retention_days": 30,
+  "logs": [
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:49.714Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:49.966Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:50.967Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:51.104Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:51.216Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:52.967Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:53.219Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:53.468Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:53.605Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:53.721Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:55.473Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:55.746Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:55.975Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:56.105Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:56.226Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:57.982Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:58.233Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:58.481Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:58.605Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:02:58.732Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:00.483Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:00.737Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:00.985Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:01.106Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:01.235Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:02.987Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:03.238Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:03.487Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:03.606Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:03.742Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:05.491Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:05.744Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:06.000Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:06.107Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:06.246Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:07.999Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:08.254Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:08.501Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:08.608Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:08.752Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:10.504Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:10.756Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:11.007Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:11.110Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:11.258Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:13.259Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:13.508Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:13.607Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:13.607Z",
+      "level": "info",
+      "values": [
+        "dlv:req id=p1788555790412_Jaz kind=pots q=hpot1:40+mpot1:40 farm=spider @US/III main 767,-124"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:13.616Z",
+      "level": "info",
+      "values": [
+        "dlv:ack id=p1788555790412_Jaz ok=1"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:15.261Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:15.513Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:15.764Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:16.014Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:16.109Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:17.770Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:18.029Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:18.267Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:18.519Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:18.608Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:20.271Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:20.521Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:20.772Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:21.022Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:21.123Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:22.777Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:23.026Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:23.275Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:23.525Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:23.609Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:25.279Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:25.528Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:25.780Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:26.029Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:26.110Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:27.784Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:28.032Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:28.285Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:28.533Z",
+      "level": "info",
+      "values": [
+        "Hunt spider"
+      ]
+    },
+    {
+      "assignment_id": "92bce5c909b57051e567c7eaba72d747",
+      "at": "2026-09-04T21:03:28.610Z",
+      "level": "info",
+      "values": [
+        "go_s:wait"
+      ]
+    }
+  ]
+}

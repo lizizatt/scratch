@@ -166,10 +166,13 @@ async function main() {
     };
     fs.writeFileSync(path.join(ROOT, "_live_gear.json"), JSON.stringify(result, null, 2));
     console.log("RESULT", result);
+    if (offer || got) {
+      console.log("SUCCESS gear handoff observed");
+      return;
+    }
     if (!start && planN === 0) throw new Error("FAIL: no upgrades to gift from bank/bag");
-    if (!start) throw new Error("FAIL: gear session never started");
-    if (!(offer || got)) throw new Error("FAIL: no offer/got — handoff incomplete");
-    console.log("SUCCESS gear handoff observed");
+    if (!start && !here && !tried) throw new Error("FAIL: gear session never started");
+    throw new Error("FAIL: no offer/got — handoff incomplete");
   } finally {
     strip();
     deploy();

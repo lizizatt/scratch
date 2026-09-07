@@ -113,7 +113,7 @@ test("fighter dry_pots towns and cancels delivery", async () => {
     map: "cave", level: 42, real_x: -194, real_y: -461, _server: ["US", "III"]
   });
   env.hold = false;
-  env.dlv_pending = { id: "dry2", kind: "pots", t0: Date.now(), acked: 1 };
+  env.dlv_pending = { id: "dry2", kind: "pots", t0: Date.now(), acked: 0 };
   assert.strictEqual(env.dry_pots(), true);
   await env.logistics();
   assert.ok((env.log.cm || []).some((c) => c.data && c.data.dlv_cancel && c.data.reason === "dry"));
@@ -122,6 +122,37 @@ test("fighter dry_pots towns and cancels delivery", async () => {
     "moves to potions plaza or bank"
   );
   assert.ok(!env.dlv_pending || env.dlv_pending.id !== "dry2", "old dry job cleared");
+});
+
+test("broke dry fighter requests pots without canceling delivery", async () => {
+  const items = new Array(42).fill(null);
+  items[0] = { name: "helmet", q: 1 };
+  const env = loadScript("mage.js", {
+    name: "Sarene", ctype: "mage", items, gold: 0, esize: 20,
+    map: "main", level: 42, real_x: 500, real_y: 1800, _server: ["US", "III"]
+  });
+  env.hold = false;
+  env.REQ_COOLDOWN_MS = 0;
+  env.dlv_pending = { id: "keep1", kind: "pots", t0: Date.now(), acked: 1 };
+  assert.strictEqual(env.dry_pots(), true);
+  await env.logistics();
+  assert.ok(!(env.log.cm || []).some((c) => c.data && c.data.dlv_cancel), "must not cancel when broke");
+  assert.ok(env.dlv_pending && env.dlv_pending.id === "keep1", "keep pending merchant job");
+});
+
+test("acked dry delivery is not canceled when fighter can self-buy", async () => {
+  const items = new Array(42).fill(null);
+  items[0] = { name: "helmet", q: 1 };
+  const env = loadScript("mage.js", {
+    name: "Sarene", ctype: "mage", items, gold: 50000, esize: 20,
+    map: "cave", level: 42, real_x: -60, real_y: -480, _server: ["US", "III"]
+  });
+  env.hold = false;
+  env.dlv_pending = { id: "enroute1", kind: "pots", t0: Date.now(), acked: 1 };
+  assert.strictEqual(env.dry_pots(), true);
+  await env.logistics();
+  assert.ok(!(env.log.cm || []).some((c) => c.data && c.data.dlv_cancel), "keep acked merchant job");
+  assert.ok(env.dlv_pending && env.dlv_pending.id === "enroute1");
 });
 
 test("fighter tosses bank loot to nearby merchant", async () => {

@@ -281,11 +281,39 @@ test("!resume from self clears hold", () => {
   assert.ok((lead.log.game || []).some((s) => /Resuming/i.test(s)));
 });
 
-test("psay rate-limits party chat", () => {
+test("own !hunt does not immediately party_say status", () => {
+  const lead = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
+  lead.last_psay = new Date(0);
+  lead.hear({ from: "Jazwyn", message: "!hunt armadillo" });
+  assert.strictEqual(lead.farm_ovr, "armadillo");
+  assert.ok(
+    !lead.log.said.some((s) => /^~s /.test(s)),
+    "must not stack ~s on the same party chat tick as !hunt"
+  );
+  assert.ok((lead.psay_q || []).some((s) => /^~s /.test(s)), "status is queued for later");
+});
+
+test("psay queues and flushes one message per cooldown", () => {
   const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
+  env.last_psay = new Date(0);
   assert.strictEqual(env.psay("one"), true);
-  assert.strictEqual(env.psay("two"), false);
-  assert.strictEqual(env.log.said.filter((s) => s === "one" || s === "two").length, 1);
+  assert.deepStrictEqual(env.log.said, ["one"]);
+  assert.strictEqual(env.psay("two"), true);
+  assert.deepStrictEqual(env.log.said, ["one"], "second stays queued");
+  assert.deepStrictEqual(Array.from(env.psay_q || []), ["two"]);
+  env.last_psay = new Date(0);
+  env.psay_tick();
+  assert.deepStrictEqual(env.log.said, ["one", "two"]);
+  assert.strictEqual((env.psay_q || []).length, 0);
+});
+
+test("psay coalesces pending ~s status messages", () => {
+  const env = loadScript("warrior.js", { name: "Jazwyn", ctype: "warrior" });
+  env.last_psay = new Date();
+  env.psay("~s h=0 f=bat w=US/III");
+  env.psay("~s h=0 f=armadillo w=US/III");
+  env.psay("Ding!");
+  assert.deepStrictEqual(Array.from(env.psay_q || []), ["~s h=0 f=armadillo w=US/III", "Ding!"]);
 });
 
 test("only leader broadcasts ~s state", () => {
@@ -398,6 +426,7 @@ function wentTo(env, dest) {
     if (!d) return false;
     if (d.to === dest) return true;
     if (dest === "potions" && d.map === "main" && d.x != null && Math.abs(d.x - 56) < 8 && Math.abs((d.y || 0) + 122) < 8) return true;
+    if (dest === "upgrade" && d.map === "main" && d.x != null && Math.abs(d.x + 207) < 12 && Math.abs((d.y || 0) + 220) < 12) return true;
     if (dest === "bank" && (d.map === "bank" || (d.to && d.to.map === "bank"))) return true;
     return false;
   });
@@ -776,19 +805,67 @@ test("follow_formation interrupts solo smart_move toward leader", async () => {
   assert.ok(env.log.moved.some((d) => d && d.x != null && d.x > 200));
 });
 
-test("stale same-map party without leader vision falls back to go_farm", async () => {
+test("stale same-map party without leader vision chases, does not solo go_farm", async () => {
   const env = loadScript("priest.js", stocked({
     name: "Zarook", ctype: "priest", level: 40, max_hp: 3000, real_x: 216, real_y: 944, map: "main",
     _server: ["US", "III"]
   }));
+  // Party lists leader nearby (within FORM_SMART) but not in vision → leader_ok false after blind timeout
   env.parent.party = {
-    Jazwyn: { name: "Jazwyn", map: "main", x: 216, y: 944 },
+    Jazwyn: { name: "Jazwyn", map: "main", x: 250, y: 944 },
     Zarook: { name: "Zarook", map: "main", x: 216, y: 944 }
   };
   env.lead_blind_since = Date.now() - 25000;
   assert.strictEqual(env.leader_ok(), false);
   await env.logistics();
-  assert.ok(wentTo(env, "bat") || wentTo(env, { map: "cave" }), "priest should go_farm bat/cave when leader coords are stale");
+  assert.strictEqual(env.lastMessage, "Chase");
+  assert.ok(env.log.moved.some((d) => d && Math.abs((d.x || 0) - 250) < 1), "priest chases party leader coords");
+  assert.ok(!wentTo(env, "bat"), "must not independently go_farm while party_with_lead");
+});
+
+test("leader announces transfer and waits for party after map change", async () => {
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", level: 40, max_hp: 2000, real_x: 0, real_y: 0, map: "main",
+    _server: ["US", "III"]
+  }));
+  env.need_party = 0;
+  env.parent.party = {
+    Jazwyn: { name: "Jazwyn", map: "main", x: 0, y: 0 },
+    Sarene: { name: "Sarene", map: "main", x: 0, y: 0 },
+    Zarook: { name: "Zarook", map: "main", x: 0, y: 0 }
+  };
+  env.parent.entities.Sarene = { name: "Sarene", type: "character", rip: false, map: "main", real_x: 5, real_y: 0 };
+  env.parent.entities.Zarook = { name: "Zarook", type: "character", rip: false, map: "main", real_x: -5, real_y: 0 };
+  await env.go_farm("bat");
+  assert.ok(env.log.said.some((m) => /Transfer bat/i.test(m)) || env.log.game.some((m) => /Transfer bat/i.test(m)));
+  assert.ok(wentTo(env, "bat") || wentTo(env, { map: "cave" }));
+});
+
+test("leader do_town announces Port town and waits until party appears", async () => {
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", level: 12, max_hp: 800, real_x: 500, real_y: 500, map: "main",
+    _server: ["US", "III"]
+  }));
+  env.need_party = 0;
+  env.parent.party = {
+    Jazwyn: { name: "Jazwyn", map: "main", x: 500, y: 500 },
+    Sarene: { name: "Sarene", map: "main", x: 0, y: 0 },
+    Zarook: { name: "Zarook", map: "main", x: 0, y: 0 }
+  };
+  let ticks = 0;
+  const origSleep = env.sleep;
+  env.sleep = async (ms) => {
+    ticks++;
+    if (ticks === 3) {
+      env.parent.entities.Sarene = { name: "Sarene", type: "character", rip: false, map: "main", real_x: 10, real_y: 10 };
+      env.parent.entities.Zarook = { name: "Zarook", type: "character", rip: false, map: "main", real_x: 20, real_y: 10 };
+    }
+    return origSleep(ms);
+  };
+  await env.do_town();
+  assert.ok(env.log.said.some((m) => /Port town/i.test(m)) || env.log.game.some((m) => /Port town/i.test(m)));
+  assert.ok(env.log.game.some((m) => /party here/i.test(m)));
+  assert.strictEqual(env.need_party, 0);
 });
 
 test("potion restock banks loot and does not sell it", async () => {
@@ -1006,6 +1083,37 @@ test("hold restock with no gold requests merchant pots instead of spinning", asy
   assert.ok(!(env.log.game || []).some((s) => /buy_pots no gold/i.test("" + s)), "must not re-enter buy_pots loop");
 });
 
+test("restock fails backoff instead of tight-looping", async () => {
+  const items = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) items[i] = { name: "gem0", q: 1 };
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", items, gold: 50000, esize: 0, level: 12, map: "main"
+  }));
+  env.smart_move = async () => ({ failed: 1, reason: "blocked" });
+  await env.restock("potions");
+  assert.ok((env.log.game || []).some((s) => /restock fail/i.test("" + s)));
+  env.log.game = [];
+  await env.restock("potions");
+  assert.ok(!(env.log.game || []).some((s) => /restock fail/i.test("" + s)), "must backoff after fail");
+});
+
+test("hold restocks on current server before hopping HOME", async () => {
+  const items = new Array(42).fill(null);
+  items[0] = { name: "hpot0", q: 5 };
+  items[1] = { name: "mpot0", q: 5 };
+  const env = loadScript("warrior.js", stocked({
+    name: "Jazwyn", ctype: "warrior", items, gold: 50000, esize: 39, level: 12,
+    map: "main", real_x: 56, real_y: -122, _server: ["US", "III"]
+  }));
+  env.emitCm("puppygirl", { hold: 1 });
+  assert.strictEqual(env.hold, true);
+  assert.ok(!(env.log.server || []).some((s) => s[1] === "II"), "must not hop before restock");
+  await env.logistics();
+  assert.ok(wentTo(env, "bank") || wentTo(env, "potions"), "restock on farm server first");
+  assert.ok((env.log.server || []).some((s) => s[0] === "US" && s[1] === "II"), "then hop HOME for hang");
+  assert.strictEqual(env.hold_done, true);
+});
+
 test("merchant hold CM restocks, announces states, and waits until resume", async () => {
   const items = new Array(42).fill(null);
   items[0] = { name: "hpot0", q: 5 };
@@ -1018,8 +1126,6 @@ test("merchant hold CM restocks, announces states, and waits until resume", asyn
   env.emitCm("puppygirl", { hold: 1 });
   assert.strictEqual(env.hold, true);
   assert.ok((env.log.game || []).some((s) => s === "Hold: restocking"));
-  assert.deepStrictEqual(env.log.server[0], ["US", "II"]);
-  assert.strictEqual(env.parent.server_identifier, "II");
   assert.strictEqual(env.localStorage.getItem("hold_Jazwyn"), "1");
   env.parent.entities.puppygirl = {
     name: "puppygirl", type: "character", rip: false, real_x: 120, real_y: -80, map: "main"
@@ -1031,6 +1137,7 @@ test("merchant hold CM restocks, announces states, and waits until resume", asyn
   assert.ok((env.log.game || []).some((s) => s === "Hold: buying pots"));
   assert.ok((env.log.game || []).some((s) => s === "Hold: ready"));
   assert.strictEqual(env.hold_done, true);
+  assert.ok((env.log.server || []).some((s) => s[0] === "US" && s[1] === "II"), "HOME hop after restock");
   env.log.moved = [];
   env.log.said = [];
   await env.logistics();

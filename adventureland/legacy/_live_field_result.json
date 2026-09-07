@@ -1,0 +1,15 @@
+{
+  "stats": {
+    "req": 0,
+    "doneOk": 3,
+    "doneFail": 0,
+    "meet": 0,
+    "goto": 1,
+    "toss": 1,
+    "cancel": 0,
+    "maps": {
+      "cave": 35
+    }
+  },
+  "at": "2026-09-05T03:43:38.816Z"
+}

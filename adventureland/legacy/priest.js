@@ -31,4 +31,6 @@ function combat() {
   if (character.mp / character.max_mp >= 0.7 && ready("curse")) use_skill("curse", t);
   if (can_attack(t)) attack(t);
 }
+
+
 boot_fighter({ combat: combat, pre_combat: pre_combat, ding_line: "Ding! Bless.", form: { dx: 45, dy: 55, face: 1 } });

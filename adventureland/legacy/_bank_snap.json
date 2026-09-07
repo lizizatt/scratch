@@ -1,0 +1,170 @@
+{
+  "success": true,
+  "source": "last_account_snapshot",
+  "observed_at": null,
+  "stale": false,
+  "mounted_character_id": null,
+  "gold": 1000,
+  "packs": {
+    "items0": [
+      {
+        "name": "ringsj",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "strearring",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "shoes",
+        "level": 4
+      },
+      {
+        "name": "hpbelt",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "shoes",
+        "level": 3
+      },
+      {
+        "name": "wshoes",
+        "level": 3
+      },
+      {
+        "name": "rednose",
+        "level": 0
+      },
+      {
+        "name": "wcap",
+        "level": 3
+      },
+      {
+        "name": "stramulet",
+        "level": 0
+      },
+      {
+        "name": "dexamulet",
+        "level": 0
+      },
+      {
+        "name": "wshoes",
+        "level": 3
+      },
+      {
+        "name": "helmet",
+        "level": 4
+      },
+      null,
+      {
+        "name": "dexearring",
+        "level": 0
+      },
+      {
+        "name": "staff",
+        "level": 3
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      null,
+      null,
+      null,
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "items1": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  }
+}

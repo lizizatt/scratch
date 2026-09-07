@@ -1,0 +1,19 @@
+{
+  "stats": {
+    "dump": 1,
+    "req": 2,
+    "doneOk": 5,
+    "restock": 1,
+    "restockHp": 40,
+    "restockMp": 40
+  },
+  "before": {
+    "hp": 2,
+    "mp": 32
+  },
+  "after": {
+    "hp": 0,
+    "mp": 0
+  },
+  "at": "2026-09-05T05:23:12.680Z"
+}

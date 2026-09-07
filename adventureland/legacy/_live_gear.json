@@ -1,0 +1,15 @@
+{
+  "start": false,
+  "offer": true,
+  "got": true,
+  "done": false,
+  "fail": false,
+  "here": true,
+  "hop": false,
+  "planN": -1,
+  "planDetail": "",
+  "far": false,
+  "tried": true,
+  "wait": true,
+  "at": "2026-09-05T23:25:35.702Z"
+}

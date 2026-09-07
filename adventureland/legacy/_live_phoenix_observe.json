@@ -1,0 +1,705 @@
+{
+  "started": "2026-09-07T09:17:32.273Z",
+  "hunt": {
+    "dispatched": false,
+    "huntingMsgs": 89,
+    "seen": 0,
+    "gone": 0,
+    "killLikely": false
+  },
+  "cohesion": {
+    "announces": [
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town",
+      "Jazwyn:Transfer phoenix",
+      "Jazwyn:psay out Transfer phoenix",
+      "Jazwyn:Port town",
+      "Jazwyn:psay out Port town"
+    ],
+    "waitParty": 0,
+    "partyHere": 0,
+    "waitTimeout": 0,
+    "splitPolls": 0,
+    "togetherPolls": 52,
+    "maxSameMapSpread": 96,
+    "samples": [
+      {
+        "t": "2026-09-07T09:19:07.068Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:19:21.069Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:19:35.020Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:19:49.021Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:20:03.009Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:20:17.024Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:20:31.027Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:20:44.992Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:20:58.986Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:21:13.009Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:21:26.990Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:21:41.015Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:21:55.043Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:22:09.100Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:22:23.117Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:22:37.105Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:22:51.145Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:23:05.247Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:23:19.201Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:23:33.215Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:23:47.192Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:24:01.120Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:24:15.206Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:24:29.180Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:24:43.206Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:24:57.184Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:25:11.200Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:25:25.197Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:25:39.334Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:25:53.376Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:26:07.356Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:26:21.343Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:26:35.421Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:26:49.396Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:27:03.390Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:27:17.326Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:27:31.321Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:27:45.350Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:27:59.352Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:28:13.317Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:28:27.536Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:28:41.547Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:28:55.607Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:29:09.535Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:29:23.456Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:29:37.445Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:29:51.409Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:30:05.390Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:30:19.499Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:30:33.490Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:30:47.447Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      },
+      {
+        "t": "2026-09-07T09:31:01.468Z",
+        "maps": [
+          "desertland"
+        ],
+        "together": true,
+        "msgs": [
+          "Sarene:",
+          "Zarook:",
+          "Jazwyn:"
+        ]
+      }
+    ],
+    "togetherRatio": 1
+  },
+  "errs": [],
+  "cohesionPass": true,
+  "huntPass": true,
+  "killPass": false,
+  "pass": false,
+  "finished": "2026-09-07T09:31:13.469Z"
+}

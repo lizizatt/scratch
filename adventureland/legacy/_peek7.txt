@@ -1,0 +1,10 @@
+﻿slot 7 len 23507 lines 73
+head:
+var ATTACK_MODE=true,POTION_TARGET=500,POTION_MIN=40,MAX_ATTACK_RATIO=0.24;
+var LEADER="Jazwyn",TANK="Jazwyn",MERCHANT="Puppygirl",PARTY=["Jazwyn","Sarene","Zarook"];
+var LADDER=[[1,"goo"],[4,"bee"],[8,"crab"],[12,"snake"],[16,"armadillo"],[20,"arcticbee"],[24,"porcupine"],[28,"croc"],[30,"tortoise"],[32,"bat"],[42,"spider"],[50,"scorpion"],[54,"boar"],[60,"bigbird"],[66,"gscorpion"],[72,"wolf"],[78,"dryad"]];
+var HOME=["US","II"],FARM=["US","III"],FORM_NEAR=18,FORM_FAR=40,FORM_SMART=220,FORM_RE
+has typeof mssince false
+has HOME III false
+use_pots line 42 function use_pots(){if(safeties&&ms(last_potion)<min(200,character.ping*3)||is_on_cooldown("use_hp"))return;var skill=ch
+next function ding(){if(character.level<=last_lv)return;last_lv=character.level;psay(hooks&&hooks.ding_line||"Ding!")}
