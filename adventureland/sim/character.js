@@ -323,15 +323,16 @@ function createCharacter(world, over) {
           ms,
         });
 
-        // Long legs: advance clock per slice so viz can scrub the route.
-        // Short legs: owe time (tickAll drains) to keep a single clock owner for micro-moves.
-        const slices = Math.max(1, Math.ceil(ms / PATH_SAMPLE_MS));
-        const sliceMs = Math.floor(ms / slices);
+        // Detours (multi-waypoint): slice + clock.advance so Sim Viz can scrub the route.
+        // Direct legs: owe time for single clock owner (tickAll drains).
+        const scrub = waypoints.length > 1;
+        const slices = scrub ? Math.max(1, Math.ceil(ms / PATH_SAMPLE_MS)) : 1;
         if (slices === 1) {
           advanceTime(ms);
           if (!smart.moving) return { failed: true, reason: "interrupted" };
           place(legTo.map, legTo.x, legTo.y);
         } else {
+          const sliceMs = Math.floor(ms / slices);
           for (let i = 1; i <= slices; i++) {
             if (!smart.moving) return { failed: true, reason: "interrupted" };
             const t = i / slices;
