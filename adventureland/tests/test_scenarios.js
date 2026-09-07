@@ -230,54 +230,63 @@ test("scenario: boot Zarook-only subset farms without crash", async () => {
   assert.strictEqual(ctrl.isLead(), true);
 });
 
-test("scenario: Puppygirl delivers around spider-island obstacles", async () => {
+test("scenario: Puppygirl delivers via cave past ridge + island", async () => {
   const { isBlocked } = require("../sim/world");
-  const { segmentHitsAny } = require("../sim/path");
-  // Party south of spider island; merchant starts at potions — direct chord crosses blocked water
-  const p = bootParty({
-    pack: "armadillo",
-    pots: 0,
-    gold: 50000,
-    // place fighters past the island
-  });
+  const { findPathSameMap } = require("../sim/path");
+  // Party SE of the ridge (overland sealed). Merchant must tunnel the cave.
+  const p = bootParty({ pack: "armadillo", pots: 0, gold: 50000 });
   for (const n of ["Jazwyn", "Sarene", "Zarook"]) {
     p.bots[n].api.character.map = "main";
-    p.bots[n].api.character.real_x = 500;
-    p.bots[n].api.character.x = 500;
-    p.bots[n].api.character.real_y = 200;
-    p.bots[n].api.character.y = 200;
+    p.bots[n].api.character.real_x = 750;
+    p.bots[n].api.character.x = 750;
+    p.bots[n].api.character.real_y = 1750;
+    p.bots[n].api.character.y = 1750;
+    // Freeze fighters so they don't walk back to the armadillo pack mid-route
+    p.bots[n].ctrl.tick = async () => {};
   }
   p.bots.Puppygirl.api.character.real_x = 56;
   p.bots.Puppygirl.api.character.x = 56;
   p.bots.Puppygirl.api.character.real_y = -122;
   p.bots.Puppygirl.api.character.y = -122;
 
-  const blocked = p.world.G.maps.main.blocked;
-  assert.ok(segmentHitsAny(56, -122, 500, 200, blocked));
+  assert.strictEqual(
+    findPathSameMap(
+      { map: "main", x: 56, y: -122 },
+      { map: "main", x: 750, y: 1750 },
+      "main",
+      p.world.G
+    ),
+    null
+  );
 
   await p.bots.Jazwyn.ctrl.requestPots();
   let done = false;
-  const trail = [];
-  for (let i = 0; i < 400; i++) {
+  for (let i = 0; i < 600; i++) {
     await p.tickAll();
     const ch = p.bots.Puppygirl.api.character;
-    trail.push({ x: ch.real_x, y: ch.real_y });
-    assert.ok(!isBlocked("main", ch.real_x, ch.real_y, p.world.G), "merchant entered blocked @" + ch.real_x + "," + ch.real_y);
-    if (p.bots.Jazwyn.api.log.game.some((g) => /dlv:done/.test(g.m))) {
-      done = true;
-      break;
+    if (ch.map === "main" || ch.map === "cave") {
+      assert.ok(
+        !isBlocked(ch.map, ch.real_x, ch.real_y, p.world.G),
+        "in blocked " + ch.map + " " + ch.real_x + "," + ch.real_y
+      );
     }
-    if (p.bots.Puppygirl.api.log.game.some((g) => /dlv:done/.test(g.m))) {
+    if (
+      p.bots.Jazwyn.api.log.game.some((g) => /dlv:done/.test(g.m)) ||
+      p.bots.Puppygirl.api.log.game.some((g) => /dlv:done/.test(g.m))
+    ) {
       done = true;
       break;
     }
   }
   assert.ok(done, "expected delivery");
-  assert.ok(p.bots.Puppygirl.api.log.path.length >= 2, "legs=" + p.bots.Puppygirl.api.log.path.length);
-  // Trail should go west or east of island, not through its interior samples
-  const crossedLeft = trail.some((pt) => pt.x < 304 && pt.y > -300 && pt.y < 120);
-  const crossedRight = trail.some((pt) => pt.x > 688 && pt.y > -300 && pt.y < 120);
-  assert.ok(crossedLeft || crossedRight || p.bots.Puppygirl.api.log.path.length >= 2, "expected detour evidence");
+  assert.ok(
+    p.bots.Puppygirl.api.log.path.some((leg) => leg.from.map === "cave" || leg.to.map === "cave"),
+    "path log must include cave legs: " +
+      JSON.stringify(p.bots.Puppygirl.api.log.path.map((l) => l.from.map + ">" + l.to.map))
+  );
+  assert.strictEqual(p.bots.Puppygirl.api.character.map, "main");
+  assert.ok(Math.abs(p.bots.Puppygirl.api.character.real_x - 750) < 80);
+  assert.ok(Math.abs(p.bots.Puppygirl.api.character.real_y - 1750) < 80);
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
 });
 

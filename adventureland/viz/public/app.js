@@ -273,37 +273,76 @@
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
 
-    // World bounds covering potions → past spider island → armadillo
-    const x0 = -100,
-      x1 = 900,
-      y0 = -450,
-      y1 = 2200;
+    const pup = frame.chars && frame.chars.Puppygirl;
+    const onCave = pup && pup.map === "cave";
+
+    // Bounds: main overview vs cave inset
+    const x0 = onCave ? -200 : -150;
+    const x1 = onCave ? 1300 : 1000;
+    const y0 = onCave ? -500 : -450;
+    const y1 = onCave ? 150 : 2100;
     const sx = (x) => ((x - x0) / (x1 - x0)) * w;
     const sy = (y) => ((y - y0) / (y1 - y0)) * h;
 
-    // Spider-island exclusion (LESSONS)
-    const blocked = [{ x0: 304, y0: -300, x1: 688, y1: 120 }];
+    const blocked = onCave
+      ? [
+          { x0: 80, y0: -60, x1: 950, y1: 80 },
+          { x0: -100, y0: -420, x1: 550, y1: -120 },
+        ]
+      : [
+          { x0: 304, y0: -300, x1: 688, y1: 120, label: "island" },
+          { x0: -4000, y0: 280, x1: 4000, y1: 1580, label: "ridge" },
+          { x0: -10, y0: -280, x1: 80, y1: -160, label: "rock" },
+        ];
+
     for (const r of blocked) {
-      ctx.fillStyle = "rgba(70, 90, 120, 0.45)";
-      ctx.strokeStyle = "rgba(140, 170, 210, 0.7)";
+      ctx.fillStyle = onCave ? "rgba(50, 40, 35, 0.65)" : "rgba(70, 90, 120, 0.4)";
+      ctx.strokeStyle = onCave ? "rgba(180, 140, 100, 0.6)" : "rgba(140, 170, 210, 0.65)";
       ctx.lineWidth = 1.5;
       ctx.fillRect(sx(r.x0), sy(r.y0), sx(r.x1) - sx(r.x0), sy(r.y1) - sy(r.y0));
       ctx.strokeRect(sx(r.x0), sy(r.y0), sx(r.x1) - sx(r.x0), sy(r.y1) - sy(r.y0));
+      if (r.label) {
+        ctx.fillStyle = "rgba(180, 200, 220, 0.8)";
+        ctx.font = "11px IBM Plex Mono";
+        ctx.fillText(r.label, sx(r.x0) + 6, sy(r.y0) + 14);
+      }
     }
-    ctx.fillStyle = "rgba(140, 170, 210, 0.85)";
-    ctx.font = "11px IBM Plex Mono";
-    ctx.fillText("blocked water", sx(320), sy(-280));
 
-    // Route trail from earlier frames (Puppygirl)
+    if (!onCave) {
+      // Cave mouth + SE exit markers
+      ctx.fillStyle = "rgba(212, 162, 76, 0.9)";
+      ctx.font = "11px IBM Plex Mono";
+      ctx.fillText("cave↓", sx(-40), sy(-300) - 6);
+      ctx.beginPath();
+      ctx.arc(sx(-40), sy(-300), 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillText("cave↑", sx(750), sy(1800) - 6);
+      ctx.beginPath();
+      ctx.arc(sx(750), sy(1800), 5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = "rgba(212, 162, 76, 0.9)";
+      ctx.font = "11px IBM Plex Mono";
+      ctx.fillText("exit→main", sx(1100), sy(50) - 8);
+      ctx.beginPath();
+      ctx.arc(sx(1100), sy(50), 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Route trail for Puppygirl on current map
     const tr = state.activeTrace;
     if (tr && tr.frames) {
-      ctx.strokeStyle = "rgba(201, 122, 154, 0.55)";
+      ctx.strokeStyle = "rgba(201, 122, 154, 0.6)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       let started = false;
+      const mapName = onCave ? "cave" : "main";
       for (let i = 0; i <= state.frameIdx; i++) {
         const ch = tr.frames[i].chars && tr.frames[i].chars.Puppygirl;
-        if (!ch || ch.map !== "main") continue;
+        if (!ch || ch.map !== mapName) {
+          started = false;
+          continue;
+        }
         const px = sx(ch.x),
           py = sy(ch.y);
         if (!started) {
@@ -311,35 +350,29 @@
           started = true;
         } else ctx.lineTo(px, py);
       }
-      if (started) ctx.stroke();
+      ctx.stroke();
     }
 
-    ctx.fillStyle = "rgba(139,145,124,0.5)";
-    ctx.fillText("main", 12, 20);
+    ctx.fillStyle = "rgba(232, 226, 212, 0.85)";
+    ctx.font = "13px IBM Plex Mono";
+    ctx.fillText(onCave ? "map: cave" : "map: main", 12, 22);
 
     for (const m of frame.monsters || []) {
-      if (m.map !== "main") continue;
+      if (m.map !== (onCave ? "cave" : "main")) continue;
       ctx.fillStyle = "rgba(196,92,74,0.85)";
       ctx.beginPath();
       ctx.arc(sx(m.x), sy(m.y), 7, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "rgba(232,226,212,0.7)";
-      ctx.fillText(m.mtype || "mob", sx(m.x) + 10, sy(m.y) + 4);
     }
 
     for (const name of Object.keys(frame.chars || {})) {
       const c = frame.chars[name];
-      if (c.map !== "main") continue;
+      if (c.map !== (onCave ? "cave" : "main")) continue;
       const col = COLORS[name] || "#e8e2d4";
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.arc(sx(c.x), sy(c.y), name === "Puppygirl" ? 6 : 8, 0, Math.PI * 2);
+      ctx.arc(sx(c.x), sy(c.y), name === "Puppygirl" ? 7 : 8, 0, Math.PI * 2);
       ctx.fill();
-      if (!c.connected) {
-        ctx.strokeStyle = "#c45c4a";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
       ctx.fillStyle = col;
       ctx.fillText(name[0], sx(c.x) + 10, sy(c.y) - 6);
     }

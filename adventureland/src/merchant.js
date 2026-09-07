@@ -125,7 +125,7 @@ function bootMerchant(api, opts) {
       saveQ(store);
     }
 
-    // Locate fighter
+    // Locate fighter: live vision > explicit request coords > farm pack guess
     let t = api.get_player(job.who);
     let map = job.map,
       x = job.x,
@@ -134,7 +134,7 @@ function bootMerchant(api, opts) {
       map = t.map;
       x = t.real_x;
       y = t.real_y;
-    } else if (job.farm) {
+    } else if ((map == null || x == null || y == null) && job.farm) {
       const c = packCenter(job.farm);
       if (c) {
         map = c.map;

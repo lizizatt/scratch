@@ -288,15 +288,12 @@ function createCharacter(world, over) {
         y = sp ? sp[1] : 0;
       }
 
-      if (map === c.map && isBlocked(map, x, y, world.G)) {
+      if (isBlocked(map, x, y, world.G)) {
         return { failed: true, reason: "blocked" };
       }
 
       const from = { map: c.map, x: c.real_x, y: c.real_y };
-      const waypoints =
-        map === c.map
-          ? findPath(from, { map, x, y }, map, world.G)
-          : [{ map, x, y }];
+      const waypoints = findPath(from, { map, x, y }, map, world.G);
       if (!waypoints || !waypoints.length) {
         return { failed: true, reason: "no_path" };
       }
@@ -321,11 +318,12 @@ function createCharacter(world, over) {
           to: legTo,
           dist: dist(legFrom, legTo) + (legTo.map !== legFrom.map ? 2500 : 0),
           ms,
+          door: !!wp.door,
         });
 
-        // Detours (multi-waypoint): slice + clock.advance so Sim Viz can scrub the route.
-        // Direct legs: owe time for single clock owner (tickAll drains).
-        const scrub = waypoints.length > 1;
+        // Multi-waypoint / cross-map: slice + clock.advance so Sim Viz can scrub.
+        // Single direct leg: owe time for single clock owner (tickAll drains).
+        const scrub = waypoints.length > 1 || legTo.map !== legFrom.map;
         const slices = scrub ? Math.max(1, Math.ceil(ms / PATH_SAMPLE_MS)) : 1;
         if (slices === 1) {
           advanceTime(ms);
@@ -335,12 +333,19 @@ function createCharacter(world, over) {
           const sliceMs = Math.floor(ms / slices);
           for (let i = 1; i <= slices; i++) {
             if (!smart.moving) return { failed: true, reason: "interrupted" };
-            const t = i / slices;
-            const ix = legFrom.x + (legTo.x - legFrom.x) * t;
-            const iy = legFrom.y + (legTo.y - legFrom.y) * t;
-            world.clock.advance(sliceMs);
-            if (i === slices) place(legTo.map, legTo.x, legTo.y);
-            else place(legFrom.map, ix, iy);
+            const cross = legTo.map !== legFrom.map;
+            if (cross) {
+              // Door transit: stay on from-map until the last slice, then land
+              world.clock.advance(sliceMs);
+              if (i === slices) place(legTo.map, legTo.x, legTo.y);
+            } else {
+              const t = i / slices;
+              const ix = legFrom.x + (legTo.x - legFrom.x) * t;
+              const iy = legFrom.y + (legTo.y - legFrom.y) * t;
+              world.clock.advance(sliceMs);
+              if (i === slices) place(legTo.map, legTo.x, legTo.y);
+              else place(legFrom.map, ix, iy);
+            }
           }
         }
       }

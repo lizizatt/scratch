@@ -206,8 +206,14 @@ test("hop: heap wipe clears handlers; storage restores hold; party re-invite", a
 
 test("clock: smart_move owes time; tickAll is sole advancer", async () => {
   const p = bootParty({ pots: 200 });
+  // Stay south of the ridge (same-map direct leg) so travel is owed, not scrub-sliced
+  const j = p.bots.Jazwyn.api;
   const t0 = p.world.clock.now();
-  await p.bots.Jazwyn.api.smart_move({ map: "main", x: 0, y: 0 });
+  await j.smart_move({
+    map: "main",
+    x: j.character.real_x + 40,
+    y: j.character.real_y + 40,
+  });
   assert.strictEqual(p.world.clock.now(), t0, "smart_move must not advance clock directly");
   assert.ok(p.world.getOwedMs() > 0, "owed=" + p.world.getOwedMs());
   await p.tickAll();

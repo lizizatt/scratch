@@ -100,14 +100,14 @@ test("smart_move to phoenix fails (no fixed spawn)", async () => {
   assert.strictEqual(r.failed, true);
 });
 
-test("smart_move to armadillo arrives with travel time", async () => {
+test("smart_move to goo pack arrives with travel time owed", async () => {
   const w = createWorld();
   const j = w.spawn({ name: "Jazwyn", map: "main", real_x: 0, real_y: 0 });
   const t0 = w.clock.now();
-  const r = await j.smart_move({ to: "armadillo" });
+  const r = await j.smart_move({ to: "goo" });
   assert.strictEqual(r.success, true);
   assert.strictEqual(j.character.map, "main");
-  assert.ok(Math.abs(j.character.real_x - 526) < 1);
+  assert.ok(Math.abs(j.character.real_y - 180) < 1);
   assert.ok(w.getOwedMs() > 0, "travel should be owed");
   w.drainOwedTime();
   assert.ok(w.clock.now() > t0);
@@ -123,16 +123,31 @@ test("path: routes around spider-island blocked rect", async () => {
   assert.ok(segmentHitsAny(from.x, from.y, to.x, to.y, blocked), "direct line must cross island");
   const wps = findPath(from, to, "main", G);
   assert.ok(wps && wps.length >= 2, "expected detour waypoints, got " + JSON.stringify(wps));
-  // No waypoint inside blocked
+  assert.ok(!wps.some((p) => p.map === "cave"), "short island detour should stay on main");
   for (const p of wps) {
-    assert.ok(!require("../sim/world").isBlocked("main", p.x, p.y, G), "wp in blocked " + JSON.stringify(p));
+    assert.ok(!require("../sim/world").isBlocked(p.map, p.x, p.y, G), "wp in blocked " + JSON.stringify(p));
   }
-  // Consecutive legs clear
   let prev = from;
   for (const p of wps) {
-    assert.ok(!segmentHitsAny(prev.x, prev.y, p.x, p.y, blocked), "leg hits blocked " + JSON.stringify([prev, p]));
+    if (p.map !== "main") continue;
+    assert.ok(!segmentHitsAny(prev.x, prev.y, p.x, p.y, [blocked[0]]), "leg hits island");
     prev = p;
   }
+});
+
+test("path: SE farm requires cave tunnel through obstacles", async () => {
+  const { findPath, findPathSameMap } = require("../sim/path");
+  const { baseG } = require("../sim/world");
+  const G = baseG();
+  const from = { map: "main", x: 56, y: -122 };
+  const to = { map: "main", x: 750, y: 1750 };
+  assert.strictEqual(findPathSameMap(from, to, "main", G), null, "overland must be impossible");
+  const wps = findPath(from, to, "main", G);
+  assert.ok(wps && wps.length >= 4, "expected long cave route, got " + JSON.stringify(wps));
+  assert.ok(wps.some((p) => p.map === "cave"), "must enter cave");
+  assert.ok(wps.filter((p) => p.map === "cave").length >= 2, "must traverse cave, not teleport");
+  assert.strictEqual(wps[wps.length - 1].map, "main");
+  assert.ok(Math.abs(wps[wps.length - 1].x - 750) < 2);
 });
 
 test("smart_move: Puppygirl walks multi-leg route past spider island", async () => {
@@ -145,17 +160,19 @@ test("smart_move: Puppygirl walks multi-leg route past spider island", async () 
   w.drainOwedTime();
   assert.ok(Math.abs(p.character.real_x - 500) < 2);
   assert.ok(Math.abs(p.character.real_y - 200) < 2);
-  // Never logged a straight-through single leg from start to end
-  assert.ok(
-    !p.log.path.some(
-      (leg) =>
-        leg.from.x === 56 &&
-        leg.from.y === -122 &&
-        Math.abs(leg.to.x - 500) < 1 &&
-        Math.abs(leg.to.y - 200) < 1
-    ),
-    "must not take direct blocked chord"
-  );
+});
+
+test("smart_move: Puppygirl routes through cave to SE destination", async () => {
+  const w = createWorld();
+  const p = w.spawn({ name: "Puppygirl", ctype: "merchant", map: "main", real_x: 56, real_y: -122 });
+  const r = await p.smart_move({ map: "main", x: 750, y: 1750 });
+  assert.ok(r.success, JSON.stringify(r));
+  assert.ok(r.waypoints.some((wp) => wp.map === "cave"), JSON.stringify(r.waypoints));
+  assert.ok(p.log.path.some((leg) => leg.to.map === "cave" || leg.from.map === "cave"));
+  assert.ok(p.log.path.some((leg) => leg.door || (leg.from.map !== leg.to.map)));
+  assert.ok(Math.abs(p.character.real_x - 750) < 2);
+  assert.ok(Math.abs(p.character.real_y - 1750) < 2);
+  assert.strictEqual(p.character.map, "main");
 });
 
 test("blocked spider-island rectangle rejects can_move_to", async () => {

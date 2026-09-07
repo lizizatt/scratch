@@ -58,20 +58,48 @@ function baseG() {
           { type: "tortoise", boundary: [-1160, 1080, -1080, 1160] },
           { type: "spider", boundary: [700, -282, 1196, -6] },
         ],
-        spawns: [[0, 0], [56, -122], [40, -20]],
+        // 0 town, 1 potions-ish, 2 bank exit, 3 cave mouth, 4 cave east exit
+        spawns: [
+          [0, 0],
+          [56, -122],
+          [40, -20],
+          [-40, -300],
+          [750, 1800],
+        ],
         doors: [
           { to: "cave", x: -40, y: -300, spawn: 0 },
           { to: "bank", x: 0, y: -50, spawn: 0 },
         ],
-        // Water/spider-island exclusion (LESSONS §1.2)
-        blocked: [{ x0: 304, y0: -300, x1: 688, y1: 120 }],
+        blocked: [
+          // Water / spider-island (LESSONS §1.2)
+          { x0: 304, y0: -300, x1: 688, y1: 120 },
+          // Full-width ridge: no overland walk from town belt to SE farms — cave only
+          { x0: -4000, y0: 280, x1: 4000, y1: 1580 },
+          // Extra rock west of potions → cave mouth (forces a short west dogleg)
+          { x0: -10, y0: -280, x1: 80, y1: -160 },
+        ],
       },
       cave: {
         monsters: [
           { type: "bat", boundary: [-240, -500, -140, -420] },
           { type: "bat", boundary: [1060, 20, 1160, 100] },
         ],
-        spawns: [[0, 0], [-194, -461]],
+        spawns: [
+          [0, 0],
+          [-194, -461],
+          [1100, 50],
+        ],
+        doors: [
+          // Back out near cave mouth on main
+          { to: "main", x: 0, y: 0, spawn: 3 },
+          // East tunnel → SE main (past the ridge)
+          { to: "main", x: 1100, y: 50, spawn: 4 },
+        ],
+        blocked: [
+          // Force a southern then eastern crawl through the cave
+          { x0: 80, y0: -60, x1: 950, y1: 80 },
+          { x0: -100, y0: -420, x1: 550, y1: -120 },
+        ],
       },
       winterland: {
         monsters: [
