@@ -323,14 +323,16 @@ function createCharacter(world, over) {
           ms,
         });
 
-        // Walk in time slices so viz/trace can scrub along the route
+        // Walk in time slices with real clock advances so viz can scrub the route.
+        // (oweTime would collapse the whole leg into one post-tick jump.)
         const slices = Math.max(1, Math.ceil(ms / PATH_SAMPLE_MS));
+        const sliceMs = Math.floor(ms / slices);
         for (let i = 1; i <= slices; i++) {
           if (!smart.moving) return { failed: true, reason: "interrupted" };
           const t = i / slices;
           const ix = legFrom.x + (legTo.x - legFrom.x) * t;
           const iy = legFrom.y + (legTo.y - legFrom.y) * t;
-          advanceTime(Math.floor(ms / slices));
+          world.clock.advance(sliceMs);
           if (i === slices) place(legTo.map, legTo.x, legTo.y);
           else place(legFrom.map, ix, iy);
         }
