@@ -153,8 +153,34 @@ async function main() {
   );
 
   recorded.push(
+    await record("puppy-route", "Puppygirl around spider-island to party", ["delivery", "motion"], async (o) => {
+      const p = bootParty(Object.assign({ pack: "armadillo", pots: 0, gold: 50000 }, o));
+      for (const n of ["Jazwyn", "Sarene", "Zarook"]) {
+        p.bots[n].api.character.map = "main";
+        p.bots[n].api.character.real_x = 500;
+        p.bots[n].api.character.x = 500;
+        p.bots[n].api.character.real_y = 200;
+        p.bots[n].api.character.y = 200;
+      }
+      p.bots.Puppygirl.api.character.real_x = 56;
+      p.bots.Puppygirl.api.character.x = 56;
+      p.bots.Puppygirl.api.character.real_y = -122;
+      p.bots.Puppygirl.api.character.y = -122;
+      await p.bots.Jazwyn.ctrl.requestPots();
+      for (let i = 0; i < 400; i++) {
+        await p.tickAll();
+        if (
+          p.bots.Jazwyn.api.log.game.some((g) => /dlv:done/.test(g.m)) ||
+          p.bots.Puppygirl.api.log.game.some((g) => /dlv:done/.test(g.m))
+        )
+          break;
+      }
+      return p;
+    })
+  );
+
+  recorded.push(
     await record("farm-5min", "scenario: compressed 5 min farm", ["farm", "chat"], async (o) => {
-      // Shorter than full 30m for viz size; same path as 30m scenario
       const p = bootParty(Object.assign({ pack: "armadillo", pots: 200, burnPots: true }, o));
       await p.runFor(5 * 60 * 1000);
       return p;
@@ -172,6 +198,8 @@ async function main() {
     "scenario: hold triggers hop-prep; fighter ends on HOME": "hold-home",
     "hop: heap wipe clears handlers; storage restores hold; party re-invite": "hold-home",
     "scenario: compressed 30 min farm armadillo, 0 throttle 0 fighter hop": "farm-5min",
+    "scenario: Puppygirl delivers around spider-island obstacles": "puppy-route",
+    "smart_move: Puppygirl walks multi-leg route past spider island": "puppy-route",
   };
 
   for (const t of catalog) {

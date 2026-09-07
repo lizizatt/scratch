@@ -1,6 +1,7 @@
 "use strict";
 
 const { dist, isBlocked, VISION_PX, SEND_ITEM_RANGE, packCenter, NPC, FARM_XY } = require("./world");
+const { findPath } = require("./path");
 const { createStorage } = require("./storage");
 
 const WALK_PX_PER_S = 30; // ~AL walk speed ballpark; explorer will calibrate
@@ -8,6 +9,7 @@ const CROSS_MAP_BASE_MS = 8000;
 const TOWN_MS = 2000;
 const RECONNECT_MS = 55000; // change_server reconnect (LESSONS)
 const SERVER_REGION_DELAY_MS = 3000; // unset after reload
+const PATH_SAMPLE_MS = 2000; // intermediate place() while walking long legs (viz scrub)
 
 function makeCharState(over) {
   return Object.assign(
@@ -291,25 +293,53 @@ function createCharacter(world, over) {
       }
 
       const from = { map: c.map, x: c.real_x, y: c.real_y };
-      const ms = travelMs(from, { map, x, y });
+      const waypoints =
+        map === c.map
+          ? findPath(from, { map, x, y }, map, world.G)
+          : [{ map, x, y }];
+      if (!waypoints || !waypoints.length) {
+        return { failed: true, reason: "no_path" };
+      }
+
       smart.moving = true;
       smart.map = map;
       smart.x = x;
       smart.y = y;
       log.moved.push(dest);
-      log.path.push({ from, to: { map, x, y }, dist: dist(from, { x, y }) + (map !== from.map ? 2500 : 0), ms });
 
       if (smart.failInject === "stall") {
         smart.failInject = null;
-        // Stay moving; caller must stop("smart") or advance past a watchdog.
         return { failed: true, reason: "stalled" };
       }
 
-      advanceTime(ms);
+      for (const wp of waypoints) {
+        const legFrom = { map: c.map, x: c.real_x, y: c.real_y };
+        const legTo = { map: wp.map, x: wp.x, y: wp.y };
+        const ms = travelMs(legFrom, legTo);
+        log.path.push({
+          from: legFrom,
+          to: legTo,
+          dist: dist(legFrom, legTo) + (legTo.map !== legFrom.map ? 2500 : 0),
+          ms,
+        });
+
+        // Walk in time slices so viz/trace can scrub along the route
+        const slices = Math.max(1, Math.ceil(ms / PATH_SAMPLE_MS));
+        for (let i = 1; i <= slices; i++) {
+          if (!smart.moving) return { failed: true, reason: "interrupted" };
+          const t = i / slices;
+          const ix = legFrom.x + (legTo.x - legFrom.x) * t;
+          const iy = legFrom.y + (legTo.y - legFrom.y) * t;
+          advanceTime(Math.floor(ms / slices));
+          if (i === slices) place(legTo.map, legTo.x, legTo.y);
+          else place(legFrom.map, ix, iy);
+        }
+      }
+
       if (!smart.moving) return { failed: true, reason: "interrupted" };
       place(map, x, y);
       smart.moving = false;
-      return { success: true };
+      return { success: true, waypoints };
     },
 
     change_server(region, ident) {

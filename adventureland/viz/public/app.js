@@ -273,20 +273,48 @@
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
 
-    // World bounds roughly covering armadillo pack + town
-    const x0 = -200,
+    // World bounds covering potions → past spider island → armadillo
+    const x0 = -100,
       x1 = 900,
-      y0 = -400,
+      y0 = -450,
       y1 = 2200;
     const sx = (x) => ((x - x0) / (x1 - x0)) * w;
     const sy = (y) => ((y - y0) / (y1 - y0)) * h;
 
-    ctx.strokeStyle = "rgba(212,162,76,0.15)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(sx(0), sy(0), sx(800) - sx(0), sy(2000) - sy(0));
+    // Spider-island exclusion (LESSONS)
+    const blocked = [{ x0: 304, y0: -300, x1: 688, y1: 120 }];
+    for (const r of blocked) {
+      ctx.fillStyle = "rgba(70, 90, 120, 0.45)";
+      ctx.strokeStyle = "rgba(140, 170, 210, 0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(sx(r.x0), sy(r.y0), sx(r.x1) - sx(r.x0), sy(r.y1) - sy(r.y0));
+      ctx.strokeRect(sx(r.x0), sy(r.y0), sx(r.x1) - sx(r.x0), sy(r.y1) - sy(r.y0));
+    }
+    ctx.fillStyle = "rgba(140, 170, 210, 0.85)";
+    ctx.font = "11px IBM Plex Mono";
+    ctx.fillText("blocked water", sx(320), sy(-280));
+
+    // Route trail from earlier frames (Puppygirl)
+    const tr = state.activeTrace;
+    if (tr && tr.frames) {
+      ctx.strokeStyle = "rgba(201, 122, 154, 0.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let started = false;
+      for (let i = 0; i <= state.frameIdx; i++) {
+        const ch = tr.frames[i].chars && tr.frames[i].chars.Puppygirl;
+        if (!ch || ch.map !== "main") continue;
+        const px = sx(ch.x),
+          py = sy(ch.y);
+        if (!started) {
+          ctx.moveTo(px, py);
+          started = true;
+        } else ctx.lineTo(px, py);
+      }
+      if (started) ctx.stroke();
+    }
 
     ctx.fillStyle = "rgba(139,145,124,0.5)";
-    ctx.font = "12px IBM Plex Mono";
     ctx.fillText("main", 12, 20);
 
     for (const m of frame.monsters || []) {

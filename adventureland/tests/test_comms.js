@@ -113,6 +113,51 @@ test("smart_move to armadillo arrives with travel time", async () => {
   assert.ok(w.clock.now() > t0);
 });
 
+test("path: routes around spider-island blocked rect", async () => {
+  const { findPath, segmentHitsAny } = require("../sim/path");
+  const { baseG } = require("../sim/world");
+  const G = baseG();
+  const blocked = G.maps.main.blocked;
+  const from = { map: "main", x: 56, y: -122 };
+  const to = { map: "main", x: 500, y: 200 };
+  assert.ok(segmentHitsAny(from.x, from.y, to.x, to.y, blocked), "direct line must cross island");
+  const wps = findPath(from, to, "main", G);
+  assert.ok(wps && wps.length >= 2, "expected detour waypoints, got " + JSON.stringify(wps));
+  // No waypoint inside blocked
+  for (const p of wps) {
+    assert.ok(!require("../sim/world").isBlocked("main", p.x, p.y, G), "wp in blocked " + JSON.stringify(p));
+  }
+  // Consecutive legs clear
+  let prev = from;
+  for (const p of wps) {
+    assert.ok(!segmentHitsAny(prev.x, prev.y, p.x, p.y, blocked), "leg hits blocked " + JSON.stringify([prev, p]));
+    prev = p;
+  }
+});
+
+test("smart_move: Puppygirl walks multi-leg route past spider island", async () => {
+  const w = createWorld();
+  const p = w.spawn({ name: "Puppygirl", ctype: "merchant", map: "main", real_x: 56, real_y: -122 });
+  const r = await p.smart_move({ map: "main", x: 500, y: 200 });
+  assert.ok(r.success, JSON.stringify(r));
+  assert.ok(r.waypoints && r.waypoints.length >= 2, "waypoints=" + JSON.stringify(r.waypoints));
+  assert.ok(p.log.path.length >= 2, "path legs=" + p.log.path.length);
+  w.drainOwedTime();
+  assert.ok(Math.abs(p.character.real_x - 500) < 2);
+  assert.ok(Math.abs(p.character.real_y - 200) < 2);
+  // Never logged a straight-through single leg from start to end
+  assert.ok(
+    !p.log.path.some(
+      (leg) =>
+        leg.from.x === 56 &&
+        leg.from.y === -122 &&
+        Math.abs(leg.to.x - 500) < 1 &&
+        Math.abs(leg.to.y - 200) < 1
+    ),
+    "must not take direct blocked chord"
+  );
+});
+
 test("blocked spider-island rectangle rejects can_move_to", async () => {
   const w = createWorld();
   const j = w.spawn({ name: "Jazwyn", map: "main" });

@@ -230,4 +230,55 @@ test("scenario: boot Zarook-only subset farms without crash", async () => {
   assert.strictEqual(ctrl.isLead(), true);
 });
 
+test("scenario: Puppygirl delivers around spider-island obstacles", async () => {
+  const { isBlocked } = require("../sim/world");
+  const { segmentHitsAny } = require("../sim/path");
+  // Party south of spider island; merchant starts at potions — direct chord crosses blocked water
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 50000,
+    // place fighters past the island
+  });
+  for (const n of ["Jazwyn", "Sarene", "Zarook"]) {
+    p.bots[n].api.character.map = "main";
+    p.bots[n].api.character.real_x = 500;
+    p.bots[n].api.character.x = 500;
+    p.bots[n].api.character.real_y = 200;
+    p.bots[n].api.character.y = 200;
+  }
+  p.bots.Puppygirl.api.character.real_x = 56;
+  p.bots.Puppygirl.api.character.x = 56;
+  p.bots.Puppygirl.api.character.real_y = -122;
+  p.bots.Puppygirl.api.character.y = -122;
+
+  const blocked = p.world.G.maps.main.blocked;
+  assert.ok(segmentHitsAny(56, -122, 500, 200, blocked));
+
+  await p.bots.Jazwyn.ctrl.requestPots();
+  let done = false;
+  const trail = [];
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    const ch = p.bots.Puppygirl.api.character;
+    trail.push({ x: ch.real_x, y: ch.real_y });
+    assert.ok(!isBlocked("main", ch.real_x, ch.real_y, p.world.G), "merchant entered blocked @" + ch.real_x + "," + ch.real_y);
+    if (p.bots.Jazwyn.api.log.game.some((g) => /dlv:done/.test(g.m))) {
+      done = true;
+      break;
+    }
+    if (p.bots.Puppygirl.api.log.game.some((g) => /dlv:done/.test(g.m))) {
+      done = true;
+      break;
+    }
+  }
+  assert.ok(done, "expected delivery");
+  assert.ok(p.bots.Puppygirl.api.log.path.length >= 2, "legs=" + p.bots.Puppygirl.api.log.path.length);
+  // Trail should go west or east of island, not through its interior samples
+  const crossedLeft = trail.some((pt) => pt.x < 304 && pt.y > -300 && pt.y < 120);
+  const crossedRight = trail.some((pt) => pt.x > 688 && pt.y > -300 && pt.y < 120);
+  assert.ok(crossedLeft || crossedRight || p.bots.Puppygirl.api.log.path.length >= 2, "expected detour evidence");
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
 module.exports = { tests };
