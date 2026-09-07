@@ -15,7 +15,7 @@
 | 4 | Social NL | **Remove** Ding/Gratz/Ok (comms load). |
 | 5 | Present | **Vision ∧ range** (in vision and within formation/cohesion radius). |
 | 6 | Rares | **Whitelist interrupt:** any member who **sees** a rare announces → assemble → Puppygirl restocks needy → kill → resume prior task. **Only Puppygirl may change servers.** MVP whitelist includes **phoenix**. |
-| 7 | Gear / hold | **No plaza hold** unless user explicitly `hold`. Puppygirl **field-delivers upgrades** on request. Hold = **user utility to assemble**, not automation’s restock path. |
+| 7 | Gear / hold | **No plaza hold** unless user explicitly `hold`. Gear is a **field logistics job** (§5D): Puppygirl **pushes** upgrades automatically whenever she holds a strictly better piece; batched onto pot runs. Hold = **user utility to assemble**, not automation’s path. |
 | 8 | Slots / publish | **OK to refactor slots.** Add a **code compressor**: author readable/documented source → verify behavior-preserving compress → publish ≤176 lines / ≤6–7 slots. |
 | 9 | MVP bar | All **sim** tests pass. Mainframe: **0 chat throttle**, **no restock-fail storm**, **≥30 min** valid farming + **successful Puppygirl deliveries**, **no manual refills**, **no fighter world transfers**. |
 
@@ -176,11 +176,26 @@ S = {
 - Fallback: if Puppygirl unreachable N seconds → **same-world town** pot buy (instrumented); never world hop for pots.
 - Any subset boots: solo/duo farm works; requests no-op until merchant appears.
 
-### D. Hold & gear
+### D. Hold & gear (locked 2026-09-07)
 
-- `hold` = user assemble tool (long-term).
-- Automation never opens plaza hold for gear/pots.
-- Upgrades: request → Puppygirl field deliver → equip.
+- `hold` = user assemble tool (long-term). Automation never opens plaza hold for gear/pots.
+- **Gear is a field logistics job**, same pipe as pots — fighters never hop for it:
+
+```text
+fighter state diff (worn slots@lv, esize)
+  → Puppygirl wishlist per fighter (state + bank + her upgrade results)
+  → strictly better piece && esize ≥ 1  ⇒  job dlv_gear {who,name,lv,slot}
+  → batch onto pending pot run; standalone only if idle
+  → hop to farm world → walk in → send_item → gear_offer
+  → fighter equips → gear_got ok → tosses replaced piece back → bank
+```
+
+- **Trigger:** Puppygirl **pushes automatically** (no request, no leader approval). Jazwyn’s intent gates **timing only** (never during rare assemble/kill; nack `path`/`space` otherwise).
+- **Sourcing (all in scope):** bank loot + drops; **buy vendor base gear and upgrade it** (main progression path); Ponty whitelist buys; compound accessories (ringsj/hpbelt/amulets first).
+- **Risk (MVP):** conservative — scroll0 only, preview `chance ≥ 0.9`, max **+5**, **never UNIQUE/seasonal**, never candy/carrot. Upgrades happen in town during idle econ with gold above `GOLD_FLOAT`. `GEAR_RISK` stays a knob for later.
+- **Equip score:** `item_properties`-based, class-legal, empty slot = 0 baseline, rings fill `ring1` then `ring2`; never `item_value`.
+- **Keep rule:** delivered piece protected from bank dump by gift TTL until equipped.
+- Carried from V1: merchant-only upgrading; `*_upgrade.js` fighter scripts stay archived; `gear_ad` CM replaced by worn-gear fields in the shared-state diff.
 
 ### E. Comms
 
@@ -226,7 +241,7 @@ Fixtures land in `adventureland/sim/fixtures/paths/` and feed the sim’s delay/
 | --- | --- |
 | **World stub** | maps, doors/spawns, distance, vision radius, monsters (incl. phoenix), NPCs |
 | **Path engine** | `smart_move` / `move` / town with time + quirks from §6.2–6.3 |
-| **Character runtime** | items, pots, rip, server id, levels/att caps |
+| **Character runtime** | items, pots, rip, server id, levels/att caps; `upgrade`/`compound` with real `chance` + destroy-on-fail; item stat tables for equip scoring; bank/bag/esize |
 | **Comms** | party_say with **real rate-limit model**; CM with gap; drop/reorder options |
 | **Clock** | accelerate time; deterministic + Monte Carlo seeds |
 | **Invariants monitor** | together, no fighter hop, chat throttle=0, no restock-fail storm, dlv completes, path-storm=0 |
@@ -248,6 +263,7 @@ Suite `test_sim_parity` documents which invariants are enforced identically in s
 5. User `hold` / `resume` / `!world` (only then fighter hop).
 6. Chat stress: throttle counter stays 0 under sync+rare+heartbeat.
 7. Path fail injection: no Transfer/Port / restock-fail storm.
+8. Gear push: merchant upgrades vendor piece in town → dlv_gear batched with a pot run → fighter equips, tosses old piece → no hold, no fighter hop; UNIQUE never risked; preview <0.9 skipped.
 
 **Monte Carlo (goal once wall-clock allows)**
 
@@ -334,7 +350,7 @@ Tune with sim + live probes, not opinion:
 3. Heartbeat **60s** vs 45–90s under load.  
 4. Rare whitelist beyond phoenix for post-MVP.  
 5. Exact published slot names after compressor exists.  
-6. GEAR_RISK / UNIQUE policy (unchanged until gear pass).  
+6. ~~GEAR_RISK / UNIQUE policy~~ — locked conservative for MVP (§5D); revisit after 30‑min gate.  
 7. Path-fail **rate bands** from explorers (per route class).  
 8. MC suite size / CI budget once wall-clock known.
 
