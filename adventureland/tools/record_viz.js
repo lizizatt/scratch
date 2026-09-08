@@ -50,12 +50,12 @@ function tagsFor(name) {
 function planTag(name) {
   // Map to V2_PLAN §6.6 scenario numbers when obvious
   const n = name.toLowerCase();
-  if (/boot|rejoin|succession|subset|ordering/.test(n)) return "6.6.1";
+  if (/\bboot\b|rejoin|succession|subset|ordering/.test(n)) return "6.6.1";
   if (/30 min|compressed|short farm|bee pack|goo pack|farm armadillo|farm bee|farm goo/.test(n)) return "6.6.2";
   if (/dlv|town_fallback|dry pots|status flowing|low_gold|bag-full|gold/.test(n)) return "6.6.3";
   if (/phoenix|rare|assemble|rare_gone|rare_timeout/.test(n)) return "6.6.4";
   if (/hold|resume|!world|hop-prep|heap wipe|re-invite|meet_home|world hop/.test(n)) return "6.6.5";
-  if (/chat stress|throttle|heartbeat|reseed|human echo|~r/.test(n)) return "6.6.6";
+  if (/chat stress|throttle|heartbeat|reseed|human echo|~r|reboot reseeds/.test(n)) return "6.6.6";
   if (/path fail|smart_move phoenix|server_region unset|reload mid-job|cave past|spider|owe/.test(n)) return "6.6.7";
   if (/gear|bags tight|deadlock/.test(n)) return "6.6.8";
   return null;
