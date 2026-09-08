@@ -181,24 +181,44 @@ function createAlApi() {
       return g.send_gold(name, amount);
     },
     async bank_store(i) {
-      if (typeof bank_store === "function") return bank_store(i);
-      throw { reason: "no_bank_store" };
+      try {
+        if (typeof bank_store !== "function") return { failed: true, reason: "no_bank_store" };
+        return await bank_store(i);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
     },
     async bank_retrieve(pack, i) {
-      if (typeof bank_retrieve === "function") return bank_retrieve(pack, i);
-      throw { reason: "no_bank_retrieve" };
+      try {
+        if (typeof bank_retrieve !== "function") return { failed: true, reason: "no_bank_retrieve" };
+        return await bank_retrieve(pack, i);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
     },
     async equip(i, slot) {
-      if (typeof equip === "function") return equip(i, slot);
-      throw { reason: "no_equip" };
+      try {
+        if (typeof equip !== "function") return { failed: true, reason: "no_equip" };
+        return await equip(i, slot);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
     },
     async upgrade(itemI, scrollI, offering, calculate) {
-      if (typeof upgrade === "function") return upgrade(itemI, scrollI, offering, calculate);
-      throw { reason: "no_upgrade" };
+      try {
+        if (typeof upgrade !== "function") return { failed: true, reason: "no_upgrade" };
+        return await upgrade(itemI, scrollI, offering, calculate);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
     },
     async compound(a, b, cSlot, scrollI) {
-      if (typeof compound === "function") return compound(a, b, cSlot, scrollI);
-      throw { reason: "no_compound" };
+      try {
+        if (typeof compound !== "function") return { failed: true, reason: "no_compound" };
+        return await compound(a, b, cSlot, scrollI);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
     },
     trade(i, price) {
       if (typeof trade === "function") return trade(i, price);
