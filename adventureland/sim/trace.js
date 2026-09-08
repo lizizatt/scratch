@@ -159,6 +159,10 @@ function attachTrace(world, opts) {
         angle: ch.angle != null ? ch.angle : null,
         hpots: countNamed(ch.items, /^hpot/),
         mpots: countNamed(ch.items, /^mpot/),
+        stand: !!ch.stand,
+        gloves: ch.slots && ch.slots.gloves ? (ch.slots.gloves.name || "") + "@" + (ch.slots.gloves.level || 0) : null,
+        shoes: ch.slots && ch.slots.shoes ? (ch.slots.shoes.name || "") + "@" + (ch.slots.shoes.level || 0) : null,
+        bagGear: (ch.items || []).filter((it) => it && !/^hpot|^mpot/.test(it.name)).map((it) => it.name + (it.level != null ? "@" + it.level : "")).slice(0, 6),
       };
     }
     frames.push({ t, chars, monsters: snapshotMonsters() });

@@ -90,6 +90,7 @@ function bootParty(opts) {
 
   function mkFighter(name, ctype, xy, range, atk) {
     if (!want.has(name)) return null;
+    const seedSlots = (opts.slots && opts.slots[name]) || opts.fighterSlots || {};
     const api = w.spawn(
       {
         name,
@@ -105,6 +106,7 @@ function bootParty(opts) {
         gold: opts.gold != null ? opts.gold : 50000,
         esize: opts.esize != null ? opts.esize : 20,
         items: opts.items || seedPots(opts.pots != null ? opts.pots : 200),
+        slots: Object.assign({}, seedSlots),
       },
       region,
       ident
@@ -121,6 +123,7 @@ function bootParty(opts) {
   mkFighter("Zarook", "priest", { x: pc.x + 40, y: pc.y + 55 }, PRIEST_RANGE, 70);
 
   if (want.has("Puppygirl")) {
+    const bankSeed = opts.bankSeed || null;
     const mApi = w.spawn(
       {
         name: "Puppygirl",
@@ -132,6 +135,12 @@ function bootParty(opts) {
         gold: 2000000,
         esize: 30,
         items: new Array(42).fill(null),
+        _bank: bankSeed
+          ? {
+              gold: 0,
+              items0: bankSeed.concat(new Array(Math.max(0, 42 - bankSeed.length)).fill(null)),
+            }
+          : { gold: 0, items0: new Array(42).fill(null) },
       },
       region,
       ident

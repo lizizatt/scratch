@@ -16,11 +16,14 @@ const {
   RARE_WHITELIST,
   ASSEMBLE_TIMEOUT_MS,
   RARE_GONE_MS,
+  GEAR_AD_MS,
+  SEND_RANGE,
 } = require("./constants");
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
 const { createMotion } = require("./motion");
 const { packCenter } = require("./packs");
+const { equipPending, isKeep, wornSnapshot, markGift } = require("./gear");
 
 /**
  * Boot a fighter into a sim (or real) API environment.
@@ -43,6 +46,8 @@ function bootFighter(api, opts) {
   let assembleUntil = 0;
   let rareGoneAt = 0;
   let bootQuietUntil = 0;
+  let lastGearAd = 0;
+  const giftTtl = {};
 
   function persist() {
     try {
@@ -120,6 +125,8 @@ function bootFighter(api, opts) {
   /** Free ≥1 bag slot by selling junk, then surplus pots if dry on the other type. */
   async function freeBagSlot() {
     if ((api.character.esize || 0) >= 1) return true;
+    equipPending(api, api.G || {}, giftTtl);
+    if ((api.character.esize || 0) >= 1) return true;
     async function sellAt(i, it) {
       if (typeof api.sell !== "function") return false;
       await api.sell(i, it.q == null ? 1 : it.q);
@@ -130,6 +137,13 @@ function bootFighter(api, opts) {
       const it = api.character.items[i];
       if (!it) continue;
       if (/^hpot|^mpot/.test(it.name)) continue;
+      if (isKeep(api, it, api.G || {}, giftTtl)) continue;
+      if (await sellAt(i, it)) return true;
+    }
+    // Still full of "keep" gear duplicates — sell any non-pot
+    for (let i = 0; i < api.character.items.length; i++) {
+      const it = api.character.items[i];
+      if (!it || /^hpot|^mpot/.test(it.name)) continue;
       if (await sellAt(i, it)) return true;
     }
     // Pot-only full bag: dry on one type while the other fills every slot
@@ -144,6 +158,88 @@ function bootFighter(api, opts) {
     }
     api.game_log("bag:full");
     return (api.character.esize || 0) >= 1;
+  }
+
+  function sendGearAd() {
+    const snap = wornSnapshot(api);
+    api.send_cm(MERCHANT, {
+      gear_ad: 1,
+      name,
+      esize: snap.esize,
+      ctype: snap.ctype,
+      slots: snap.slots,
+    });
+    lastGearAd = api._now();
+    api.game_log("gear_ad");
+  }
+
+  async function tossLoot() {
+    const m = api.get_player(MERCHANT);
+    if (!m || m.rip) return 0;
+    if (api.character.bank) return 0;
+    const d =
+      typeof api.parent.distance === "function"
+        ? api.parent.distance(api.character, m)
+        : Math.hypot((api.character.real_x || 0) - (m.real_x || m.x || 0), (api.character.real_y || 0) - (m.real_y || m.y || 0));
+    if (!(d <= (SEND_RANGE || 320))) return 0;
+    let n = 0;
+    for (let i = 0; i < api.character.items.length && n < 12; i++) {
+      const it = api.character.items[i];
+      if (!it || isKeep(api, it, api.G || {}, giftTtl)) continue;
+      try {
+        const r = await api.send_item(MERCHANT, i, it.q == null ? 1 : it.q);
+        if (r && r.failed) {
+          if (r.reason === "no_space") break;
+          continue;
+        }
+        if (api.character.items[i]) continue;
+        api.game_log("toss " + it.name + "@" + (it.level || 0));
+        n++;
+      } catch (e) {
+        break;
+      }
+    }
+    return n;
+  }
+
+  async function handleGearOffer(d) {
+    if (!d || !d.name) return;
+    const id = d.id || d.name;
+    const slot = d.slot;
+    const prev = slot && api.character.slots[slot] ? Object.assign({}, api.character.slots[slot]) : null;
+    markGift(giftTtl, id, d.name, api._now());
+    equipPending(api, api.G || {}, giftTtl);
+    for (let i = 0; i < api.character.items.length; i++) {
+      const it = api.character.items[i];
+      if (it && it.name === d.name && (it.level || 0) === (d.level || 0)) {
+        if (typeof api.equip === "function") await api.equip(i, d.slot || undefined);
+        break;
+      }
+    }
+    equipPending(api, api.G || {}, giftTtl);
+    const worn = slot && api.character.slots[slot];
+    const ok =
+      worn && worn.name === d.name && (worn.level || 0) === (d.level || 0) ? 1 : 0;
+    if (
+      prev &&
+      ok &&
+      (prev.name !== d.name || (prev.level || 0) !== (d.level || 0))
+    ) {
+      api.game_log("gear:replaced " + prev.name + "@" + (prev.level || 0));
+    }
+    // Return replaced / non-keep pieces while merchant is still in range (P5)
+    const tossed = await tossLoot();
+    if (tossed) api.game_log("gear:toss_after n=" + tossed);
+    await api.send_cm(MERCHANT, {
+      gear_got: 1,
+      id: d.id,
+      name: d.name,
+      level: d.level || 0,
+      slot: d.slot,
+      ok,
+      replaced: prev && ok ? { name: prev.name, level: prev.level || 0 } : null,
+    });
+    api.game_log("gear_got " + d.name + " ok=" + ok);
   }
 
   async function requestPots() {
@@ -391,6 +487,12 @@ function bootFighter(api, opts) {
       refreshPots();
       persist();
     }
+    if (d.dlv_loot_q) {
+      const n = await tossLoot();
+      api.game_log("dlv:toss n=" + n);
+      api.send_cm(MERCHANT, { dlv_loot_done: 1, id: d.id || null, n });
+    }
+    if (d.gear_offer) await handleGearOffer(d);
     if (d.job === "meet_home" || d.hold === 1) {
       state.setIntent({ hold: 1, kind: "hold" });
       persist();
@@ -569,6 +671,10 @@ function bootFighter(api, opts) {
       return;
     }
     motion.evalPresent(now);
+    if (typeof api.loot === "function") api.loot();
+    equipPending(api, api.G || {}, giftTtl);
+    if (now - lastGearAd >= GEAR_AD_MS) sendGearAd();
+    await tossLoot();
     if (isLead() && now >= bootQuietUntil && now - lastHb >= HEARTBEAT_MS) {
       reseedSeqAboveHeard();
       lastHb = now;

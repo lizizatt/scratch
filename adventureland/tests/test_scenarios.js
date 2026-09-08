@@ -237,35 +237,727 @@ test("scenario: 15 min farm multi-restock vendor→Puppygirl→party", async () 
   assert.strictEqual(gradeSim(p.world, {}).chat_throttle, 0);
 });
 
+test("scenario: 15 min farm loot→equip / bank / gift / stall", async () => {
+  // bankSeed gloves@2 only — proves bank→gift pipe. Frogt/stall must come from farm.
+  const FROGT_SEED = 0;
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 25,
+    gold: 200000,
+    burnPots: true,
+    burnPerTick: 2,
+    potionTarget: 40,
+    fighterSlots: {},
+    bankSeed: [{ name: "gloves", level: 2 }],
+  });
+  await p.runFor(20 * 60 * 1000);
 
-test("scenario: gear bank piece batched on pot delivery", async () => {
-  const p = bootParty({ pack: "armadillo", pots: 0 });
-  // Put a glove in merchant bag for dlv_gear
-  p.bots.Puppygirl.api.character.items[5] = { name: "gloves", level: 0, q: 1 };
-  p.bots.Puppygirl.ctrl.enqueue({
-    id: "g1",
-    kind: "dlv_gear",
+  const allGame = [];
+  for (const n of Object.keys(p.bots)) {
+    for (const g of p.bots[n].api.log.game) allGame.push({ who: n, m: g.m, t: g.t != null ? g.t : 0 });
+  }
+  const mGame = p.bots.Puppygirl.api.log.game.map((g) => ({
+    who: "Puppygirl",
+    m: g.m,
+    t: g.t != null ? g.t : 0,
+  }));
+  const mLog = mGame.map((g) => g.m);
+
+  function first(logs, re) {
+    return logs.find((g) => re.test(g.m)) || null;
+  }
+
+  // --- Combat loot spine (farm-sourced) ---
+  const kills = allGame.filter((g) => /^kill /.test(g.m));
+  const drops = allGame.filter((g) => /^drop /.test(g.m));
+  const loots = allGame.filter((g) => /^loot /.test(g.m));
+  assert.ok(kills.length >= 3, "expected kills, got " + kills.length);
+  assert.ok(drops.length >= 3, "expected drops, got " + drops.length);
+  assert.ok(loots.length >= 3, "expected loots, got " + loots.length);
+  assert.ok(
+    drops.some((g) => /frogt/.test(g.m)),
+    "expected frogt in a drop line"
+  );
+  assert.ok(
+    loots.some((g) => /^loot frogt/.test(g.m)),
+    "expected loot frogt"
+  );
+  // At least one killer also looted frogt (weak coupling; same who)
+  const killers = new Set(kills.map((g) => g.who));
+  assert.ok(
+    loots.some((g) => /^loot frogt/.test(g.m) && killers.has(g.who)),
+    "expected a killer to also loot frogt"
+  );
+
+  // --- Immediate drop-equip (@0 from loot; gift path is @2) ---
+  const dropEquip = allGame.find((g) => /^equip (gloves|shoes|helmet|pants) \+0 -> /.test(g.m));
+  assert.ok(dropEquip, "expected @0 gear equip from a farm drop");
+  const lootedNames = new Set();
+  for (const g of loots) {
+    const m = g.m.match(/^loot (gloves|shoes|helmet|pants)/);
+    if (m) lootedNames.add(m[1]);
+  }
+  const dropEquipName = dropEquip.m.match(/^equip (gloves|shoes|helmet|pants)/)[1];
+  assert.ok(
+    lootedNames.has(dropEquipName),
+    "drop-equip " + dropEquipName + " should appear in loot lines"
+  );
+
+  // --- Toss → bank frogt (farm junk) ---
+  const tossFrogt = allGame.filter((g) => /^toss frogt/.test(g.m));
+  const storeFrogt = mGame.filter((g) => /^bank:store frogt/.test(g.m));
+  assert.ok(tossFrogt.length >= 1, "expected toss frogt to merchant");
+  assert.ok(storeFrogt.length >= 1, "expected bank:store frogt");
+  assert.ok(
+    storeFrogt.some((s) => tossFrogt.some((t) => t.t <= s.t)),
+    "expected a frogt toss at or before a bank:store frogt"
+  );
+
+  // --- Ordered gift chain from bankSeed gloves@2 (batched onto pots or standalone) ---
+  const planEv = first(mGame, /^gear:plan gloves@2->(\w+)/);
+  assert.ok(planEv, "expected gear:plan gloves@2");
+  const giftWho = planEv.m.match(/^gear:plan gloves@2->(\w+)/)[1];
+  const retrieveEv = first(mGame, /bank_retrieve gloves@2/);
+  const sendEv = first(mGame, /^dlv:send_gear gloves@2/);
+  const gotEv = allGame.find((g) => g.who === giftWho && /^gear_got gloves ok=1/.test(g.m));
+  assert.ok(retrieveEv, "expected bank_retrieve gloves@2");
+  assert.ok(sendEv, "expected dlv:send_gear gloves@2");
+  assert.ok(gotEv, "expected gear_got gloves ok=1 from " + giftWho);
+  assert.ok(planEv.t <= retrieveEv.t, "plan before retrieve");
+  assert.ok(retrieveEv.t <= sendEv.t, "retrieve before send_gear");
+  assert.ok(sendEv.t <= gotEv.t, "send_gear before gear_got");
+  const worn = p.bots[giftWho].api.character.slots.gloves;
+  assert.ok(worn && worn.name === "gloves" && (worn.level || 0) >= 2, giftWho + " should wear gloves@2");
+  // P3 under burn: gift must ride a pot job (no standalone dlv_gear)
+  const batchEv = mGame.find((g) => /^gear:batch id=/.test(g.m));
+  assert.ok(batchEv, "expected gear:batch under burnPots");
+  assert.ok(
+    !mGame.some((g) => /^dlv:active dlv_gear/.test(g.m)),
+    "must not spawn standalone dlv_gear while pots are burning"
+  );
+  const batchId = batchEv.m.match(/^gear:batch id=(\S+)/)[1];
+  assert.ok(
+    mGame.some((g) => g.m === "dlv:done id=" + batchId),
+    "gear:batch id must match a pot dlv:done id"
+  );
+
+  // --- Stall from farm frogt (no frogt in bankSeed) ---
+  const stallOpen = first(mGame, /^stall:open /);
+  const stallList = first(mGame, /^stall:list frogt /);
+  assert.ok(stallOpen, "expected stall:open");
+  assert.ok(stallList, "expected stall:list frogt");
+  assert.ok(
+    storeFrogt.some((s) => s.t <= stallList.t),
+    "expected bank:store frogt before stall:list"
+  );
+  assert.strictEqual(FROGT_SEED, 0, "test invariant: no frogt seed");
+  const bank = p.bots.Puppygirl.api.character._bank || p.bots.Puppygirl.api.character.bank;
+  let frogtBank = 0;
+  if (bank) {
+    for (const pack of Object.keys(bank)) {
+      if (!Array.isArray(bank[pack])) continue;
+      for (const it of bank[pack]) {
+        if (it && it.name === "frogt") frogtBank += it.q == null ? 1 : it.q;
+      }
+    }
+  }
+  let frogtTrade = 0;
+  for (const it of Object.values(p.bots.Puppygirl.api.character.slots || {})) {
+    if (it && it.name === "frogt") frogtTrade += it.q == null ? 1 : it.q;
+  }
+  assert.ok(
+    frogtBank + frogtTrade >= 1,
+    "farm frogt should remain in bank and/or stall (got bank=" + frogtBank + " trade=" + frogtTrade + ")"
+  );
+
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+  assert.strictEqual(gradeSim(p.world, {}).chat_throttle, 0);
+});
+
+
+test("scenario: gear batches onto pot delivery (P3)", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 200000,
+    bankSeed: [{ name: "gloves", level: 2 }],
+    fighterSlots: {},
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    name: "Jazwyn",
+    esize: 18,
+    ctype: "warrior",
+    slots: {
+      mainhand: null,
+      offhand: null,
+      helmet: null,
+      chest: null,
+      pants: null,
+      shoes: null,
+      gloves: null,
+      cape: null,
+      belt: null,
+      amulet: null,
+      ring1: null,
+      ring2: null,
+    },
+  });
+  await p.bots.Jazwyn.ctrl.requestPots();
+  let doneId = null;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    const hit = p.bots.Puppygirl.api.log.game.find((g) => /^dlv:done id=/.test(g.m));
+    if (hit) {
+      doneId = hit.m.replace(/^dlv:done id=/, "");
+      break;
+    }
+  }
+  assert.ok(doneId, "expected pot delivery done");
+  const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+  assert.ok(
+    mLog.some((m) => m.indexOf("gear:batch id=" + doneId + " ") === 0),
+    "expected gear:batch on the same pot job id=" + doneId
+  );
+  assert.ok(
+    mLog.some((m) => m === "dlv:send hpot1 id=" + doneId || m === "dlv:send mpot1 id=" + doneId),
+    "expected pot send bound to job id=" + doneId
+  );
+  assert.ok(
+    mLog.some((m) => m === "dlv:send_gear gloves@2 id=" + doneId),
+    "expected gear send bound to job id=" + doneId
+  );
+  assert.ok(
+    !mLog.some((m) => /^dlv:active dlv_gear/.test(m)),
+    "must not spawn a standalone dlv_gear when pot run can carry it"
+  );
+  const g = p.bots.Jazwyn.api.character.slots.gloves;
+  assert.ok(g && g.name === "gloves" && (g.level || 0) >= 2, "Jazwyn wears gloves@2");
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: gift swap tosses replaced piece to bank (P5)", async () => {
+  // Solo fighter so replaced gloves@0 are not immediately re-gifted to another empty slot
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 200000,
+    bankSeed: [{ name: "gloves", level: 2 }],
+    slots: { Jazwyn: { gloves: { name: "gloves", level: 0 } } },
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    name: "Jazwyn",
+    esize: 18,
+    ctype: "warrior",
+    slots: {
+      mainhand: null,
+      offhand: null,
+      helmet: null,
+      chest: null,
+      pants: null,
+      shoes: null,
+      gloves: { name: "gloves", level: 0 },
+      cape: null,
+      belt: null,
+      amulet: null,
+      ring1: null,
+      ring2: null,
+    },
+  });
+  await p.bots.Jazwyn.ctrl.requestPots();
+  let gotAt = null;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    const got = p.bots.Jazwyn.api.log.game.find((g) => /^gear_got gloves ok=1/.test(g.m));
+    if (got) {
+      gotAt = got.t != null ? got.t : p.world.clock.now();
+      break;
+    }
+  }
+  assert.ok(gotAt != null, "expected gear_got ok");
+  // Park only — stop once replaced gloves are banked (avoid stall consuming them)
+  let stored = false;
+  for (let j = 0; j < 80; j++) {
+    await p.tickAll();
+    if (p.bots.Puppygirl.api.log.game.some((g) => /^bank:store gloves@0/.test(g.m))) {
+      stored = true;
+      break;
+    }
+  }
+  assert.ok(stored, "expected bank:store gloves@0");
+
+  const jGame = p.bots.Jazwyn.api.log.game;
+  const mGame = p.bots.Puppygirl.api.log.game;
+  const replaced = jGame.find((g) => /^gear:replaced gloves@0/.test(g.m));
+  const toss = jGame.find((g) => /^toss gloves@0/.test(g.m));
+  const store = mGame.find((g) => /^bank:store gloves@0/.test(g.m));
+  assert.ok(replaced, "expected gear:replaced gloves@0");
+  assert.ok(toss, "expected toss gloves@0");
+  assert.ok(store, "expected bank:store gloves@0");
+  assert.ok(replaced.t <= toss.t, "replaced before toss");
+  assert.ok(toss.t <= store.t, "toss before bank:store");
+
+  const bank = p.bots.Puppygirl.api.character._bank || p.bots.Puppygirl.api.character.bank;
+  const bankGloves0 =
+    bank &&
+    bank.items0 &&
+    bank.items0.some((it) => it && it.name === "gloves" && (it.level || 0) === 0);
+  assert.ok(bankGloves0, "replaced gloves@0 must still be in bank");
+  const worn = p.bots.Jazwyn.api.character.slots.gloves;
+  assert.ok(worn && (worn.level || 0) >= 2, "wearing gloves@2 after swap");
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: continuous pot queue parks then stalls before next dequeue", async () => {
+  // Non-empty q must not starve bank:store / stall:open (regression for park-before-dequeue).
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 40,
+    gold: 200000,
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  const mCtrl = p.bots.Puppygirl.ctrl;
+  const mApi = p.bots.Puppygirl.api;
+  // Seed whitelist junk into merchant bag + keep queue busy with pot jobs
+  const bag = mApi.character.items;
+  const slot = bag.findIndex((x) => !x);
+  assert.ok(slot >= 0, "merchant needs a free bag slot");
+  bag[slot] = { name: "frogt", q: 3 };
+  mApi.character.esize = Math.max(0, (mApi.character.esize || 0) - 1);
+  mCtrl.enqueue({
+    id: "q_keep_1",
+    kind: "dlv_pots",
     who: "Jazwyn",
     items: [
-      { name: "hpot1", q: 200 },
-      { name: "mpot1", q: 200 },
+      { name: "hpot1", q: 5 },
+      { name: "mpot1", q: 5 },
     ],
-    gear: { name: "gloves", level: 0 },
-    farm: "armadillo",
-    map: "main",
-    x: 526,
-    y: 1846,
   });
-  let done = false;
-  for (let i = 0; i < 300; i++) {
+  mCtrl.enqueue({
+    id: "q_keep_2",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [
+      { name: "hpot1", q: 5 },
+      { name: "mpot1", q: 5 },
+    ],
+  });
+  assert.ok(mCtrl.store.q.length >= 2, "queue must stay non-empty during park/stall");
+
+  let storeEv = null;
+  let stallEv = null;
+  for (let i = 0; i < 200; i++) {
     await p.tickAll();
-    if (p.bots.Puppygirl.api.log.game.some((g) => /dlv:done id=g1/.test(g.m))) {
+    const mGame = mApi.log.game;
+    if (!storeEv) storeEv = mGame.find((g) => /^bank:store frogt/.test(g.m));
+    if (!stallEv) stallEv = mGame.find((g) => /^stall:open /.test(g.m));
+    if (storeEv && stallEv) break;
+  }
+  assert.ok(storeEv, "expected bank:store frogt while queue busy");
+  assert.ok(stallEv, "expected stall:open while queue busy");
+  assert.ok(storeEv.t <= stallEv.t, "store before stall");
+
+  let afterStall = null;
+  for (let i = 0; i < 200; i++) {
+    await p.tickAll();
+    afterStall = mApi.log.game.find(
+      (g) => g.t >= stallEv.t && /^dlv:active dlv_pots/.test(g.m)
+    );
+    if (afterStall) break;
+  }
+  assert.ok(afterStall, "expected a pot job to activate after park/stall");
+  assert.ok(storeEv.t <= afterStall.t, "park before next dlv:active");
+  assert.ok(stallEv.t <= afterStall.t, "stall before next dlv:active");
+
+  let done = false;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    if (mApi.log.game.some((g) => /^dlv:done id=/.test(g.m))) {
       done = true;
       break;
     }
   }
-  assert.ok(done);
-  assert.ok(p.bots.Jazwyn.api.character.items.some((x) => x && x.name === "gloves"));
+  assert.ok(done, "pot delivery must still complete after park/stall");
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: park path_fail does not starve pot queue", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 40,
+    gold: 200000,
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  const mCtrl = p.bots.Puppygirl.ctrl;
+  const mApi = p.bots.Puppygirl.api;
+  const bag = mApi.character.items;
+  const slot = bag.findIndex((x) => !x);
+  bag[slot] = { name: "frogt", q: 1 };
+  mApi.character.esize = Math.max(0, (mApi.character.esize || 0) - 1);
+  mCtrl.enqueue({
+    id: "q_pathfail_pots",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [
+      { name: "hpot1", q: 10 },
+      { name: "mpot1", q: 10 },
+    ],
+  });
+  mApi._injectSmartFail("fail");
+
+  let pathFail = false;
+  let done = false;
+  let stuck = false;
+  for (let i = 0; i < 300; i++) {
+    await p.tickAll();
+    const msgs = mApi.log.game.map((g) => g.m);
+    if (msgs.some((m) => m === "bank:path_fail" || m === "bank:park_stuck")) pathFail = true;
+    if (msgs.some((m) => m === "bank:park_stuck")) stuck = true;
+    if (msgs.some((m) => /^dlv:done id=/.test(m))) {
+      done = true;
+      break;
+    }
+  }
+  assert.ok(pathFail, "expected bank path failure while parking");
+  assert.ok(stuck || pathFail, "expected park stuck signal or path_fail");
+  assert.ok(done, "pot dlv:done must proceed despite park failure");
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: P5 replace under continuous pot queue", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 200000,
+    bankSeed: [{ name: "gloves", level: 2 }],
+    slots: { Jazwyn: { gloves: { name: "gloves", level: 0 } } },
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    name: "Jazwyn",
+    esize: 18,
+    ctype: "warrior",
+    slots: {
+      mainhand: null,
+      offhand: null,
+      helmet: null,
+      chest: null,
+      pants: null,
+      shoes: null,
+      gloves: { name: "gloves", level: 0 },
+      cape: null,
+      belt: null,
+      amulet: null,
+      ring1: null,
+      ring2: null,
+    },
+  });
+  await p.bots.Jazwyn.ctrl.requestPots();
+  // Keep another pot job queued so park must win against a non-empty q after gift
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "q_after_gift",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [
+      { name: "hpot1", q: 5 },
+      { name: "mpot1", q: 5 },
+    ],
+  });
+
+  let gotAt = null;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    const got = p.bots.Jazwyn.api.log.game.find((g) => /^gear_got gloves ok=1/.test(g.m));
+    if (got) {
+      gotAt = got.t != null ? got.t : p.world.clock.now();
+      break;
+    }
+  }
+  assert.ok(gotAt != null, "expected gear_got ok");
+
+  let store = null;
+  for (let j = 0; j < 120; j++) {
+    await p.tickAll();
+    store = p.bots.Puppygirl.api.log.game.find((g) => /^bank:store gloves@0/.test(g.m));
+    if (store) break;
+  }
+  assert.ok(store, "expected bank:store gloves@0 under queued pots");
+
+  const jGame = p.bots.Jazwyn.api.log.game;
+  const replaced = jGame.find((g) => /^gear:replaced gloves@0/.test(g.m));
+  const toss = jGame.find((g) => /^toss gloves@0/.test(g.m));
+  assert.ok(replaced && toss, "expected replaced + toss");
+  assert.ok(replaced.t <= toss.t && toss.t <= store.t, "replaced → toss → store order");
+
+  const bank = p.bots.Puppygirl.api.character._bank || p.bots.Puppygirl.api.character.bank;
+  assert.ok(
+    bank &&
+      bank.items0 &&
+      bank.items0.some((it) => it && it.name === "gloves" && (it.level || 0) === 0),
+    "replaced gloves@0 must remain in bank"
+  );
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: full bag does not emit empty pot dlv:done", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 40,
+    gold: 200000,
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const mCtrl = p.bots.Puppygirl.ctrl;
+  // Fill merchant bag with gear; fill bank so park cannot clear
+  const items = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) items[i] = { name: "gloves", level: 0 };
+  mApi.character.items = items;
+  mApi.character.esize = 0;
+  const bankBag = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) bankBag[i] = { name: "shoes", level: 0 };
+  mApi.character.bank = mApi.character._bank = { gold: 0, items0: bankBag };
+
+  mCtrl.enqueue({
+    id: "empty_send_guard",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [
+      { name: "hpot1", q: 10 },
+      { name: "mpot1", q: 10 },
+    ],
+  });
+
+  for (let i = 0; i < 250; i++) await p.tickAll();
+  const mLog = mApi.log.game.map((g) => g.m);
+  assert.ok(
+    mLog.some((m) => m === "dlv:no_space" || m === "dlv:buy_fail hpot1" || m === "dlv:empty_send" || m === "bank:full" || m === "bank:park_stuck"),
+    "expected space/buy/park failure signal"
+  );
+  assert.ok(
+    !mLog.some((m) => m === "dlv:done id=empty_send_guard"),
+    "must not dlv:done without sending pots"
+  );
+  assert.ok(
+    !mLog.some((m) => /^dlv:send hpot1 id=empty_send_guard/.test(m)),
+    "no successful pot send expected"
+  );
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: toss does not log when merchant has no space", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 40,
+    gold: 50000,
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  // Place both on farm pack in range
+  const j = p.bots.Jazwyn.api.character;
+  const m = p.bots.Puppygirl.api.character;
+  j.map = "main";
+  j.real_x = j.x = 526;
+  j.real_y = j.y = 1846;
+  m.map = "main";
+  m.real_x = m.x = 530;
+  m.real_y = m.y = 1846;
+  // Merchant bag + bank full so park cannot free space for toss
+  const mItems = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) mItems[i] = { name: "ringsj", level: 0 };
+  m.items = mItems;
+  m.esize = 0;
+  const bankBag = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) bankBag[i] = { name: "shoes", level: 0 };
+  m.bank = m._bank = { gold: 0, items0: bankBag };
+  // Fighter has tossable frogt
+  const slot = j.items.findIndex((x) => !x);
+  j.items[slot] = { name: "frogt", q: 2 };
+  j.esize = Math.max(0, (j.esize || 1) - 1);
+
+  for (let i = 0; i < 30; i++) await p.tickAll();
+  assert.ok(
+    !p.bots.Jazwyn.api.log.game.some((g) => /^toss frogt/.test(g.m)),
+    "must not log toss when send_item fails no_space"
+  );
+  assert.ok(
+    j.items.some((it) => it && it.name === "frogt"),
+    "frogt must remain on fighter"
+  );
+});
+
+test("scenario: merchant reserves ≥3 slots before field delivery", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 200000,
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const mCtrl = p.bots.Puppygirl.ctrl;
+  // Nearly full bag of parkable gear + leave 0 free slots after pots would fill
+  const items = new Array(42).fill(null);
+  for (let i = 0; i < 40; i++) items[i] = { name: "gloves", level: 0 };
+  mApi.character.items = items;
+  mApi.character.esize = 2;
+  mCtrl.enqueue({
+    id: "reserve3",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [
+      { name: "hpot1", q: 5 },
+      { name: "mpot1", q: 5 },
+    ],
+  });
+  let done = false;
+  let sawNeed = false;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    const msgs = mApi.log.game.map((g) => g.m);
+    if (msgs.some((m) => /^dlv:need_space/.test(m))) sawNeed = true;
+    if (msgs.some((m) => m === "dlv:done id=reserve3")) {
+      done = true;
+      break;
+    }
+  }
+  assert.ok(done, "delivery should complete after parking for take-back slots");
+  // At or before done, merchant must have parked gear (store) and left with space
+  assert.ok(
+    mApi.log.game.some((g) => /^bank:store gloves/.test(g.m)),
+    "expected park before field to free take-back slots"
+  );
+  assert.ok((mApi.character.esize || 0) >= 3 || sawNeed, "esize≥3 after reserve or need_space logged");
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: take-back reserve must not park in-transit gift", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 200000,
+    bankSeed: [{ name: "gloves", level: 2 }],
+    fighterSlots: {},
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    name: "Jazwyn",
+    esize: 18,
+    ctype: "warrior",
+    slots: {
+      gloves: null,
+      helmet: null,
+      chest: null,
+      pants: null,
+      shoes: null,
+      mainhand: null,
+      offhand: null,
+      cape: null,
+      belt: null,
+      amulet: null,
+      ring1: null,
+      ring2: null,
+    },
+  });
+  // Fill merchant with parkable junk so ensureTakeBackSlots must park something
+  const m = p.bots.Puppygirl.api.character;
+  for (let i = 0; i < 38; i++) {
+    if (!m.items[i]) m.items[i] = { name: "shoes", level: 0 };
+  }
+  m.esize = Math.max(0, 42 - m.items.filter(Boolean).length);
+  await p.bots.Jazwyn.ctrl.requestPots();
+
+  let doneId = null;
+  for (let i = 0; i < 500; i++) {
+    await p.tickAll();
+    const hit = p.bots.Puppygirl.api.log.game.find((g) => /^dlv:done id=/.test(g.m));
+    if (hit) {
+      doneId = hit.m.replace(/^dlv:done id=/, "");
+      break;
+    }
+  }
+  assert.ok(doneId, "expected pot+gift delivery done");
+  const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+  assert.ok(
+    mLog.some((m) => m === "dlv:send_gear gloves@2 id=" + doneId),
+    "in-transit gloves@2 must be sent, not parked by take-back reserve"
+  );
+  assert.ok(
+    mLog.some((m) => m.indexOf("gear:batch id=" + doneId + " ") === 0),
+    "expected gear batch on same job"
+  );
+  assert.ok(
+    !mLog.some((m) => m === "bank:store gloves@2"),
+    "must not bank:store the in-transit gift gloves@2"
+  );
+  const worn = p.bots.Jazwyn.api.character.slots.gloves;
+  assert.ok(worn && worn.name === "gloves" && (worn.level || 0) >= 2, "Jazwyn wears gloves@2");
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: late gear_ad batches onto in-flight pot job (P3)", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 200000,
+    bankSeed: [{ name: "gloves", level: 2 }],
+    fighterSlots: {},
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  // Start pot job with NO gear_ad yet
+  await p.bots.Jazwyn.ctrl.requestPots();
+  let bought = false;
+  for (let i = 0; i < 80; i++) {
+    await p.tickAll();
+    if (p.bots.Puppygirl.api.log.game.some((g) => /^dlv:buy /.test(g.m))) {
+      bought = true;
+      break;
+    }
+  }
+  assert.ok(bought, "vendor buy should happen before ad");
+  assert.ok(
+    !p.bots.Puppygirl.api.log.game.some((g) => /^gear:batch /.test(g.m)),
+    "must not batch before gear_ad"
+  );
+  // Late advertisement while pot job is active
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    name: "Jazwyn",
+    esize: 18,
+    ctype: "warrior",
+    slots: {
+      gloves: null,
+      helmet: null,
+      chest: null,
+      pants: null,
+      shoes: null,
+      mainhand: null,
+      offhand: null,
+      cape: null,
+      belt: null,
+      amulet: null,
+      ring1: null,
+      ring2: null,
+    },
+  });
+  let doneId = null;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    const hit = p.bots.Puppygirl.api.log.game.find((g) => /^dlv:done id=/.test(g.m));
+    if (hit) {
+      doneId = hit.m.replace(/^dlv:done id=/, "");
+      break;
+    }
+  }
+  assert.ok(doneId, "delivery completes");
+  const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+  assert.ok(
+    mLog.some((m) => m.indexOf("gear:batch id=" + doneId + " ") === 0),
+    "late gear_ad must still batch onto the in-flight pot job"
+  );
+  assert.ok(mLog.some((m) => m === "dlv:send_gear gloves@2 id=" + doneId));
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
 });
 

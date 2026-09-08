@@ -130,6 +130,7 @@ function buildAll(root) {
     [
       path.join(src, "constants.js"),
       path.join(src, "packs.js"),
+      path.join(src, "gear.js"),
       path.join(src, "chat_queue.js"),
       path.join(src, "party_state.js"),
       path.join(src, "motion.js"),

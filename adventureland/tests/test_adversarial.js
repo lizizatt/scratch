@@ -336,7 +336,7 @@ test("rare_timeout: assemble window expires without kill", async () => {
 
 test("bag-full: dry fighter sells junk then requests pots", async () => {
   const items = new Array(42).fill(null);
-  for (let i = 0; i < 42; i++) items[i] = { name: "gloves", level: 0, q: 1 };
+  for (let i = 0; i < 42; i++) items[i] = { name: "frogt", q: 1 };
   const p = bootParty({ pots: 0, gold: 50000, esize: 0, items });
   await p.bots.Jazwyn.ctrl.requestPots();
   assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /bag:sell/.test(g.m)), "should sell junk");

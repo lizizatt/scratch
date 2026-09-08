@@ -36,6 +36,12 @@ const SEND_RANGE = 320;
 const ASSEMBLE_TIMEOUT_MS = 60000;
 const RARE_GONE_MS = 20000;
 const RARE_WHITELIST = ["phoenix"];
+/** Merchant stall / bank junk whitelist (legacy SELL subset). */
+const SELL_WHITELIST = ["frogt", "leatherboots"];
+/** Armor names we treat as equippable upgrades in sim. */
+const GEAR_TYPES = ["gloves", "shoes", "helmet", "pants", "coat", "ringsj"];
+const GEAR_AD_MS = 20000;
+const GIFT_TTL_MS = 120000;
 const JOB_MS = 480000;
 
 module.exports = {
@@ -73,5 +79,9 @@ module.exports = {
   ASSEMBLE_TIMEOUT_MS,
   RARE_GONE_MS,
   RARE_WHITELIST,
+  SELL_WHITELIST,
+  GEAR_TYPES,
+  GEAR_AD_MS,
+  GIFT_TTL_MS,
   JOB_MS,
 };

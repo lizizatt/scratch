@@ -1,6 +1,6 @@
 "use strict";
 
-const { dist, isBlocked, VISION_PX, SEND_ITEM_RANGE, packCenter, NPC, FARM_XY } = require("./world");
+const { dist, isBlocked, VISION_PX, SEND_ITEM_RANGE, LOOT_RANGE, packCenter, NPC, FARM_XY } = require("./world");
 const { findPath } = require("./path");
 const { createStorage } = require("./storage");
 const knobs = require("./knobs");
@@ -72,6 +72,10 @@ function createCharacter(world, over) {
     gold: [],
     bought: [],
     skills: [],
+    equipped: [],
+    looted: [],
+    traded: [],
+    retrieved: [],
   };
   let heapAlive = true;
 
@@ -256,8 +260,124 @@ function createCharacter(world, over) {
         const respawnMs = (world.G && world.G.respawnMs) || knobs.RESPAWN_MS || 10000;
         t.respawnAt = world.clock.now() + respawnMs;
         api.game_log("kill " + t.mtype + " id=" + t.id);
+        if (typeof world.nextKillDrops === "function" && typeof world.spawnChest === "function") {
+          const drops = world.nextKillDrops(t.mtype);
+          if (drops && drops.length) {
+            world.spawnChest(serverKey(), c.map, { x: t.real_x || t.x, y: t.real_y || t.y }, drops);
+            api.game_log("drop " + drops.map((d) => d.name + (d.level != null ? "@" + d.level : "")).join(","));
+          }
+        }
       }
       return Promise.resolve({ success: true, damage: dmg });
+    },
+
+    loot() {
+      const ents = world.entitiesOn(serverKey(), c.map);
+      let n = 0;
+      for (const id of Object.keys(ents)) {
+        const e = ents[id];
+        if (!e || e.type !== "chest" || !e.items || !e.items.length) continue;
+        if (dist(c, e) > LOOT_RANGE) continue;
+        while (e.items.length && (c.esize || 0) >= 1) {
+          const piece = e.items.shift();
+          if (piece.q != null) {
+            const stack = c.items.findIndex((x) => x && x.name === piece.name && x.q != null);
+            if (stack >= 0) {
+              c.items[stack].q += piece.q;
+              log.looted.push(piece);
+              api.game_log("loot " + piece.name);
+              n++;
+              continue;
+            }
+          }
+          const slot = c.items.findIndex((x) => !x);
+          if (slot < 0) break;
+          c.items[slot] = piece;
+          c.esize = Math.max(0, (c.esize || 1) - 1);
+          log.looted.push(piece);
+          api.game_log("loot " + piece.name + (piece.level != null ? "@" + piece.level : ""));
+          n++;
+        }
+        if (!e.items.length && typeof world.removeChest === "function") {
+          world.removeChest(serverKey(), c.map, id);
+        }
+      }
+      return n;
+    },
+
+    equip(i, slot) {
+      const it = c.items[i];
+      if (!it) return Promise.resolve({ failed: true, reason: "no_item" });
+      const prev = slot ? c.slots[slot] : null;
+      if (slot) {
+        c.slots[slot] = { name: it.name, level: it.level || 0 };
+        c.items[i] = prev || null;
+        if (!prev) c.esize = (c.esize || 0) + 1;
+        log.equipped.push({ i, slot, name: it.name, level: it.level || 0 });
+        api.game_log("equip " + it.name + " +" + (it.level || 0) + " -> " + slot);
+      }
+      return Promise.resolve({ success: true });
+    },
+
+    unequip(slot) {
+      const it = c.slots[slot];
+      if (!it) return Promise.resolve({ failed: true });
+      if (("" + slot).indexOf("trade") === 0 && !c.stand) {
+        return Promise.resolve({ failed: true, reason: "stand_closed" });
+      }
+      const i = c.items.findIndex((x) => !x);
+      if (i < 0) return Promise.resolve({ failed: true, reason: "full" });
+      c.slots[slot] = null;
+      c.items[i] = it;
+      c.esize = Math.max(0, (c.esize || 1) - 1);
+      return Promise.resolve({ success: true });
+    },
+
+    async bank_retrieve(pack, i) {
+      if (c.map !== "bank") return { failed: true, reason: "not_bank" };
+      if (!c.bank) c.bank = c._bank || { gold: 0, items0: new Array(42).fill(null) };
+      const bag = c.bank[pack] || c.bank.items0;
+      if (!bag || !bag[i]) return { failed: true, reason: "empty" };
+      if ((c.esize || 0) < 1) return { failed: true, reason: "no_space" };
+      const it = bag[i];
+      bag[i] = null;
+      const slot = c.items.findIndex((x) => !x);
+      c.items[slot] = it;
+      c.esize = Math.max(0, (c.esize || 1) - 1);
+      log.retrieved.push({ pack, i, name: it.name, level: it.level || 0 });
+      api.game_log("bank_retrieve " + it.name + "@" + (it.level || 0));
+      return { success: true };
+    },
+
+    open_stand() {
+      c.stand = true;
+      api.game_log("stand:open");
+    },
+    close_stand() {
+      c.stand = false;
+      api.game_log("stand:close");
+    },
+
+    /** List bag slot on merchant stand (trade1..). */
+    trade(slot, price) {
+      if (!c.stand) return { failed: true, reason: "stand_closed" };
+      const it = c.items[slot];
+      if (!it) return { failed: true, reason: "no_item" };
+      let dest = null;
+      for (let t = 1; t <= 16; t++) {
+        const k = "trade" + t;
+        if (!c.slots[k]) {
+          dest = k;
+          break;
+        }
+      }
+      if (!dest) return { failed: true, reason: "no_trade_slot" };
+      c.slots[dest] = Object.assign({}, it, { price: price || 1 });
+      c.items[slot] = null;
+      c.esize = (c.esize || 0) + 1;
+      log.traded.push({ slot: dest, name: it.name, price: price || 1 });
+      api.game_log("stall:list " + it.name + " @" + (price || 1));
+      return { success: true, slot: dest };
     },
 
     move(x, y) {
@@ -427,12 +547,11 @@ function createCharacter(world, over) {
       const price = (world.G.items[name] && world.G.items[name].g) || 20;
       const cost = price * q;
       if (c.gold < cost) return { failed: true, reason: "gold" };
-      c.gold -= cost;
       const i = c.items.findIndex((x) => !x);
-      if (i >= 0) {
-        c.items[i] = { name, q };
-        c.esize = Math.max(0, (c.esize || 1) - 1);
-      }
+      if (i < 0) return { failed: true, reason: "no_space" };
+      c.gold -= cost;
+      c.items[i] = { name, q };
+      c.esize = Math.max(0, (c.esize || 1) - 1);
       log.bought.push({ name, q });
       return { num: i };
     },
@@ -485,16 +604,33 @@ function createCharacter(world, over) {
     },
 
     async bank_store(i) {
-      if (c.map !== "bank") return;
+      if (c.map !== "bank") return false;
       if (!c.bank) c.bank = { gold: 0, items0: new Array(42).fill(null) };
       const it = c.items[i];
-      if (!it) return;
+      if (!it) return false;
       const bag = c.bank.items0;
+      // Stack quantity items onto matching bank stacks first (frogt, pots, etc.)
+      if (it.q != null) {
+        const stackI = bag.findIndex(
+          (x) =>
+            x &&
+            x.name === it.name &&
+            (x.level || 0) === (it.level || 0) &&
+            x.q != null
+        );
+        if (stackI >= 0) {
+          bag[stackI].q = (bag[stackI].q || 0) + it.q;
+          c.items[i] = null;
+          c.esize = (c.esize || 0) + 1;
+          return true;
+        }
+      }
       const j = bag.findIndex((x) => !x);
-      if (j < 0) return;
+      if (j < 0) return false;
       bag[j] = it;
       c.items[i] = null;
       c.esize = (c.esize || 0) + 1;
+      return true;
     },
 
     sleep(ms) {

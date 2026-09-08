@@ -220,6 +220,31 @@ async function main() {
   );
 
   recorded.push(
+    await record("farm-15min-gear", "scenario: 15 min loot/equip/bank/gift/stall", ["farm", "delivery", "gear", "combat"], async (o) => {
+      const p = bootParty(
+        Object.assign(
+          {
+            pack: "armadillo",
+            pots: 25,
+            gold: 200000,
+            burnPots: true,
+            burnPerTick: 2,
+            potionTarget: 40,
+            fighterSlots: {},
+            bankSeed: [{ name: "gloves", level: 2 }],
+          },
+          o,
+          {
+            trace: Object.assign({}, o.trace, { sampleMs: 1000, maxFrames: 1200 }),
+          }
+        )
+      );
+      await p.runFor(20 * 60 * 1000);
+      return p;
+    })
+  );
+
+  recorded.push(
     await record("world-hop", "scenario: !world hop-prep to US/II", ["hop", "hold"], async (o) => {
       const p = bootParty(Object.assign({ pack: "armadillo", pots: 200, gold: 50000 }, o));
       p.bots.Jazwyn.ctrl.applyCmd({ cmd: "world", args: ["US/II"] });
@@ -270,6 +295,7 @@ async function main() {
     "hop: heap wipe clears handlers; storage restores hold; party re-invite": "hold-home",
     "scenario: compressed 30 min farm armadillo, 0 throttle 0 fighter hop": "farm-5min",
     "scenario: 15 min farm multi-restock vendor→Puppygirl→party": "farm-15min-restock",
+    "scenario: 15 min farm loot→equip / bank / gift / stall": "farm-15min-gear",
     "scenario: Puppygirl delivers via cave past ridge + island": "puppy-route",
     "smart_move: Puppygirl routes through cave to SE destination": "puppy-route",
     "scenario: !world hop-prep lands party on target server": "world-hop",

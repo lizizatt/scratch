@@ -61,11 +61,13 @@ function createWorld(opts) {
         for (const [n, ch] of m) {
           if (ch.map === map) out[n] = ch;
         }
-        // monsters
-        const mon = monstersOn(serverKey, map);
-        Object.assign(out, mon);
+        Object.assign(out, monstersOn(serverKey, map));
+        Object.assign(out, chestsOn(serverKey, map));
         return out;
       },
+      spawnChest,
+      removeChest,
+      nextKillDrops,
       entity(serverKey, name) {
         const m = servers.get(serverKey);
         return (m && m.get(name)) || null;
@@ -154,6 +156,9 @@ function createWorld(opts) {
       deliverCm: self.deliverCm,
       deliverPm: self.deliverPm,
       changeServer: self.changeServer,
+      spawnChest: self.spawnChest,
+      removeChest: self.removeChest,
+      nextKillDrops: self.nextKillDrops,
       oweTime(ms) {
         oweTime(ms);
       },
@@ -190,10 +195,47 @@ function createWorld(opts) {
 
   /** monster id -> entity, keyed lightly per map */
   const monsterBags = new Map(); // serverKey|map -> { id: entity }
+  /** ground chests after kills */
+  const chestBags = new Map(); // serverKey|map -> { id: chest }
+  let killSeq = 0;
 
   function monstersOn(serverKey, map) {
     const k = serverKey + "|" + map;
     return monsterBags.get(k) || {};
+  }
+
+  function chestsOn(serverKey, map) {
+    const k = serverKey + "|" + map;
+    return chestBags.get(k) || {};
+  }
+
+  function spawnChest(serverKey, map, xy, items, id) {
+    const k = serverKey + "|" + map;
+    if (!chestBags.has(k)) chestBags.set(k, {});
+    const bag = chestBags.get(k);
+    const cid = id || "chest_" + Object.keys(bag).length + "_" + clock.now();
+    bag[cid] = {
+      id: cid,
+      type: "chest",
+      map,
+      real_x: xy.x,
+      real_y: xy.y,
+      x: xy.x,
+      y: xy.y,
+      items: (items || []).map((it) => Object.assign({}, it)),
+    };
+    return bag[cid];
+  }
+
+  function removeChest(serverKey, map, id) {
+    const bag = chestsOn(serverKey, map);
+    if (bag[id]) delete bag[id];
+  }
+
+  function nextKillDrops(mtype) {
+    const { dropsForKill } = require("./world");
+    killSeq += 1;
+    return dropsForKill(mtype, killSeq);
   }
 
   function spawnMonster(serverKey, map, mtype, xy, id) {
@@ -362,7 +404,13 @@ function createWorld(opts) {
     spawn,
     spawnMonster,
     spawnPack,
+    spawnChest,
+    removeChest,
+    nextKillDrops,
     tickMonsters,
+    getKillSeq() {
+      return killSeq;
+    },
     formParty,
     refreshPartyCoords,
     tickReconnects,

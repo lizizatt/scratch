@@ -9,7 +9,7 @@ function baseG() {
       bee: { attack: 16, xp: 400 },
       crab: { attack: 24, xp: 500 },
       snake: { attack: 24, xp: 960 },
-      armadillo: { attack: 20, xp: 1720 },
+      armadillo: { attack: 20, xp: 1720, hp: 280 },
       croc: { attack: 48, xp: 3600 },
       tortoise: { attack: 36, xp: 5200 },
       bat: { attack: 50, xp: 8000 },
@@ -34,7 +34,11 @@ function baseG() {
       coat: { g: 2400, type: "chest", upgrade: true, armor: 12, grades: [7, 9] },
       gloves: { g: 800, type: "gloves", upgrade: true, armor: 4, grades: [7, 9] },
       shoes: { g: 800, type: "shoes", upgrade: true, armor: 4, grades: [7, 9] },
+      helmet: { g: 1200, type: "helmet", upgrade: true, armor: 8, grades: [7, 9] },
       ringsj: { g: 24000, type: "ring", compound: { str: 2 }, grades: [2, 5] },
+      /** Whitelisted junk — sell/stall (legacy SELL) */
+      frogt: { g: 120, type: "material", sell: true },
+      leatherboots: { g: 200, type: "shoes", upgrade: true, armor: 1, grades: [7, 9] },
       stand0: { g: 40000 },
     },
     skills: {
@@ -125,7 +129,11 @@ function baseG() {
         spawns: [[0, 0], [-48, 56]],
         doors: [{ to: "main", x: 0, y: 0, spawn: 0 }],
       },
-      bank: { monsters: [], spawns: [[0, -37]] },
+      bank: {
+        monsters: [],
+        spawns: [[0, -37]],
+        doors: [{ to: "main", x: 0, y: -37, spawn: 2 }], // exit near bank door on main
+      },
       halloween: { monsters: [], spawns: [[0, 0]] },
       jail: { monsters: [], spawns: [[0, 0]] },
       winter_inn: { monsters: [], spawns: [[0, 0]] },
@@ -172,6 +180,19 @@ function isBlocked(map, x, y, G) {
 const VISION_PX = knobs.VISION_PX;
 const SEND_ITEM_RANGE = knobs.SEND_ITEM_RANGE;
 const SEND_GOLD_RANGE = knobs.SEND_GOLD_RANGE;
+const LOOT_RANGE = 40;
+
+/**
+ * Deterministic kill drops: whitelist junk every kill + rotating gear upgrades.
+ * n = world kill counter (stable for tests / viz).
+ */
+function dropsForKill(mtype, n) {
+  const out = [{ name: "frogt", q: 1 }];
+  const gear = ["gloves", "shoes", "helmet", "pants"];
+  if (n % 2 === 0) out.push({ name: gear[(n / 2) % gear.length], level: 0 });
+  if (mtype === "armadillo" && n % 5 === 0) out.push({ name: "leatherboots", level: 0 });
+  return out;
+}
 
 module.exports = {
   baseG,
@@ -181,7 +202,9 @@ module.exports = {
   packCenter,
   boundaryCenter,
   isBlocked,
+  dropsForKill,
   VISION_PX,
   SEND_ITEM_RANGE,
   SEND_GOLD_RANGE,
+  LOOT_RANGE,
 };
