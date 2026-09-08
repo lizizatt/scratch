@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-09-08T01:30:19.509Z",
+  "source": "assumed",
+  "reconnectMs": 55000,
+  "serverRegionDelayMs": 3000,
+  "walkPxPerS": 30,
+  "crossMapBaseMs": 8000,
+  "townMs": 2000,
+  "note": "Calibrate via tools/explore_live.js + Mainframe; keep sim in lockstep with this file until then."
+}

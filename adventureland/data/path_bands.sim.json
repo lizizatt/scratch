@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T01:27:36.849Z",
+  "generatedAt": "2026-09-08T01:30:50.753Z",
   "source": "sim",
   "note": "Baseline from tools/explore_routes.js. Replace/widen with live explorer samples before Mainframe gate.",
   "samples": [
@@ -78,6 +78,44 @@
       "ok": true
     },
     {
+      "id": "potions_to_bank",
+      "ms": 11483,
+      "failed": false,
+      "waypoints": 3,
+      "maps": [
+        "main",
+        "bank"
+      ],
+      "pathLegs": 3,
+      "expectFail": false,
+      "ok": true
+    },
+    {
+      "id": "potions_to_crab",
+      "ms": 41974,
+      "failed": false,
+      "waypoints": 1,
+      "maps": [
+        "main"
+      ],
+      "pathLegs": 1,
+      "expectFail": false,
+      "ok": true
+    },
+    {
+      "id": "town_to_winterland_spawn",
+      "ms": 10426,
+      "failed": false,
+      "waypoints": 2,
+      "maps": [
+        "main",
+        "winterland"
+      ],
+      "pathLegs": 2,
+      "expectFail": false,
+      "ok": true
+    },
+    {
       "id": "phoenix_by_type_fail",
       "ms": 0,
       "failed": true,
@@ -144,6 +182,35 @@
       "maxMs": 39300,
       "maps": [
         "main"
+      ]
+    },
+    "potions_to_bank": {
+      "expectFail": false,
+      "simMs": 11483,
+      "minMs": 5741,
+      "maxMs": 23966,
+      "maps": [
+        "main",
+        "bank"
+      ]
+    },
+    "potions_to_crab": {
+      "expectFail": false,
+      "simMs": 41974,
+      "minMs": 20987,
+      "maxMs": 84948,
+      "maps": [
+        "main"
+      ]
+    },
+    "town_to_winterland_spawn": {
+      "expectFail": false,
+      "simMs": 10426,
+      "minMs": 5213,
+      "maxMs": 21852,
+      "maps": [
+        "main",
+        "winterland"
       ]
     },
     "phoenix_by_type_fail": {

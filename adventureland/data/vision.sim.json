@@ -1,0 +1,8 @@
+{
+  "generatedAt": "2026-09-08T01:30:19.508Z",
+  "source": "assumed",
+  "visionPx": 600,
+  "sendItemRange": 320,
+  "sendGoldRange": 320,
+  "note": "Calibrate via tools/explore_live.js + Mainframe; keep sim in lockstep with this file until then."
+}

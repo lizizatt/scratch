@@ -37,6 +37,7 @@ Sim baseline (no auth) writes `data/path_bands.sim.json`:
 
 ```bash
 node tools/explore_routes.js
+node tools/dump_sim_knobs.js   # vision.sim.json + reconnect.sim.json from sim/knobs.js
 ```
 
 Live stubs (token required; measurement automation still TODO):
@@ -67,4 +68,4 @@ Unit/comms tests show up in the catalog for coverage even without a timeline; pa
 
 ## Status
 
-Sim + party scenarios + dist slots green. Packs coords live in `src/packs.js` (sim re-exports). Sim path-band fixture from `explore_routes.js`. Next (V2_PLAN §12): real Mainframe explorers (vision px, path fail bands, reconnect), then 30‑min gate.
+Sim + party scenarios + dist slots green. Packs in `src/packs.js`; ASSUMED vision/reconnect knobs in `sim/knobs.js` with data fixtures. All 15 roster subsets boot. Next (V2_PLAN §12): live Mainframe explorers → Monte Carlo → 30‑min gate.

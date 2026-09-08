@@ -3,13 +3,14 @@
 const { dist, isBlocked, VISION_PX, SEND_ITEM_RANGE, packCenter, NPC, FARM_XY } = require("./world");
 const { findPath } = require("./path");
 const { createStorage } = require("./storage");
+const knobs = require("./knobs");
 
-const WALK_PX_PER_S = 30; // ~AL walk speed ballpark; explorer will calibrate
-const CROSS_MAP_BASE_MS = 8000;
-const TOWN_MS = 2000;
-const RECONNECT_MS = 55000; // change_server reconnect (LESSONS)
-const SERVER_REGION_DELAY_MS = 3000; // unset after reload
-const PATH_SAMPLE_MS = 2000; // intermediate place() while walking long legs (viz scrub)
+const WALK_PX_PER_S = knobs.WALK_PX_PER_S;
+const CROSS_MAP_BASE_MS = knobs.CROSS_MAP_BASE_MS;
+const TOWN_MS = knobs.TOWN_MS;
+const RECONNECT_MS = knobs.RECONNECT_MS;
+const SERVER_REGION_DELAY_MS = knobs.SERVER_REGION_DELAY_MS;
+const PATH_SAMPLE_MS = knobs.PATH_SAMPLE_MS;
 
 function makeCharState(over) {
   return Object.assign(

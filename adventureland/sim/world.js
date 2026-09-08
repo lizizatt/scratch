@@ -69,6 +69,9 @@ function baseG() {
         doors: [
           { to: "cave", x: -40, y: -300, spawn: 0 },
           { to: "bank", x: 0, y: -50, spawn: 0 },
+          // Stub transporters (real G later); explorer cross-map routes
+          { to: "winterland", x: -50, y: -50, spawn: 0 },
+          { to: "desertland", x: -80, y: -50, spawn: 0 },
         ],
         blocked: [
           // Water / spider-island (LESSONS §1.2)
@@ -110,6 +113,7 @@ function baseG() {
           { type: "wolf", boundary: [400, -2780, 460, -2710] },
         ],
         spawns: [[0, 0]],
+        doors: [{ to: "main", x: 0, y: 0, spawn: 0 }],
       },
       desertland: {
         monsters: [
@@ -117,6 +121,7 @@ function baseG() {
           { type: "gscorpion", boundary: [360, -1460, 420, -1380] },
         ],
         spawns: [[0, 0], [-48, 56]],
+        doors: [{ to: "main", x: 0, y: 0, spawn: 0 }],
       },
       bank: { monsters: [], spawns: [[0, -37]] },
       halloween: { monsters: [], spawns: [[0, 0]] },
@@ -129,6 +134,7 @@ function baseG() {
 }
 
 const { FARM_XY, packCenter } = require("../src/packs");
+const knobs = require("./knobs");
 
 const NPC = {
   potions: { map: "main", x: 56, y: -122 },
@@ -161,9 +167,9 @@ function isBlocked(map, x, y, G) {
 }
 
 /** Default vision radius (px). Explorer will calibrate; ASSUMED until then. */
-const VISION_PX = 600;
-const SEND_ITEM_RANGE = 320;
-const SEND_GOLD_RANGE = 320;
+const VISION_PX = knobs.VISION_PX;
+const SEND_ITEM_RANGE = knobs.SEND_ITEM_RANGE;
+const SEND_GOLD_RANGE = knobs.SEND_GOLD_RANGE;
 
 module.exports = {
   baseG,

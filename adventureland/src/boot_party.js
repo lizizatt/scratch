@@ -21,6 +21,9 @@ function bootParty(opts) {
   const ident = (opts.server && opts.server[1]) || FARM[1];
   const pack = opts.pack || "armadillo";
   const pc = packCenter(pack);
+  const want = opts.members
+    ? new Set(opts.members)
+    : new Set(FIGHTERS.concat(["Puppygirl"]));
 
   const bots = {};
   const tickMs = opts.tickMs || 250;
@@ -39,7 +42,7 @@ function bootParty(opts) {
     const members = FIGHTERS.filter((n) => {
       const wh = w.where(n);
       const api = w.get(n);
-      return wh && wh.key === here.key && api && api.character.connected;
+      return bots[n] && wh && wh.key === here.key && api && api.character.connected;
     });
     if (members.length) w.inviteAll(here.key, members);
   }
@@ -57,6 +60,7 @@ function bootParty(opts) {
   }
 
   function mkFighter(name, ctype, xy) {
+    if (!want.has(name)) return null;
     const api = w.spawn(
       {
         name,
@@ -87,37 +91,42 @@ function bootParty(opts) {
   mkFighter("Sarene", "mage", { x: pc.x - 40, y: pc.y + 40 });
   mkFighter("Zarook", "priest", { x: pc.x + 40, y: pc.y + 40 });
 
-  const mApi = w.spawn(
-    {
-      name: "Puppygirl",
-      ctype: "merchant",
-      level: 40,
-      map: "main",
-      real_x: 56,
-      real_y: -122,
-      gold: 2000000,
-      esize: 30,
-      items: new Array(42).fill(null),
-    },
-    region,
-    ident
-  );
-  bots.Puppygirl = { api: mApi, ctrl: bootMerchant(mApi, { now: () => w.clock.now() }) };
-  wireReload("Puppygirl", bootMerchant);
+  if (want.has("Puppygirl")) {
+    const mApi = w.spawn(
+      {
+        name: "Puppygirl",
+        ctype: "merchant",
+        level: 40,
+        map: "main",
+        real_x: 56,
+        real_y: -122,
+        gold: 2000000,
+        esize: 30,
+        items: new Array(42).fill(null),
+      },
+      region,
+      ident
+    );
+    bots.Puppygirl = { api: mApi, ctrl: bootMerchant(mApi, { now: () => w.clock.now() }) };
+    wireReload("Puppygirl", bootMerchant);
+  }
 
-  w.formParty(region + "/" + ident, FIGHTERS);
+  const partyMembers = FIGHTERS.filter((n) => bots[n]);
+  if (partyMembers.length) w.formParty(region + "/" + ident, partyMembers);
   w.spawnMonster(region + "/" + ident, pc.map, pack, pc);
 
   async function tickAll() {
     const keys = new Set();
-    for (const n of FIGHTERS.concat(["Puppygirl"])) {
+    for (const n of Object.keys(bots)) {
       const wh = w.where(n);
       if (wh) keys.add(wh.key);
     }
     for (const key of keys) w.refreshPartyCoords(key);
 
-    for (const n of FIGHTERS) await bots[n].ctrl.tick();
-    await bots.Puppygirl.ctrl.tick();
+    for (const n of FIGHTERS) {
+      if (bots[n]) await bots[n].ctrl.tick();
+    }
+    if (bots.Puppygirl) await bots.Puppygirl.ctrl.tick();
     w.drainOwedTime();
     w.advance(tickMs);
     if (trace) trace.sample();

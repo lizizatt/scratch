@@ -32,6 +32,21 @@ const ROUTES = [
     to: { map: "main", x: 750, y: 1750 },
   },
   { id: "island_detour", from: { map: "main", x: 56, y: -122 }, to: { map: "main", x: 500, y: 200 } },
+  {
+    id: "potions_to_bank",
+    from: { map: "main", x: NPC.potions.x, y: NPC.potions.y },
+    to: { map: "bank", x: 0, y: -50 },
+  },
+  {
+    id: "potions_to_crab",
+    from: { map: "main", x: NPC.potions.x, y: NPC.potions.y },
+    to: { to: "crab" },
+  },
+  {
+    id: "town_to_winterland_spawn",
+    from: { map: "main", x: 0, y: 0 },
+    to: { map: "winterland", x: 0, y: 0 },
+  },
   { id: "phoenix_by_type_fail", from: { map: "main", x: 0, y: 0 }, to: { to: "phoenix" }, expectFail: true },
 ];
 

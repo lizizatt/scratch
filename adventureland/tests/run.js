@@ -6,6 +6,7 @@ const suites = [
   require("./test_adversarial"),
   require("./test_dist"),
   require("./test_packs"),
+  require("./test_boot_subsets"),
 ];
 
 async function main() {
