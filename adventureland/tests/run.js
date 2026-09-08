@@ -7,6 +7,7 @@ const suites = [
   require("./test_dist"),
   require("./test_packs"),
   require("./test_boot_subsets"),
+  require("./test_mc_mvp"),
 ];
 
 async function main() {

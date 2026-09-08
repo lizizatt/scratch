@@ -31,6 +31,14 @@ node deploy_mcp.js
 node live_observe_v2.js   # optional party snapshot dump
 ```
 
+## Monte Carlo (MVP)
+
+Seeded short farms with path-fail injection + intermittent merchant silence:
+
+```bash
+node tools/mc_mvp.js 20 1 120000
+```
+
 ## Path / vision explorers
 
 Sim baseline (no auth) writes `data/path_bands.sim.json`:
@@ -68,4 +76,4 @@ Unit/comms tests show up in the catalog for coverage even without a timeline; pa
 
 ## Status
 
-Sim + party scenarios + dist slots green. Packs in `src/packs.js`; ASSUMED vision/reconnect knobs in `sim/knobs.js` with data fixtures. All 15 roster subsets boot. Next (V2_PLAN §12): live Mainframe explorers → Monte Carlo → 30‑min gate.
+Sim + party scenarios + dist + boot subsets + MVP Monte Carlo green. Next gate needs Mainframe explorers (vision/path/reconnect live), then 30‑min live farm.
