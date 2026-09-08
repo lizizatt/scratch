@@ -88,6 +88,15 @@ describe("SimulatedHostEngine", () => {
     expect(engine.snapshot().settings).toMatchObject({ metronomeEnabled: true, metronomeVolume: 0.25 });
   });
 
+  it("defaults to strong key response and accepts curve changes", async () => {
+    const engine = new SimulatedHostEngine();
+    expect(engine.snapshot().settings.velocityCurve).toBe("strong");
+
+    await engine.execute({ type: "configure", settings: { velocityCurve: "linear" } });
+
+    expect(engine.snapshot().settings.velocityCurve).toBe("linear");
+  });
+
   it("publishes observable normalized MIDI activity", () => {
     const engine = new SimulatedHostEngine();
     engine.dispatchMidi({ type: "pitch-bend", channel: 0, value: 0.5 });

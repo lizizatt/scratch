@@ -28,6 +28,12 @@ test("connects every selected pane to the host without viewport overflow", async
   await page.getByRole("button", { name: "Options" }).click();
   await expect(page.getByRole("region", { name: "Options" })).toBeVisible();
   await expect(page.getByLabel("Input device")).toHaveValue("software-vortex");
+  const keyResponse = page.getByLabel("Key response");
+  await expect(keyResponse).toHaveValue("strong");
+  await keyResponse.selectOption("linear");
+  await expect(keyResponse).toHaveValue("linear");
+  await keyResponse.selectOption("strong");
+  await expect(keyResponse).toHaveValue("strong");
   const beatCount = Number(await page.getByLabel("Beats per measure").inputValue()) * Number(await page.getByLabel("Loop measures").inputValue());
 
   await page.getByRole("button", { name: "Synth" }).click();

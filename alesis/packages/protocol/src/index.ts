@@ -1,11 +1,12 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 1 as const;
+export const PROTOCOL_VERSION = 2 as const;
 
 const waveformSchema = z.array(z.number().min(-1).max(1)).max(256);
 const takeIdSchema = z.string().min(1).max(128);
 export const exportNameSchema = z.string().trim().min(1).max(80).regex(/^[a-zA-Z0-9][a-zA-Z0-9 _-]*$/);
 export const quantizationModeSchema = z.enum(["off", "1/4", "1/8", "1/16", "1/32"]);
+export const velocityCurveSchema = z.enum(["linear", "responsive", "strong", "fixed"]);
 
 export const dependencyReadinessSchema = z.object({
   ready: z.boolean(),
@@ -26,6 +27,7 @@ export const settingsSchema = z.object({
   loopMeasures: z.number().int().min(1).max(128),
   midiInputId: z.string(),
   audioOutputId: z.string(),
+  velocityCurve: velocityCurveSchema,
   metronomeEnabled: z.boolean(),
   metronomeVolume: z.number().min(0).max(1),
   countInEnabled: z.boolean(),
@@ -177,6 +179,7 @@ export type SoundFontPreset = z.infer<typeof soundFontPresetSchema>;
 export type ArpeggiatorSettings = z.infer<typeof arpeggiatorSchema>;
 export type DrumSettings = z.infer<typeof drumSettingsSchema>;
 export type QuantizationMode = z.infer<typeof quantizationModeSchema>;
+export type VelocityCurve = z.infer<typeof velocityCurveSchema>;
 export type DependencyReadiness = z.infer<typeof dependencyReadinessSchema>;
 export type Readiness = z.infer<typeof readinessSchema>;
 export type EngineSnapshot = z.infer<typeof engineSnapshotSchema>;

@@ -95,6 +95,12 @@ report the selected identity in diagnostics. The attached Vortex cable receiver
 is `13b2:005e`, with ALSA sequencer name `Vortex Wireless 2`; the wireless USB
 receiver variant previously observed on the development host was `13b2:005f`.
 
+A 15-strike keybed capture measured soft velocities at 20-35 (mean 28), normal
+at 24-51 (mean 38), and firm at 68-77 (mean 72). Since the official Windows/macOS
+preset editor is unavailable for this used unit, the host defaults to Strong
+mapping: positive note-on velocity becomes `min(127, round(1.5v + 10))`.
+Linear, a milder 1.35x Responsive curve, and Fixed 127 remain selectable.
+
 ## Power and storage behavior
 
 PiSugar S Plus has no battery-status data interface. Its documented battery

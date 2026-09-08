@@ -46,6 +46,7 @@ describe("control protocol", () => {
         loopMeasures: 4,
         midiInputId: "software-vortex",
         audioOutputId: "simulated-output",
+        velocityCurve: "strong",
         metronomeEnabled: true,
         metronomeVolume: 0.65,
         countInEnabled: true,

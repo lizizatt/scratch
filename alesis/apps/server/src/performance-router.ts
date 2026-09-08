@@ -1,4 +1,15 @@
 import type { MidiEvent } from "@alesis/engine";
+import type { VelocityCurve } from "@alesis/protocol";
+
+export function applyVelocityCurve(event: MidiEvent, curve: VelocityCurve): MidiEvent {
+  if (event.type !== "note-on" || event.velocity === 0 || curve === "linear") return event;
+  const velocity = curve === "fixed"
+    ? 127
+    : curve === "strong"
+      ? Math.round(event.velocity * 1.5 + 10)
+      : Math.round(event.velocity * 1.35);
+  return { ...event, velocity: Math.max(1, Math.min(127, velocity)) };
+}
 
 export class PerformanceRouter {
   private readonly heldNotes = new Map<string, number>();

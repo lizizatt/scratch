@@ -10,6 +10,8 @@ fixed bottom-left navigation, and no document-level page scrolling.
 - BPM, beats per measure, and loop measures define cycle duration.
 - Timing changes with captured material require confirmation and clear it.
 - MIDI input, audio output, count-in, metronome enablement, and metronome volume are host settings.
+- Key Response selects Linear, Responsive, Strong, or Fixed 127 note-on
+	velocity mapping. Strong is the default for the Vortex.
 - Count-in runs before each Play from Stop.
 
 ## Synth

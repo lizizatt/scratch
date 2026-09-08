@@ -1,7 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { PerformanceRouter } from "./performance-router.js";
+import { applyVelocityCurve, PerformanceRouter } from "./performance-router.js";
 
 describe("PerformanceRouter", () => {
+  it("maps measured Vortex note velocities through selectable host curves", () => {
+    const note = { type: "note-on", channel: 0, note: 60, velocity: 20 } as const;
+
+    expect(applyVelocityCurve(note, "linear")).toEqual(note);
+    expect(applyVelocityCurve(note, "responsive")).toMatchObject({ velocity: 27 });
+    expect(applyVelocityCurve(note, "strong")).toMatchObject({ velocity: 40 });
+    expect(applyVelocityCurve(note, "fixed")).toMatchObject({ velocity: 127 });
+    expect(applyVelocityCurve({ ...note, velocity: 38 }, "strong")).toMatchObject({ velocity: 67 });
+    expect(applyVelocityCurve({ ...note, velocity: 72 }, "strong")).toMatchObject({ velocity: 118 });
+    expect(applyVelocityCurve({ ...note, velocity: 100 }, "strong")).toMatchObject({ velocity: 127 });
+  });
+
+  it("does not curve note releases or non-note expression", () => {
+    expect(applyVelocityCurve({ type: "note-on", channel: 0, note: 60, velocity: 0 }, "strong")).toEqual({ type: "note-on", channel: 0, note: 60, velocity: 0 });
+    expect(applyVelocityCurve({ type: "note-off", channel: 0, note: 60 }, "strong")).toEqual({ type: "note-off", channel: 0, note: 60 });
+    expect(applyVelocityCurve({ type: "channel-pressure", channel: 0, value: 20 }, "strong")).toEqual({ type: "channel-pressure", channel: 0, value: 20 });
+  });
+
   it("routes a global pitch wheel onto the held note channel", () => {
     const router = new PerformanceRouter();
     router.route({ type: "note-on", channel: 1, note: 67, velocity: 103 });

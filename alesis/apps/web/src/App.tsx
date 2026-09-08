@@ -58,6 +58,7 @@ function SettingsPane({ snapshot, send }: PaneProps) {
     snapshot.settings.loopMeasures,
     snapshot.settings.midiInputId,
     snapshot.settings.audioOutputId,
+    snapshot.settings.velocityCurve,
     snapshot.settings.metronomeEnabled,
     snapshot.settings.metronomeVolume,
     snapshot.settings.countInEnabled,
@@ -95,7 +96,7 @@ function SettingsPane({ snapshot, send }: PaneProps) {
     setDraft((current) => ({ ...current, [field]: checked }));
     send({ type: "configure", settings: { [field]: checked } });
   };
-  const updateDevice = (field: "midiInputId" | "audioOutputId") => (event: ChangeEvent<HTMLSelectElement>) => {
+  const updateSelection = (field: "midiInputId" | "audioOutputId" | "velocityCurve") => (event: ChangeEvent<HTMLSelectElement>) => {
     const value = event.target.value;
     setDraft((current) => ({ ...current, [field]: value }));
     send({ type: "configure", settings: { [field]: value } });
@@ -107,8 +108,9 @@ function SettingsPane({ snapshot, send }: PaneProps) {
         <Setting label="BPM"><input aria-label="BPM" type="number" min="30" max="300" value={numberDraft.bpm} onChange={setNumber("bpm")} onBlur={commitNumber("bpm")} onKeyDown={commitOnEnter} /></Setting>
         <Setting label="Beats per measure"><input aria-label="Beats per measure" type="number" min="1" max="16" value={numberDraft.beatsPerMeasure} onChange={setNumber("beatsPerMeasure")} onBlur={commitNumber("beatsPerMeasure")} onKeyDown={commitOnEnter} /></Setting>
         <Setting label="Loop measures"><input aria-label="Loop measures" type="number" min="1" max="128" value={numberDraft.loopMeasures} onChange={setNumber("loopMeasures")} onBlur={commitNumber("loopMeasures")} onKeyDown={commitOnEnter} /></Setting>
-        <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateDevice("midiInputId")}><option value={draft.midiInputId}>{draft.midiInputId.startsWith("alsa") ? "Vortex Wireless 2" : "Software Vortex"}</option></select></Setting>
-        <Setting label="Output device"><select aria-label="Output device" value={draft.audioOutputId} onChange={updateDevice("audioOutputId")}><option value={draft.audioOutputId}>{draft.audioOutputId.startsWith("alsa:") ? "CM108 USB audio" : "Simulated output"}</option></select></Setting>
+        <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateSelection("midiInputId")}><option value={draft.midiInputId}>{draft.midiInputId.startsWith("alsa") ? "Vortex Wireless 2" : "Software Vortex"}</option></select></Setting>
+        <Setting label="Output device"><select aria-label="Output device" value={draft.audioOutputId} onChange={updateSelection("audioOutputId")}><option value={draft.audioOutputId}>{draft.audioOutputId.startsWith("alsa:") ? "CM108 USB audio" : "Simulated output"}</option></select></Setting>
+        <Setting label="Key response"><select aria-label="Key response" value={draft.velocityCurve} onChange={updateSelection("velocityCurve")}><option value="linear">Linear</option><option value="responsive">Responsive</option><option value="strong">Strong</option><option value="fixed">Fixed 127</option></select></Setting>
         <Setting label="Metronome"><input aria-label="Metronome" type="checkbox" checked={draft.metronomeEnabled} onChange={updateBoolean("metronomeEnabled")} /></Setting>
         <Setting label="Click volume"><input aria-label="Click volume" type="range" min="0" max="100" value={numberDraft.metronomeVolume} onChange={setNumber("metronomeVolume")} onBlur={commitNumber("metronomeVolume", 0.01)} /></Setting>
         <Setting label="Count-in"><input aria-label="Count-in" type="checkbox" checked={draft.countInEnabled} onChange={updateBoolean("countInEnabled")} /></Setting>

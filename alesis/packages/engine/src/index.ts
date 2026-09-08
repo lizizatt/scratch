@@ -99,6 +99,7 @@ export class SimulatedHostEngine implements HostEngine {
         loopMeasures: 4,
         midiInputId: "software-vortex",
         audioOutputId: "simulated-output",
+        velocityCurve: "strong",
         metronomeEnabled: true,
         metronomeVolume: 0.25,
         countInEnabled: true,
@@ -293,6 +294,7 @@ export class SimulatedHostEngine implements HostEngine {
         if (settings.loopMeasures !== undefined) this.state.settings.loopMeasures = settings.loopMeasures;
         if (settings.midiInputId !== undefined) this.state.settings.midiInputId = settings.midiInputId;
         if (settings.audioOutputId !== undefined) this.state.settings.audioOutputId = settings.audioOutputId;
+        if (settings.velocityCurve !== undefined) this.state.settings.velocityCurve = settings.velocityCurve;
         if (settings.metronomeEnabled !== undefined) this.state.settings.metronomeEnabled = settings.metronomeEnabled;
         if (settings.metronomeVolume !== undefined) this.state.settings.metronomeVolume = settings.metronomeVolume;
         if (settings.countInEnabled !== undefined) this.state.settings.countInEnabled = settings.countInEnabled;

@@ -10,7 +10,7 @@ import { DrumPatternScheduler } from "./drum-patterns.js";
 import { MidiLoopScheduler } from "./loop-playback.js";
 import { MetronomeScheduler } from "./metronome.js";
 import { exportMp3Session } from "./mp3-exporter.js";
-import { PerformanceRouter } from "./performance-router.js";
+import { applyVelocityCurve, PerformanceRouter } from "./performance-router.js";
 import { DeviceHotplugCoordinator } from "./hotplug.js";
 
 let soundFonts = discoverSoundFonts();
@@ -73,8 +73,9 @@ const dispatchPerformance = (event: MidiEvent): void => {
   audio.dispatchMidi(event);
 };
 const handleMidi = (event: MidiEvent): void => {
-  engine.dispatchMidi(event);
-  for (const routedEvent of performanceRouter.route(event)) {
+  const curvedEvent = applyVelocityCurve(event, engine.snapshot().settings.velocityCurve);
+  engine.dispatchMidi(curvedEvent);
+  for (const routedEvent of performanceRouter.route(curvedEvent)) {
     for (const outputEvent of arpeggiator.handle(routedEvent)) dispatchPerformance(outputEvent);
   }
 };
