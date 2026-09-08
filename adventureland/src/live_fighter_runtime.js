@@ -42,10 +42,12 @@ function v2_start_fighter(opts) {
       }
       const p = ctrl.tick();
       if (p && typeof p.then === "function") p.catch(function (e) {
-        game_log("tick:" + ((e && e.reason) || (e && e.message) || e));
+        const msg = e && e.message ? e.message : e && e.reason ? e.reason : e;
+        game_log("tick:" + (typeof msg === "string" ? msg : JSON.stringify(msg)));
       });
     } catch (e) {
-      game_log("tick:" + ((e && e.reason) || (e && e.message) || e));
+      const msg = e && e.message ? e.message : e && e.reason ? e.reason : e;
+      game_log("tick:" + (typeof msg === "string" ? msg : JSON.stringify(msg)));
     }
   }, 250);
   return ctrl;

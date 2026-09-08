@@ -39,6 +39,14 @@ function createAlApi() {
     sell: typeof sell === "function" ? sell : async function () {},
     send_item: typeof send_item === "function" ? send_item : async function () {},
     send_gold: typeof send_gold === "function" ? send_gold : function () {},
+    bank_store: typeof bank_store === "function" ? bank_store : async function () {},
+    bank_retrieve: typeof bank_retrieve === "function" ? bank_retrieve : async function () {},
+    equip: typeof equip === "function" ? equip : async function () {},
+    upgrade: typeof upgrade === "function" ? upgrade : async function () {},
+    compound: typeof compound === "function" ? compound : async function () {},
+    trade: typeof trade === "function" ? trade : function () {},
+    open_stand: typeof open_stand === "function" ? open_stand : function () {},
+    close_stand: typeof close_stand === "function" ? close_stand : function () {},
     use: typeof use === "function" ? use : function () {},
     use_skill: typeof use_skill === "function" ? use_skill : function () {},
     attack: typeof attack === "function" ? attack : function () {},
@@ -171,6 +179,39 @@ function createAlApi() {
     },
     send_gold(name, amount) {
       return g.send_gold(name, amount);
+    },
+    async bank_store(i) {
+      if (typeof bank_store === "function") return bank_store(i);
+      throw { reason: "no_bank_store" };
+    },
+    async bank_retrieve(pack, i) {
+      if (typeof bank_retrieve === "function") return bank_retrieve(pack, i);
+      throw { reason: "no_bank_retrieve" };
+    },
+    async equip(i, slot) {
+      if (typeof equip === "function") return equip(i, slot);
+      throw { reason: "no_equip" };
+    },
+    async upgrade(itemI, scrollI, offering, calculate) {
+      if (typeof upgrade === "function") return upgrade(itemI, scrollI, offering, calculate);
+      throw { reason: "no_upgrade" };
+    },
+    async compound(a, b, cSlot, scrollI) {
+      if (typeof compound === "function") return compound(a, b, cSlot, scrollI);
+      throw { reason: "no_compound" };
+    },
+    trade(i, price) {
+      if (typeof trade === "function") return trade(i, price);
+    },
+    open_stand() {
+      try {
+        if (typeof open_stand === "function") open_stand();
+      } catch (e) {}
+    },
+    close_stand() {
+      try {
+        if (typeof close_stand === "function") close_stand();
+      } catch (e) {}
     },
     use(skill) {
       return g.use(skill);

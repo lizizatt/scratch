@@ -4,6 +4,18 @@
  * Live helpers for v2_merchant slot — exposes hunt/world/hold on global for console.
  */
 
+function v2_err(e) {
+  if (e == null) return String(e);
+  if (typeof e === "string") return e;
+  if (e.message) return e.message;
+  if (e.reason) return String(e.reason);
+  try {
+    return JSON.stringify(e);
+  } catch (x) {
+    return String(e);
+  }
+}
+
 function v2_start_merchant() {
   const api = createAlApi();
   const ctrl = bootMerchant(api, {});
@@ -26,11 +38,12 @@ function v2_start_merchant() {
   setInterval(function () {
     try {
       const p = ctrl.tick();
-      if (p && typeof p.then === "function") p.catch(function (e) {
-        game_log("mtick:" + (e && e.message ? e.message : e));
-      });
+      if (p && typeof p.then === "function")
+        p.catch(function (e) {
+          game_log("mtick:" + v2_err(e));
+        });
     } catch (e) {
-      game_log("mtick:" + (e && e.message ? e.message : e));
+      game_log("mtick:" + v2_err(e));
     }
   }, 400);
   return ctrl;
