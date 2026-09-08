@@ -86,9 +86,36 @@ function gradeFarmObserve(result) {
 }
 
 /**
+ * One cohesion poll: all listed fighters connected, same server, within R of pack center.
+ * @returns {boolean}
+ */
+function samplePack(world, opts) {
+  opts = opts || {};
+  const fighters = opts.fighters || ["Jazwyn", "Sarene", "Zarook"];
+  const pack = opts.pack;
+  if (!pack) return false;
+  const { packCenter } = require("./world");
+  const pc = packCenter(pack);
+  if (!pc) return false;
+  const R = opts.R != null ? opts.R : 500;
+  let server = null;
+  for (const f of fighters) {
+    const api = world.get(f);
+    if (!api || !api.character.connected) return false;
+    const w = world.where(f);
+    if (!w) return false;
+    if (!server) server = w.key;
+    if (w.key !== server) return false;
+    if (api.character.map !== pc.map) return false;
+    if (world.dist(api.character, pc) > R) return false;
+  }
+  return true;
+}
+
+/**
  * Grade sim character logs after a scenario.
  * @param {object} world createWorld() instance
- * @param {object} opts { fighters, pack, R }
+ * @param {object} opts { fighters, pack, R, packHits: {samples,on_pack} }
  */
 function gradeSim(world, opts) {
   opts = opts || {};
@@ -106,30 +133,13 @@ function gradeSim(world, opts) {
   }
   const c = gradeLogs(lines, { fighters });
 
-  // attendance sample
-  if (opts.pack) {
-    const { packCenter } = require("./world");
-    const pc = packCenter(opts.pack);
-    const R = opts.R != null ? opts.R : 500;
-    if (pc) {
-      c.samples++;
-      let ok = true;
-      let server = null;
-      for (const f of fighters) {
-        const api = world.get(f);
-        if (!api || !api.character.connected) {
-          ok = false;
-          break;
-        }
-        const w = world.where(f);
-        if (!server) server = w.key;
-        if (w.key !== server) ok = false;
-        if (api.character.map !== pc.map) ok = false;
-        const d = world.dist(api.character, pc);
-        if (d > R) ok = false;
-      }
-      if (ok) c.on_pack++;
-    }
+  if (opts.packHits) {
+    c.samples += opts.packHits.samples || 0;
+    c.on_pack += opts.packHits.on_pack || 0;
+  } else if (opts.pack) {
+    // Single end-of-run poll (prefer packHits collected during the run)
+    c.samples++;
+    if (samplePack(world, opts)) c.on_pack++;
   }
   return c;
 }
@@ -155,5 +165,6 @@ module.exports = {
   gradeLogs,
   gradeFarmObserve,
   gradeSim,
+  samplePack,
   mvpPass,
 };

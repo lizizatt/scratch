@@ -42,6 +42,7 @@ function bootFighter(api, opts) {
   let lastStatusAt = 0;
   let assembleUntil = 0;
   let rareGoneAt = 0;
+  let bootQuietUntil = 0;
 
   function persist() {
     try {
@@ -93,6 +94,16 @@ function bootFighter(api, opts) {
     const lead = state.currentLeader(present);
     state.S.lead = lead;
     return lead === name;
+  }
+
+  /** Lead seq must climb above anything heard (plan §6.6.6). */
+  function reseedSeqAboveHeard() {
+    let maxH = 0;
+    for (const n of Object.keys(state.S.seq)) {
+      if (n === name) continue;
+      maxH = Math.max(maxH, state.S.seq[n] || 0);
+    }
+    if ((state.S.seq[name] || 0) <= maxH) state.S.seq[name] = maxH + 1;
   }
 
   function refreshPots() {
@@ -306,10 +317,17 @@ function bootFighter(api, opts) {
       }
     } else if (cmd === "world" && parsed.args[0]) {
       const parts = parsed.args[0].split("/");
-      if (isLead()) state.setIntent({ world: parts }, present);
-      else state.S.intent.world = parts;
+      if (isLead()) state.setIntent({ world: parts, hold: 0, kind: "farm" }, present);
+      else {
+        state.S.intent.world = parts;
+        state.S.intent.hold = 0;
+        state.S.intent.kind = "farm";
+      }
     }
-    if (mine) chat.enqueue("!" + cmd + (parsed.args[0] ? " " + parsed.args[0] : ""), "echo");
+    if (mine) {
+      chat.enqueue("!" + cmd + (parsed.args[0] ? " " + parsed.args[0] : ""), "echo");
+      chat.tick(api._now());
+    }
     persist();
   }
 
@@ -518,7 +536,8 @@ function bootFighter(api, opts) {
       return;
     }
     motion.evalPresent(now);
-    if (isLead() && now - lastHb >= HEARTBEAT_MS) {
+    if (isLead() && now >= bootQuietUntil && now - lastHb >= HEARTBEAT_MS) {
+      reseedSeqAboveHeard();
       lastHb = now;
       chat.enqueue(state.formatHeartbeat(), "hb");
     }
@@ -534,6 +553,22 @@ function bootFighter(api, opts) {
   }
 
   restore();
+  // Fresh boot: party_state defaults mtype to armadillo — honor opts.farm (bee/goo/…).
+  // After hop, storage restore already applied intent; leave it.
+  if (opts.farm) {
+    let hadIntent = false;
+    try {
+      const raw = api.storage.getItem(SK);
+      if (raw) {
+        const d = JSON.parse(raw);
+        hadIntent = !!(d && d.intent && d.intent.mtype);
+      }
+    } catch (e) {}
+    if (!hadIntent) state.S.intent.mtype = opts.farm;
+  }
+  // Plan §6.6.6: listen one heartbeat cycle, reseed above heard, then publish
+  lastHb = 0;
+  bootQuietUntil = api._now() + HEARTBEAT_MS;
 
   if (typeof api.clearHandlers === "function") api.clearHandlers();
   api.on("partym", hearParty);
@@ -559,8 +594,8 @@ function bootFighter(api, opts) {
       return dlvPending;
     },
     _setDlv(p) {
+      // Test helper: set pending only — do not fake status (hearCm {status} bumps lastStatusAt)
       dlvPending = p;
-      lastStatusAt = api._now();
       persist();
     },
   };

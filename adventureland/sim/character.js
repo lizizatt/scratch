@@ -169,7 +169,9 @@ function createCharacter(world, over) {
       for (const n of names) {
         if (world.deliverCm(c.name, n, message)) receivers.push(n);
       }
-      log.cm.push({ to: names, message, receivers });
+      const clk = world.clock;
+      clk._evt = (clk._evt || 0) + 1;
+      log.cm.push({ t: clk.now(), i: clk._evt, to: names, message, receivers });
       return { receivers, locals: [] };
     },
 
@@ -364,7 +366,12 @@ function createCharacter(world, over) {
     },
 
     change_server(region, ident) {
-      log.server.push([region, ident]);
+      const clk = world.clock;
+      clk._evt = (clk._evt || 0) + 1;
+      const hop = [region, ident];
+      hop.t = clk.now();
+      hop.i = clk._evt;
+      log.server.push(hop);
       // Persist storage; wipe heap-like flags
       const persisted = storage._dump();
       world.changeServer(c.name, region, ident, {

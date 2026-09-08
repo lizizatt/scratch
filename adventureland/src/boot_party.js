@@ -52,6 +52,7 @@ function bootParty(opts) {
       const ctrl = bootFn(api, {
         now: () => w.clock.now(),
         burnPots: !!opts.burnPots,
+        farm: pack,
       });
       bots[name].ctrl = ctrl;
       bots[name].api = api;
@@ -81,6 +82,7 @@ function bootParty(opts) {
     const ctrl = bootFighter(api, {
       now: () => w.clock.now(),
       burnPots: !!opts.burnPots,
+      farm: pack,
     });
     bots[name] = { api, ctrl };
     wireReload(name, bootFighter);

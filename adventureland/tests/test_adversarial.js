@@ -169,8 +169,14 @@ test("hold: hop-prep emits cancel_all before server change", async () => {
     if (p.world.where("Jazwyn").key === "US/II" && p.bots.Jazwyn.api.character.connected) break;
   }
   assert.ok(p.bots.Jazwyn.api.character.connected);
-  assert.ok(p.bots.Jazwyn.api.log.cm.some((c) => c.message && c.message.job === "cancel_all"));
-  assert.ok(p.bots.Jazwyn.api.log.server.some((s) => s[0] === "US" && s[1] === "II"));
+  const cancel = p.bots.Jazwyn.api.log.cm.find((c) => c.message && c.message.job === "cancel_all");
+  const meet = p.bots.Jazwyn.api.log.cm.find((c) => c.message && c.message.job === "meet_home");
+  const hop = p.bots.Jazwyn.api.log.server.find((s) => s[0] === "US" && s[1] === "II");
+  assert.ok(cancel, "cancel_all");
+  assert.ok(meet, "meet_home");
+  assert.ok(hop, "hop HOME");
+  assert.ok(cancel.i < hop.i, "cancel_all before change_server (i " + cancel.i + " vs " + hop.i + ")");
+  assert.ok(meet.i < hop.i, "meet_home before change_server");
 });
 
 test("delivery: status flowing prevents town_fallback", async () => {
@@ -178,18 +184,20 @@ test("delivery: status flowing prevents town_fallback", async () => {
   await p.bots.Jazwyn.ctrl.requestPots();
   const id = p.bots.Jazwyn.ctrl.dlvPending && p.bots.Jazwyn.ctrl.dlvPending.id;
   assert.ok(id);
-  for (let i = 0; i < 500; i++) {
-    // inject status every 30s without completing delivery
+  // Real ack + status CMs (not _setDlv refreshing lastStatusAt)
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", { dlv_ack: 1, id, ok: 1 });
+  await p.bots.Jazwyn.ctrl.tick();
+  assert.strictEqual(p.bots.Jazwyn.ctrl.dlvPending.acked, 1);
+  // > PENDING_MS (480s) with status every ~30s must not town_fallback
+  for (let i = 0; i < 2200; i++) {
     if (i % 120 === 0) {
-      p.bots.Jazwyn.ctrl._setDlv({ id, t0: p.world.clock.now() - 5000, acked: 1 });
-      // simulate status bump
-      await p.bots.Jazwyn.api.send_cm; // no-op keep lint calm
-      p.bots.Jazwyn.ctrl._setDlv({ id, t0: p.world.clock.now() - 5000, acked: 1 });
+      await p.bots.Puppygirl.api.send_cm("Jazwyn", { status: 1, id, phase: "enroute" });
     }
     await p.bots.Jazwyn.ctrl.tick();
     p.world.advance(250);
   }
   assert.ok(!p.bots.Jazwyn.api.log.game.some((g) => /town_fallback/.test(g.m)));
+  assert.ok(p.bots.Jazwyn.ctrl.dlvPending && p.bots.Jazwyn.ctrl.dlvPending.id === id);
 });
 
 test("hop: heap wipe clears handlers; storage restores hold; party re-invite", async () => {
