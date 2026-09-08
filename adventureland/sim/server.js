@@ -202,6 +202,8 @@ function createWorld(opts) {
     const bag = monsterBags.get(k);
     const mid = id || mtype + "_" + Object.keys(bag).length;
     const g = G.monsters[mtype] || { attack: 10 };
+    // Farmable packs die in a few swings so viz shows kill cycles
+    const maxHp = g.hp || (mtype === "phoenix" ? 4000 : 280);
     bag[mid] = {
       id: mid,
       type: "monster",
@@ -213,10 +215,57 @@ function createWorld(opts) {
       y: xy.y,
       attack: g.attack,
       dead: false,
-      hp: 1000,
-      max_hp: 1000,
+      hp: maxHp,
+      max_hp: maxHp,
+      respawnAt: 0,
     };
     return bag[mid];
+  }
+
+  /** Respawn dead pack mobs; call from world.advance. */
+  function tickMonsters() {
+    const now = clock.now();
+    for (const bag of monsterBags.values()) {
+      for (const id of Object.keys(bag)) {
+        const m = bag[id];
+        if (!m || !m.dead || !m.respawnAt || now < m.respawnAt) continue;
+        m.dead = false;
+        m.hp = m.max_hp;
+        m.target = null;
+        m.respawnAt = 0;
+        // Small jitter so respawns "pop" nearby rather than exact corpse xy
+        const jx = ((Math.abs(hashStr(id + now)) % 70) - 35);
+        const jy = ((Math.abs(hashStr(id + "y" + now)) % 70) - 35);
+        m.real_x = (m._homeX != null ? m._homeX : m.real_x) + jx;
+        m.real_y = (m._homeY != null ? m._homeY : m.real_y) + jy;
+        m.x = m.real_x;
+        m.y = m.real_y;
+      }
+    }
+  }
+
+  function hashStr(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return h;
+  }
+
+  function spawnPack(serverKey, map, mtype, center, count) {
+    count = count == null ? 5 : count;
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const ang = (i / count) * Math.PI * 2;
+      const rad = 40 + (i % 3) * 25;
+      const xy = {
+        x: Math.round(center.x + Math.cos(ang) * rad),
+        y: Math.round(center.y + Math.sin(ang) * rad),
+      };
+      const m = spawnMonster(serverKey, map, mtype, xy, mtype + "_p" + i);
+      m._homeX = center.x;
+      m._homeY = center.y;
+      out.push(m);
+    }
+    return out;
   }
 
   function formParty(serverKey, members) {
@@ -301,7 +350,10 @@ function createWorld(opts) {
     return n;
   }
 
-  clock.onAdvance(() => tickReconnects());
+  clock.onAdvance(() => {
+    tickReconnects();
+    tickMonsters();
+  });
 
   return {
     clock,
@@ -309,6 +361,8 @@ function createWorld(opts) {
     comms,
     spawn,
     spawnMonster,
+    spawnPack,
+    tickMonsters,
     formParty,
     refreshPartyCoords,
     tickReconnects,

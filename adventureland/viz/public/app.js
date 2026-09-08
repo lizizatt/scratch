@@ -390,8 +390,25 @@
 
     for (const m of frame.monsters || []) {
       if (m.map !== (onCave ? "cave" : "main")) continue;
+      const px = sx(m.x);
+      const py = sy(m.y);
+      const maxHp = m.max_hp || 1;
+      const hp = m.hp != null ? m.hp : maxHp;
+      const ratio = Math.max(0, Math.min(1, hp / maxHp));
+      if (m.dead) {
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = "#6a5a52";
+        ctx.fillRect(px - 5, py - 5, 10, 10);
+        ctx.globalAlpha = 1;
+        continue;
+      }
       ctx.fillStyle = "#c45c4a";
-      ctx.fillRect(sx(m.x) - 4, sy(m.y) - 4, 8, 8);
+      ctx.fillRect(px - 5, py - 5, 10, 10);
+      // HP bar
+      ctx.fillStyle = "#2a2420";
+      ctx.fillRect(px - 8, py - 12, 16, 3);
+      ctx.fillStyle = ratio > 0.35 ? "#6aaf6a" : "#d45c4a";
+      ctx.fillRect(px - 8, py - 12, 16 * ratio, 3);
     }
 
     for (const name of Object.keys(frame.chars || {})) {
@@ -403,6 +420,28 @@
       ctx.beginPath();
       ctx.arc(sx(c.x), sy(c.y), r, 0, Math.PI * 2);
       ctx.fill();
+      // Facing tick for tank
+      if (c.angle != null && name === "Jazwyn") {
+        ctx.strokeStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(sx(c.x), sy(c.y));
+        ctx.lineTo(sx(c.x) + Math.cos(c.angle) * 14, sy(c.y) + Math.sin(c.angle) * 14);
+        ctx.stroke();
+      }
+      // Attack line to target monster
+      if (c.target && frame.monsters) {
+        const tm = frame.monsters.find((m) => m.id === c.target && !m.dead);
+        if (tm && tm.map === c.map) {
+          ctx.strokeStyle = col;
+          ctx.globalAlpha = 0.45;
+          ctx.beginPath();
+          ctx.moveTo(sx(c.x), sy(c.y));
+          ctx.lineTo(sx(tm.x), sy(tm.y));
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+      ctx.fillStyle = col;
       ctx.fillText(name[0], sx(c.x) + 9, sy(c.y) - 5);
     }
   }

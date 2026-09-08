@@ -100,14 +100,14 @@ function attachTrace(world, opts) {
   }
 
   function snapshotMonsters() {
-    // Best-effort: monsters live in server bags; expose via entities if present on farm map
+    // Include living + recently-dead (pre-respawn) so viz can show kill/pop cycles
     const out = [];
     for (const [name, r] of world.roster) {
       if (!r.api) continue;
       const ents = r.api.parent.entities || {};
       for (const id of Object.keys(ents)) {
         const e = ents[id];
-        if (!e || e.type !== "monster" || e.dead) continue;
+        if (!e || e.type !== "monster") continue;
         if (out.some((m) => m.id === e.id)) continue;
         out.push({
           id: e.id,
@@ -115,6 +115,10 @@ function attachTrace(world, opts) {
           map: e.map,
           x: e.real_x != null ? e.real_x : e.x,
           y: e.real_y != null ? e.real_y : e.y,
+          hp: e.hp != null ? e.hp : e.max_hp,
+          max_hp: e.max_hp || e.hp || 1,
+          dead: !!e.dead,
+          target: e.target || null,
         });
       }
       break; // one character's vision bag is enough for same-map farm
@@ -143,6 +147,8 @@ function attachTrace(world, opts) {
         esize: ch.esize,
         gold: ch.gold,
         ctype: ch.ctype,
+        target: ch.target || null,
+        angle: ch.angle != null ? ch.angle : null,
       };
     }
     frames.push({ t, chars, monsters: snapshotMonsters() });

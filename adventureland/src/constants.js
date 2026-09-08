@@ -10,6 +10,18 @@ const CHAT_GAP_MS = 16000;
 const HEARTBEAT_MS = 60000;
 const FORM_R_IN = 220;
 const FORM_R_OUT = 400;
+/** Loose formation (legacy fighter_core): near/far band + re-anchor. */
+const FORM_NEAR = 18;
+const FORM_FAR = 40;
+const FORM_REANCHOR = 70;
+const FORM_MAGE = { dx: -45, dy: 55, face: 1 };
+const FORM_PRIEST = { dx: 45, dy: 55, face: 1 };
+const ATTACK_MS = 800;
+const PACK_COUNT = 5;
+const RESPAWN_MS = 10000;
+const MELEE_RANGE = 40;
+const MAGE_RANGE = 120;
+const PRIEST_RANGE = 100;
 const PRESENT_EXIT_MS = 20000;
 const WAIT_PARTY_MS = 90000;
 const ACK_MS = 20000;
@@ -36,6 +48,17 @@ module.exports = {
   HEARTBEAT_MS,
   FORM_R_IN,
   FORM_R_OUT,
+  FORM_NEAR,
+  FORM_FAR,
+  FORM_REANCHOR,
+  FORM_MAGE,
+  FORM_PRIEST,
+  ATTACK_MS,
+  PACK_COUNT,
+  RESPAWN_MS,
+  MELEE_RANGE,
+  MAGE_RANGE,
+  PRIEST_RANGE,
   PRESENT_EXIT_MS,
   WAIT_PARTY_MS,
   ACK_MS,

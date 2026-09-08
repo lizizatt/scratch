@@ -17,6 +17,8 @@ module.exports = {
   /** server_region unset after reload (sim delay before go_s can fire); live probe inconclusive */
   SERVER_REGION_DELAY_MS: 3000,
   PATH_SAMPLE_MS: 2000,
+  ATTACK_MS: 800,
+  RESPAWN_MS: 10000,
   source: "assumed",
   note: "Calibrate via tools/explore_live.js + Mainframe; keep sim in lockstep with this file until then.",
 };

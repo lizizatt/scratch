@@ -105,8 +105,12 @@ async function main() {
 
   // Curated scrubbable party scenarios (full bootParty runs)
   recorded.push(
-    await record("farm-1min", "scenario: farm armadillo 1 min", ["farm", "chat"], async (o) => {
-      const p = bootParty(Object.assign({ pack: "armadillo", pots: 200 }, o));
+    await record("farm-1min", "scenario: farm armadillo 1 min", ["farm", "chat", "combat"], async (o) => {
+      const p = bootParty(
+        Object.assign({ pack: "armadillo", pots: 200 }, o, {
+          trace: Object.assign({}, o.trace, { sampleMs: 500, maxFrames: 4000 }),
+        })
+      );
       // Include one heartbeat in the 1-min window
       await p.runFor(65000);
       return p;

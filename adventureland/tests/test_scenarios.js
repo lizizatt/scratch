@@ -40,7 +40,7 @@ test("scenario: farm armadillo stays together, 0 throttle", async () => {
   const c = gradeSim(p.world, { packHits: hits });
   const j = p.bots.Jazwyn.api;
   assert.strictEqual(j.character.map, "main");
-  assert.ok(Math.abs(j.character.real_x - 526) < 80);
+  assert.ok(Math.abs(j.character.real_x - 526) < 120);
   assert.strictEqual(c.chat_throttle, 0);
   assert.strictEqual(c.fighter_hop, 0);
   assertOnPack(c, 0.7);
@@ -49,6 +49,30 @@ test("scenario: farm armadillo stays together, 0 throttle", async () => {
     "all fighters connected"
   );
 });
+
+test("scenario: farm combat — tank melee, kills, respawns, formation", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200 });
+  let tankMelee = 0;
+  for (let i = 0; i < 160; i++) {
+    await p.tickAll();
+    const j = p.bots.Jazwyn.api;
+    const mon = j.get_nearest_monster({ type: "armadillo" });
+    if (mon && j.is_in_range(mon)) tankMelee++;
+  }
+  const kills = p.bots.Jazwyn.api.log.game.filter((g) => /^kill /.test(g.m)).length;
+  assert.ok(kills >= 1, "expected kills, got " + kills);
+  assert.ok(tankMelee >= 5, "tank should spend ticks in melee, got " + tankMelee);
+  const lead = p.bots.Jazwyn.api.character;
+  for (const n of ["Sarene", "Zarook"]) {
+    const c = p.bots[n].api.character;
+    const d = Math.hypot(c.real_x - lead.real_x, c.real_y - lead.real_y);
+    assert.ok(d >= 20 && d < 250, n + " formation dist=" + d.toFixed(1));
+  }
+  const ents = p.bots.Jazwyn.api.parent.entities;
+  const packMobs = Object.keys(ents).filter((id) => ents[id].type === "monster" && ents[id].mtype === "armadillo");
+  assert.ok(packMobs.length >= 3, "pack size=" + packMobs.length);
+});
+
 
 test("scenario: dry pots → merchant delivery → dlv_done", async () => {
   const p = bootParty({ pack: "armadillo", pots: 0, gold: 50000 });

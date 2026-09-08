@@ -475,7 +475,14 @@ function bootFighter(api, opts) {
 
     if (!isLead()) {
       state.setSelf({ task: "follow" });
-      await motion.followLeader();
+      if (opts.form) await motion.followFormation(opts.form);
+      else await motion.followLeader();
+      const mtype = state.S.intent.mtype || "armadillo";
+      if (opts.pre_combat && opts.pre_combat()) {
+        persist();
+        return;
+      }
+      if (opts.combat) opts.combat(mtype);
       return;
     }
 

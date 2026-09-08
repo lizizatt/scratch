@@ -27,6 +27,8 @@ function makeCharState(over) {
       rip: false,
       esize: 20,
       range: 40,
+      attack: 95,
+      target: null,
       real_x: 0,
       real_y: 0,
       x: 0,
@@ -217,6 +219,45 @@ function createCharacter(world, over) {
     },
     is_on_cooldown() {
       return false;
+    },
+
+    change_target(t) {
+      c.target = t && (t.id || t.name) ? t.id || t.name : null;
+    },
+    get_targeted_monster() {
+      if (!c.target) return null;
+      return api.get_monster(c.target);
+    },
+    get_monster(id) {
+      if (!id) return null;
+      const ents = world.entitiesOn(serverKey(), c.map);
+      const e = ents[id];
+      if (e && e.type === "monster" && !e.dead) return e;
+      return null;
+    },
+    can_attack(t) {
+      if (!t || t.dead || t.type !== "monster") return false;
+      if (!api.is_in_range(t)) return false;
+      const gap = (world.G && world.G.attackMs) || knobs.ATTACK_MS || 800;
+      return world.clock.now() - (c._lastAttackAt || 0) >= gap;
+    },
+    attack(t) {
+      if (!api.can_attack(t)) return Promise.resolve({ failed: true });
+      c._lastAttackAt = world.clock.now();
+      c.target = t.id;
+      const dmg = c.attack || (c.ctype === "mage" ? 110 : c.ctype === "priest" ? 70 : 95);
+      t.hp = Math.max(0, (t.hp != null ? t.hp : t.max_hp || 200) - dmg);
+      t.target = c.name;
+      log.skills.push("attack:" + t.id);
+      api.game_log("hit " + t.mtype + " -" + dmg + " hp=" + t.hp);
+      if (t.hp <= 0) {
+        t.dead = true;
+        t.hp = 0;
+        const respawnMs = (world.G && world.G.respawnMs) || knobs.RESPAWN_MS || 10000;
+        t.respawnAt = world.clock.now() + respawnMs;
+        api.game_log("kill " + t.mtype + " id=" + t.id);
+      }
+      return Promise.resolve({ success: true, damage: dmg });
     },
 
     move(x, y) {

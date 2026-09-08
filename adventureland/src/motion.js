@@ -3,6 +3,9 @@
 const {
   FORM_R_IN,
   FORM_R_OUT,
+  FORM_NEAR,
+  FORM_FAR,
+  FORM_REANCHOR,
   PRESENT_EXIT_MS,
   WAIT_PARTY_MS,
   RARE_WHITELIST,
@@ -18,8 +21,21 @@ function dist(a, b) {
   return Math.sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
 }
 
+function formationPos(lead, form, angle) {
+  const dx = form.dx || 0;
+  const dy = form.dy || 0;
+  const x = lead.real_x != null ? lead.real_x : lead.x;
+  const y = lead.real_y != null ? lead.real_y : lead.y;
+  if (form.face && angle != null && !isNaN(angle)) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    return { map: lead.map, x: x + dx * c - dy * s, y: y + dx * s + dy * c };
+  }
+  return { map: lead.map, x: x + dx, y: y + dy };
+}
+
 /**
- * Present hysteresis + WaitParty + follow leader / assemble.
+ * Present hysteresis + WaitParty + follow leader / formation / assemble.
  */
 function createMotion(api, opts) {
   opts = opts || {};
@@ -29,6 +45,9 @@ function createMotion(api, opts) {
   let present = false;
   let waitUntil = 0;
   let movingTask = false;
+  let formAnchor = null;
+  let formSlot = null;
+  let lastLeadAngle = 0;
 
   function leadEnt() {
     const n = leadName();
@@ -52,7 +71,6 @@ function createMotion(api, opts) {
       }
     } else {
       const bad = !inVision || d > FORM_R_OUT;
-      // While leader moving, use party-list distance only
       const leadMoving = opts.leadMoving && opts.leadMoving();
       if (leadMoving) {
         if (L.map === api.character.map && d < FORM_R_OUT) {
@@ -120,6 +138,54 @@ function createMotion(api, opts) {
     }
   }
 
+  /**
+   * Loose formation (legacy): face-relative slot, re-anchor when lead drifts,
+   * walk with move() inside FORM_R_IN, smart_move when farther.
+   */
+  async function followFormation(form) {
+    if (!form) return followLeader();
+    const L = leadEnt();
+    if (!L) return false;
+    const lx = L.real_x != null ? L.real_x : L.x;
+    const ly = L.real_y != null ? L.real_y : L.y;
+    if (L.angle != null) lastLeadAngle = L.angle;
+    const ang = L.angle != null ? L.angle : lastLeadAngle;
+    const ad =
+      !formAnchor || formAnchor.map !== L.map
+        ? 1e9
+        : Math.sqrt((lx - formAnchor.x) * (lx - formAnchor.x) + (ly - formAnchor.y) * (ly - formAnchor.y));
+    if (!formSlot || ad > FORM_REANCHOR) {
+      formSlot = formationPos({ map: L.map, real_x: lx, real_y: ly, x: lx, y: ly }, form, ang);
+      formAnchor = { map: L.map, x: lx, y: ly };
+    }
+    const slot = formSlot;
+    const d = api.character.map !== slot.map ? 1e9 : dist(api.character, slot);
+    if (api.character.map === slot.map && d <= FORM_NEAR) {
+      try {
+        api.stop("smart");
+      } catch (e) {}
+      return true;
+    }
+    if (api.character.map === slot.map && d <= FORM_R_IN) {
+      try {
+        api.stop("smart");
+      } catch (e) {}
+      if (d > FORM_FAR) api.move(slot.x, slot.y);
+      return true;
+    }
+    movingTask = true;
+    try {
+      const r = await api.smart_move({ map: slot.map, x: slot.x, y: slot.y });
+      if (r && r.failed) api.game_log("smart_fail " + (r.reason || "fail"));
+      return !(r && r.failed);
+    } catch (e) {
+      api.game_log("smart_fail " + ((e && e.reason) || (e && e.message) || "err"));
+      return false;
+    } finally {
+      movingTask = false;
+    }
+  }
+
   async function goTo(dest) {
     movingTask = true;
     try {
@@ -146,9 +212,11 @@ function createMotion(api, opts) {
     evalPresent,
     waitParty,
     followLeader,
+    followFormation,
     goTo,
     spotRare,
     dist,
+    formationPos,
     get present() {
       return present;
     },
@@ -160,4 +228,4 @@ function createMotion(api, opts) {
   };
 }
 
-module.exports = { createMotion, dist };
+module.exports = { createMotion, dist, formationPos };
