@@ -76,4 +76,4 @@ Unit/comms tests show up in the catalog for coverage even without a timeline; pa
 
 ## Status
 
-Sim + party scenarios + dist + boot subsets + MVP Monte Carlo green. Live explorers measured path bands + reconnect (~35s); vision ~175px (low-confidence — recheck). Party relinked on US III with V2 CODE. Next: confirm vision, then 30‑min live farm gate.
+Sim suite **72** tests (scenarios cover §6.6.1–8 gaps: resume/world, path-fail, mid-job reload, bee/goo, rejoin, bags). Viz is GPU-light (no auto-draw, flat CSS, ~5fps play). Live explorers measured path + reconnect; vision ~175px low-confidence. Next: 30‑min live farm gate.

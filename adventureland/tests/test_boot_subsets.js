@@ -36,6 +36,23 @@ const tests = [
       }
     },
   },
+  {
+    name: "boot: key orderings (merchant-first, lead-last, lead-first) farm",
+    async fn() {
+      const orders = [
+        ["Puppygirl", "Zarook", "Sarene", "Jazwyn"],
+        ["Jazwyn", "Sarene", "Zarook", "Puppygirl"],
+        ["Sarene", "Jazwyn", "Puppygirl", "Zarook"],
+      ];
+      for (const order of orders) {
+        const p = bootParty({ pack: "armadillo", pots: 40, members: order });
+        for (let i = 0; i < 12; i++) await p.tickAll();
+        const lead = LEADER_ORDER.find((n) => p.bots[n]);
+        if (lead) assert.strictEqual(p.bots[lead].ctrl.isLead(), true, order.join("→"));
+        assert.strictEqual(p.world.where(Object.keys(p.bots)[0]).key, "US/III");
+      }
+    },
+  },
 ];
 
 module.exports = { tests };

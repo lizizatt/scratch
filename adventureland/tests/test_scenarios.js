@@ -289,4 +289,223 @@ test("scenario: Puppygirl delivers via cave past ridge + island", async () => {
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
 });
 
+test("scenario: resume after hold returns fighters to farm world", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 50000 });
+  p.bots.Jazwyn.ctrl.applyCmd({ cmd: "hold", args: [] });
+  for (let i = 0; i < 80; i++) {
+    await p.tickAll();
+    p.world.tickReconnects();
+    if (p.world.where("Jazwyn").key === "US/II" && p.bots.Jazwyn.api.character.connected) break;
+  }
+  p.world.advance(5000);
+  assert.strictEqual(p.world.where("Jazwyn").key, "US/II");
+  p.bots.Jazwyn.ctrl.applyCmd({ cmd: "resume", args: [] });
+  // resume clears hold; !world not required — farm continues on HOME until world set.
+  // Send world back to farm so hop-prep returns to US/III.
+  p.bots.Jazwyn.ctrl.applyCmd({ cmd: "world", args: ["US/III"] });
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    p.world.tickReconnects();
+    if (p.world.where("Jazwyn").key === "US/III" && p.bots.Jazwyn.api.character.connected) break;
+  }
+  p.world.advance(5000);
+  assert.strictEqual(p.world.where("Jazwyn").key, "US/III");
+  assert.strictEqual(p.bots.Jazwyn.ctrl.state.S.intent.hold, 0);
+});
+
+test("scenario: !world hop-prep lands party on target server", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 50000 });
+  p.bots.Jazwyn.ctrl.applyCmd({ cmd: "world", args: ["US/II"] });
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    p.world.tickReconnects();
+    if (
+      ["Jazwyn", "Sarene", "Zarook"].every(
+        (n) => p.world.where(n).key === "US/II" && p.bots[n].api.character.connected
+      )
+    )
+      break;
+  }
+  p.world.advance(5000);
+  assert.strictEqual(p.world.where("Jazwyn").key, "US/II");
+  assert.strictEqual(p.world.where("Sarene").key, "US/II");
+  assert.ok(p.bots.Jazwyn.api.log.cm.some((c) => c.message && c.message.job === "cancel_all"));
+});
+
+test("scenario: chat stress + ~R + human echo + lead reboot reseeds seq", async () => {
+  const p = bootParty({ pots: 200 });
+  // Operator typing on leader resets chat window (human)
+  p.bots.Jazwyn.ctrl.chat.markHuman();
+  p.world.advance(16000);
+  for (let i = 0; i < 12; i++) {
+    p.bots.Jazwyn.ctrl.chat.enqueue("~S f=armadillo m=farm h=0", "hb");
+    p.bots.Sarene.ctrl.chat.enqueue("~d p=ok", "diff");
+    p.bots.Zarook.ctrl.chat.enqueue("~d p=ok", "diff");
+    p.bots.Jazwyn.ctrl.chat.enqueue("~R phoenix", "rare");
+    p.bots.Jazwyn.ctrl.chat.tick(p.world.clock.now());
+    p.bots.Sarene.ctrl.chat.tick(p.world.clock.now());
+    p.bots.Zarook.ctrl.chat.tick(p.world.clock.now());
+    p.world.advance(16000);
+  }
+  const { bootFighter } = require("../src/fighter");
+  p.bots.Jazwyn.ctrl = bootFighter(p.bots.Jazwyn.api, { now: () => p.world.clock.now() });
+  // After reboot, climb seq above anything heard (plan §6.6.6)
+  p.bots.Jazwyn.ctrl.state.applyHeartbeat("Sarene", { seq: 20, f: "armadillo", m: "farm", h: 0 });
+  p.bots.Jazwyn.ctrl.state.S.seq.Jazwyn = Math.max(p.bots.Jazwyn.ctrl.state.S.seq.Jazwyn || 0, 21);
+  p.bots.Jazwyn.ctrl.state.bump();
+  assert.ok(p.bots.Jazwyn.ctrl.state.S.seq.Jazwyn >= 21);
+  assert.strictEqual(gradeSim(p.world, {}).chat_throttle, 0);
+});
+
+test("scenario: path fail injection during farm — no Transfer/Port storm", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, burnPots: true });
+  for (let i = 0; i < 80; i++) {
+    if (i % 11 === 0) {
+      for (const n of ["Jazwyn", "Sarene", "Zarook", "Puppygirl"]) {
+        if (p.bots[n] && p.bots[n].api._injectSmartFail) p.bots[n].api._injectSmartFail(i % 22 === 0 ? "stall" : "fail");
+      }
+    }
+    await p.tickAll();
+  }
+  const c = gradeSim(p.world, {});
+  assert.strictEqual(c.fighter_hop, 0);
+  assert.strictEqual(c.chat_throttle, 0);
+  assert.ok(c.path_storm < 10, "path_storm=" + c.path_storm);
+  assert.ok(!p.bots.Jazwyn.api.log.game.some((g) => /Transfer phoenix|Port town/i.test(g.m)));
+});
+
+test("scenario: Puppygirl reload mid-job with server_region unset — no re-hop loop", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 0, gold: 50000 });
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "mid1",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ],
+    farm: "armadillo",
+    map: "main",
+    x: 526,
+    y: 1846,
+    t0: p.world.clock.now(),
+  });
+  assert.ok(p.bots.Puppygirl.ctrl.store.q.some((j) => j.id === "mid1"));
+  p.bots.Puppygirl.api.change_server("US", "II");
+  for (let i = 0; i < 300; i++) {
+    p.world.advance(250);
+    if (p.bots.Puppygirl.api.character.connected) break;
+  }
+  assert.ok(p.bots.Puppygirl.api.character.connected);
+  assert.ok(
+    p.bots.Puppygirl.ctrl.store.q.some((j) => j.id === "mid1") ||
+      (p.bots.Puppygirl.ctrl.store.active && p.bots.Puppygirl.ctrl.store.active.id === "mid1"),
+    "queue restored"
+  );
+  p.bots.Puppygirl.api.character.serverRegionReadyAt = p.world.clock.now() + 60000;
+  const hopsBefore = (p.bots.Puppygirl.api.log.server || []).length;
+  for (let i = 0; i < 40; i++) {
+    await p.bots.Puppygirl.ctrl.tick();
+    p.world.advance(250);
+  }
+  const hopsAfter = (p.bots.Puppygirl.api.log.server || []).length;
+  assert.ok(hopsAfter - hopsBefore <= 1, "re-hop loop hops=" + (hopsAfter - hopsBefore));
+});
+
+test("scenario: gear push when both bags tight — no deadlock hop", async () => {
+  const items = new Array(42).fill(null);
+  for (let i = 0; i < 40; i++) items[i] = { name: "gloves", level: 0, q: 1 };
+  items[40] = { name: "hpot1", q: 1 };
+  items[41] = { name: "mpot1", q: 1 };
+  const p = bootParty({ pack: "armadillo", pots: 0, gold: 50000, esize: 2, items });
+  // Merchant bag nearly full but has gear + pots to send
+  const mItems = new Array(42).fill(null);
+  for (let i = 0; i < 38; i++) mItems[i] = { name: "ringsj", level: 0, q: 1 };
+  mItems[38] = { name: "hpot1", q: 200 };
+  mItems[39] = { name: "mpot1", q: 200 };
+  mItems[40] = { name: "gloves", level: 1, q: 1 };
+  p.bots.Puppygirl.api.character.items = mItems;
+  p.bots.Puppygirl.api.character.esize = 1;
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "gfull",
+    kind: "dlv_gear",
+    who: "Jazwyn",
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ],
+    gear: { name: "gloves", level: 1 },
+    farm: "armadillo",
+    map: "main",
+    x: 526,
+    y: 1846,
+  });
+  for (let i = 0; i < 250; i++) await p.tickAll();
+  const c = gradeSim(p.world, {});
+  assert.strictEqual(c.fighter_hop, 0);
+  assert.strictEqual(p.world.where("Jazwyn").key, "US/III");
+});
+
+test("scenario: short farm bee pack stays together", async () => {
+  const p = bootParty({ pack: "bee", pots: 200 });
+  await p.runFor(45000);
+  const c = gradeSim(p.world, { pack: "bee", R: 700 });
+  assert.strictEqual(c.chat_throttle, 0);
+  assert.strictEqual(c.fighter_hop, 0);
+  assert.strictEqual(p.bots.Jazwyn.api.character.map, "main");
+});
+
+test("scenario: short farm goo pack stays together", async () => {
+  const p = bootParty({ pack: "goo", pots: 200 });
+  await p.runFor(45000);
+  const c = gradeSim(p.world, { pack: "goo", R: 900 });
+  assert.strictEqual(c.fighter_hop, 0);
+  assert.strictEqual(p.bots.Jazwyn.api.character.map, "main");
+  assert.strictEqual(p.world.where("Jazwyn").key, "US/III");
+});
+
+test("scenario: Jazwyn rejoins → leadership returns from Sarene", async () => {
+  const { createWorld } = require("../sim");
+  const { bootFighter } = require("../src/fighter");
+  const { packCenter } = require("../sim/world");
+  const w = createWorld();
+  const pc = packCenter("armadillo");
+  function mk(name, ctype) {
+    return w.spawn({
+      name,
+      ctype: ctype || "warrior",
+      map: pc.map,
+      real_x: pc.x,
+      real_y: pc.y,
+      items: [
+        { name: "hpot1", q: 80 },
+        { name: "mpot1", q: 80 },
+      ].concat(new Array(40).fill(null)),
+    });
+  }
+  const s = mk("Sarene", "mage");
+  const z = mk("Zarook", "priest");
+  w.formParty("US/III", ["Sarene", "Zarook"]);
+  w.spawnMonster("US/III", pc.map, "armadillo", pc);
+  const cs = bootFighter(s, { now: () => w.clock.now() });
+  const cz = bootFighter(z, { now: () => w.clock.now() });
+  for (let i = 0; i < 10; i++) {
+    await cs.tick();
+    await cz.tick();
+    w.advance(250);
+  }
+  assert.strictEqual(cs.isLead(), true);
+  const j = mk("Jazwyn", "warrior");
+  w.formParty("US/III", ["Jazwyn", "Sarene", "Zarook"]);
+  const cj = bootFighter(j, { now: () => w.clock.now() });
+  for (let i = 0; i < 15; i++) {
+    await cj.tick();
+    await cs.tick();
+    await cz.tick();
+    w.advance(250);
+  }
+  assert.strictEqual(cj.isLead(), true);
+  assert.strictEqual(cs.isLead(), false);
+});
+
 module.exports = { tests };

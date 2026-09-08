@@ -1,4 +1,4 @@
-/* AL Sim Viz — browse suite + scrub recorded traces */
+/* AL Sim Viz — browse suite + scrub recorded traces (GPU-light) */
 (() => {
   const COLORS = {
     Jazwyn: "#e0b45a",
@@ -17,6 +17,9 @@
     frameIdx: 0,
     playing: false,
     playTimer: null,
+    scrubRaf: 0,
+    lastDrawnKey: "",
+    mapCtx: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -26,6 +29,18 @@
     if (ms < 1000) return ms + "ms";
     if (ms < 60000) return (ms / 1000).toFixed(1) + "s";
     return (ms / 60000).toFixed(1) + "m";
+  }
+
+  function scrubPanelOn() {
+    const p = $("panel-scrub");
+    return !!(p && p.classList.contains("is-on"));
+  }
+
+  function mapCtx() {
+    if (state.mapCtx) return state.mapCtx;
+    const canvas = $("map");
+    state.mapCtx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+    return state.mapCtx;
   }
 
   async function loadCatalog() {
@@ -46,6 +61,8 @@
   function setTab(name) {
     document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === name));
     document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("is-on", p.id === "panel-" + name));
+    if (name !== "scrub") stopPlay();
+    else if (state.activeTrace) scheduleDraw(true);
   }
 
   function filteredTests() {
@@ -88,11 +105,11 @@
   function renderTests() {
     const list = $("test-list");
     list.innerHTML = "";
+    const frag = document.createDocumentFragment();
     for (const t of filteredTests()) {
       const li = document.createElement("li");
       if (state.selectedTest && state.selectedTest.name === t.name) li.classList.add("is-on");
-      li.innerHTML =
-        '<div class="name"></div><div class="meta"></div>';
+      li.innerHTML = '<div class="name"></div><div class="meta"></div>';
       li.querySelector(".name").textContent = t.name;
       li.querySelector(".meta").textContent =
         t.suite +
@@ -105,8 +122,9 @@
         renderTests();
         renderDetail(t);
       };
-      list.appendChild(li);
+      frag.appendChild(li);
     }
+    list.appendChild(frag);
   }
 
   function renderDetail(t) {
@@ -195,13 +213,19 @@
   function renderTraceSelect() {
     const sel = $("trace-select");
     sel.innerHTML = "";
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "Select a trace…";
+    sel.appendChild(opt0);
     for (const t of state.catalog.traces || []) {
       const opt = document.createElement("option");
       opt.value = t.id;
       opt.textContent = t.id + " (" + fmtMs(t.durationMs) + ", " + t.eventCount + " ev)";
       sel.appendChild(opt);
     }
-    sel.onchange = () => selectTrace(sel.value);
+    sel.onchange = () => {
+      if (sel.value) selectTrace(sel.value);
+    };
   }
 
   async function selectTrace(id) {
@@ -209,11 +233,12 @@
     const tr = await loadTrace(id);
     state.activeTrace = tr;
     state.frameIdx = 0;
+    state.lastDrawnKey = "";
     const scrub = $("scrub");
     scrub.max = Math.max(0, tr.frames.length - 1);
     scrub.value = 0;
     renderGrades(tr.grades || {});
-    renderFrame();
+    scheduleDraw(true);
   }
 
   function renderGrades(g) {
@@ -235,10 +260,24 @@
     return tr.frames[Math.min(state.frameIdx, tr.frames.length - 1)];
   }
 
-  function renderFrame() {
+  function scheduleDraw(force) {
+    if (!scrubPanelOn() || document.hidden) return;
+    if (state.scrubRaf) cancelAnimationFrame(state.scrubRaf);
+    state.scrubRaf = requestAnimationFrame(() => {
+      state.scrubRaf = 0;
+      renderFrame(force);
+    });
+  }
+
+  function renderFrame(force) {
+    if (!scrubPanelOn() || document.hidden) return;
     const tr = state.activeTrace;
     const frame = currentFrame();
     if (!tr || !frame) return;
+    const key = (tr.id || tr.name || "t") + ":" + state.frameIdx;
+    if (!force && key === state.lastDrawnKey) return;
+    state.lastDrawnKey = key;
+
     $("time-label").textContent = fmtMs(frame.t);
     $("scrub").value = String(state.frameIdx);
 
@@ -268,15 +307,15 @@
 
   function drawMap(frame) {
     const canvas = $("map");
-    const ctx = canvas.getContext("2d");
+    const ctx = mapCtx();
     const w = canvas.width;
     const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#1a1f16";
+    ctx.fillRect(0, 0, w, h);
 
     const pup = frame.chars && frame.chars.Puppygirl;
     const onCave = pup && pup.map === "cave";
 
-    // Bounds: main overview vs cave inset
     const x0 = onCave ? -200 : -150;
     const x1 = onCave ? 1300 : 1000;
     const y0 = onCave ? -500 : -450;
@@ -291,53 +330,44 @@
         ]
       : [
           { x0: 304, y0: -300, x1: 688, y1: 120, label: "island" },
-          { x0: -4000, y0: 280, x1: 4000, y1: 1580, label: "ridge" },
+          { x0: -4000, y0: 1200, x1: 4000, y1: 1580, label: "ridge" },
           { x0: -10, y0: -280, x1: 80, y1: -160, label: "rock" },
         ];
 
     for (const r of blocked) {
-      ctx.fillStyle = onCave ? "rgba(50, 40, 35, 0.65)" : "rgba(70, 90, 120, 0.4)";
-      ctx.strokeStyle = onCave ? "rgba(180, 140, 100, 0.6)" : "rgba(140, 170, 210, 0.65)";
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = onCave ? "#322823" : "#2a3340";
       ctx.fillRect(sx(r.x0), sy(r.y0), sx(r.x1) - sx(r.x0), sy(r.y1) - sy(r.y0));
-      ctx.strokeRect(sx(r.x0), sy(r.y0), sx(r.x1) - sx(r.x0), sy(r.y1) - sy(r.y0));
       if (r.label) {
-        ctx.fillStyle = "rgba(180, 200, 220, 0.8)";
-        ctx.font = "11px IBM Plex Mono";
-        ctx.fillText(r.label, sx(r.x0) + 6, sy(r.y0) + 14);
+        ctx.fillStyle = "#8b917c";
+        ctx.font = "11px monospace";
+        ctx.fillText(r.label, sx(Math.max(r.x0, x0)) + 6, sy(Math.max(r.y0, y0)) + 14);
       }
     }
 
     if (!onCave) {
-      // Cave mouth + SE exit markers
-      ctx.fillStyle = "rgba(212, 162, 76, 0.9)";
-      ctx.font = "11px IBM Plex Mono";
-      ctx.fillText("cave↓", sx(-40), sy(-300) - 6);
-      ctx.beginPath();
-      ctx.arc(sx(-40), sy(-300), 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillText("cave↑", sx(750), sy(1800) - 6);
-      ctx.beginPath();
-      ctx.arc(sx(750), sy(1800), 5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = "#d4a24c";
+      ctx.font = "11px monospace";
+      ctx.fillText("cave", sx(-40), sy(-300) - 4);
+      ctx.fillRect(sx(-40) - 3, sy(-300) - 3, 6, 6);
+      ctx.fillText("SE", sx(750), sy(1800) - 4);
+      ctx.fillRect(sx(750) - 3, sy(1800) - 3, 6, 6);
     } else {
-      ctx.fillStyle = "rgba(212, 162, 76, 0.9)";
-      ctx.font = "11px IBM Plex Mono";
-      ctx.fillText("exit→main", sx(1100), sy(50) - 8);
-      ctx.beginPath();
-      ctx.arc(sx(1100), sy(50), 5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = "#d4a24c";
+      ctx.font = "11px monospace";
+      ctx.fillText("exit", sx(1100), sy(50) - 4);
+      ctx.fillRect(sx(1100) - 3, sy(50) - 3, 6, 6);
     }
 
-    // Route trail for Puppygirl on current map
     const tr = state.activeTrace;
     if (tr && tr.frames) {
-      ctx.strokeStyle = "rgba(201, 122, 154, 0.6)";
+      ctx.strokeStyle = "#c97a9a";
+      ctx.globalAlpha = 0.55;
       ctx.lineWidth = 2;
       ctx.beginPath();
       let started = false;
       const mapName = onCave ? "cave" : "main";
-      for (let i = 0; i <= state.frameIdx; i++) {
+      const step = Math.max(1, Math.floor(state.frameIdx / 400));
+      for (let i = 0; i <= state.frameIdx; i += step) {
         const ch = tr.frames[i].chars && tr.frames[i].chars.Puppygirl;
         if (!ch || ch.map !== mapName) {
           started = false;
@@ -351,18 +381,17 @@
         } else ctx.lineTo(px, py);
       }
       ctx.stroke();
+      ctx.globalAlpha = 1;
     }
 
-    ctx.fillStyle = "rgba(232, 226, 212, 0.85)";
-    ctx.font = "13px IBM Plex Mono";
+    ctx.fillStyle = "#e8e2d4";
+    ctx.font = "13px monospace";
     ctx.fillText(onCave ? "map: cave" : "map: main", 12, 22);
 
     for (const m of frame.monsters || []) {
       if (m.map !== (onCave ? "cave" : "main")) continue;
-      ctx.fillStyle = "rgba(196,92,74,0.85)";
-      ctx.beginPath();
-      ctx.arc(sx(m.x), sy(m.y), 7, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = "#c45c4a";
+      ctx.fillRect(sx(m.x) - 4, sy(m.y) - 4, 8, 8);
     }
 
     for (const name of Object.keys(frame.chars || {})) {
@@ -370,36 +399,33 @@
       if (c.map !== (onCave ? "cave" : "main")) continue;
       const col = COLORS[name] || "#e8e2d4";
       ctx.fillStyle = col;
+      const r = name === "Puppygirl" ? 6 : 7;
       ctx.beginPath();
-      ctx.arc(sx(c.x), sy(c.y), name === "Puppygirl" ? 7 : 8, 0, Math.PI * 2);
+      ctx.arc(sx(c.x), sy(c.y), r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = col;
-      ctx.fillText(name[0], sx(c.x) + 10, sy(c.y) - 6);
+      ctx.fillText(name[0], sx(c.x) + 9, sy(c.y) - 5);
     }
   }
 
   function renderEvents(t) {
     const tr = state.activeTrace;
     const el = $("event-log");
-    el.innerHTML = "";
     const windowStart = Math.max(0, t - 60000);
     const evs = (tr.events || []).filter((e) => e.t <= t && e.t >= windowStart);
-    const show = evs.slice(-120);
-    let last = null;
+    const show = evs.slice(-80);
+    const frag = document.createDocumentFragment();
     for (const e of show) {
       const li = document.createElement("li");
-      if (!last || t - e.t < 1500) {
-        /* mark near tip */
-      }
-      last = e;
       const kind = e.kind || "log";
       const m = e.m != null ? e.m : e.to ? JSON.stringify(e.to) : "";
       li.innerHTML = '<span class="who"></span> <span class="kind"></span> <span class="msg"></span>';
       li.querySelector(".who").textContent = (e.who || "?") + "@" + fmtMs(e.t);
       li.querySelector(".kind").textContent = kind;
-      li.querySelector(".msg").textContent = m.length > 120 ? m.slice(0, 120) + "…" : m;
-      el.appendChild(li);
+      li.querySelector(".msg").textContent = m.length > 100 ? m.slice(0, 100) + "…" : m;
+      frag.appendChild(li);
     }
+    el.innerHTML = "";
+    el.appendChild(frag);
     if (el.lastElementChild) el.lastElementChild.classList.add("is-now");
     el.scrollTop = el.scrollHeight;
   }
@@ -408,7 +434,8 @@
     state.playing = false;
     if (state.playTimer) clearInterval(state.playTimer);
     state.playTimer = null;
-    $("btn-play").textContent = "Play";
+    const btn = $("btn-play");
+    if (btn) btn.textContent = "Play";
   }
 
   function togglePlay() {
@@ -417,16 +444,22 @@
       stopPlay();
       return;
     }
+    if (!scrubPanelOn()) setTab("scrub");
     state.playing = true;
     $("btn-play").textContent = "Pause";
+    // ~5 fps — enough for scrub, cheap on GPU
     state.playTimer = setInterval(() => {
+      if (document.hidden || !scrubPanelOn()) {
+        stopPlay();
+        return;
+      }
       if (state.frameIdx >= state.activeTrace.frames.length - 1) {
         stopPlay();
         return;
       }
       state.frameIdx++;
-      renderFrame();
-    }, 120);
+      scheduleDraw(false);
+    }, 200);
   }
 
   async function boot() {
@@ -440,9 +473,13 @@
     $("scrub").addEventListener("input", (e) => {
       stopPlay();
       state.frameIdx = Number(e.target.value);
-      renderFrame();
+      scheduleDraw(false);
     });
     $("btn-play").addEventListener("click", togglePlay);
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopPlay();
+    });
 
     try {
       await loadCatalog();
@@ -456,9 +493,7 @@
     renderTests();
     renderCoverage();
     renderTraceSelect();
-    if (state.catalog.traces && state.catalog.traces.length) {
-      await selectTrace(state.catalog.traces[0].id);
-    }
+    // Lazy: do not auto-load/draw a trace (avoids canvas work on Tests tab).
   }
 
   boot();

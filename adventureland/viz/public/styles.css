@@ -26,10 +26,7 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background:
-    radial-gradient(ellipse 80% 50% at 10% -10%, #2a3320 0%, transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, #2c2418 0%, transparent 50%),
-    var(--bg0);
+  background: var(--bg0);
   color: var(--ink);
   font-family: var(--font-display);
 }
@@ -294,24 +291,13 @@ select,
 }
 
 #map {
-  width: 100%;
+  width: 720px;
+  max-width: 100%;
   height: auto;
-  background:
-    linear-gradient(180deg, rgba(18, 21, 16, 0.2), transparent 40%),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 31px,
-      rgba(58, 66, 50, 0.35) 32px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 31px,
-      rgba(58, 66, 50, 0.35) 32px
-    ),
-    var(--bg1);
+  background: var(--bg1);
   border: 1px solid var(--line);
+  /* Avoid CSS-scaled canvas upscaling (GPU thrash) — match backing store */
+  image-rendering: auto;
 }
 
 .scrub-side {

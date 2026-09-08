@@ -50,14 +50,14 @@ function tagsFor(name) {
 function planTag(name) {
   // Map to V2_PLAN §6.6 scenario numbers when obvious
   const n = name.toLowerCase();
-  if (/boot/.test(n)) return "6.6.1";
-  if (/30 min|compressed/.test(n)) return "6.6.2";
-  if (/dlv|town_fallback|dry pots|status flowing/.test(n)) return "6.6.3";
-  if (/phoenix|rare/.test(n)) return "6.6.4";
-  if (/hold|hop-prep|heap wipe|re-invite|meet_home/.test(n)) return "6.6.5";
-  if (/chat stress|throttle|heartbeat/.test(n)) return "6.6.6";
-  if (/path|smart_move phoenix|server_region unset/.test(n)) return "6.6.7";
-  if (/gear/.test(n)) return "6.6.8";
+  if (/boot|rejoin|succession|subset|ordering/.test(n)) return "6.6.1";
+  if (/30 min|compressed|short farm|bee pack|goo pack|farm armadillo|farm bee|farm goo/.test(n)) return "6.6.2";
+  if (/dlv|town_fallback|dry pots|status flowing|low_gold|bag-full|gold/.test(n)) return "6.6.3";
+  if (/phoenix|rare|assemble|rare_gone|rare_timeout/.test(n)) return "6.6.4";
+  if (/hold|resume|!world|hop-prep|heap wipe|re-invite|meet_home|world hop/.test(n)) return "6.6.5";
+  if (/chat stress|throttle|heartbeat|reseed|human echo|~r/.test(n)) return "6.6.6";
+  if (/path fail|smart_move phoenix|server_region unset|reload mid-job|cave past|spider|owe/.test(n)) return "6.6.7";
+  if (/gear|bags tight|deadlock/.test(n)) return "6.6.8";
   return null;
 }
 
@@ -66,6 +66,10 @@ function buildCatalog() {
     { id: "comms", mod: require("../tests/test_comms") },
     { id: "scenarios", mod: require("../tests/test_scenarios") },
     { id: "adversarial", mod: require("../tests/test_adversarial") },
+    { id: "boot", mod: require("../tests/test_boot_subsets") },
+    { id: "packs", mod: require("../tests/test_packs") },
+    { id: "dist", mod: require("../tests/test_dist") },
+    { id: "mc", mod: require("../tests/test_mc_mvp") },
   ];
   const tests = [];
   for (const s of suites) {
@@ -188,6 +192,45 @@ async function main() {
     })
   );
 
+  recorded.push(
+    await record("world-hop", "scenario: !world hop-prep to US/II", ["hop", "hold"], async (o) => {
+      const p = bootParty(Object.assign({ pack: "armadillo", pots: 200, gold: 50000 }, o));
+      p.bots.Jazwyn.ctrl.applyCmd({ cmd: "world", args: ["US/II"] });
+      for (let i = 0; i < 120; i++) {
+        await p.tickAll();
+        if (
+          ["Jazwyn", "Sarene", "Zarook"].every(
+            (n) => p.world.where(n).key === "US/II" && p.bots[n].api.character.connected
+          )
+        )
+          break;
+      }
+      p.world.advance(5000);
+      return p;
+    })
+  );
+
+  recorded.push(
+    await record("path-fail-farm", "scenario: path fail injection farm", ["farm", "motion"], async (o) => {
+      const p = bootParty(Object.assign({ pack: "armadillo", pots: 200, burnPots: true }, o));
+      for (let i = 0; i < 60; i++) {
+        if (i % 11 === 0 && p.bots.Jazwyn.api._injectSmartFail) {
+          p.bots.Jazwyn.api._injectSmartFail("fail");
+        }
+        await p.tickAll();
+      }
+      return p;
+    })
+  );
+
+  recorded.push(
+    await record("farm-bee", "scenario: short bee farm", ["farm"], async (o) => {
+      const p = bootParty(Object.assign({ pack: "bee", pots: 200 }, o));
+      await p.runFor(45000);
+      return p;
+    })
+  );
+
   const byId = {};
   for (const r of recorded) byId[r.id] = r;
 
@@ -201,6 +244,9 @@ async function main() {
     "scenario: compressed 30 min farm armadillo, 0 throttle 0 fighter hop": "farm-5min",
     "scenario: Puppygirl delivers via cave past ridge + island": "puppy-route",
     "smart_move: Puppygirl routes through cave to SE destination": "puppy-route",
+    "scenario: !world hop-prep lands party on target server": "world-hop",
+    "scenario: path fail injection during farm — no Transfer/Port storm": "path-fail-farm",
+    "scenario: short farm bee pack stays together": "farm-bee",
   };
 
   for (const t of catalog) {
