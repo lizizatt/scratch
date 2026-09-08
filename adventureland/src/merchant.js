@@ -93,15 +93,7 @@ function bootMerchant(api, opts) {
       Math.hypot(api.character.real_x - dest.x, api.character.real_y - dest.y) < 40;
 
     if (!nearVendor()) {
-      let r = await api.smart_move(dest);
-      // SE farm → potions is sealed overland; town to hub then walk (viz shows return trips)
-      if (r && r.failed) {
-        api.game_log("dlv:town_for_vendor");
-        try {
-          api.use("town");
-        } catch (e) {}
-        r = await api.smart_move(dest);
-      }
+      const r = await api.smart_move(dest);
       if (r && r.failed) {
         api.game_log("dlv:vendor_path_fail");
         return false;

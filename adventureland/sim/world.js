@@ -68,6 +68,8 @@ function baseG() {
         ],
         doors: [
           { to: "cave", x: -40, y: -300, spawn: 0 },
+          // SE farm entrance (symmetric with cave east exit → spawn 4)
+          { to: "cave", x: 750, y: 1800, spawn: 2 },
           { to: "bank", x: 0, y: -50, spawn: 0 },
           // Stub transporters (real G later); explorer cross-map routes
           { to: "winterland", x: -50, y: -50, spawn: 0 },

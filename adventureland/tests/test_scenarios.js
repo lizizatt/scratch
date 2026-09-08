@@ -210,20 +210,29 @@ test("scenario: 15 min farm multi-restock vendor→Puppygirl→party", async () 
   assert.ok(buys >= 3, "expected multiple vendor buys, got " + buys);
   assert.ok(dones >= 3, "expected multiple deliveries, got " + dones);
   assert.ok(sends >= 3, "expected pot sends, got " + sends);
-  const towns = mLog.filter((m) => /town_for_vendor/.test(m)).length;
+  const towns = mLog.filter((m) => /town_for_vendor|use:town/.test(m)).length;
   let nearVendor = 0;
   let nearFarm = 0;
   let caveLegs = 0;
+  let seDoor = 0;
   for (const leg of p.bots.Puppygirl.api.log.path || []) {
     const to = leg.to || {};
     const from = leg.from || {};
     if (to.map === "cave" || from.map === "cave") caveLegs++;
     if (to.map === "main" && Math.abs((to.x || 0) - 56) < 40 && Math.abs((to.y || 0) + 122) < 40) nearVendor++;
     if (to.map === "main" && Math.abs((to.x || 0) - 526) < 120 && Math.abs((to.y || 0) - 1846) < 120) nearFarm++;
+    // SE cave mouth used on return
+    if (
+      (from.map === "main" && to.map === "cave" && Math.abs(from.x - 750) < 40 && from.y > 1600) ||
+      (from.map === "cave" && to.map === "main" && Math.abs(to.x - 750) < 40 && to.y > 1600)
+    )
+      seDoor++;
   }
-  assert.ok(nearVendor + towns >= 3, "vendor trips vendor=" + nearVendor + " town=" + towns);
+  assert.strictEqual(towns, 0, "must not town home for vendor; use cave return");
+  assert.ok(nearVendor >= 3, "vendor landings=" + nearVendor);
   assert.ok(nearFarm >= 2 || dones >= 3, "farm approaches=" + nearFarm);
-  assert.ok(caveLegs >= 2, "expected cave transit on restock legs, got " + caveLegs);
+  assert.ok(caveLegs >= 6, "expected repeated cave transit, got " + caveLegs);
+  assert.ok(seDoor >= 2, "expected SE cave door on returns, got " + seDoor);
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
   assert.strictEqual(gradeSim(p.world, {}).chat_throttle, 0);
 });

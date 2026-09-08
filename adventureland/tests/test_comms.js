@@ -150,6 +150,21 @@ test("path: SE farm requires cave tunnel through obstacles", async () => {
   assert.ok(Math.abs(wps[wps.length - 1].x - 750) < 2);
 });
 
+test("path: SE farm returns to potions via cave (not town)", async () => {
+  const { findPath, findPathSameMap } = require("../sim/path");
+  const { baseG } = require("../sim/world");
+  const G = baseG();
+  const from = { map: "main", x: 526, y: 1846 };
+  const to = { map: "main", x: 56, y: -122 };
+  assert.strictEqual(findPathSameMap(from, to, "main", G), null, "overland return sealed");
+  const wps = findPath(from, to, "main", G);
+  assert.ok(wps && wps.length >= 4, "expected cave return, got " + JSON.stringify(wps));
+  assert.ok(wps.some((p) => p.map === "cave"), "must enter cave from SE");
+  assert.ok(wps.filter((p) => p.map === "cave").length >= 2, "must traverse cave");
+  assert.ok(Math.abs(wps[wps.length - 1].x - 56) < 2);
+  assert.ok(Math.abs(wps[wps.length - 1].y + 122) < 2);
+});
+
 test("smart_move: Puppygirl walks multi-leg route past spider island", async () => {
   const w = createWorld();
   const p = w.spawn({ name: "Puppygirl", ctype: "merchant", map: "main", real_x: 56, real_y: -122 });
