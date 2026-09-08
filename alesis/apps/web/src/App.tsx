@@ -21,16 +21,20 @@ import { useControlSocket } from "./use-control-socket";
 type Pane = "settings" | "synth" | "loops";
 
 export function App() {
-  const { snapshot, connection, lastError, lastMessage, send } = useControlSocket();
+  const { snapshot, readiness, connection, lastError, lastMessage, send } = useControlSocket();
   const [pane, setPane] = useState<Pane>("loops");
 
   if (!snapshot) {
     return <main className="boot"><span className={`connection-dot ${connection}`} /> CONNECTING TO HOST ENGINE</main>;
   }
+  const failures = readiness
+    ? Object.entries(readiness).filter(([, dependency]) => !dependency.ready)
+    : [];
 
   return (
     <main className="app-shell">
       <div className="connection-line"><span className={`connection-dot ${connection}`} /> {connection} // rev {snapshot.revision} // MIDI {snapshot.engine.midiEventsReceived}{snapshot.engine.lastMidiEvent ? ` ${snapshot.engine.lastMidiEvent}` : ""}</div>
+      {failures.length > 0 && <div className="readiness-line" role="alert"><strong>NOT READY</strong>{failures.map(([name, dependency]) => <span key={name}>{name}: {dependency.reason ?? "Unavailable"}</span>)}</div>}
       {lastError && <div className="error-line" role="alert">{lastError}</div>}
       {lastMessage && <div className="success-line" role="status">{lastMessage}</div>}
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
@@ -104,7 +108,7 @@ function SettingsPane({ snapshot, send }: PaneProps) {
         <Setting label="Beats per measure"><input aria-label="Beats per measure" type="number" min="1" max="16" value={numberDraft.beatsPerMeasure} onChange={setNumber("beatsPerMeasure")} onBlur={commitNumber("beatsPerMeasure")} onKeyDown={commitOnEnter} /></Setting>
         <Setting label="Loop measures"><input aria-label="Loop measures" type="number" min="1" max="128" value={numberDraft.loopMeasures} onChange={setNumber("loopMeasures")} onBlur={commitNumber("loopMeasures")} onKeyDown={commitOnEnter} /></Setting>
         <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateDevice("midiInputId")}><option value={draft.midiInputId}>{draft.midiInputId.startsWith("alsa") ? "Vortex Wireless 2" : "Software Vortex"}</option></select></Setting>
-        <Setting label="Output device"><select aria-label="Output device" value={draft.audioOutputId} onChange={updateDevice("audioOutputId")}><option value={draft.audioOutputId}>{draft.audioOutputId.startsWith("pulse:") ? "System Speakers" : "Simulated output"}</option></select></Setting>
+        <Setting label="Output device"><select aria-label="Output device" value={draft.audioOutputId} onChange={updateDevice("audioOutputId")}><option value={draft.audioOutputId}>{draft.audioOutputId.startsWith("alsa:") ? "CM108 USB audio" : "Simulated output"}</option></select></Setting>
         <Setting label="Metronome"><input aria-label="Metronome" type="checkbox" checked={draft.metronomeEnabled} onChange={updateBoolean("metronomeEnabled")} /></Setting>
         <Setting label="Click volume"><input aria-label="Click volume" type="range" min="0" max="100" value={numberDraft.metronomeVolume} onChange={setNumber("metronomeVolume")} onBlur={commitNumber("metronomeVolume", 0.01)} /></Setting>
         <Setting label="Count-in"><input aria-label="Count-in" type="checkbox" checked={draft.countInEnabled} onChange={updateBoolean("countInEnabled")} /></Setting>

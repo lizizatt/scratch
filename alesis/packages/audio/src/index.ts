@@ -1,6 +1,6 @@
-import { spawn, execFileSync, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, extname, join } from "node:path";
 import type { Readable, Writable } from "node:stream";
@@ -13,6 +13,7 @@ export interface AudioOutput {
   readonly id: string;
   readonly name: string;
   start(): Promise<void>;
+  panic(): void;
   dispatchMidi(event: MidiEvent): void;
   playMetronome(accent: boolean, volume: number): void;
   playDrum(note: number, velocity: number): void;
@@ -23,9 +24,38 @@ export interface AudioOutput {
   close(): Promise<void>;
 }
 
-export interface PulseAudioDevice {
+export interface AlsaAudioDevice {
   id: string;
   name: string;
+  usbId: string;
+  cardId: string;
+  pcm: string;
+}
+
+export const CM108_USB_IDS = ["0d8c:000c", "0d8c:013c"] as const;
+
+export function discoverCm108AudioDevice(asoundRoot = "/proc/asound", deviceRoot = "/dev/snd"): AlsaAudioDevice | null {
+  if (!existsSync(asoundRoot)) return null;
+  const cards = readdirSync(asoundRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^card\d+$/.test(entry.name))
+    .sort((left, right) => Number(left.name.slice(4)) - Number(right.name.slice(4)));
+  for (const card of cards) {
+    const cardNumber = card.name.slice(4);
+    const cardRoot = join(asoundRoot, card.name);
+    const playbackPath = join(deviceRoot, `pcmC${cardNumber}D0p`);
+    try {
+      const usbId = readFileSync(join(cardRoot, "usbid"), "utf8").trim().toLowerCase();
+      if (!CM108_USB_IDS.includes(usbId as typeof CM108_USB_IDS[number]) || !existsSync(playbackPath)) continue;
+      const cardId = readFileSync(join(cardRoot, "id"), "utf8").trim();
+      const info = readFileSync(join(cardRoot, "pcm0p", "info"), "utf8");
+      const name = info.match(/^name:\s*(.+)$/m)?.[1]?.trim() ?? cardId;
+      if (!/cm108|c-media|usb(?: pnp sound)? audio/i.test(name)) continue;
+      return { id: `alsa:${cardId}`, name, usbId, cardId, pcm: "alesis_cm108" };
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 export interface SoundFontFile {
@@ -72,7 +102,7 @@ const soundFontParameterRanges: Record<keyof SoundFontParameterValues, readonly 
 const performanceChannels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
 
 export interface FluidSynthOptions {
-  device: PulseAudioDevice;
+  device: Pick<AlsaAudioDevice, "id" | "name" | "pcm">;
   soundFontPath?: string;
   gain?: number;
   percussionSoundFontPath?: string;
@@ -80,6 +110,7 @@ export interface FluidSynthOptions {
 }
 
 export const fluidSynthStdio: ["pipe", "pipe", "pipe"] = ["pipe", "pipe", "pipe"];
+export const FLUIDSYNTH_READY_TIMEOUT_MS = 30_000;
 
 export function drainFluidSynthStdout(stdout: Readable): void {
   stdout.resume();
@@ -110,10 +141,36 @@ export function isFluidSynthRendererStalled(message: string): boolean {
   return /Ringbuffer full|Failed to allocate a synthesis process/i.test(message);
 }
 
+export function stereoFloatToDualMonoS16(samples: Float32Array): Buffer {
+  if (samples.length % 2 !== 0) throw new Error("Stereo PCM must contain complete frames");
+  const output = Buffer.allocUnsafe(samples.length * 2);
+  for (let index = 0; index < samples.length; index += 2) {
+    const mono = Math.max(-1, Math.min(1, (samples[index]! + samples[index + 1]!) / 2));
+    const value = Math.round(mono * 32_767);
+    output.writeInt16LE(value, index * 2);
+    output.writeInt16LE(value, index * 2 + 2);
+  }
+  return output;
+}
+
+export function alsaPlaybackArguments(pcm: string): string[] {
+  return [
+    "-q",
+    "-D", pcm,
+    "-t", "raw",
+    "-f", "S16_LE",
+    "-r", "48000",
+    "-c", "2",
+    "--period-size=512",
+    "--buffer-size=1024",
+  ];
+}
+
 export class SilentAudioOutput implements AudioOutput {
   readonly id = "simulated-output";
   readonly name = "Simulated output";
   async start(): Promise<void> {}
+  panic(): void {}
   dispatchMidi(): void {}
   playMetronome(): void {}
   playDrum(): void {}
@@ -129,11 +186,11 @@ export class NeonPressureOutput {
   private process: ChildProcessWithoutNullStreams | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly deviceId: string) {}
+  constructor(private readonly pcm: string) {}
 
   async start(): Promise<void> {
     if (this.process) return;
-    const child = spawn("pw-cat", ["--playback", "--target", this.deviceId, "--rate", "48000", "--channels", "2", "--format", "f32", "-"], {
+    const child = spawn("aplay", alsaPlaybackArguments(this.pcm), {
       stdio: fluidSynthStdio,
     });
     await new Promise<void>((resolve, reject) => {
@@ -150,7 +207,7 @@ export class NeonPressureOutput {
     this.timer = setInterval(() => {
       if (!child.stdin.writable || child.stdin.writableLength > 48_000) return;
       const samples = this.synth.render(480);
-      child.stdin.write(Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
+      child.stdin.write(stereoFloatToDualMonoS16(samples));
     }, 10);
   }
 
@@ -190,14 +247,14 @@ export class FluidSynthOutput implements AudioOutput {
   private selectedSynthId = "soundfont";
 
   constructor(private readonly options: FluidSynthOptions) {
-    this.id = `pulse:${options.device.id}`;
+    this.id = options.device.id;
     this.name = options.device.name;
     this.soundFontPath = options.soundFontPath ?? "/usr/share/sounds/sf2/FluidR3_GM.sf2";
     this.gain = options.gain ?? 0.6;
     const defaultPercussion = "/usr/share/sounds/sf2/FluidR3_GM.sf2";
     this.percussionSoundFontPath = options.percussionSoundFontPath ?? (existsSync(defaultPercussion) ? defaultPercussion : null);
     this.soundFontParameters = { bank: 0, program: 0, gain: this.gain, "chorus-send": 0.12, "reverb-send": 0.24, "chorus-rate": 0.3, "chorus-depth": 8, "chorus-voices": 3, "reverb-room": 0.2, "reverb-damping": 0, "reverb-width": 0.5 };
-    this.neonOutput = new NeonPressureOutput(options.device.id);
+    this.neonOutput = new NeonPressureOutput(options.device.pcm);
   }
 
   async start(): Promise<void> {
@@ -208,7 +265,7 @@ export class FluidSynthOutput implements AudioOutput {
 
   private async launch(): Promise<void> {
     if (!existsSync(this.soundFontPath)) throw new Error(`SoundFont not found: ${this.soundFontPath}`);
-    const child = spawn("fluidsynth", fluidSynthArguments(this.options.device.id, this.soundFontPath, this.gain, this.percussionSoundFontPath), {
+    const child = spawn("fluidsynth", fluidSynthArguments(this.options.device.pcm, this.soundFontPath, this.gain, this.percussionSoundFontPath), {
       stdio: fluidSynthStdio,
     });
     await new Promise<void>((resolve, reject) => {
@@ -228,9 +285,30 @@ export class FluidSynthOutput implements AudioOutput {
       if (message && !message.includes("Failed to set thread to high priority")) console.error(message);
     });
     this.process = child;
-    await waitForFluidSynthShell(child.stdin, child.stdout);
+    try {
+      await waitForFluidSynthShell(child.stdin, child.stdout, FLUIDSYNTH_READY_TIMEOUT_MS);
+    } catch (error) {
+      if (this.process === child) this.process = null;
+      await stopFluidSynth(child);
+      throw error;
+    }
     drainFluidSynthStdout(child.stdout);
     this.applySoundFontParameters();
+    this.panic();
+  }
+
+  panic(): void {
+    for (let channel = 0; channel < 16; channel += 1) {
+      this.neonOutput.dispatchMidi({ type: "control-change", channel, controller: 64, value: 0 });
+      this.neonOutput.dispatchMidi({ type: "control-change", channel, controller: 123, value: 0 });
+      for (const command of [
+        `cc ${channel} 64 0`,
+        `cc ${channel} 120 0`,
+        `cc ${channel} 121 0`,
+        `cc ${channel} 123 0`,
+        `pitch_bend ${channel} 8192`,
+      ]) this.writeCommand(command);
+    }
   }
 
   dispatchMidi(event: MidiEvent): void {
@@ -312,6 +390,7 @@ export class FluidSynthOutput implements AudioOutput {
 
   async close(): Promise<void> {
     this.closing = true;
+    this.panic();
     for (const timer of this.clickTimers) clearTimeout(timer);
     this.clickTimers.clear();
     if (this.recovery) await this.recovery;
@@ -371,19 +450,6 @@ function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): 
     };
     child.once("exit", onExit);
   });
-}
-
-export function discoverDefaultPulseAudioDevice(): PulseAudioDevice | null {
-  try {
-    const id = execFileSync("pactl", ["get-default-sink"], { encoding: "utf8" }).trim();
-    if (!id) return null;
-    const rows = execFileSync("pactl", ["list", "short", "sinks"], { encoding: "utf8" });
-    const row = rows.split("\n").find((line) => line.split("\t")[1] === id);
-    const name = id.includes("sofhdadsp__sink") ? "System Speakers" : row?.split("\t")[1] ?? id;
-    return { id, name };
-  } catch {
-    return null;
-  }
 }
 
 export function discoverSoundFonts(directories = [join(homedir(), "Downloads"), "/usr/share/sounds/sf2", "/usr/share/sounds/sf3"]): SoundFontFile[] {
@@ -485,8 +551,12 @@ function soundFontSelectionCommands(bank: number, program: number): string[] {
 export function fluidSynthArguments(deviceId: string, soundFontPath: string, gain: number, percussionSoundFontPath?: string | null): string[] {
   const args = [
     "-q",
-    "-a", "pulseaudio",
-    "-o", `audio.pulseaudio.device=${deviceId}`,
+    "-a", "alsa",
+    "-o", `audio.alsa.device=${deviceId}`,
+    "-r", "48000",
+    "-z", "512",
+    "-c", "2",
+    "-o", "midi.autoconnect=0",
     "-o", `synth.gain=${gain}`,
     soundFontPath,
   ];

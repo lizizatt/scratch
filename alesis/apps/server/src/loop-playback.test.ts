@@ -8,6 +8,7 @@ function fakeOutput(): AudioOutput & { dispatchMidi: ReturnType<typeof vi.fn> } 
     id: "test",
     name: "Test output",
     start: async () => {},
+    panic: () => {},
     dispatchMidi: vi.fn(),
     playMetronome: () => {},
     playDrum: () => {},

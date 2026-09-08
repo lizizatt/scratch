@@ -4,18 +4,21 @@ import {
   serverMessageSchema,
   type EngineCommand,
   type EngineSnapshot,
+  type Readiness,
 } from "@alesis/protocol";
 
 export type ConnectionState = "connecting" | "connected" | "disconnected";
 
 export function useControlSocket(): {
   snapshot: EngineSnapshot | null;
+  readiness: Readiness | null;
   connection: ConnectionState;
   lastError: string | null;
   lastMessage: string | null;
   send: (command: EngineCommand) => string | null;
 } {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
+  const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
@@ -43,7 +46,10 @@ export function useControlSocket(): {
           setLastError("Host sent an incompatible message");
           return;
         }
-        if (parsed.data.type === "snapshot") setSnapshot(parsed.data.snapshot);
+        if (parsed.data.type === "snapshot") {
+          setSnapshot(parsed.data.snapshot);
+          setReadiness(parsed.data.readiness);
+        }
         if (parsed.data.type === "command-result" && !parsed.data.accepted) setLastError(parsed.data.error ?? "Command rejected");
         if (parsed.data.type === "command-result" && parsed.data.accepted && parsed.data.message) setLastMessage(parsed.data.message);
       });
@@ -78,5 +84,5 @@ export function useControlSocket(): {
     return commandId;
   };
 
-  return { snapshot, connection, lastError, lastMessage, send };
+  return { snapshot, readiness, connection, lastError, lastMessage, send };
 }

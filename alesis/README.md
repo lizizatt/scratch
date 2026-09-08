@@ -30,13 +30,42 @@ npm start
 
 Open `http://127.0.0.1:8787`.
 
-The server uses a connected Vortex automatically. SoundFonts are discovered recursively from `~/Downloads`, `/usr/share/sounds/sf2`, and `/usr/share/sounds/sf3`. HS Synthetic Electronic is preferred, followed by Sonic/STH and FluidR3.
+The server uses a connected Vortex automatically. Production readiness requires
+an exact `STH.sf2` discovered under `~/Downloads`, `/usr/share/sounds/sf2`, or
+`/usr/share/sounds/sf3`; it does not silently substitute another melodic bank.
+Missing FluidSynth, SoundFont, audio, or MIDI dependencies are reported through
+`/health` and the control UI, and Play remains blocked while Not Ready.
 
 For deterministic development without hardware:
 
 ```bash
 MIDI_MODE=software AUDIO_MODE=simulated SOFTWARE_VORTEX_DEMO=1 npm start
 ```
+
+## Raspberry Pi bridge
+
+Connect the Pi and this workstation to the same router/switch, or use the tested
+direct Ethernet profile `alesis-pi-bridge` on this workstation. Wi-Fi also works
+after configuration. In Raspberry Pi Imager, set hostname and username
+`alesis`, enable SSH with public-key authentication, then verify the connection:
+
+```bash
+ssh <username>@alesis.local
+```
+
+The bridge helper keeps inspection, code transfer, and the external SoundFont
+as separate explicit operations:
+
+```bash
+deploy/pi-bridge.sh probe <username>@alesis.local
+deploy/pi-bridge.sh sync <username>@alesis.local
+deploy/pi-bridge.sh asset <username>@alesis.local
+```
+
+`probe` runs read-only hardware diagnostics and never uses `sudo`. `sync` copies
+the checkout to `~/alesis` without dependencies and does not start it. `asset`
+verifies the known SHA-256 before and after copying `STH.sf2` to `~/Downloads`.
+No operation installs packages, starts services, or produces audio.
 
 ## Validate
 
@@ -48,9 +77,11 @@ npm run test:e2e
 npm run test:audio
 ```
 
-`test:audio` requires Linux, PipeWire/PulseAudio, FluidSynth, FFmpeg, and a physical speaker sink.
+`test:audio` is the legacy workstation sink-monitor check and requires Linux,
+PipeWire/PulseAudio, FluidSynth, FFmpeg, and a physical speaker sink. Pi
+production playback uses the `alesis_cm108` ALSA route instead.
 
-## Audio recovery
+## Workstation audio recovery
 
 If streams appear connected but `test:audio` receives no PCM, check:
 
@@ -93,8 +124,10 @@ is the discovery contract for Jarvis.
 
 ## Design
 
+- [Raspberry Pi v1 TODO](TODO.md)
 - [Scope](SCOPE.md)
 - [UI behavior](UI_DESIGN.md)
+- [Digital window recreation specification](docs/DIGITAL_WINDOW_RECREATION_SPEC.md)
 - [Hardware notes](docs/HARDWARE.md)
 - [Minimum hardware BOM](docs/MINIMUM_HARDWARE_BOM.md)
 - [Host-owned engine ADR](docs/adr/0001-host-owned-realtime-engine.md)

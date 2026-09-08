@@ -16,6 +16,8 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .connection-dot.connected { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
 .connection-dot.connecting { animation: blink .8s infinite alternate; }
 @keyframes blink { to { background: var(--cyan); } }
+.readiness-line { position: fixed; z-index: 24; top: 24px; left: 3vw; right: 3vw; display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--danger); font-size: 10px; text-transform: uppercase; }
+.readiness-line strong { color: #fff; }
 .error-line { position: fixed; z-index: 25; top: 24px; right: 3vw; max-width: 60vw; color: var(--danger); font-size: 11px; }
 .success-line { position: fixed; z-index: 25; top: 24px; right: 3vw; max-width: 70vw; color: var(--signal); font-size: 11px; }
 .dialog-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; place-items: center; background: rgb(4 8 9 / 72%); }

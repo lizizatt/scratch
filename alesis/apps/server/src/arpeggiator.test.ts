@@ -91,6 +91,15 @@ describe("MidiArpeggiator", () => {
     expect(arp.advance(0, 120)).toEqual([]);
   });
 
+  it("releases and forgets held notes on lifecycle panic", () => {
+    const arp = new MidiArpeggiator({ ...defaults, latch: true });
+    arp.handle({ type: "note-on", channel: 0, note: 60, velocity: 100 });
+    arp.advance(0, 120);
+
+    expect(arp.panic()).toEqual([{ type: "note-off", channel: 0, note: 60 }]);
+    expect(arp.advance(0, 120)).toEqual([]);
+  });
+
   it("resets and releases the sequence when mode changes", () => {
     const arp = new MidiArpeggiator(defaults);
     arp.handle({ type: "note-on", channel: 0, note: 60, velocity: 100 });

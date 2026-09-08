@@ -16,4 +16,9 @@ export class PerformanceRouter {
     if (channels.length === 0 && this.lastNoteChannel !== null) channels.push(this.lastNoteChannel);
     return channels.length > 0 ? channels.map((channel) => ({ ...event, channel })) : [event];
   }
+
+  panic(): void {
+    this.heldNotes.clear();
+    this.lastNoteChannel = null;
+  }
 }

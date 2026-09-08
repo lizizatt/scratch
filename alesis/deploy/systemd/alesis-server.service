@@ -1,0 +1,28 @@
+[Unit]
+Description=Alesis host engine
+After=network.target sound.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=alesis
+Group=alesis
+SupplementaryGroups=audio input
+WorkingDirectory=/home/alesis/alesis
+Environment=HOME=/home/alesis
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+ExecStartPre=/usr/bin/test -r /home/alesis/Downloads/STH.sf2
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=15
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

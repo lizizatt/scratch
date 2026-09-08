@@ -21,15 +21,52 @@ afterEach(async () => {
 });
 
 describe("control server", () => {
-  it("reports health from the production HTTP server", async () => {
+  it("reports each failed readiness dependency independently", async () => {
     engine = new SimulatedHostEngine();
-    server = await createControlServer(engine);
+    server = await createControlServer(engine, 0, undefined, undefined, "127.0.0.1", {
+      soundFont: { ready: false, reason: "Required STH.sf2 was not found" },
+      synth: { ready: false, reason: "FluidSynth did not start" },
+      audio: { ready: false, reason: "CM108 USB audio was not found" },
+      midi: { ready: false, reason: "Vortex Wireless 2 was not found" },
+    });
 
     const response = await fetch(`http://127.0.0.1:${server.port}/health`);
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(response.headers.get("content-type")).toBe("application/json");
-    expect(await response.json()).toEqual({ status: "ok" });
+    expect(await response.json()).toEqual({
+      status: "not-ready",
+      dependencies: {
+        soundFont: { ready: false, reason: "Required STH.sf2 was not found" },
+        synth: { ready: false, reason: "FluidSynth did not start" },
+        audio: { ready: false, reason: "CM108 USB audio was not found" },
+        midi: { ready: false, reason: "Vortex Wireless 2 was not found" },
+      },
+    });
+  });
+
+  it("stays stopped and rejects play while a required dependency is not ready", async () => {
+    engine = new SimulatedHostEngine();
+    server = await createControlServer(engine, 0, undefined, undefined, "127.0.0.1", {
+      soundFont: { ready: true, identity: "STH.sf2" },
+      synth: { ready: true, identity: "FluidSynth" },
+      audio: { ready: false, reason: "CM108 USB audio was not found" },
+      midi: { ready: true, identity: "Vortex Wireless 2" },
+    });
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+
+    socket.send(JSON.stringify({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: "75e35298-48e6-48c0-a464-f06473725fc8",
+      command: { type: "play" },
+    }));
+
+    const messages = await collectUntil(inbox, (message) => message.type === "command-result");
+    expect(messages.at(-1)).toMatchObject({ accepted: false, error: "Not Ready: audio: CM108 USB audio was not found" });
+    expect(engine.snapshot().transport.state).toBe("stopped");
+    socket.close();
   });
 
   it("serves assets created after startup", async () => {
@@ -53,7 +90,15 @@ describe("control server", () => {
     const inbox = new MessageInbox(socket);
 
     const initial = await inbox.next();
-    expect(initial.type).toBe("snapshot");
+    expect(initial).toMatchObject({
+      type: "snapshot",
+      readiness: {
+        soundFont: { ready: true },
+        synth: { ready: true },
+        audio: { ready: true },
+        midi: { ready: true },
+      },
+    });
 
     socket.send(JSON.stringify({
       protocolVersion: PROTOCOL_VERSION,

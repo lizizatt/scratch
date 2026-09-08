@@ -1,0 +1,25 @@
+[Unit]
+Description=Alesis Chromium kiosk
+Wants=alesis-server.service
+After=graphical.target alesis-server.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=alesis
+Group=alesis
+Environment=HOME=/home/alesis
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+ExecStart=/home/alesis/alesis/deploy/run-kiosk.sh
+Restart=always
+RestartSec=2
+TimeoutStopSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0027
+
+[Install]
+WantedBy=graphical.target

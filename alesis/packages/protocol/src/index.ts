@@ -7,6 +7,19 @@ const takeIdSchema = z.string().min(1).max(128);
 export const exportNameSchema = z.string().trim().min(1).max(80).regex(/^[a-zA-Z0-9][a-zA-Z0-9 _-]*$/);
 export const quantizationModeSchema = z.enum(["off", "1/4", "1/8", "1/16", "1/32"]);
 
+export const dependencyReadinessSchema = z.object({
+  ready: z.boolean(),
+  reason: z.string().min(1).optional(),
+  identity: z.string().min(1).optional(),
+});
+
+export const readinessSchema = z.object({
+  soundFont: dependencyReadinessSchema,
+  synth: dependencyReadinessSchema,
+  audio: dependencyReadinessSchema,
+  midi: dependencyReadinessSchema,
+});
+
 export const settingsSchema = z.object({
   bpm: z.number().int().min(30).max(300),
   beatsPerMeasure: z.number().int().min(1).max(16),
@@ -143,7 +156,7 @@ export const commandEnvelopeSchema = z.object({
 });
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema }),
+  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema }),
   z.object({
     type: z.literal("command-result"),
     commandId: z.string().uuid(),
@@ -164,6 +177,8 @@ export type SoundFontPreset = z.infer<typeof soundFontPresetSchema>;
 export type ArpeggiatorSettings = z.infer<typeof arpeggiatorSchema>;
 export type DrumSettings = z.infer<typeof drumSettingsSchema>;
 export type QuantizationMode = z.infer<typeof quantizationModeSchema>;
+export type DependencyReadiness = z.infer<typeof dependencyReadinessSchema>;
+export type Readiness = z.infer<typeof readinessSchema>;
 export type EngineSnapshot = z.infer<typeof engineSnapshotSchema>;
 export type EngineCommand = z.infer<typeof commandSchema>;
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;

@@ -208,6 +208,7 @@ export class SimulatedHostEngine implements HostEngine {
 
   advance(seconds: number): void {
     if (!Number.isFinite(seconds) || seconds < 0) throw new Error("advance requires nonnegative finite seconds");
+    if (this.state.transport.state === "stopped") return;
     if (this.state.transport.state === "counting-in") {
       const countInDuration = this.measureDurationSeconds();
       const consumed = Math.min(seconds, this.countInSecondsRemaining);

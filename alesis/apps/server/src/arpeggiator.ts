@@ -120,6 +120,11 @@ export class MidiArpeggiator {
     return events;
   }
 
+  panic(): MidiEvent[] {
+    this.held.clear();
+    return this.flush();
+  }
+
   private nextNote(): HeldNote | null {
     const expanded = this.expandedNotes();
     if (expanded.length === 0) return null;

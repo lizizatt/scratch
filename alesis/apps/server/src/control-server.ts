@@ -5,6 +5,7 @@ import {
   commandEnvelopeSchema,
   type CommandEnvelope,
   type EngineCommand,
+  type Readiness,
   type ServerMessage,
 } from "@alesis/protocol";
 import { WebSocket, WebSocketServer } from "ws";
@@ -15,21 +16,29 @@ export interface ControlServer {
   close(): Promise<void>;
 }
 
+const readyForDevelopment: Readiness = {
+  soundFont: { ready: true },
+  synth: { ready: true },
+  audio: { ready: true },
+  midi: { ready: true },
+};
+
 export async function createControlServer(
   engine: HostEngine,
   port = 0,
   staticDirectory?: string,
   executeCommand: (command: EngineCommand) => Promise<EngineResult> = (command) => engine.execute(command),
   host = "127.0.0.1",
+  readiness: Readiness = readyForDevelopment,
 ): Promise<ControlServer> {
-  const httpServer = createHttpServer(staticDirectory);
+  const httpServer = createHttpServer(staticDirectory, readiness);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control" });
   const results = new Map<string, ServerMessage>();
   let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
   let snapshotPending = false;
 
   const broadcastSnapshotNow = (): void => {
-    const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot() } satisfies ServerMessage);
+    const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage);
     webSocketServer.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) client.send(payload);
     });
@@ -47,7 +56,7 @@ export async function createControlServer(
   const unsubscribe = engine.subscribe(scheduleSnapshot);
 
   webSocketServer.on("connection", (socket) => {
-    socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot() } satisfies ServerMessage));
+    socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage));
     socket.on("message", async (data) => {
       const envelope = parseEnvelope(data.toString());
       if (!envelope) {
@@ -61,7 +70,11 @@ export async function createControlServer(
         return;
       }
 
-      const result = await executeCommand(envelope.command);
+      const notReady = envelope.command.type === "play" ? readinessFailure(readiness) : null;
+      const snapshot = engine.snapshot();
+      const result = notReady
+        ? { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: notReady }
+        : await executeCommand(envelope.command);
       snapshotPending = false;
       broadcastSnapshotNow();
       const message = commandResult(envelope, result);
@@ -88,12 +101,13 @@ export async function createControlServer(
   };
 }
 
-function createHttpServer(staticDirectory?: string): HttpServer {
+function createHttpServer(staticDirectory: string | undefined, readiness: Readiness): HttpServer {
   const serveStatic = staticDirectory ? sirv(staticDirectory, { single: true, dev: true }) : undefined;
   return createServer((request, response) => {
     if (request.url === "/health") {
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ status: "ok" }));
+      const ready = Object.values(readiness).every((dependency) => dependency.ready);
+      response.writeHead(ready ? 200 : 503, { "content-type": "application/json" });
+      response.end(JSON.stringify({ status: ready ? "ready" : "not-ready", dependencies: readiness }));
       return;
     }
     if (serveStatic) {
@@ -104,6 +118,13 @@ function createHttpServer(staticDirectory?: string): HttpServer {
     }
     response.writeHead(404).end();
   });
+}
+
+function readinessFailure(readiness: Readiness): string | null {
+  const failures = Object.entries(readiness)
+    .filter(([, dependency]) => !dependency.ready)
+    .map(([name, dependency]) => `${name}: ${dependency.reason ?? "Unavailable"}`);
+  return failures.length > 0 ? `Not Ready: ${failures.join("; ")}` : null;
 }
 
 function parseEnvelope(raw: string): CommandEnvelope | null {

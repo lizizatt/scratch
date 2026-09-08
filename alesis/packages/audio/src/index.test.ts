@@ -3,9 +3,39 @@ import { PassThrough } from "node:stream";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auxiliaryPercussionSelectionCommands, discoverSoundFonts, drainFluidSynthStdout, drumCommands, FluidSynthOutput, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, parseSoundFontPresets, preferredSoundFont, soundFontInitializationCommands, soundFontParameterCommands, waitForFluidSynthShell } from "./index.js";
+import { alsaPlaybackArguments, auxiliaryPercussionSelectionCommands, discoverCm108AudioDevice, discoverSoundFonts, drainFluidSynthStdout, drumCommands, FLUIDSYNTH_READY_TIMEOUT_MS, FluidSynthOutput, fluidSynthArguments, fluidSynthStdio, isFluidSynthRendererStalled, metronomeCommands, midiEventToFluidCommand, parseSoundFontPresets, preferredSoundFont, soundFontInitializationCommands, soundFontParameterCommands, stereoFloatToDualMonoS16, waitForFluidSynthShell } from "./index.js";
 
 describe("FluidSynth output", () => {
+  it("discovers the first CM108 playback device by USB identity and ALSA name", () => {
+    const asoundRoot = mkdtempSync(join(tmpdir(), "alesis-asound-test-"));
+    const deviceRoot = mkdtempSync(join(tmpdir(), "alesis-snd-test-"));
+    try {
+      for (const [card, id, usbId, name] of [
+        ["card2", "Headphones", "", "bcm2835 Headphones"],
+        ["card3", "Device", "0d8c:013c", "USB Audio"],
+        ["card5", "Device_1", "0d8c:013c", "USB Audio"],
+      ] as const) {
+        mkdirSync(join(asoundRoot, card));
+        writeFileSync(join(asoundRoot, card, "id"), `${id}\n`);
+        writeFileSync(join(asoundRoot, card, "usbid"), `${usbId}\n`);
+        mkdirSync(join(asoundRoot, card, "pcm0p"));
+        writeFileSync(join(asoundRoot, card, "pcm0p", "info"), `name: ${name}\n`);
+        writeFileSync(join(deviceRoot, `pcmC${card.slice(4)}D0p`), "");
+      }
+
+      expect(discoverCm108AudioDevice(asoundRoot, deviceRoot)).toEqual({
+        id: "alsa:Device",
+        name: "USB Audio",
+        usbId: "0d8c:013c",
+        cardId: "Device",
+        pcm: "alesis_cm108",
+      });
+    } finally {
+      rmSync(asoundRoot, { recursive: true, force: true });
+      rmSync(deviceRoot, { recursive: true, force: true });
+    }
+  });
+
   it("maps normalized MIDI events to FluidSynth commands", () => {
     expect(midiEventToFluidCommand({ type: "note-on", channel: 2, note: 64, velocity: 111 })).toBe("noteon 2 64 111");
     expect(midiEventToFluidCommand({ type: "note-off", channel: 2, note: 64 })).toBe("noteoff 2 64");
@@ -16,13 +46,59 @@ describe("FluidSynth output", () => {
     expect(midiEventToFluidCommand({ type: "channel-pressure", channel: 0, value: 80 })).toBeNull();
   });
 
-  it("builds an explicit PulseAudio sink invocation", () => {
-    expect(fluidSynthArguments("speaker-sink", "/sounds/gm.sf2", 0.25)).toEqual([
+  it("panics every MIDI channel before accepting performance input", () => {
+    const commands: string[] = [];
+    const output = new FluidSynthOutput({ device: { id: "test", name: "Test", pcm: "test" }, commandObserver: (command) => commands.push(command) });
+
+    output.panic();
+
+    for (let channel = 0; channel < 16; channel += 1) {
+      expect(commands).toContain(`cc ${channel} 64 0`);
+      expect(commands).toContain(`cc ${channel} 120 0`);
+      expect(commands).toContain(`cc ${channel} 121 0`);
+      expect(commands).toContain(`cc ${channel} 123 0`);
+      expect(commands).toContain(`pitch_bend ${channel} 8192`);
+    }
+  });
+
+  it("builds an explicit direct ALSA invocation with conservative buffering", () => {
+    expect(fluidSynthArguments("alesis_cm108", "/sounds/gm.sf2", 0.25)).toEqual([
       "-q",
-      "-a", "pulseaudio",
-      "-o", "audio.pulseaudio.device=speaker-sink",
+      "-a", "alsa",
+      "-o", "audio.alsa.device=alesis_cm108",
+      "-r", "48000",
+      "-z", "512",
+      "-c", "2",
+      "-o", "midi.autoconnect=0",
       "-o", "synth.gain=0.25",
       "/sounds/gm.sf2",
+    ]);
+  });
+
+  it("converts stereo float samples to clipped 16-bit dual mono", () => {
+    const converted = stereoFloatToDualMonoS16(new Float32Array([
+      1, 0,
+      -1, 0,
+      1, 1,
+    ]));
+
+    expect(Array.from({ length: 6 }, (_, index) => converted.readInt16LE(index * 2))).toEqual([
+      16_384, 16_384,
+      -16_383, -16_383,
+      32_767, 32_767,
+    ]);
+  });
+
+  it("builds an explicit direct ALSA playback invocation for Neon Pressure", () => {
+    expect(alsaPlaybackArguments("alesis_cm108")).toEqual([
+      "-q",
+      "-D", "alesis_cm108",
+      "-t", "raw",
+      "-f", "S16_LE",
+      "-r", "48000",
+      "-c", "2",
+      "--period-size=512",
+      "--buffer-size=1024",
     ]);
   });
 
@@ -41,7 +117,7 @@ describe("FluidSynth output", () => {
   it("recognizes renderer failures that require a fresh FluidSynth process", () => {
     expect(isFluidSynthRendererStalled("fluidsynth: warning: Ringbuffer full, try increasing synth.polyphony!")).toBe(true);
     expect(isFluidSynthRendererStalled("Failed to allocate a synthesis process. (chan=9,key=77)")).toBe(true);
-    expect(isFluidSynthRendererStalled("Using PulseAudio driver")).toBe(false);
+    expect(isFluidSynthRendererStalled("Using ALSA driver")).toBe(false);
   });
 
   it("waits until the FluidSynth shell consumes commands", async () => {
@@ -53,6 +129,7 @@ describe("FluidSynth output", () => {
     });
 
     await expect(waitForFluidSynthShell(stdin, stdout, 100)).resolves.toBeUndefined();
+    expect(FLUIDSYNTH_READY_TIMEOUT_MS).toBe(30_000);
   });
 
   it("maps metronome accents and level to short bank-agnostic notes", () => {
@@ -132,7 +209,7 @@ describe("FluidSynth output", () => {
     vi.useFakeTimers();
     try {
       const commands: string[] = [];
-      const output = new FluidSynthOutput({ device: { id: "test", name: "Test" }, commandObserver: (command) => commands.push(command) });
+      const output = new FluidSynthOutput({ device: { id: "test", name: "Test", pcm: "test" }, commandObserver: (command) => commands.push(command) });
       output.playDrum(36, 100);
       expect(commands).toEqual(["noteon 9 36 100"]);
       vi.advanceTimersByTime(79);

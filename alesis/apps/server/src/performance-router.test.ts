@@ -32,4 +32,15 @@ describe("PerformanceRouter", () => {
       { type: "pitch-bend", channel: 1, value: 0 },
     ]);
   });
+
+  it("forgets held-note routing on lifecycle panic", () => {
+    const router = new PerformanceRouter();
+    router.route({ type: "note-on", channel: 3, note: 67, velocity: 100 });
+
+    router.panic();
+
+    expect(router.route({ type: "pitch-bend", channel: 0, value: 0 })).toEqual([
+      { type: "pitch-bend", channel: 0, value: 0 },
+    ]);
+  });
 });

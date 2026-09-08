@@ -9,6 +9,16 @@ async function captureOneCycle(engine: SimulatedHostEngine): Promise<void> {
 }
 
 describe("SimulatedHostEngine", () => {
+  it("does not publish unchanged snapshots while transport is stopped", () => {
+    const engine = new SimulatedHostEngine();
+    let snapshots = 0;
+    engine.subscribe(() => { snapshots += 1; });
+
+    engine.advance(0.05);
+
+    expect(snapshots).toBe(1);
+  });
+
   it("owns validated arpeggiator configuration", async () => {
     const engine = new SimulatedHostEngine();
     const result = await engine.execute({ type: "configure-arpeggiator", settings: { enabled: true, mode: "up-down", rate: "1/16", octaves: 3, gate: 0.7, latch: true, swing: 0.2 } });

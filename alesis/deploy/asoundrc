@@ -1,0 +1,28 @@
+pcm.alesis_cm108_dmix {
+  type dmix
+  ipc_key 1095521619
+  ipc_key_add_uid true
+  slave {
+    pcm "hw:CARD=Device,DEV=0"
+    format S16_LE
+    rate 48000
+    channels 2
+    period_size 512
+    buffer_size 1024
+  }
+}
+
+pcm.alesis_cm108 {
+  type route
+  slave.pcm "alesis_cm108_dmix"
+  slave.channels 2
+  ttable.0.0 0.5
+  ttable.1.0 0.5
+  ttable.0.1 0.5
+  ttable.1.1 0.5
+}
+
+ctl.alesis_cm108 {
+  type hw
+  card Device
+}
