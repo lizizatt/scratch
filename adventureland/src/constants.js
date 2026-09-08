@@ -24,7 +24,7 @@ const SEND_RANGE = 320;
 const ASSEMBLE_TIMEOUT_MS = 60000;
 const RARE_GONE_MS = 20000;
 const RARE_WHITELIST = ["phoenix"];
-const JOB_MS = 300000;
+const JOB_MS = 480000;
 
 module.exports = {
   LEADER_ORDER,

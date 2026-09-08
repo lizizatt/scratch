@@ -8,7 +8,7 @@ const { bootFighter } = require("../src/fighter");
 const { bootMerchant } = require("../src/merchant");
 const { gradeLogs } = require("../sim/invariants");
 const { GOLD_FLOAT_FIGHTER } = require("../src/constants");
-const { packCenter } = require("../sim/world");
+const { packCenter } = require("../src/packs");
 
 const tests = [];
 function test(name, fn) {
@@ -81,18 +81,32 @@ test("merchant: meet_home with server_region unset keeps active", async () => {
   assert.ok(ctrl.store.active && ctrl.store.active.kind === "meet_home");
 });
 
-test("fighter: town_fallback sends cancel_all and refuses buy below GOLD_FLOAT", async () => {
+test("fighter: town_fallback low_gold keeps delivery, no cancel", async () => {
   const p = bootParty({ pack: "armadillo", pots: 0, gold: 100 }); // below float
   await p.bots.Jazwyn.ctrl.requestPots();
-  p.bots.Jazwyn.ctrl._setDlv({ id: "pend1", t0: p.world.clock.now() - 100000, acked: 1 });
-  for (let i = 0; i < 20; i++) {
+  p.bots.Jazwyn.ctrl._setDlv({ id: "pend1", t0: p.world.clock.now() - 500000, acked: 1 });
+  for (let i = 0; i < 40; i++) {
+    await p.bots.Jazwyn.ctrl.tick();
+    p.world.advance(250);
+    if (p.bots.Jazwyn.api.log.game.some((g) => /town_fallback/.test(g.m))) break;
+  }
+  assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /town_fallback/.test(g.m)));
+  assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /low_gold/.test(g.m)));
+  assert.ok(!p.bots.Jazwyn.api.log.cm.some((c) => c.message && c.message.job === "cancel_all"));
+  assert.strictEqual(p.bots.Jazwyn.api.log.bought.length, 0);
+});
+
+test("fighter: town_fallback with gold cancels pending and buys", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 0, gold: 100000 });
+  await p.bots.Jazwyn.ctrl.requestPots();
+  p.bots.Jazwyn.ctrl._setDlv({ id: "pend2", t0: p.world.clock.now() - 100000, acked: 0 });
+  for (let i = 0; i < 40; i++) {
     await p.bots.Jazwyn.ctrl.tick();
     p.world.advance(250);
     if (p.bots.Jazwyn.api.log.game.some((g) => /town_fallback/.test(g.m))) break;
   }
   assert.ok(p.bots.Jazwyn.api.log.cm.some((c) => c.message && c.message.job === "cancel_all"));
-  assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /low_gold/.test(g.m)));
-  assert.strictEqual(p.bots.Jazwyn.api.log.bought.length, 0);
+  assert.ok(p.bots.Jazwyn.api.log.bought.length >= 1);
 });
 
 test("fighter: !hunt phoenix never smart_move to phoenix type", async () => {

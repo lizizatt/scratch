@@ -20,7 +20,7 @@ const {
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
 const { createMotion } = require("./motion");
-const { packCenter } = require("../sim/world");
+const { packCenter } = require("./packs");
 
 /**
  * Boot a fighter into a sim (or real) API environment.
@@ -178,14 +178,27 @@ function bootFighter(api, opts) {
 
   async function townFallback() {
     api.game_log("town_fallback");
+    // Low gold: merchant delivery is the only option — never cancel it
+    if (api.character.gold < GOLD_FLOAT_FIGHTER) {
+      api.game_log("town_fallback low_gold");
+      if (dlvPending) {
+        lastStatusAt = api._now();
+        await api.send_cm(MERCHANT, {
+          dlv_loc: 1,
+          id: dlvPending.id,
+          map: api.character.map,
+          x: api.character.real_x,
+          y: api.character.real_y,
+        });
+      } else {
+        await requestPots();
+      }
+      persist();
+      return;
+    }
     if (dlvPending) {
       await api.send_cm(MERCHANT, { job: "cancel_all", id: dlvPending.id, who: name });
       dlvPending = null;
-    }
-    if (api.character.gold < GOLD_FLOAT_FIGHTER) {
-      api.game_log("town_fallback low_gold");
-      persist();
-      return; // never buy into debt (LESSONS #5)
     }
     await motion.goTo({ to: "potions" });
     await api.buy("hpot1", POTION_TARGET);
@@ -213,6 +226,15 @@ function bootFighter(api, opts) {
       }
     }
     await api.send_cm(MERCHANT, { job: "cancel_all", who: name });
+    // Same-server CM first (still on farm world before hop); PM if deaf
+    if (isLead() && targetServer[0] === HOME[0] && targetServer[1] === HOME[1]) {
+      const r = await api.send_cm(MERCHANT, { job: "meet_home" });
+      if (!r.receivers || !r.receivers.length) {
+        try {
+          await api.pm(MERCHANT, "meet_home");
+        } catch (e) {}
+      }
+    }
     if (isLead()) chat.enqueue("World " + targetServer[0] + "/" + targetServer[1], "echo");
     chat.tick(api._now());
     persist();
@@ -293,6 +315,13 @@ function bootFighter(api, opts) {
   async function hearCm(m) {
     const d = m.message;
     if (!d || typeof d !== "object") return;
+    // Merchant console → CM (Puppygirl hunt/world/hold)
+    if (d.hunt) applyCmd({ type: "cmd", cmd: "hunt", args: ["" + d.hunt] }, isLead());
+    if (d.grind) applyCmd({ type: "cmd", cmd: "grind", args: [] }, isLead());
+    if (d.world && Array.isArray(d.world))
+      applyCmd({ type: "cmd", cmd: "world", args: [d.world[0] + "/" + d.world[1]] }, isLead());
+    if (d.hold === 1) applyCmd({ type: "cmd", cmd: "hold", args: [] }, isLead());
+    if (d.hold === 0) applyCmd({ type: "cmd", cmd: "resume", args: [] }, isLead());
     if (d.dlv_ack && dlvPending && d.id === dlvPending.id) {
       dlvPending.acked = d.ok ? 1 : 0;
       lastStatusAt = api._now();
@@ -400,7 +429,9 @@ function bootFighter(api, opts) {
       if ((api.character.esize || 0) < 1) {
         await freeBagSlot();
       }
-      if (dlvPending && lastStatusAt && now - lastStatusAt < FALLBACK_SILENCE_MS) {
+      // After ack, give merchant PENDING_MS (path can be multi-minute via cave)
+      const grace = dlvPending && dlvPending.acked ? PENDING_MS : FALLBACK_SILENCE_MS;
+      if (dlvPending && lastStatusAt && now - lastStatusAt < grace) {
         // wait for merchant
         if (now - lastBeacon > BEACON_MS) {
           lastBeacon = now;
@@ -414,7 +445,7 @@ function bootFighter(api, opts) {
         }
         return;
       }
-      if (dlvPending && now - dlvPending.t0 > FALLBACK_SILENCE_MS) {
+      if (dlvPending && now - dlvPending.t0 > grace) {
         await townFallback();
         return;
       }
@@ -442,10 +473,8 @@ function bootFighter(api, opts) {
       if (isLead()) {
         chat.enqueue("Transfer " + mtype, "echo");
         chat.tick(now);
-        const ok = await motion.waitParty(now, 5000);
-        if (!ok && Object.keys(api.get_party() || {}).length > 1) {
-          return;
-        }
+        // Brief cohesion window; always proceed after (followers use followLeader)
+        await motion.waitParty(now, 5000);
       }
       const pc = packCenter(mtype);
       if (pc) await motion.goTo({ map: pc.map, x: pc.x, y: pc.y });
@@ -462,10 +491,31 @@ function bootFighter(api, opts) {
         }
       }
     }
+    if (opts.pre_combat && opts.pre_combat()) return;
+    if (opts.combat) opts.combat(mtype);
   }
 
   async function tick() {
     const now = api._now();
+    // Jail / death before any farm motion (LESSONS)
+    if (api.character.map === "jail") {
+      api.game_log("jail:leave");
+      try {
+        if (typeof api.leave === "function") await api.leave();
+      } catch (e) {}
+      await api.sleep(1000);
+      persist();
+      return;
+    }
+    if (api.character.rip) {
+      api.game_log("rip:respawn");
+      try {
+        if (typeof api.respawn === "function") await api.respawn();
+      } catch (e) {}
+      await api.sleep(1000);
+      persist();
+      return;
+    }
     motion.evalPresent(now);
     if (isLead() && now - lastHb >= HEARTBEAT_MS) {
       lastHb = now;

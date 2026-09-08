@@ -239,6 +239,12 @@ function createCharacter(world, over) {
       if (c.map === "jail") place("main", 0, 0);
     },
 
+    async respawn() {
+      c.rip = false;
+      c.hp = c.max_hp;
+      place(c.map, c.real_x, c.real_y);
+    },
+
     stop(what) {
       if (!what || what === "smart") smart.moving = false;
     },

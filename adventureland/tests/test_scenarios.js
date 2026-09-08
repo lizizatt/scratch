@@ -49,11 +49,10 @@ test("scenario: dry pots → merchant delivery → dlv_done", async () => {
 });
 
 test("scenario: merchant delayed → fighter waits; silence → town_fallback", async () => {
-  const p = bootParty({ pack: "armadillo", pots: 0 });
-  // Don't tick merchant — only fighters
+  const p = bootParty({ pack: "armadillo", pots: 0, gold: 100000 });
+  // Don't tick merchant — only fighters; no ack → 90s silence grace
   await p.bots.Jazwyn.ctrl.requestPots();
-  p.bots.Jazwyn.ctrl._setDlv({ id: "x", t0: p.world.clock.now(), acked: 1 });
-  // Advance past FALLBACK_SILENCE_MS without merchant status
+  p.bots.Jazwyn.ctrl._setDlv({ id: "x", t0: p.world.clock.now(), acked: 0 });
   for (let i = 0; i < 400; i++) {
     await p.bots.Jazwyn.ctrl.tick();
     p.world.advance(250);

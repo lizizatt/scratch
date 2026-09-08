@@ -67,18 +67,32 @@ function createMotion(api, opts) {
     return present;
   }
 
+  function followersNear() {
+    const party = api.get_party() || {};
+    const names = Object.keys(party).filter((n) => n !== api.character.name);
+    if (!names.length) return true;
+    for (const n of names) {
+      const p = api.get_player(n) || party[n];
+      if (!p) return false;
+      if (p.map && p.map !== api.character.map) return false;
+      if (dist(api.character, p) > FORM_R_OUT) return false;
+    }
+    return true;
+  }
+
   async function waitParty(now, ms) {
     waitUntil = now + (ms || WAIT_PARTY_MS);
     api.game_log("wait_party");
+    const selfIsLead = leadName() === api.character.name;
     while ((opts.now ? opts.now() : Date.now()) < waitUntil) {
-      if (evalPresent(opts.now ? opts.now() : Date.now())) {
+      const t = opts.now ? opts.now() : Date.now();
+      if (selfIsLead ? followersNear() : evalPresent(t)) {
         waitUntil = 0;
         return true;
       }
       await api.sleep(500);
     }
     api.game_log("wait_timeout");
-    // abort move, re-anchor — do not proceed split
     try {
       api.stop("smart");
     } catch (e) {}
@@ -95,17 +109,26 @@ function createMotion(api, opts) {
     if (map === api.character.map && dist(api.character, { x, y }) <= FORM_R_IN) return true;
     movingTask = true;
     try {
-      await api.smart_move({ map, x, y });
+      const r = await api.smart_move({ map, x, y });
+      if (r && r.failed) api.game_log("smart_fail " + (r.reason || "fail"));
+      return !(r && r.failed);
+    } catch (e) {
+      api.game_log("smart_fail " + ((e && e.reason) || (e && e.message) || "err"));
+      return false;
     } finally {
       movingTask = false;
     }
-    return true;
   }
 
   async function goTo(dest) {
     movingTask = true;
     try {
-      return await api.smart_move(dest);
+      const r = await api.smart_move(dest);
+      if (r && r.failed) api.game_log("smart_fail " + (r.reason || "fail"));
+      return r;
+    } catch (e) {
+      api.game_log("smart_fail " + ((e && e.reason) || (e && e.message) || "err"));
+      return { failed: true, reason: e };
     } finally {
       movingTask = false;
     }

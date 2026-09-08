@@ -1,7 +1,7 @@
 "use strict";
 
 const { FIGHTERS, FARM, HOME, JOB_MS, POTION_TARGET, GOLD_FLOAT_FIGHTER, SEND_RANGE } = require("./constants");
-const { packCenter } = require("../sim/world");
+const { packCenter } = require("./packs");
 
 /**
  * Merchant logistics under Jazwyn command.
@@ -86,10 +86,21 @@ function bootMerchant(api, opts) {
   }
 
   async function buyPots(items) {
-    await api.smart_move({ to: "potions" });
+    // Prefer coords (named {to:"potions"} stalls on Mainframe)
+    await api.smart_move({ map: "main", x: 56, y: -122 });
     for (const it of items || []) {
-      await api.buy(it.name, it.q || POTION_TARGET);
-      api.game_log("dlv:buy " + it.name + " " + it.q);
+      const need = it.q || POTION_TARGET;
+      let have = 0;
+      for (const bag of api.character.items || []) {
+        if (bag && bag.name === it.name) have += bag.q == null ? 1 : bag.q;
+      }
+      const buyQ = need - have;
+      if (buyQ <= 0) {
+        api.game_log("dlv:have " + it.name + " " + have);
+        continue;
+      }
+      await api.buy(it.name, buyQ);
+      api.game_log("dlv:buy " + it.name + " " + buyQ);
     }
   }
 
@@ -160,23 +171,41 @@ function bootMerchant(api, opts) {
 
     t = api.get_player(job.who);
     if (!t) {
-      api.game_log("dlv:no_vision");
-      return;
+      // Party list coords — stand nearby and retry next tick
+      const p = (api.get_party() || {})[job.who];
+      if (p && p.map) {
+        await api.smart_move({
+          map: p.map,
+          x: p.real_x != null ? p.real_x : p.x,
+          y: p.real_y != null ? p.real_y : p.y,
+        });
+        t = api.get_player(job.who);
+      }
+      if (!t) {
+        api.game_log("dlv:no_vision");
+        return;
+      }
     }
 
     // Top up gold if needed
     if ((t.gold || 0) < GOLD_FLOAT_FIGHTER) {
-      api.send_gold(job.who, GOLD_FLOAT_FIGHTER - (t.gold || 0));
-      api.game_log("gold_topup");
+      try {
+        api.send_gold(job.who, GOLD_FLOAT_FIGHTER - (t.gold || 0));
+        api.game_log("gold_topup");
+      } catch (e) {}
     }
 
-    // Send pots from bag
+    // Send pots from bag (AL send_item may not return {success})
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (!it) continue;
       if (it.name !== "hpot1" && it.name !== "mpot1") continue;
-      const sr = await api.send_item(job.who, i, it.q == null ? 1 : it.q);
-      if (sr && sr.success) api.game_log("dlv:send " + it.name);
+      try {
+        await api.send_item(job.who, i, it.q == null ? 1 : it.q);
+        api.game_log("dlv:send " + it.name);
+      } catch (e) {
+        api.game_log("dlv:send_fail " + it.name);
+      }
     }
 
     // Optional gear piece from bank job
@@ -228,9 +257,69 @@ function bootMerchant(api, opts) {
     }
   });
 
+  /** Console helpers — issue from Puppygirl only (avoid fighter chat jail). */
+  function hunt(mob) {
+    const k = ("" + (mob || "")).toLowerCase().replace(/[^a-z0-9_]/g, "");
+    const ban = ["spider", "scorpion", "bigbird"];
+    if (!k) return;
+    if (ban.indexOf(k) >= 0) {
+      api.set_message("Skip " + k);
+      api.game_log("Hunt skipped " + k);
+      return;
+    }
+    api.send_cm("Jazwyn", { hunt: k });
+    api.set_message("Hunt " + k);
+    api.game_log("Hunt " + k);
+  }
+  function grind() {
+    api.send_cm("Jazwyn", { grind: 1 });
+    api.set_message("Grind");
+    api.game_log("Grind sent");
+  }
+  function hold() {
+    for (const n of FIGHTERS) api.send_cm(n, { hold: 1 });
+    enqueue({ id: "hold_" + (api._now ? api._now() : Date.now()), kind: "meet_home", who: "party" });
+    api.set_message("Hold");
+    api.game_log("Hold sent");
+  }
+  function resume() {
+    for (const n of FIGHTERS) api.send_cm(n, { hold: 0 });
+    api.set_message("Stand");
+    api.game_log("Resume sent");
+  }
+  function parseWorld(raw) {
+    const p = ("" + (raw || ""))
+      .trim()
+      .replace(/[!/,]+/g, " ")
+      .replace(/\s+/g, " ")
+      .toUpperCase()
+      .split(" ")
+      .filter(Boolean);
+    let parts = p[0] === "WORLD" ? p.slice(1) : p;
+    if (parts.length === 1 && /^(I|II|III|IV|V|PVP)$/.test(parts[0])) return ["US", parts[0]];
+    if (parts.length >= 2 && /^(US|EU|ASIA)$/.test(parts[0]) && /^[A-Z0-9]+$/.test(parts[1]))
+      return [parts[0], parts[1]];
+    return null;
+  }
+  function world(spec) {
+    const s = parseWorld(spec);
+    if (!s) {
+      api.game_log("World bad");
+      return;
+    }
+    api.send_cm("Jazwyn", { world: s });
+    api.set_message("W " + s[0] + "/" + s[1]);
+    api.game_log("World " + s[0] + "/" + s[1]);
+  }
+
   return {
     tick,
     enqueue,
+    hunt,
+    grind,
+    hold,
+    resume,
+    world,
     get store() {
       return store;
     },
