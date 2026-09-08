@@ -64,6 +64,8 @@ function bootParty(opts) {
       burnPots: !!opts.burnPots,
       farm: pack,
     };
+    if (opts.burnPerTick != null) o.burnPerTick = opts.burnPerTick;
+    if (opts.potionTarget != null) o.potionTarget = opts.potionTarget;
     if (!combatOn) return o;
     if (name === "Jazwyn") {
       o.combat = (mtype) => combatTank(api, mtype, { leadName: "Jazwyn", isLead: true });

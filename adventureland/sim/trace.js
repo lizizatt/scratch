@@ -38,6 +38,14 @@ function attachTrace(world, opts) {
     return logCursor.get(name);
   }
 
+  function countNamed(items, re) {
+    let n = 0;
+    for (const it of items || []) {
+      if (it && re.test(it.name)) n += it.q == null ? 1 : it.q;
+    }
+    return n;
+  }
+
   function pushEvent(ev) {
     if (events.length >= maxEvents) return;
     events.push(ev);
@@ -149,6 +157,8 @@ function attachTrace(world, opts) {
         ctype: ch.ctype,
         target: ch.target || null,
         angle: ch.angle != null ? ch.angle : null,
+        hpots: countNamed(ch.items, /^hpot/),
+        mpots: countNamed(ch.items, /^mpot/),
       };
     }
     frames.push({ t, chars, monsters: snapshotMonsters() });

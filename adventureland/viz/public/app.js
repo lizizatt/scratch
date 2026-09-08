@@ -443,6 +443,12 @@
       }
       ctx.fillStyle = col;
       ctx.fillText(name[0], sx(c.x) + 9, sy(c.y) - 5);
+      if (c.hpots != null || c.mpots != null) {
+        ctx.font = "10px monospace";
+        ctx.fillStyle = "#a89f90";
+        ctx.fillText((c.hpots || 0) + "/" + (c.mpots || 0), sx(c.x) + 9, sy(c.y) + 8);
+        ctx.font = "13px monospace";
+      }
     }
   }
 

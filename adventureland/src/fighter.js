@@ -163,12 +163,13 @@ function bootFighter(api, opts) {
     const id = "p" + api._now() + "_" + name.slice(0, 3);
     dlvPending = { id, kind: "pots", t0: api._now(), acked: 0 };
     state.S.dlv = { id, who: name, phase: "req", t: api._now() };
+    const qty = opts.potionTarget != null ? opts.potionTarget : POTION_TARGET;
     const items = [
-      { name: "hpot1", q: POTION_TARGET },
-      { name: "mpot1", q: POTION_TARGET },
+      { name: "hpot1", q: qty },
+      { name: "mpot1", q: qty },
     ];
     const farm = state.S.intent.mtype;
-    api.game_log("dlv:req id=" + id);
+    api.game_log("dlv:req id=" + id + " q=" + qty);
     persist();
     const r = await api.send_cm(MERCHANT, {
       v: 1,
@@ -185,6 +186,37 @@ function bootFighter(api, opts) {
       api.game_log("cm_unreachable");
       // stay pending; fallback timer uses silence
     }
+  }
+
+  /** Drain inventory to force restock pressure (sim / long-farm knobs). */
+  function burnPotsNow(now) {
+    if (!opts.burnPots) return;
+    const per = opts.burnPerTick;
+    function take(pred, n) {
+      let left = n;
+      for (const it of api.character.items) {
+        if (!it || !pred(it.name) || left <= 0) continue;
+        const q = it.q == null ? 1 : it.q;
+        const use = Math.min(q, left);
+        it.q = q - use;
+        left -= use;
+        if (it.q <= 0) {
+          const i = api.character.items.indexOf(it);
+          if (i >= 0) {
+            api.character.items[i] = null;
+            api.character.esize = (api.character.esize || 0) + 1;
+          }
+        }
+      }
+    }
+    if (per == null) {
+      // Legacy light burn: 1 hpot ~every 10s
+      if (now % 10000 >= 250) return;
+      take((n) => n === "hpot1" || n === "hpot0", 1);
+      return;
+    }
+    take((n) => /^hpot/.test(n), per);
+    take((n) => /^mpot/.test(n), per);
   }
 
   async function townFallback() {
@@ -473,6 +505,9 @@ function bootFighter(api, opts) {
     }
     if (pots === "low" && !dlvPending) await requestPots();
 
+    // Burn after restock checks so dry-wait does not waste pots
+    burnPotsNow(now);
+
     if (!isLead()) {
       state.setSelf({ task: "follow" });
       if (opts.form) await motion.followFormation(opts.form);
@@ -508,15 +543,6 @@ function bootFighter(api, opts) {
       return;
     }
     state.setSelf({ task: "farm" });
-    // consume pot lightly to create delivery pressure in long farms
-    if (opts.burnPots && now % 10000 < 250) {
-      for (const it of api.character.items) {
-        if (it && it.name === "hpot1" && it.q > 0) {
-          it.q--;
-          break;
-        }
-      }
-    }
     if (opts.pre_combat && opts.pre_combat()) return;
     if (opts.combat) opts.combat(mtype);
   }

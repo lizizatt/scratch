@@ -87,7 +87,30 @@ function bootMerchant(api, opts) {
 
   async function buyPots(items) {
     // Prefer coords (named {to:"potions"} stalls on Mainframe)
-    await api.smart_move({ map: "main", x: 56, y: -122 });
+    const dest = { map: "main", x: 56, y: -122 };
+    const nearVendor = () =>
+      api.character.map === dest.map &&
+      Math.hypot(api.character.real_x - dest.x, api.character.real_y - dest.y) < 40;
+
+    if (!nearVendor()) {
+      let r = await api.smart_move(dest);
+      // SE farm → potions is sealed overland; town to hub then walk (viz shows return trips)
+      if (r && r.failed) {
+        api.game_log("dlv:town_for_vendor");
+        try {
+          api.use("town");
+        } catch (e) {}
+        r = await api.smart_move(dest);
+      }
+      if (r && r.failed) {
+        api.game_log("dlv:vendor_path_fail");
+        return false;
+      }
+    }
+    if (!nearVendor() && Math.hypot(api.character.real_x - dest.x, api.character.real_y - dest.y) > 60) {
+      api.game_log("dlv:vendor_far");
+      return false;
+    }
     for (const it of items || []) {
       const need = it.q || POTION_TARGET;
       let have = 0;
@@ -102,6 +125,7 @@ function bootMerchant(api, opts) {
       await api.buy(it.name, buyQ);
       api.game_log("dlv:buy " + it.name + " " + buyQ);
     }
+    return true;
   }
 
   async function deliverActive() {
@@ -131,7 +155,8 @@ function bootMerchant(api, opts) {
     }
 
     if (job.kind === "dlv_pots" && !job.bought) {
-      await buyPots(job.items);
+      const ok = await buyPots(job.items);
+      if (!ok) return; // retry next tick — must stand at vendor
       job.bought = 1;
       saveQ(store);
     }

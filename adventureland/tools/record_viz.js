@@ -51,8 +51,8 @@ function planTag(name) {
   // Map to V2_PLAN §6.6 scenario numbers when obvious
   const n = name.toLowerCase();
   if (/\bboot\b|rejoin|succession|subset|ordering/.test(n)) return "6.6.1";
-  if (/30 min|compressed|short farm|bee pack|goo pack|farm armadillo|farm bee|farm goo/.test(n)) return "6.6.2";
-  if (/dlv|town_fallback|dry pots|status flowing|low_gold|bag-full|gold/.test(n)) return "6.6.3";
+  if (/30 min|compressed|short farm|bee pack|goo pack|farm armadillo|farm bee|farm goo|15 min|multi-restock/.test(n)) return "6.6.2";
+  if (/dlv|town_fallback|dry pots|status flowing|low_gold|bag-full|gold|restock|vendor/.test(n)) return "6.6.3";
   if (/phoenix|rare|assemble|rare_gone|rare_timeout/.test(n)) return "6.6.4";
   if (/hold|resume|!world|hop-prep|heap wipe|re-invite|meet_home|world hop/.test(n)) return "6.6.5";
   if (/chat stress|throttle|heartbeat|reseed|human echo|~r|reboot reseeds/.test(n)) return "6.6.6";
@@ -197,6 +197,29 @@ async function main() {
   );
 
   recorded.push(
+    await record("farm-15min-restock", "scenario: 15 min multi-restock", ["farm", "delivery", "combat"], async (o) => {
+      const p = bootParty(
+        Object.assign(
+          {
+            pack: "armadillo",
+            pots: 25,
+            gold: 200000,
+            burnPots: true,
+            burnPerTick: 2,
+            potionTarget: 40,
+          },
+          o,
+          {
+            trace: Object.assign({}, o.trace, { sampleMs: 1000, maxFrames: 1200 }),
+          }
+        )
+      );
+      await p.runFor(15 * 60 * 1000);
+      return p;
+    })
+  );
+
+  recorded.push(
     await record("world-hop", "scenario: !world hop-prep to US/II", ["hop", "hold"], async (o) => {
       const p = bootParty(Object.assign({ pack: "armadillo", pots: 200, gold: 50000 }, o));
       p.bots.Jazwyn.ctrl.applyCmd({ cmd: "world", args: ["US/II"] });
@@ -246,6 +269,7 @@ async function main() {
     "scenario: hold triggers hop-prep; fighter ends on HOME": "hold-home",
     "hop: heap wipe clears handlers; storage restores hold; party re-invite": "hold-home",
     "scenario: compressed 30 min farm armadillo, 0 throttle 0 fighter hop": "farm-5min",
+    "scenario: 15 min farm multi-restock vendor→Puppygirl→party": "farm-15min-restock",
     "scenario: Puppygirl delivers via cave past ridge + island": "puppy-route",
     "smart_move: Puppygirl routes through cave to SE destination": "puppy-route",
     "scenario: !world hop-prep lands party on target server": "world-hop",

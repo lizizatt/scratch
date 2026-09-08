@@ -192,6 +192,43 @@ test("scenario: compressed 30 min farm armadillo, 0 throttle 0 fighter hop", asy
   assert.strictEqual(p.world.where("Zarook").key, "US/III");
 });
 
+test("scenario: 15 min farm multi-restock vendor→Puppygirl→party", async () => {
+  // Low start + small top-ups + aggressive burn → several merchant round-trips
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 25,
+    gold: 200000,
+    burnPots: true,
+    burnPerTick: 2,
+    potionTarget: 40,
+  });
+  await p.runFor(15 * 60 * 1000);
+  const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+  const buys = mLog.filter((m) => /^dlv:buy /.test(m)).length;
+  const dones = mLog.filter((m) => /^dlv:done /.test(m)).length;
+  const sends = mLog.filter((m) => /^dlv:send /.test(m)).length;
+  assert.ok(buys >= 3, "expected multiple vendor buys, got " + buys);
+  assert.ok(dones >= 3, "expected multiple deliveries, got " + dones);
+  assert.ok(sends >= 3, "expected pot sends, got " + sends);
+  const towns = mLog.filter((m) => /town_for_vendor/.test(m)).length;
+  let nearVendor = 0;
+  let nearFarm = 0;
+  let caveLegs = 0;
+  for (const leg of p.bots.Puppygirl.api.log.path || []) {
+    const to = leg.to || {};
+    const from = leg.from || {};
+    if (to.map === "cave" || from.map === "cave") caveLegs++;
+    if (to.map === "main" && Math.abs((to.x || 0) - 56) < 40 && Math.abs((to.y || 0) + 122) < 40) nearVendor++;
+    if (to.map === "main" && Math.abs((to.x || 0) - 526) < 120 && Math.abs((to.y || 0) - 1846) < 120) nearFarm++;
+  }
+  assert.ok(nearVendor + towns >= 3, "vendor trips vendor=" + nearVendor + " town=" + towns);
+  assert.ok(nearFarm >= 2 || dones >= 3, "farm approaches=" + nearFarm);
+  assert.ok(caveLegs >= 2, "expected cave transit on restock legs, got " + caveLegs);
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+  assert.strictEqual(gradeSim(p.world, {}).chat_throttle, 0);
+});
+
+
 test("scenario: gear bank piece batched on pot delivery", async () => {
   const p = bootParty({ pack: "armadillo", pots: 0 });
   // Put a glove in merchant bag for dlv_gear
