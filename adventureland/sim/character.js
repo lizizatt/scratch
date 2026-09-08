@@ -544,16 +544,60 @@ function createCharacter(world, over) {
 
     async buy(name, q) {
       q = q == null ? 1 : q;
-      const price = (world.G.items[name] && world.G.items[name].g) || 20;
+      const def = world.G.items[name] || {};
+      const price = def.g || 20;
       const cost = price * q;
       if (c.gold < cost) return { failed: true, reason: "gold" };
+      // Stack scrolls / pots
+      if (!def.upgrade && (def.g != null || /^scroll|^hpot|^mpot|^cscroll/.test(name))) {
+        const stack = c.items.findIndex((x) => x && x.name === name && x.q != null);
+        if (stack >= 0) {
+          c.gold -= cost;
+          c.items[stack].q = (c.items[stack].q || 0) + q;
+          log.bought.push({ name, q });
+          return { num: stack };
+        }
+      }
       const i = c.items.findIndex((x) => !x);
       if (i < 0) return { failed: true, reason: "no_space" };
       c.gold -= cost;
-      c.items[i] = { name, q };
+      if (def.upgrade) {
+        c.items[i] = { name, level: 0 };
+      } else {
+        c.items[i] = { name, q };
+      }
       c.esize = Math.max(0, (c.esize || 1) - 1);
       log.bought.push({ name, q });
       return { num: i };
+    },
+
+    /**
+     * AL-shaped upgrade(itemSlot, scrollSlot, offering, calculate?).
+     * Deterministic: succeed iff preview chance ≥ 0.9; else destroy on real call.
+     */
+    async upgrade(itemI, scrollI, offering, calculate) {
+      const it = c.items[itemI];
+      const sc = c.items[scrollI];
+      if (!it || !sc || !/^scroll\d$/.test(sc.name)) return { failed: true, reason: "args" };
+      const lv = it.level || 0;
+      const chance = Math.max(0.5, 1 - lv * 0.08);
+      if (calculate) return { chance, level: lv };
+      // consume scroll
+      const sq = sc.q == null ? 1 : sc.q;
+      if (sq <= 1) {
+        c.items[scrollI] = null;
+        c.esize = (c.esize || 0) + 1;
+      } else {
+        sc.q = sq - 1;
+      }
+      log.skills.push("upgrade:" + it.name + "@" + lv);
+      if (chance < 0.9) {
+        c.items[itemI] = null;
+        c.esize = (c.esize || 0) + 1;
+        return { failed: true, reason: "destroyed", chance };
+      }
+      it.level = lv + 1;
+      return { success: true, level: it.level, chance };
     },
 
     async sell(slot, q) {

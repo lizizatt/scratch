@@ -7,10 +7,21 @@ const {
   JOB_MS,
   POTION_TARGET,
   GOLD_FLOAT_FIGHTER,
+  GOLD_FLOAT_MERCHANT,
   SELL_WHITELIST,
+  MIN_UPGRADE_CHANCE,
 } = require("./constants");
 const { packCenter } = require("./packs");
-const { isSellJunk, isGearPiece, planGifts } = require("./gear");
+const {
+  isSellJunk,
+  isGearPiece,
+  planGifts,
+  pickUpgradeIndex,
+  scrollFor,
+  upgradeChance,
+  planVendorBuy,
+  eligibleUpgrade,
+} = require("./gear");
 
 /**
  * Merchant logistics under Jazwyn command.
@@ -40,6 +51,22 @@ function bootMerchant(api, opts) {
   const gearAds = {};
   let stallDone = false;
   let giftBusy = false;
+  const metrics = { t0: 0, gold0: 0, emitCount: 0 };
+
+  function emitMetrics() {
+    const now = api._now ? api._now() : Date.now();
+    if (!metrics.t0) {
+      metrics.t0 = now;
+      metrics.gold0 = api.character.gold || 0;
+      return;
+    }
+    const due = Math.floor((now - metrics.t0) / 60000);
+    if (due <= metrics.emitCount) return;
+    metrics.emitCount = due;
+    const mins = Math.max(1 / 60, (now - metrics.t0) / 60000);
+    const gpm = ((api.character.gold || 0) - metrics.gold0) / mins;
+    api.game_log("metrics kpm=0 gpm=" + Math.round(gpm));
+  }
 
   function enqueue(job) {
     if (store.q.length >= 8) {
@@ -149,6 +176,11 @@ function bootMerchant(api, opts) {
       }
       if ((api.character.esize || 0) < 1) {
         api.game_log("dlv:no_space");
+        return false;
+      }
+      const price = (api.G.items[it.name] && api.G.items[it.name].g) || 20;
+      if ((api.character.gold || 0) - price * buyQ < GOLD_FLOAT_MERCHANT) {
+        api.game_log("dlv:buy_float");
         return false;
       }
       await api.buy(it.name, buyQ);
@@ -388,12 +420,182 @@ function bootMerchant(api, opts) {
     return true;
   }
 
+  function spendableGold() {
+    return (api.character.gold || 0) - GOLD_FLOAT_MERCHANT;
+  }
+
+  function ownedGearList() {
+    const out = [];
+    for (const it of api.character.items || []) {
+      if (it && isGearPiece(it, api.G)) out.push({ name: it.name, level: it.level || 0 });
+    }
+    for (const e of listBankItems()) {
+      if (isGearPiece({ name: e.name, level: e.level || 0 }, api.G)) {
+        out.push({ name: e.name, level: e.level || 0 });
+      }
+    }
+    return out;
+  }
+
+  async function goUpgradeNpc() {
+    closeStandIfOpen();
+    let r = await api.smart_move({ map: "main", x: -207, y: -220 });
+    if (r && r.failed) r = await api.smart_move({ to: "upgrade" });
+    return !(r && r.failed);
+  }
+
+  function hasUpgradeableOwned() {
+    if (pickUpgradeIndex(api.character.items, api.G) >= 0) return true;
+    return listBankItems().some((e) => {
+      const it = { name: e.name, level: e.level || 0 };
+      return eligibleUpgrade(it, api.G) && upgradeChance(it) >= MIN_UPGRADE_CHANCE;
+    });
+  }
+
+  /** Buy one vendor base piece for an advertised empty/weak slot (no bank cover). */
+  async function tryBuyVendorBase() {
+    if (hasUpgradeableOwned()) return false;
+    const ads = {};
+    for (const who of FIGHTERS) {
+      if (gearAds[who] && gearAds[who].slots) ads[who] = gearAds[who];
+    }
+    if (!Object.keys(ads).length) return false;
+    const plan = planVendorBuy(ads, ownedGearList(), api.G);
+    if (!plan) return false;
+    const price = (api.G.items[plan.name] && api.G.items[plan.name].g) || 800;
+    const scrollPrice = (api.G.items.scroll0 && api.G.items.scroll0.g) || 1000;
+    const haveScroll = (api.character.items || []).some((x) => x && x.name === "scroll0");
+    const need = price + (haveScroll ? 0 : scrollPrice);
+    if (spendableGold() < need) {
+      api.game_log("gear:buy_gold");
+      return false;
+    }
+    if ((api.character.esize || 0) < 1) {
+      await parkToBank();
+      if ((api.character.esize || 0) < 1) return false;
+    }
+    closeStandIfOpen();
+    const dest = { map: "main", x: 56, y: -122 };
+    const r = await api.smart_move(dest);
+    if (r && r.failed) {
+      api.game_log("gear:vendor_path_fail");
+      return false;
+    }
+    const bought = await api.buy(plan.name, 1);
+    if (bought && bought.failed) {
+      api.game_log("gear:buy_fail " + plan.name);
+      return false;
+    }
+    api.game_log("gear:buy " + plan.name + "@0 for " + plan.who);
+    return true;
+  }
+
+  /** One conservative scroll0 upgrade (chance ≥ MIN, max +5, allowlist). */
+  async function tryUpgradeOne() {
+    let i = pickUpgradeIndex(api.character.items, api.G);
+    if (i < 0) {
+      const low = (api.character.items || []).findIndex(
+        (it) => eligibleUpgrade(it, api.G) && upgradeChance(it) < MIN_UPGRADE_CHANCE
+      );
+      if (low >= 0) {
+        api.game_log("gear:upgrade_skip chance=" + upgradeChance(api.character.items[low]).toFixed(2));
+        return false;
+      }
+      const bankHit = listBankItems().find((e) =>
+        eligibleUpgrade({ name: e.name, level: e.level || 0 }, api.G)
+      );
+      if (!bankHit) return false;
+      if (upgradeChance({ level: bankHit.level || 0 }) < MIN_UPGRADE_CHANCE) {
+        api.game_log("gear:upgrade_skip chance=" + upgradeChance({ level: bankHit.level || 0 }).toFixed(2));
+        return false;
+      }
+      if ((api.character.esize || 0) < 1) await parkToBank();
+      const bagI = await ensureGearInBag({ name: bankHit.name, level: bankHit.level || 0 });
+      if (bagI < 0) return false;
+      i = pickUpgradeIndex(api.character.items, api.G);
+      if (i < 0) return false;
+    }
+    const it = api.character.items[i];
+    const scn = scrollFor(it, api.G);
+    if (!scn) return false;
+    const chance = upgradeChance(it);
+    if (chance < MIN_UPGRADE_CHANCE) {
+      api.game_log("gear:upgrade_skip chance=" + chance.toFixed(2));
+      return false;
+    }
+    let sci = api.character.items.findIndex((x) => x && x.name === scn);
+    if (sci < 0) {
+      const price = (api.G.items[scn] && api.G.items[scn].g) || 1000;
+      if (spendableGold() < price) {
+        api.game_log("gear:scroll_gold");
+        return false;
+      }
+      if ((api.character.esize || 0) < 1) {
+        await parkToBank(it);
+        if ((api.character.esize || 0) < 1) return false;
+        i = pickUpgradeIndex(api.character.items, api.G);
+        if (i < 0) return false;
+      }
+      if (!(await goUpgradeNpc())) {
+        api.game_log("gear:upgrade_path_fail");
+        return false;
+      }
+      const br = await api.buy(scn, 1);
+      if (br && br.failed) {
+        api.game_log("gear:scroll_buy_fail");
+        return false;
+      }
+      api.game_log("gear:buy " + scn);
+      sci = api.character.items.findIndex((x) => x && x.name === scn);
+      i = pickUpgradeIndex(api.character.items, api.G);
+      if (sci < 0 || i < 0) return false;
+    }
+    if (typeof api.upgrade !== "function") return false;
+    if (!(await goUpgradeNpc())) {
+      api.game_log("gear:upgrade_path_fail");
+      return false;
+    }
+    try {
+      const preview = await api.upgrade(i, sci, null, true);
+      if (!preview || preview.chance == null || preview.chance < MIN_UPGRADE_CHANCE) {
+        api.game_log("gear:upgrade_skip chance=" + ((preview && preview.chance) || 0));
+        return false;
+      }
+    } catch (e) {
+      api.game_log("gear:upgrade_preview_fail");
+      return false;
+    }
+    i = pickUpgradeIndex(api.character.items, api.G);
+    sci = api.character.items.findIndex((x) => x && x.name === scn);
+    if (i < 0 || sci < 0) return false;
+    const before = api.character.items[i];
+    const nm = before.name;
+    const lv0 = before.level || 0;
+    try {
+      const r = await api.upgrade(i, sci);
+      if (r && r.failed) {
+        api.game_log("gear:upgrade_fail " + nm + "@" + lv0);
+        return false;
+      }
+      const after = api.character.items[i];
+      const lv1 = after && after.name === nm ? after.level || 0 : -1;
+      api.game_log("gear:upgrade " + nm + "@" + lv0 + "->" + lv1);
+      return true;
+    } catch (e) {
+      api.game_log("gear:upgrade_fail " + nm);
+      return false;
+    }
+  }
+
   async function idleEcon() {
     await ensureFarmWorld();
     if (bagParkables().length) {
       await parkToBank();
       return;
     }
+    // Source: buy base → upgrade → gift (self-sustaining vertical)
+    if (await tryBuyVendorBase()) return;
+    if (await tryUpgradeOne()) return;
     if (await tryPlanGearGift()) return;
     await openStall();
   }
@@ -609,6 +811,7 @@ function bootMerchant(api, opts) {
       }
       if (store.active) await deliverActive();
       else await idleEcon();
+      emitMetrics();
     } finally {
       busy = false;
     }

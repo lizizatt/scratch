@@ -180,6 +180,11 @@ async function main() {
   const throttleHits = [];
   let dlvDone = 0;
   const serversSeen = { Jazwyn: new Set(), Sarene: new Set(), Zarook: new Set() };
+  const goldSeries = { Jazwyn: [], Sarene: [], Zarook: [], Puppygirl: [] };
+  const metricLines = [];
+  let killLogHits = 0;
+  let gearBuyHits = 0;
+  let gearUpgradeHits = 0;
 
   console.log("Observe %sm...", minutes);
   while (Date.now() - t0 < minutes * 60000) {
@@ -191,12 +196,15 @@ async function main() {
       const pots = potCounts(obs.items || obs.inventory);
       const key = (rt.server_region || obs.server_region || "?") + "/" + (rt.server_identifier || obs.server_identifier || "?");
       if (serversSeen[name]) serversSeen[name].add(rt.server || key);
+      const gold = obs.gold != null ? obs.gold : rt.gold != null ? rt.gold : null;
+      if (gold != null && goldSeries[name]) goldSeries[name].push({ t: snap.t, gold });
       snap.chars[name] = {
         map: obs.map,
         x: obs.x,
         y: obs.y,
         msg: rt.message || rt.status_message || "",
         pots,
+        gold,
         server: rt.server || key,
         connected: !!rt.game_connected,
       };
@@ -212,6 +220,19 @@ async function main() {
             throttleHits.push({ name, at: row.at, line: line.slice(0, 160) });
           }
           if (/dlv:done/i.test(line)) dlvDone++;
+          if (/\bkill\b/i.test(line) && !/skill/i.test(line)) killLogHits++;
+          if (/gear:buy /i.test(line)) gearBuyHits++;
+          if (/gear:upgrade /i.test(line)) gearUpgradeHits++;
+          const mm = line.match(/metrics kpm=([\d.]+)\s+gpm=(-?[\d.]+)/i);
+          if (mm) {
+            metricLines.push({
+              name,
+              at: row.at,
+              kpm: parseFloat(mm[1]),
+              gpm: parseFloat(mm[2]),
+              line: line.slice(0, 120),
+            });
+          }
         }
       } catch (e) {}
     }
@@ -224,8 +245,9 @@ async function main() {
       dist(snap.chars.Sarene, j) < 500 &&
       snap.chars.Zarook &&
       dist(snap.chars.Zarook, j) < 500;
+    const lastMet = metricLines.length ? metricLines[metricLines.length - 1] : null;
     console.log(
-      "[+%ss] J=%s/%s,%s Snear=%s thr=%s dlv~%s msg=%s",
+      "[+%ss] J=%s/%s,%s Snear=%s thr=%s dlv~%s kpm=%s gpm=%s msg=%s",
       Math.round((Date.now() - t0) / 1000),
       j && j.map,
       j && Math.round(j.x),
@@ -233,10 +255,26 @@ async function main() {
       near ? 1 : 0,
       throttleHits.length,
       dlvDone,
+      lastMet ? lastMet.kpm.toFixed(2) : "-",
+      lastMet ? Math.round(lastMet.gpm) : "-",
       (j && j.msg) || ""
     );
     await sleep(20000);
   }
+
+  function seriesGpm(series) {
+    if (!series || series.length < 2) return null;
+    const a = series[0];
+    const b = series[series.length - 1];
+    const mins = Math.max(1 / 60, (b.t - a.t) / 60000);
+    return (b.gold - a.gold) / mins;
+  }
+
+  const elapsedMin = Math.max(1 / 60, (Date.now() - t0) / 60000);
+  const merchantGpm = seriesGpm(goldSeries.Puppygirl);
+  const fighterMet = metricLines.filter((m) => m.name !== "Puppygirl");
+  const avgCodedKpm =
+    fighterMet.length > 0 ? fighterMet.reduce((s, m) => s + m.kpm, 0) / fighterMet.length : null;
 
   let farmOk = 0;
   for (const s of samples) {
@@ -263,6 +301,15 @@ async function main() {
     throttle_samples: throttleHits.slice(0, 20),
     dlv_done_log_hits: dlvDone,
     fighter_servers: fighterHops,
+    growth: {
+      kill_log_hits: killLogHits,
+      kill_log_per_min: killLogHits / elapsedMin,
+      merchant_gpm: merchantGpm,
+      coded_metrics: metricLines.slice(-12),
+      avg_coded_kpm: avgCodedKpm,
+      gear_buy_hits: gearBuyHits,
+      gear_upgrade_hits: gearUpgradeHits,
+    },
     pass: {
       throttle0: throttleHits.length === 0,
       farm90: farmPct >= 90,
@@ -274,7 +321,7 @@ async function main() {
 
   const out = path.join(ROOT, "_live_v2_observe.json");
   fs.writeFileSync(out, JSON.stringify(result, null, 2));
-  console.log(JSON.stringify(result.pass, null, 2));
+  console.log(JSON.stringify({ pass: result.pass, growth: result.growth }, null, 2));
   console.log("wrote", out, "ok=" + result.ok);
   if (!result.ok) process.exit(2);
 }

@@ -18,6 +18,7 @@ const {
   RARE_GONE_MS,
   GEAR_AD_MS,
   SEND_RANGE,
+  METRICS_MS,
 } = require("./constants");
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
@@ -48,6 +49,35 @@ function bootFighter(api, opts) {
   let bootQuietUntil = 0;
   let lastGearAd = 0;
   const giftTtl = {};
+  const metrics = { t0: 0, kills: 0, gold0: 0, emitCount: 0 };
+
+  if (typeof api.attack === "function") {
+    const _attack = api.attack.bind(api);
+    api.attack = function (t) {
+      const was =
+        t && !t.dead && (t.hp == null || t.hp > 0);
+      const out = _attack(t);
+      return Promise.resolve(out).then((r) => {
+        if (was && t && (t.dead || (t.hp != null && t.hp <= 0))) metrics.kills += 1;
+        return r;
+      });
+    };
+  }
+
+  function emitMetrics(now) {
+    if (!metrics.t0) {
+      metrics.t0 = now;
+      metrics.gold0 = api.character.gold || 0;
+      return;
+    }
+    const due = Math.floor((now - metrics.t0) / METRICS_MS);
+    if (due <= metrics.emitCount) return;
+    metrics.emitCount = due;
+    const mins = Math.max(1 / 60, (now - metrics.t0) / 60000);
+    const kpm = metrics.kills / mins;
+    const gpm = ((api.character.gold || 0) - metrics.gold0) / mins;
+    api.game_log("metrics kpm=" + kpm.toFixed(2) + " gpm=" + Math.round(gpm));
+  }
 
   function persist() {
     try {
@@ -675,6 +705,7 @@ function bootFighter(api, opts) {
     equipPending(api, api.G || {}, giftTtl);
     if (now - lastGearAd >= GEAR_AD_MS) sendGearAd();
     await tossLoot();
+    emitMetrics(now);
     if (isLead() && now >= bootQuietUntil && now - lastHb >= HEARTBEAT_MS) {
       reseedSeqAboveHeard();
       lastHb = now;

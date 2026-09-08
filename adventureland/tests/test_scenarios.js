@@ -500,14 +500,13 @@ test("scenario: gift swap tosses replaced piece to bank (P5)", async () => {
   assert.ok(replaced.t <= toss.t, "replaced before toss");
   assert.ok(toss.t <= store.t, "toss before bank:store");
 
-  const bank = p.bots.Puppygirl.api.character._bank || p.bots.Puppygirl.api.character.bank;
-  const bankGloves0 =
-    bank &&
-    bank.items0 &&
-    bank.items0.some((it) => it && it.name === "gloves" && (it.level || 0) === 0);
-  assert.ok(bankGloves0, "replaced gloves@0 must still be in bank");
   const worn = p.bots.Jazwyn.api.character.slots.gloves;
   assert.ok(worn && (worn.level || 0) >= 2, "wearing gloves@2 after swap");
+  // After store, idle sourcing may pull/upgrade the take-back — spine is replaced→toss→store
+  assert.ok(
+    p.bots.Puppygirl.api.log.game.some((g) => /^bank:store gloves@0/.test(g.m)),
+    "merchant banked the replaced gloves@0 at least once"
+  );
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
 });
 
@@ -695,10 +694,8 @@ test("scenario: P5 replace under continuous pot queue", async () => {
 
   const bank = p.bots.Puppygirl.api.character._bank || p.bots.Puppygirl.api.character.bank;
   assert.ok(
-    bank &&
-      bank.items0 &&
-      bank.items0.some((it) => it && it.name === "gloves" && (it.level || 0) === 0),
-    "replaced gloves@0 must remain in bank"
+    bank && bank.items0 && bank.items0.some((it) => it && it.name === "gloves"),
+    "replaced gloves must remain in bank"
   );
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
 });
@@ -895,6 +892,188 @@ test("scenario: take-back reserve must not park in-transit gift", async () => {
   const worn = p.bots.Jazwyn.api.character.slots.gloves;
   assert.ok(worn && worn.name === "gloves" && (worn.level || 0) >= 2, "Jazwyn wears gloves@2");
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: self-sustaining buy→upgrade→gift (empty bank)", async () => {
+  // No bankSeed — merchant must vendor-buy + scroll0-upgrade then gift.
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 40,
+    gold: 80000,
+    bankSeed: [],
+    fighterSlots: {},
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  // Merchant gold above float so buys are allowed
+  p.bots.Puppygirl.api.character.gold = 500000;
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    name: "Jazwyn",
+    esize: 18,
+    ctype: "warrior",
+    slots: {
+      gloves: null,
+      helmet: null,
+      chest: null,
+      pants: null,
+      shoes: null,
+      mainhand: null,
+      offhand: null,
+      cape: null,
+      belt: null,
+      amulet: null,
+      ring1: null,
+      ring2: null,
+    },
+  });
+
+  let got = null;
+  for (let i = 0; i < 800; i++) {
+    await p.tickAll();
+    got = p.bots.Jazwyn.api.log.game.find((g) => /^gear_got gloves ok=1/.test(g.m));
+    if (got) break;
+  }
+  const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+  assert.ok(
+    mLog.some((m) => /^gear:buy gloves@0/.test(m)),
+    "expected vendor buy gloves@0"
+  );
+  assert.ok(
+    mLog.some((m) => m === "gear:buy scroll0" || /^gear:buy scroll0/.test(m)),
+    "expected scroll0 buy"
+  );
+  assert.ok(
+    mLog.some((m) => /^gear:upgrade gloves@0->/.test(m)),
+    "expected upgrade gloves@0→…"
+  );
+  assert.ok(got, "expected gear_got gloves from sourced piece");
+  const worn = p.bots.Jazwyn.api.character.slots.gloves;
+  assert.ok(worn && worn.name === "gloves" && (worn.level || 0) >= 1, "wearing upgraded gloves");
+  assert.ok(
+    mLog.some((m) => /^gear:plan gloves@/.test(m)),
+    "expected gear:plan after source"
+  );
+  assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
+});
+
+test("scenario: banked upgradeable vendor gear blocks further vendor buys", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    members: ["Jazwyn", "Puppygirl"],
+    fighterSlots: {},
+  });
+  p.bots.Puppygirl.api.character.gold = 500000;
+  const bank = p.bots.Puppygirl.api.character.bank || p.bots.Puppygirl.api.character._bank;
+  bank.items0[0] = { name: "gloves", level: 0 };
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    name: "Jazwyn",
+    esize: 18,
+    ctype: "warrior",
+    slots: {
+      gloves: null,
+      shoes: null,
+      helmet: null,
+      chest: null,
+      pants: null,
+      mainhand: null,
+      offhand: null,
+      cape: null,
+      belt: null,
+      amulet: null,
+      ring1: null,
+      ring2: null,
+    },
+  });
+  for (let i = 0; i < 25; i++) await p.tickAll();
+  const mGame = p.bots.Puppygirl.api.log.game;
+  const up = mGame.find((g) => /^gear:upgrade gloves@0/.test(g.m));
+  assert.ok(up, "expected upgrade of banked gloves first");
+  const earlyBuy = mGame.find(
+    (g) => g.t < up.t && /^gear:buy (shoes|helmet|pants|coat)@0/.test(g.m)
+  );
+  assert.ok(!earlyBuy, "must not vendor-buy more bases before upgrading banked gloves");
+});
+
+test("scenario: vendor buy requires scroll0 headroom under GOLD_FLOAT_MERCHANT", async () => {
+  const { GOLD_FLOAT_MERCHANT } = require("../src/constants");
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    members: ["Jazwyn", "Puppygirl"],
+    fighterSlots: {},
+    bankSeed: [],
+  });
+  // Enough for gloves (800) but not gloves+scroll0 (800+1000) above float
+  p.bots.Puppygirl.api.character.gold = GOLD_FLOAT_MERCHANT + 900;
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    name: "Jazwyn",
+    esize: 18,
+    ctype: "warrior",
+    slots: {
+      gloves: null,
+      shoes: null,
+      helmet: null,
+      chest: null,
+      pants: null,
+      mainhand: null,
+      offhand: null,
+      cape: null,
+      belt: null,
+      amulet: null,
+      ring1: null,
+      ring2: null,
+    },
+  });
+  for (let i = 0; i < 40; i++) await p.tickAll();
+  const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+  assert.ok(mLog.some((m) => m === "gear:buy_gold"), "expected gear:buy_gold without scroll headroom");
+  assert.ok(!mLog.some((m) => /^gear:buy gloves@0/.test(m)), "must not buy gloves without scroll budget");
+});
+
+test("scenario: upgrade skips when chance below gate", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 80000,
+    members: ["Puppygirl"],
+  });
+  p.bots.Puppygirl.api.character.gold = 500000;
+  // gloves@3 → chance 1-0.24=0.76 < 0.9; no ads so nothing else sources
+  const bag = p.bots.Puppygirl.api.character.items;
+  const slot = bag.findIndex((x) => !x);
+  bag[slot] = { name: "gloves", level: 3 };
+  p.bots.Puppygirl.api.character.esize = Math.max(0, (p.bots.Puppygirl.api.character.esize || 1) - 1);
+  for (let i = 0; i < 30; i++) await p.tickAll();
+  const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+  assert.ok(
+    mLog.some((m) => /^gear:upgrade_skip/.test(m)),
+    "expected gear:upgrade_skip for low-chance piece"
+  );
+  assert.ok(
+    !mLog.some((m) => /^gear:upgrade gloves@3/.test(m)),
+    "must not upgrade gloves@3"
+  );
+  const still = p.bots.Puppygirl.api.character.items.find((x) => x && x.name === "gloves" && (x.level || 0) === 3);
+  const bank = p.bots.Puppygirl.api.character.bank || p.bots.Puppygirl.api.character._bank;
+  const banked =
+    bank && bank.items0 && bank.items0.some((x) => x && x.name === "gloves" && (x.level || 0) === 3);
+  assert.ok(still || banked, "gloves@3 must remain (skipped, not destroyed)");
+});
+
+test("scenario: metrics emit kpm/gpm after farm window", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, members: ["Jazwyn", "Puppygirl"] });
+  let lines = [];
+  for (let i = 0; i < 500 && !lines.length; i++) {
+    await p.tickAll();
+    lines = p.bots.Jazwyn.api.log.game.filter((g) => /^metrics kpm=/.test(g.m));
+  }
+  assert.ok(lines.length >= 1, "expected metrics line");
+  const m = lines[0].m.match(/^metrics kpm=([\d.]+) gpm=(-?[\d.]+)/);
+  assert.ok(m, "metrics format kpm/gpm");
+  assert.ok(parseFloat(m[1]) > 0, "kills/min should be > 0 after farming");
 });
 
 test("scenario: late gear_ad batches onto in-flight pot job (P3)", async () => {

@@ -40,9 +40,18 @@ const RARE_WHITELIST = ["phoenix"];
 const SELL_WHITELIST = ["frogt", "leatherboots"];
 /** Armor names we treat as equippable upgrades in sim. */
 const GEAR_TYPES = ["gloves", "shoes", "helmet", "pants", "coat", "ringsj"];
+/** Vendor base pieces we may buy for empty fighter slots (post-MVP sourcing). */
+const VENDOR_GEAR = ["gloves", "shoes", "helmet", "pants", "coat"];
+const SCROLL0_ALLOW = ["pants", "coat", "gloves", "shoes", "helmet"];
+const MAX_SAFE_UPGRADE = 5;
+const MIN_UPGRADE_CHANCE = 0.9;
+/** Merchant keeps this gold floor for pot deliveries before gear buys. */
+const GOLD_FLOAT_MERCHANT = 150000;
 const GEAR_AD_MS = 20000;
 const GIFT_TTL_MS = 120000;
 const JOB_MS = 480000;
+/** Emit `metrics kpm=… gpm=…` this often (ms). */
+const METRICS_MS = 60000;
 
 module.exports = {
   LEADER_ORDER,
@@ -81,7 +90,13 @@ module.exports = {
   RARE_WHITELIST,
   SELL_WHITELIST,
   GEAR_TYPES,
+  VENDOR_GEAR,
+  SCROLL0_ALLOW,
+  MAX_SAFE_UPGRADE,
+  MIN_UPGRADE_CHANCE,
+  GOLD_FLOAT_MERCHANT,
   GEAR_AD_MS,
   GIFT_TTL_MS,
   JOB_MS,
+  METRICS_MS,
 };

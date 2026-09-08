@@ -73,7 +73,10 @@ test("dist: production packs contain gear batch/replace symbols", () => {
   assert.ok(/stall:open/.test(merchant), "v2_merchant stall path present");
   assert.ok(/dlv:need_space|ensureTakeBackSlots/.test(merchant), "v2_merchant take-back reserve present");
   assert.ok(/dlv:empty_send|dlv:no_space/.test(merchant), "v2_merchant empty-send guard present");
+  assert.ok(/gear:buy |gear:upgrade |tryUpgradeOne|planVendorBuy/.test(merchant), "v2_merchant buy→upgrade path");
+  assert.ok(/metrics kpm=/.test(fighter), "v2_fighter metrics kpm/gpm");
   assert.ok(/toss /.test(fighter) && /failed|no_space/.test(fighter), "v2_fighter toss checks send failure");
+  assert.ok(/planVendorBuy|pickUpgradeIndex|eligibleUpgrade/.test(lib), "v2_lib upgrade helpers");
 });
 
 test("dist: v2_lib+v2_fighter boot and tick in sim (real dist files)", async () => {
