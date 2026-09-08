@@ -10,7 +10,8 @@ describe("Pi deployment", () => {
 
     expect(setup).toContain("systemctl enable alesis-server.service alesis-kiosk.service");
     expect(setup).not.toContain("systemctl enable --now");
-    expect(setup).toContain('ln -sfn /dev/null "$runtime_home/.config/systemd/user/fluidsynth.service"');
+    expect(setup).toContain("pipewire-pulse.socket wireplumber.service");
+    expect(setup).toContain('ln -sfn /dev/null "$runtime_home/.config/systemd/user/$unit"');
     expect(setup).toContain('install -o root -g root -m 0644 "$root/deploy/asoundrc" /etc/asound.conf');
     expect(setup).toContain("amixer -q -c Device set Speaker 151 unmute");
   });
@@ -23,6 +24,7 @@ describe("Pi deployment", () => {
     expect(unit).toContain("Restart=on-failure");
     expect(unit).toContain("StartLimitBurst=5");
     expect(unit).toContain("Environment=HOST=127.0.0.1");
+    expect(unit).toContain("ExecStartPre=/usr/bin/amixer -q -c Device set Speaker 151 unmute");
   });
 
   it("starts Chromium after the server and restarts the kiosk on failure", async () => {

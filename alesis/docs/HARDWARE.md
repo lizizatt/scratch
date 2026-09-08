@@ -8,6 +8,9 @@
 - PiSugar S Plus 5000 mAh mounted beneath the Pi.
 - Waveshare `4inch HDMI LCD`, directly stacked and rotated to an 800 by 480
   landscape application viewport.
+- External trackpad as the primary pointer; keyboard available as a secondary
+  input. The panel's resistive touch remains enabled but is not required for
+  operation.
 - Vortex Wireless 2 USB receiver and a CM108-class USB audio dongle.
 - Existing mono amplifier connected through the left plug of a 3.5 mm stereo
   TRS-to-dual-1/4-inch TS breakout.
@@ -20,7 +23,9 @@ Bring-up update 2026-09-06: the Pi boots Raspberry Pi OS Desktop 64-bit Trixie,
 advertises hostname `alesis`, and accepts key-only SSH over both the direct
 Ethernet bridge and Wi-Fi. The display persists at 800 by 480 landscape after
 reboot; the stock `ads7846` overlay registers touch on `spi0.1`, and physical
-taps align with the display. The CM108 (`0d8c:013c`) is visible as ALSA playback
+taps align with the display. Its pressure response is too inconsistent for the
+primary interface, so v1 uses an external trackpad instead. The CM108
+(`0d8c:013c`) is visible as ALSA playback
 card `USB PnP Sound Device`. With the full stack attached, its hardware playback
 format is two-channel S16_LE at 48 or 44.1 kHz. The Vortex cable receiver
 enumerates as `13b2:005e`, ALSA card ID `V2`, and sequencer port

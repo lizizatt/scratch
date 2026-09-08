@@ -35,12 +35,12 @@ test("connects every selected pane to the host without viewport overflow", async
   await expect(page.locator(".parameter")).toHaveCount(6);
   await page.getByLabel("Synthesizer").selectOption("soundfont");
   const soundFont = page.getByLabel("SoundFont", { exact: true });
-  await expect(soundFont).toHaveValue("hs-synthetic-electronic-sf2");
+  await expect(soundFont).toHaveValue("sth-sf2");
   await expect(page.getByLabel("SoundFont preset")).toHaveValue("0:0");
-  await expect(page.getByLabel("SoundFont preset").locator("option", { hasText: "Fat Saw Bass" })).toHaveCount(1);
+  await expect(page.getByLabel("SoundFont preset").locator("option", { hasText: "S3 MiniBoss Piano" })).toHaveCount(1);
   await expect(soundFont.locator("option", { hasText: "FluidR3_GM" })).toHaveCount(1);
   await page.getByRole("button", { name: "Refresh SoundFonts" }).click();
-  await expect(soundFont).toHaveValue("hs-synthetic-electronic-sf2");
+  await expect(soundFont).toHaveValue("sth-sf2");
   await expect(page.locator(".synth-module > .parameter")).toHaveCount(3);
   await expect(page.locator(".effects-controls")).not.toBeVisible();
   await page.getByText("Advanced Effects", { exact: true }).click();
@@ -98,6 +98,30 @@ test("connects every selected pane to the host without viewport overflow", async
   expect(dimensions.scrollWidth).toBe(dimensions.width);
   expect(dimensions.scrollHeight).toBe(dimensions.height);
   expect(pageErrors).toEqual([]);
+});
+
+test("scrolls the Synth pane to controls below a constrained viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 320 });
+  await page.goto("/");
+  await expect(page.getByText(/connected \/\/ rev/i)).toBeVisible();
+  await page.getByRole("button", { name: "Synth" }).click();
+
+  const pane = page.getByRole("region", { name: "Synth controls" });
+  const arpeggiator = page.getByText("Arpeggiator", { exact: true });
+  const before = await pane.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop,
+  }));
+  expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
+  expect(before.scrollTop).toBe(0);
+
+  await pane.hover();
+  await page.mouse.wheel(0, 1_000);
+  await expect.poll(() => pane.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await arpeggiator.scrollIntoViewIfNeeded();
+  await expect(arpeggiator).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollTop)).toBe(0);
 });
 
 test("edits BPM locally and confirms only on commit", async ({ page }, testInfo) => {

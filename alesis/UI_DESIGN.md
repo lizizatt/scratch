@@ -1,6 +1,9 @@
 # UI Behavior
 
-Landscape phone and tablet are primary. The interface uses a black canvas, blue/cyan signal styling, fixed bottom-left navigation, and no page scrolling.
+Landscape phone and tablet are primary. The Pi appliance uses an external
+trackpad as its primary pointer and a keyboard as secondary input; resistive
+touch is optional. The interface uses a black canvas, blue/cyan signal styling,
+fixed bottom-left navigation, and no document-level page scrolling.
 
 ## Options
 
@@ -16,6 +19,8 @@ Landscape phone and tablet are primary. The interface uses a black canvas, blue/
 - Its primary controls are Volume, Chorus Send, and Reverb Send. Advanced effect parameters are expandable.
 - Neon Pressure exposes cutoff, resonance, attack, release, LFO rate, and drive.
 - Arpeggiator and drum controls apply to either instrument.
+- The Synth pane scrolls independently when zoom or viewport height puts
+	Arpeggiator or drum controls below the fold.
 - Up to root then down ascends through held notes to the lowest note transposed by the selected octave count, then descends without repeating either endpoint.
 
 ## Loops
@@ -57,5 +62,6 @@ Landscape phone and tablet are primary. The interface uses a black canvas, blue/
 
 - Icon controls have accessible names and tooltips.
 - State is communicated by fill/shape as well as color.
-- Only the promoted list scrolls.
+- The promoted list and Synth pane own their local scrolling; the document does
+	not scroll.
 - Portrait asks the performer to rotate the device.

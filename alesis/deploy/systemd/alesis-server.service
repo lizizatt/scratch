@@ -13,6 +13,7 @@ WorkingDirectory=/home/alesis/alesis
 Environment=HOME=/home/alesis
 Environment=HOST=127.0.0.1
 Environment=PORT=8787
+ExecStartPre=/usr/bin/amixer -q -c Device set Speaker 151 unmute
 ExecStartPre=/usr/bin/test -r /home/alesis/Downloads/STH.sf2
 ExecStart=/usr/bin/npm start
 Restart=on-failure

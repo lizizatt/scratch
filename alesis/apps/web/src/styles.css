@@ -36,7 +36,10 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .setting > span { color: var(--ice); text-align: right; }
 .setting input:not([type="checkbox"]), .setting select { width: 100%; min-width: 0; padding: 5px 9px; color: var(--cyan); border: 0; border-bottom: 1px solid var(--blue); background: #000; font-size: inherit; }
 .setting input[type="checkbox"] { width: 28px; height: 28px; accent-color: var(--cyan); }
-.synth-pane { padding: clamp(24px,5vh,48px) 6vw 20px; }
+.synth-pane { padding: clamp(24px,5vh,48px) 6vw 70px; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--blue) #000; scrollbar-width: thin; }
+.synth-pane::-webkit-scrollbar { width: 8px; }
+.synth-pane::-webkit-scrollbar-track { background: #000; }
+.synth-pane::-webkit-scrollbar-thumb { background: var(--blue); }
 .synth-selectors { width: min(900px,88vw); margin: 0 auto 3vh; display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 10px; }
 .synth-select, .soundfont-select, .soundfont-preset-select { width: 100%; min-width: 0; height: 44px; padding: 0 14px; color: var(--ice); border: 1px solid var(--blue); background: #000; font-size: clamp(16px,2vw,24px); }
 .soundfont-picker { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) 40px; gap: 5px; align-items: center; }
@@ -107,7 +110,7 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
   .synth-select, .soundfont-select, .soundfont-preset-select { height: 34px; }
   .soundfont-picker { grid-template-columns: minmax(0,1fr) 35px; }
   .soundfont-picker .icon-button { height: 34px; }
-  .synth-module { min-height:0; height:calc(100% - 42px); padding:12px; gap:8px; }
+  .synth-module { min-height:0; height:auto; padding:12px; gap:8px; }
   .effects-controls { grid-template-columns:repeat(6,1fr); gap:8px; }
   .midi-effect-grid { grid-template-columns:repeat(7,1fr); gap:5px; }
   .take-row { min-height: 42px; }

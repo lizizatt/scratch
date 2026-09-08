@@ -26,8 +26,10 @@ install -o root -g root -m 0644 "$root/deploy/asoundrc" /etc/asound.conf
 install -d -o "$runtime_user" -g "$runtime_user" -m 0755 "$runtime_home/.config/labwc"
 install -o "$runtime_user" -g "$runtime_user" -m 0755 "$root/deploy/labwc-autostart" "$runtime_home/.config/labwc/autostart"
 install -d -o "$runtime_user" -g "$runtime_user" -m 0755 "$runtime_home/.config/systemd/user"
-ln -sfn /dev/null "$runtime_home/.config/systemd/user/fluidsynth.service"
-chown -h "$runtime_user:$runtime_user" "$runtime_home/.config/systemd/user/fluidsynth.service"
+for unit in fluidsynth.service pipewire.service pipewire.socket pipewire-pulse.service pipewire-pulse.socket wireplumber.service; do
+  ln -sfn /dev/null "$runtime_home/.config/systemd/user/$unit"
+  chown -h "$runtime_user:$runtime_user" "$runtime_home/.config/systemd/user/$unit"
+done
 
 install -o root -g root -m 0644 "$root/deploy/sshd-alesis.conf" /etc/ssh/sshd_config.d/60-alesis.conf
 sshd -t

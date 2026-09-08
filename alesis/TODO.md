@@ -59,6 +59,8 @@ until the P0 readiness slice passes with fake devices.
 - [x] Validate persistent display and synchronized touch rotation at 800 by 480
   on the Trixie bench image.
 - [ ] Validate every Alesis UI control at 800 by 480.
+- [x] Make the Synth pane trackpad-scrollable to Arpeggiator and drum controls
+  at constrained viewport heights.
 - [ ] Tune latency below the initial 20-30 ms buffer only after dense-load tests.
 - [ ] Run the four-hour bench acceptance gate with sustained performance,
   Chromium load, USB hotplug, service crashes, orderly shutdowns, and one hard

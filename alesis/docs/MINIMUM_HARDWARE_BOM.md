@@ -11,6 +11,7 @@ over transient reseller links.
 | Host | Raspberry Pi 4 Model B, 2 GB | Owned; assembled and reaches soft boot |
 | Battery | PiSugar S Plus, 5000 mAh | Owned; mounted beneath Pi and reaches soft boot |
 | Display | Waveshare `4inch HDMI LCD`, resistive touch | Owned; connected and reaches soft boot |
+| Pointer | External USB or wireless trackpad | Ordered; primary UI input, with keyboard secondary |
 | MIDI | Vortex Wireless 2 receiver | Owned and verified as USB ID `13b2:005e`, ALSA card `V2` |
 | Amplifier | Existing mono amp with 1/4-inch input | Confirm line-level input and working speaker connection |
 | SoundFont | Existing `STH.sf2` | Verified locally; provenance remains open |
@@ -47,7 +48,7 @@ short, low-resistance cable accordingly.
 | Enclosure | Defer until the four-hour acceptance gate passes |
 | Overlay/read-only root | Defer until the writable bench image survives acceptance |
 | Wi-Fi | May be preseeded; Ethernet is the required first-boot path |
-| Hardware Panic mapping | Touchscreen Panic is required first; map hardware later |
+| Hardware Panic mapping | Persistent on-screen Panic remains required; dedicated hardware mapping is later |
 | WS2812B LEDs | Removed from v1 |
 | Powered USB hub | Buy only if measured USB power or enumeration proves unstable |
 
