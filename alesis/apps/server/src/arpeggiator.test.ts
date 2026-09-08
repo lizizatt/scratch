@@ -22,6 +22,22 @@ describe("MidiArpeggiator", () => {
     expect(arp.advance(0.125, 120)).toEqual([{ type: "note-on", channel: 0, note: 67, velocity: 100 }]);
   });
 
+  it("ends and restarts from the lowest note after a half-second idle gap", () => {
+    const arp = new MidiArpeggiator(defaults);
+    arp.handle({ type: "note-on", channel: 0, note: 67, velocity: 100 });
+    arp.handle({ type: "note-on", channel: 0, note: 60, velocity: 90 });
+    expect(arp.advance(0, 120)).toEqual([{ type: "note-on", channel: 0, note: 60, velocity: 90 }]);
+
+    arp.handle({ type: "note-off", channel: 0, note: 60 });
+    arp.handle({ type: "note-off", channel: 0, note: 67 });
+    const endingEvents = Array.from({ length: 10 }, () => arp.advance(0.05, 120)).flat();
+    expect(endingEvents).toContainEqual({ type: "note-off", channel: 0, note: 60 });
+
+    arp.handle({ type: "note-on", channel: 0, note: 67, velocity: 100 });
+    arp.handle({ type: "note-on", channel: 0, note: 60, velocity: 90 });
+    expect(arp.advance(0, 120)).toEqual([{ type: "note-on", channel: 0, note: 60, velocity: 90 }]);
+  });
+
   it("uses Tonal note transposition for octave expansion", () => {
     const arp = new MidiArpeggiator({ ...defaults, octaves: 2 });
     arp.handle({ type: "note-on", channel: 0, note: 60, velocity: 100 });

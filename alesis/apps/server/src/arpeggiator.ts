@@ -29,6 +29,7 @@ const rateBeats: Record<ArpeggiatorRate, number> = {
   "1/8T": 1 / 3,
   "1/16T": 1 / 6,
 };
+const idleResetSeconds = 0.5;
 
 export class MidiArpeggiator {
   private config: ArpeggiatorConfig;
@@ -37,6 +38,7 @@ export class MidiArpeggiator {
   private step = 0;
   private timeToStep = 0;
   private active: { channel: number; note: number; timeToOff: number } | null = null;
+  private idleSeconds: number | null = null;
 
   constructor(config: ArpeggiatorConfig, private readonly random = Math.random) {
     this.config = { ...config };
@@ -67,17 +69,26 @@ export class MidiArpeggiator {
     const key = `${event.channel}:${event.note}`;
     if (event.type === "note-on" && event.velocity > 0) {
       this.held.set(key, { channel: event.channel, note: event.note, velocity: event.velocity, order: this.order++, physicallyHeld: true });
+      this.idleSeconds = null;
       if (this.held.size === 1) this.timeToStep = 0;
     } else {
       const note = this.held.get(key);
       if (note && this.config.latch) note.physicallyHeld = false;
       else this.held.delete(key);
+      if (this.held.size === 0) this.idleSeconds = 0;
     }
     return [];
   }
 
   advance(seconds: number, bpm: number): MidiEvent[] {
     if (!this.config.enabled) return [];
+    if (this.idleSeconds !== null) {
+      this.idleSeconds += seconds;
+      if (this.idleSeconds >= idleResetSeconds - 1e-9) {
+        this.resetSequence();
+        this.idleSeconds = null;
+      }
+    }
     const events: MidiEvent[] = [];
     let remaining = seconds;
     while (remaining >= 0) {
