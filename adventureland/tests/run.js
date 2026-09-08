@@ -5,6 +5,7 @@ const suites = [
   require("./test_scenarios"),
   require("./test_adversarial"),
   require("./test_dist"),
+  require("./test_packs"),
 ];
 
 async function main() {

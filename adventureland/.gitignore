@@ -8,3 +8,6 @@ code_hashes.json
 _mcp_*.json
 _log_*.json
 dist/
+_live*.json
+_live_*.json
+data/*.live.json

@@ -6,9 +6,11 @@ Sim-first rewrite. Spec: [`V2_PLAN.md`](V2_PLAN.md). Server lessons: [`LESSONS.m
 
 ```
 sim/           # multi-character simulator (clock, comms §4.0, path, invariants, trace)
-src/           # readable bot code (fighters + merchant)
+src/           # readable bot code (fighters + merchant + live slots)
+src/slots/     # Mainframe entrypoints (one slot each)
+data/          # path/vision explorer fixtures (*.sim.json committed; *.live.json local)
 tests/         # unit + integration scenarios
-tools/         # compress_code.js, record_viz.js
+tools/         # compress, viz record, route/live explorers
 viz/           # scrubbable sim explorer (static UI)
 legacy/        # frozen V1
 ```
@@ -17,6 +19,31 @@ legacy/        # frozen V1
 
 ```bash
 node tests/run.js
+```
+
+## Deploy (Mainframe)
+
+Needs `.al_mcp_token` or `AL_MCP_TOKEN`. Builds compressed `dist/` slots and pushes via MCP:
+
+```bash
+node tools/compress_code.js
+node deploy_mcp.js
+node live_observe_v2.js   # optional party snapshot dump
+```
+
+## Path / vision explorers
+
+Sim baseline (no auth) writes `data/path_bands.sim.json`:
+
+```bash
+node tools/explore_routes.js
+```
+
+Live stubs (token required; measurement automation still TODO):
+
+```bash
+node tools/explore_live.js vision
+node tools/explore_live.js path
 ```
 
 ## Sim viz (browse + scrub)
@@ -40,4 +67,4 @@ Unit/comms tests show up in the catalog for coverage even without a timeline; pa
 
 ## Status
 
-Sim + party scenarios green (comms rules from `server.js`, delivery, rare, hold hop-prep, 30‑min compressed farm, boot order). Next: live path explorers for calibration, compressor slot map, Mainframe 30‑min gate.
+Sim + party scenarios + dist slots green. Packs coords live in `src/packs.js` (sim re-exports). Sim path-band fixture from `explore_routes.js`. Next (V2_PLAN §12): real Mainframe explorers (vision px, path fail bands, reconnect), then 30‑min gate.

@@ -10,7 +10,16 @@ const https = require("https");
 const { spawnSync } = require("child_process");
 
 const ROOT = __dirname;
-const token = fs.readFileSync(path.join(ROOT, ".al_mcp_token"), "utf8").trim();
+const token = (() => {
+  if (process.env.AL_MCP_TOKEN && process.env.AL_MCP_TOKEN.trim()) return process.env.AL_MCP_TOKEN.trim();
+  const f = path.join(ROOT, ".al_mcp_token");
+  if (fs.existsSync(f)) return fs.readFileSync(f, "utf8").trim();
+  return null;
+})();
+if (!token) {
+  console.error("Need .al_mcp_token or AL_MCP_TOKEN");
+  process.exit(1);
+}
 let headers = {
   Authorization: "Bearer " + token,
   Accept: "application/json, text/event-stream",

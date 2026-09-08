@@ -1,0 +1,154 @@
+{
+  "generatedAt": "2026-09-08T01:27:36.849Z",
+  "source": "sim",
+  "note": "Baseline from tools/explore_routes.js. Replace/widen with live explorer samples before Mainframe gate.",
+  "samples": [
+    {
+      "id": "town_to_potions",
+      "ms": 4474,
+      "failed": false,
+      "waypoints": 1,
+      "maps": [
+        "main"
+      ],
+      "pathLegs": 1,
+      "expectFail": false,
+      "ok": true
+    },
+    {
+      "id": "potions_to_goo",
+      "ms": 10238,
+      "failed": false,
+      "waypoints": 1,
+      "maps": [
+        "main"
+      ],
+      "pathLegs": 1,
+      "expectFail": false,
+      "ok": true
+    },
+    {
+      "id": "potions_to_bee",
+      "ms": 42620,
+      "failed": false,
+      "waypoints": 1,
+      "maps": [
+        "main"
+      ],
+      "pathLegs": 1,
+      "expectFail": false,
+      "ok": true
+    },
+    {
+      "id": "potions_to_armadillo_via_cave",
+      "ms": 73302,
+      "failed": false,
+      "waypoints": 8,
+      "maps": [
+        "main",
+        "cave"
+      ],
+      "pathLegs": 8,
+      "expectFail": false,
+      "ok": true
+    },
+    {
+      "id": "potions_to_se_party_via_cave",
+      "ms": 67348,
+      "failed": false,
+      "waypoints": 8,
+      "maps": [
+        "main",
+        "cave"
+      ],
+      "pathLegs": 8,
+      "expectFail": false,
+      "ok": true
+    },
+    {
+      "id": "island_detour",
+      "ms": 19150,
+      "failed": false,
+      "waypoints": 2,
+      "maps": [
+        "main"
+      ],
+      "pathLegs": 2,
+      "expectFail": false,
+      "ok": true
+    },
+    {
+      "id": "phoenix_by_type_fail",
+      "ms": 0,
+      "failed": true,
+      "reason": "no_path",
+      "waypoints": 0,
+      "maps": [],
+      "pathLegs": 0,
+      "expectFail": true,
+      "ok": true
+    }
+  ],
+  "bands": {
+    "town_to_potions": {
+      "expectFail": false,
+      "simMs": 4474,
+      "minMs": 2237,
+      "maxMs": 9948,
+      "maps": [
+        "main"
+      ]
+    },
+    "potions_to_goo": {
+      "expectFail": false,
+      "simMs": 10238,
+      "minMs": 5119,
+      "maxMs": 21476,
+      "maps": [
+        "main"
+      ]
+    },
+    "potions_to_bee": {
+      "expectFail": false,
+      "simMs": 42620,
+      "minMs": 21310,
+      "maxMs": 86240,
+      "maps": [
+        "main"
+      ]
+    },
+    "potions_to_armadillo_via_cave": {
+      "expectFail": false,
+      "simMs": 73302,
+      "minMs": 36651,
+      "maxMs": 147604,
+      "maps": [
+        "main",
+        "cave"
+      ]
+    },
+    "potions_to_se_party_via_cave": {
+      "expectFail": false,
+      "simMs": 67348,
+      "minMs": 33674,
+      "maxMs": 135696,
+      "maps": [
+        "main",
+        "cave"
+      ]
+    },
+    "island_detour": {
+      "expectFail": false,
+      "simMs": 19150,
+      "minMs": 9575,
+      "maxMs": 39300,
+      "maps": [
+        "main"
+      ]
+    },
+    "phoenix_by_type_fail": {
+      "expectFail": true,
+      "simMs": 0
+    }
+  }
+}

@@ -73,8 +73,9 @@ function baseG() {
         blocked: [
           // Water / spider-island (LESSONS §1.2)
           { x0: 304, y0: -300, x1: 688, y1: 120 },
-          // Full-width ridge: no overland walk from town belt to SE farms — cave only
-          { x0: -4000, y0: 280, x1: 4000, y1: 1580 },
+          // Full-width ridge south of bee belt: SE farms (armadillo/croc) need cave;
+          // bee (~y1059) stays overland-reachable from town.
+          { x0: -4000, y0: 1200, x1: 4000, y1: 1580 },
           // Extra rock west of potions → cave mouth (forces a short west dogleg)
           { x0: -10, y0: -280, x1: 80, y1: -160 },
         ],
@@ -127,22 +128,7 @@ function baseG() {
   };
 }
 
-const FARM_XY = {
-  goo: { map: "main", x: 0, y: 180 },
-  bee: { map: "main", x: 546, y: 1059 },
-  crab: { map: "main", x: -1202, y: -66 },
-  snake: { map: "main", x: -82, y: 1901 },
-  armadillo: { map: "main", x: 526, y: 1846 },
-  croc: { map: "main", x: 801, y: 1710 },
-  tortoise: { map: "main", x: -1124, y: 1118 },
-  bat: { map: "cave", x: -194, y: -461 },
-  arcticbee: { map: "winterland", x: 1082, y: -873 },
-  porcupine: { map: "desertland", x: -829, y: 135 },
-  boar: { map: "winterland", x: 20, y: -1109 },
-  gscorpion: { map: "desertland", x: 391, y: -1422 },
-  wolfie: { map: "winterland", x: -169, y: -2026 },
-  wolf: { map: "winterland", x: 433, y: -2745 },
-};
+const { FARM_XY, packCenter } = require("../src/packs");
 
 const NPC = {
   potions: { map: "main", x: 56, y: -122 },
@@ -159,10 +145,6 @@ function dist(a, b) {
   const bx = b.real_x != null ? b.real_x : b.x;
   const by = b.real_y != null ? b.real_y : b.y;
   return Math.sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
-}
-
-function packCenter(mtype) {
-  return FARM_XY[mtype] || null;
 }
 
 function boundaryCenter(b) {

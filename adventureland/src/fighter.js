@@ -200,7 +200,8 @@ function bootFighter(api, opts) {
       await api.send_cm(MERCHANT, { job: "cancel_all", id: dlvPending.id, who: name });
       dlvPending = null;
     }
-    await motion.goTo({ to: "potions" });
+    // Coords first — named {to:"potions"} stalls on Mainframe (LESSONS)
+    await motion.goTo({ map: "main", x: 56, y: -122 });
     await api.buy("hpot1", POTION_TARGET);
     await api.buy("mpot1", POTION_TARGET);
     refreshPots();
@@ -220,7 +221,7 @@ function bootFighter(api, opts) {
       if (api.character.gold < GOLD_FLOAT_FIGHTER) {
         api.game_log("hop_prep low_gold");
       } else {
-        await motion.goTo({ to: "potions" });
+        await motion.goTo({ map: "main", x: 56, y: -122 });
         await api.buy("hpot1", POTION_TARGET);
         await api.buy("mpot1", POTION_TARGET);
       }
