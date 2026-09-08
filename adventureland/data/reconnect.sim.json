@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-08T01:30:19.509Z",
+  "generatedAt": "2026-09-08T02:21:25.963Z",
   "source": "assumed",
-  "reconnectMs": 55000,
+  "reconnectMs": 40000,
   "serverRegionDelayMs": 3000,
   "walkPxPerS": 30,
   "crossMapBaseMs": 8000,

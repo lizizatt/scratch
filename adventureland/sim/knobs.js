@@ -12,9 +12,9 @@ module.exports = {
   WALK_PX_PER_S: 30,
   CROSS_MAP_BASE_MS: 8000,
   TOWN_MS: 2000,
-  /** change_server reconnect (LESSONS harness ~55–60s) */
-  RECONNECT_MS: 55000,
-  /** server_region unset after reload (sim delay before go_s can fire) */
+  /** change_server reconnect — live ~35s (2026-09-08); keep ≥40s margin */
+  RECONNECT_MS: 40000,
+  /** server_region unset after reload (sim delay before go_s can fire); live probe inconclusive */
   SERVER_REGION_DELAY_MS: 3000,
   PATH_SAMPLE_MS: 2000,
   source: "assumed",

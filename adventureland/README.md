@@ -76,4 +76,4 @@ Unit/comms tests show up in the catalog for coverage even without a timeline; pa
 
 ## Status
 
-Sim + party scenarios + dist + boot subsets + MVP Monte Carlo green. Next gate needs Mainframe explorers (vision/path/reconnect live), then 30‑min live farm.
+Sim + party scenarios + dist + boot subsets + MVP Monte Carlo green. Live explorers measured path bands + reconnect (~35s); vision ~175px (low-confidence — recheck). Party relinked on US III with V2 CODE. Next: confirm vision, then 30‑min live farm gate.

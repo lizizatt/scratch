@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-09-08T02:08:47.943Z",
+  "source": "live",
+  "status": "measured",
+  "measuredVisionPx": 175,
+  "assumedVisionPx": 600,
+  "lastSeenDist": 150,
+  "firstLostDist": 200,
+  "samples": [
+    { "dist": 50, "seen": true, "line": "EXPLORE_VISION d=50 seen=1" },
+    { "dist": 100, "seen": true, "line": "EXPLORE_VISION d=100 seen=1" },
+    { "dist": 150, "seen": true, "line": "EXPLORE_VISION d=150 seen=1" },
+    { "dist": 200, "seen": false, "line": "EXPLORE_VISION d=9999 seen=0 (approx step after lastSeen)" }
+  ],
+  "note": "Salvaged from Mainframe logs 2026-09-08T02:08. get_player(Jazwyn) dropped between 150 and ~200px while walking +x on main. Suspiciously low vs ASSUMED 600 — re-run after party invite if formation/entity quirks suspected. Sarene entered jail shortly after."
+}

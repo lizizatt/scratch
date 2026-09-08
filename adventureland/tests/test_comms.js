@@ -183,6 +183,7 @@ test("blocked spider-island rectangle rejects can_move_to", async () => {
 });
 
 test("change_server wipes presence until reconnect; storage survives", async () => {
+  const { RECONNECT_MS } = require("../sim/character");
   const w = createWorld();
   const p = w.spawn({ name: "Puppygirl", map: "main" }, "US", "III");
   p.storage.setItem("dlv_q_Puppygirl", JSON.stringify({ q: [{ id: "1" }] }));
@@ -191,19 +192,20 @@ test("change_server wipes presence until reconnect; storage survives", async () 
   assert.strictEqual(p.storage.getItem("dlv_q_Puppygirl").indexOf('"1"') >= 0, true);
   w.advance(10000);
   assert.strictEqual(p.character.connected, false);
-  w.advance(50000);
+  w.advance(RECONNECT_MS);
   assert.strictEqual(p.character.connected, true);
   assert.strictEqual(w.where("Puppygirl").key, "US/II");
 });
 
 test("server_region unset after reconnect for delay window", async () => {
+  const { RECONNECT_MS, SERVER_REGION_DELAY_MS } = require("../sim/character");
   const w = createWorld();
   const p = w.spawn({ name: "Puppygirl" }, "US", "III");
   p.change_server("US", "II");
-  w.advance(55000);
+  w.advance(RECONNECT_MS);
   assert.strictEqual(p.character.connected, true);
   assert.strictEqual(p.parent.server_region, null);
-  w.advance(3000);
+  w.advance(SERVER_REGION_DELAY_MS);
   assert.strictEqual(p.parent.server_region, "US");
   assert.strictEqual(p.parent.server_identifier, "II");
 });
