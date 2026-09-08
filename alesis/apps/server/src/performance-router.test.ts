@@ -51,14 +51,46 @@ describe("PerformanceRouter", () => {
     ]);
   });
 
+  it("routes sustain press and release onto every active note channel", () => {
+    const router = new PerformanceRouter();
+    router.route({ type: "note-on", channel: 1, note: 67, velocity: 100 });
+    router.route({ type: "note-on", channel: 2, note: 72, velocity: 100 });
+
+    expect(router.route({ type: "control-change", channel: 0, controller: 64, value: 127 })).toEqual([
+      { type: "control-change", channel: 1, controller: 64, value: 127 },
+      { type: "control-change", channel: 2, controller: 64, value: 127 },
+    ]);
+
+    router.route({ type: "note-off", channel: 1, note: 67 });
+    router.route({ type: "note-off", channel: 2, note: 72 });
+    expect(router.route({ type: "control-change", channel: 0, controller: 64, value: 0 })).toEqual([
+      { type: "control-change", channel: 1, controller: 64, value: 0 },
+      { type: "control-change", channel: 2, controller: 64, value: 0 },
+    ]);
+  });
+
+  it("applies held sustain to a note started on a new channel", () => {
+    const router = new PerformanceRouter();
+    router.route({ type: "control-change", channel: 0, controller: 64, value: 127 });
+
+    expect(router.route({ type: "note-on", channel: 3, note: 67, velocity: 100 })).toEqual([
+      { type: "control-change", channel: 3, controller: 64, value: 127 },
+      { type: "note-on", channel: 3, note: 67, velocity: 100 },
+    ]);
+  });
+
   it("forgets held-note routing on lifecycle panic", () => {
     const router = new PerformanceRouter();
     router.route({ type: "note-on", channel: 3, note: 67, velocity: 100 });
+    router.route({ type: "control-change", channel: 0, controller: 64, value: 127 });
 
     router.panic();
 
     expect(router.route({ type: "pitch-bend", channel: 0, value: 0 })).toEqual([
       { type: "pitch-bend", channel: 0, value: 0 },
+    ]);
+    expect(router.route({ type: "note-on", channel: 2, note: 69, velocity: 100 })).toEqual([
+      { type: "note-on", channel: 2, note: 69, velocity: 100 },
     ]);
   });
 });
