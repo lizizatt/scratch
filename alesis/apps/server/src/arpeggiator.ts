@@ -22,6 +22,11 @@ interface HeldNote {
   physicallyHeld: boolean;
 }
 
+export interface ScheduledMidiEvent {
+  event: MidiEvent;
+  delaySeconds: number;
+}
+
 const rateBeats: Record<ArpeggiatorRate, number> = {
   "1/4": 1,
   "1/8": 0.5,
@@ -81,6 +86,10 @@ export class MidiArpeggiator {
   }
 
   advance(seconds: number, bpm: number): MidiEvent[] {
+    return this.advanceScheduled(seconds, bpm).map(({ event }) => event);
+  }
+
+  advanceScheduled(seconds: number, bpm: number): ScheduledMidiEvent[] {
     if (!this.config.enabled) return [];
     if (this.idleSeconds !== null) {
       this.idleSeconds += seconds;
@@ -89,9 +98,10 @@ export class MidiArpeggiator {
         this.idleSeconds = null;
       }
     }
-    const events: MidiEvent[] = [];
+    const events: ScheduledMidiEvent[] = [];
     let remaining = seconds;
     while (remaining >= 0) {
+      const eventCount = events.length;
       const nextOff = this.active?.timeToOff ?? Number.POSITIVE_INFINITY;
       const nextStep = this.held.size > 0 ? this.timeToStep : Number.POSITIVE_INFINITY;
       const elapsed = Math.min(nextOff, nextStep, remaining);
@@ -101,17 +111,26 @@ export class MidiArpeggiator {
       remaining -= elapsed;
 
       if (this.active && this.active.timeToOff <= 1e-9) {
-        events.push({ type: "note-off", channel: this.active.channel, note: this.active.note });
+        events.push({
+          event: { type: "note-off", channel: this.active.channel, note: this.active.note },
+          delaySeconds: seconds - remaining,
+        });
         this.active = null;
       }
       if (this.held.size > 0 && this.timeToStep <= 1e-9) {
         if (this.active) {
-          events.push({ type: "note-off", channel: this.active.channel, note: this.active.note });
+          events.push({
+            event: { type: "note-off", channel: this.active.channel, note: this.active.note },
+            delaySeconds: seconds - remaining,
+          });
           this.active = null;
         }
         const note = this.nextNote();
         if (note) {
-          events.push({ type: "note-on", channel: note.channel, note: note.note, velocity: note.velocity });
+          events.push({
+            event: { type: "note-on", channel: note.channel, note: note.note, velocity: note.velocity },
+            delaySeconds: seconds - remaining,
+          });
           const interval = this.stepDuration(bpm);
           this.active = { channel: note.channel, note: note.note, timeToOff: interval * this.config.gate };
           this.timeToStep = interval;
@@ -119,7 +138,7 @@ export class MidiArpeggiator {
         }
       }
       if (elapsed === remaining && remaining === 0) break;
-      if (elapsed === 0 && this.timeToStep > 0 && (!this.active || this.active.timeToOff > 0)) break;
+      if (elapsed === 0 && events.length === eventCount) break;
     }
     return events;
   }

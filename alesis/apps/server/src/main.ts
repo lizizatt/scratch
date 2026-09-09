@@ -283,7 +283,21 @@ const executeCommand = async (command: EngineCommand) => {
 };
 const host = process.env.HOST ?? "127.0.0.1";
 const server = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeCommand, host, readiness);
+const scheduledPerformance = new Set<ReturnType<typeof setTimeout>>();
+const schedulePerformance = (event: MidiEvent, delaySeconds: number): void => {
+  if (delaySeconds <= 1e-9) {
+    dispatchPerformance(event);
+    return;
+  }
+  const timeout = setTimeout(() => {
+    scheduledPerformance.delete(timeout);
+    dispatchPerformance(event);
+  }, delaySeconds * 1000);
+  scheduledPerformance.add(timeout);
+};
 const panic = (): void => {
+  for (const timeout of scheduledPerformance) clearTimeout(timeout);
+  scheduledPerformance.clear();
   for (const event of arpeggiator.panic()) audio.dispatchMidi(event);
   performanceRouter.panic();
   audio.panic();
@@ -350,7 +364,7 @@ const metronome = new MetronomeScheduler(audio);
 const timer = setInterval(() => {
   engine.advance(0.05);
   const snapshot = engine.snapshot();
-  for (const event of arpeggiator.advance(0.05, snapshot.settings.bpm)) dispatchPerformance(event);
+  for (const { event, delaySeconds } of arpeggiator.advanceScheduled(0.05, snapshot.settings.bpm)) schedulePerformance(event, delaySeconds);
   for (const hit of drums.update(snapshot)) audio.playDrum(hit.note, hit.velocity);
   loops.update(snapshot);
   metronome.update(snapshot);

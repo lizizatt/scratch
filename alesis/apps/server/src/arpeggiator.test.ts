@@ -22,6 +22,23 @@ describe("MidiArpeggiator", () => {
     expect(arp.advance(0.125, 120)).toEqual([{ type: "note-on", channel: 0, note: 67, velocity: 100 }]);
   });
 
+  it("keeps note-on events evenly spaced at the server scheduler cadence", () => {
+    const arp = new MidiArpeggiator(defaults);
+    arp.handle({ type: "note-on", channel: 0, note: 60, velocity: 100 });
+    arp.handle({ type: "note-on", channel: 0, note: 64, velocity: 100 });
+
+    const noteOnTimes: number[] = [];
+    for (let tick = 0; tick < 100; tick += 1) {
+      for (const { event, delaySeconds } of arp.advanceScheduled(0.05, 137)) {
+        if (event.type === "note-on") noteOnTimes.push(tick * 0.05 + delaySeconds);
+      }
+    }
+    const spacings = noteOnTimes.slice(1).map((time, index) => time - noteOnTimes[index]!);
+
+    expect(Math.max(...spacings) - Math.min(...spacings)).toBeLessThan(0.001);
+    for (const spacing of spacings) expect(spacing).toBeCloseTo(60 / 137 * 0.5, 9);
+  });
+
   it("ends and restarts from the lowest note after a half-second idle gap", () => {
     const arp = new MidiArpeggiator(defaults);
     arp.handle({ type: "note-on", channel: 0, note: 67, velocity: 100 });
