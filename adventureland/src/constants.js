@@ -28,7 +28,7 @@ const ACK_MS = 20000;
 const PENDING_MS = 480000;
 const FALLBACK_SILENCE_MS = 90000;
 const BEACON_MS = 8000;
-const GOLD_FLOAT_FIGHTER = 40000; // ≥ 2 * 200 * ~100 for hpot1; tune with prices
+const GOLD_FLOAT_FIGHTER = 100000; // keep ~100k on fighters for town buys / float
 const POTION_TARGET = 200;
 const POTION_LOW = 80;
 const POTION_DRY = 0;
@@ -36,9 +36,10 @@ const SEND_RANGE = 320;
 const ASSEMBLE_TIMEOUT_MS = 60000;
 const RARE_GONE_MS = 20000;
 const RARE_WHITELIST = ["phoenix"];
-/** Merchant stall / bank junk whitelist (legacy SELL subset). */
-const SELL_WHITELIST = ["frogt", "leatherboots"];
-/** Armor names we treat as equippable upgrades in sim. */
+/** Merchant stall / bank junk whitelist (derived from live bank dump 2026-09-09). */
+const SELL_WHITELIST = ["dexamulet", "dexearring", "rednose", "strearring", "wcap", "wshoes", "frogt", "leatherboots"];
+/** Compound priority for bank clean / merchant combine. */
+const COMBINE_PRIORITY = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
 const GEAR_TYPES = ["gloves", "shoes", "helmet", "pants", "coat", "ringsj"];
 /** Vendor base pieces we may buy for empty fighter slots (post-MVP sourcing). */
 const VENDOR_GEAR = ["gloves", "shoes", "helmet", "pants", "coat"];
@@ -89,6 +90,7 @@ module.exports = {
   RARE_GONE_MS,
   RARE_WHITELIST,
   SELL_WHITELIST,
+  COMBINE_PRIORITY,
   GEAR_TYPES,
   VENDOR_GEAR,
   SCROLL0_ALLOW,

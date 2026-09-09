@@ -1,16 +1,17 @@
 "use strict";
 
 /**
- * Publish compressor: readable src → ≤176-line dist slots (join only, no mangle).
+ * Publish compressor: readable src → ≤176-line dist slots.
+ * Strips comments + collapses whitespace; joins statements into line budget.
+ * Does NOT mangle names (cross-slot load_code shares globals by identifier).
+ *
+ * Slot map: publish.manifest.js
  */
 const fs = require("fs");
 const path = require("path");
-
-const MAX_LINES = 176;
-const MAX_CHARS = 12000;
+const { MAX_LINES, MAX_CHARS, SLOTS, resolveSources } = require("../publish.manifest");
 
 function stripComments(src) {
-  // Remove block comments, then whole-line //, then inline // (not inside strings)
   let out = src.replace(/\/\*[\s\S]*?\*\//g, "");
   out = out.replace(/^\s*\/\/.*$/gm, "");
   let res = "";
@@ -21,7 +22,6 @@ function stripComments(src) {
     const n = out[i + 1];
     if (mode === "code") {
       if (c === "/" && n === "/") {
-        // skip to end of line
         while (i < out.length && out[i] !== "\n") i++;
         if (i < out.length) res += "\n";
         continue;
@@ -82,7 +82,6 @@ function packToBudget(stmts, maxLines, label) {
 
   if (out.length <= maxLines) return out.join("\n");
 
-  // Evenly bucket whole statements into maxLines (never cut a statement)
   const per = Math.ceil(stmts.length / maxLines);
   const forced = [];
   for (let i = 0; i < stmts.length; i += per) {
@@ -100,11 +99,14 @@ function assertLineBudget(text, label) {
   return n;
 }
 
-function buildSlot(files, outPath) {
+function buildSlot(files, outPath, opts) {
+  opts = opts || {};
   const stmts = [];
   for (const f of files) {
+    if (!fs.existsSync(f)) throw new Error("missing source " + f);
     const raw = fs.readFileSync(f, "utf8");
-    stmts.push.apply(stmts, flattenLines(stripModuleChrome(raw)));
+    const body = opts.stripChrome ? stripModuleChrome(raw) : raw;
+    stmts.push.apply(stmts, flattenLines(body));
   }
   const out = packToBudget(stmts, MAX_LINES, outPath);
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -113,50 +115,45 @@ function buildSlot(files, outPath) {
 }
 
 function copySlot(srcPath, outPath) {
-  const raw = fs.readFileSync(srcPath, "utf8");
-  const stmts = flattenLines(raw);
-  const out = packToBudget(stmts, MAX_LINES, outPath);
-  fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, out + "\n");
-  return assertLineBudget(out, path.basename(outPath));
+  return buildSlot([srcPath], outPath, { stripChrome: false });
 }
 
 function buildAll(root) {
   const dist = path.join(root, "dist");
-  const src = path.join(root, "src");
   const report = {};
 
-  report.v2_lib = buildSlot(
-    [
-      path.join(src, "constants.js"),
-      path.join(src, "packs.js"),
-      path.join(src, "gear.js"),
-      path.join(src, "chat_queue.js"),
-      path.join(src, "party_state.js"),
-      path.join(src, "motion.js"),
-    ],
-    path.join(dist, "v2_lib.js")
-  );
-
-  report.v2_fighter = buildSlot(
-    [path.join(src, "al_api.js"), path.join(src, "fighter.js"), path.join(src, "live_fighter_runtime.js")],
-    path.join(dist, "v2_fighter.js")
-  );
-
-  report.v2_merchant = buildSlot(
-    [path.join(src, "al_api.js"), path.join(src, "merchant.js"), path.join(src, "live_merchant_runtime.js")],
-    path.join(dist, "v2_merchant.js")
-  );
-
-  for (const name of ["warrior", "mage", "priest", "merchant"]) {
-    report[name] = copySlot(path.join(src, "slots", name + ".js"), path.join(dist, name + ".js"));
+  for (const slot of SLOTS) {
+    const files = resolveSources(root, slot);
+    const outPath = path.join(dist, slot.out);
+    if (slot.kind === "bundle") {
+      report[slot.id] = buildSlot(files, outPath, { stripChrome: true });
+    } else if (slot.kind === "entry") {
+      if (files.length !== 1) throw new Error(slot.id + " entry must have exactly one source");
+      report[slot.id] = copySlot(files[0], outPath);
+    } else {
+      throw new Error("unknown slot kind " + slot.kind + " for " + slot.id);
+    }
   }
 
   return report;
 }
 
+function printManifest(root) {
+  console.log("Publish manifest (%s slots, max %s lines):\n", SLOTS.length, MAX_LINES);
+  for (const s of SLOTS) {
+    console.log("  %s → dist/%s  upload as %s", s.id, s.out, s.upload.name);
+    console.log("    %s", s.role || "");
+    for (const src of s.sources) console.log("      · %s", src);
+  }
+}
+
 if (require.main === module) {
   const root = path.join(__dirname, "..");
+  const args = process.argv.slice(2);
+  if (args.includes("--list") || args.includes("-l")) {
+    printManifest(root);
+    process.exit(0);
+  }
   try {
     const report = buildAll(root);
     for (const k of Object.keys(report)) console.log(k + ".js lines=" + report[k]);
@@ -169,9 +166,15 @@ if (require.main === module) {
 
 module.exports = {
   compressSource: (s) => flattenLines(s).join("\n"),
+  stripComments,
+  stripModuleChrome,
+  flattenLines,
   assertLineBudget,
   buildSlot,
+  copySlot,
   buildAll,
   packToBudget,
+  printManifest,
   MAX_LINES,
+  MAX_CHARS,
 };

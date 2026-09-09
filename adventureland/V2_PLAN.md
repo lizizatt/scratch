@@ -295,20 +295,17 @@ Pass criteria per N runs: `fighter_hop == 0`; `chat_throttle == 0`; `restock_fai
 
 ## 7. Publish pipeline (readable → 176)
 
+See **[`PUBLISH.md`](PUBLISH.md)** for the operator guide. Summary:
+
 ```text
-src/           # documented, multi-file, testable
-  party_state.js
-  motion.js
-  leader.js
-  ...
-tools/compress_code.js   # terser --compress, NO mangle (cross-slot code duck-types globals by name), line-joiner
-dist/          # ≤176 lines / slot — what deploy_mcp publishes
-tests/         # run against src; the integration suite ALSO loads dist slots into the sim env (V1 did this with al_env)
+src/                    # documented, multi-file, testable — edit here
+publish.manifest.js     # slot map (sources → dist name → MCP upload name)
+tools/compress_code.js  # strip comments/whitespace, pack ≤176 lines (NO mangle)
+dist/                   # generated; gitignored
+publish.js              # CLI: --build / --upload / --test / --dry-run / --list
 ```
 
-The limit is **lines, not bytes** (V1 shipped 87-line files with ~1 kB lines), so the "compressor" is a joiner + terser-no-mangle + the existing line-count assert — not a research project. It **must** fail CI if any slot >176 lines or the integration suite fails against `dist`. Built **last** (phase 6); src runs in sim until then.
-
-Slot refactor is allowed; target ~6–7 published names.
+The limit is **lines, not bytes** (V1 shipped 87-line files with ~1 kB lines). The compressor joins statements after stripping comments; it **must** fail if any slot >176 lines. Dist smoke tests in `tests/test_dist.js` load built slots into the sim.
 
 ---
 

@@ -30,6 +30,10 @@ function baseG() {
       mpot0: { g: 20, type: "pot" },
       mpot1: { g: 100, type: "pot" },
       scroll0: { g: 1000 },
+      cscroll0: { g: 800 },
+      cscroll1: { g: 1600 },
+      cscroll2: { g: 64000 },
+      hpbelt: { g: 12000, type: "belt", compound: { hp: 60 }, grades: [2, 5] },
       pants: { g: 1600, type: "pants", upgrade: true, armor: 10, grades: [7, 9] },
       coat: { g: 2400, type: "chest", upgrade: true, armor: 12, grades: [7, 9] },
       gloves: { g: 800, type: "gloves", upgrade: true, armor: 4, grades: [7, 9] },
@@ -147,7 +151,7 @@ function baseG() {
   };
 }
 
-const { FARM_XY, packCenter } = require("../src/packs");
+const { FARM_XY, packCenter, safeMeet, nearPack } = require("../src/packs");
 const knobs = require("./knobs");
 
 const NPC = {
@@ -207,6 +211,8 @@ module.exports = {
   NPC,
   dist,
   packCenter,
+  safeMeet,
+  nearPack,
   boundaryCenter,
   isBlocked,
   dropsForKill,

@@ -14,6 +14,8 @@ const suites = [
   require("./test_live_regressions"),
   require("./test_bank_linger"),
   require("./test_restock_range"),
+  require("./test_dlv_safe_meet"),
+  require("./test_idle_bank_clean"),
   require("./test_stall_gear_spam"),
   require("./test_equip_class"),
   require("./test_monsterhunt"),

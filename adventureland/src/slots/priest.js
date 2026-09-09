@@ -27,10 +27,22 @@ function pre_combat() {
 function combat(mtype) {
   if (character.rip || (typeof is_moving === "function" && is_moving(character))) return;
   if (typeof smart !== "undefined" && smart.moving) return;
-  var lead = get_player("Jazwyn"), tank = get_player("Jazwyn"), t = null;
-  if (lead && lead.target) t = get_monster(lead.target) || parent.entities[lead.target];
-  if ((!t || t.type !== "monster") && tank && tank.target) t = get_monster(tank.target) || parent.entities[tank.target];
-  if (!t || t.type !== "monster") { set_message("Idle"); return; }
+  var leadName = typeof LEADER_ORDER !== "undefined" ? LEADER_ORDER[0] : "Jazwyn";
+  var lead = get_player(leadName);
+  var t = null;
+  var soloLead = character.name === leadName || !(get_party() || {})[leadName];
+  if (!soloLead && lead && lead.target) {
+    t = get_monster(lead.target) || parent.entities[lead.target];
+  } else {
+    t = get_targeted_monster();
+    if (!t || (mtype && t.mtype !== mtype)) {
+      t = get_nearest_monster({ type: mtype, no_target: true }) || get_nearest_monster({ type: mtype });
+    }
+  }
+  if (!t || t.type !== "monster") {
+    set_message("Idle");
+    return;
+  }
   change_target(t);
   set_message("Hunt " + t.mtype);
   if (!is_in_range(t)) {

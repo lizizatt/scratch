@@ -185,6 +185,17 @@ async function main() {
   let killLogHits = 0;
   let gearBuyHits = 0;
   let gearUpgradeHits = 0;
+  const seenLog = new Set();
+  const issues = {
+    empty_send: [],
+    send_fail: [],
+    trade_fail: [],
+    upgrade_skip: [],
+    smart_fail: [],
+    town_fallback: [],
+    code_err: [],
+    other: [],
+  };
 
   console.log("Observe %sm...", minutes);
   while (Date.now() - t0 < minutes * 60000) {
@@ -213,16 +224,30 @@ async function main() {
 
     for (const name of WATCH) {
       try {
-        const logs = await tool("mainframe_get_logs", { character: name, limit: 40 });
+        const logs = await tool("mainframe_get_logs", { character: name, limit: 50 });
         for (const row of logs.logs || []) {
+          const at = row.at ? Date.parse(row.at) : 0;
+          if (at && at < Date.parse(cut) - 2000) continue;
           const line = (row.values || []).join(" ");
+          const dedupe = name + "|" + (row.at || "") + "|" + line;
+          if (seenLog.has(dedupe)) continue;
+          seenLog.add(dedupe);
+          const hit = { name, at: row.at, line: line.slice(0, 180) };
           if (/can't chat this fast|chat_slowdown|chat this fast/i.test(line)) {
-            throttleHits.push({ name, at: row.at, line: line.slice(0, 160) });
+            throttleHits.push(hit);
           }
           if (/dlv:done/i.test(line)) dlvDone++;
+          if (/dlv:empty_send/i.test(line)) issues.empty_send.push(hit);
+          if (/dlv:send_fail/i.test(line)) issues.send_fail.push(hit);
+          if (/stall:trade_fail/i.test(line)) issues.trade_fail.push(hit);
+          if (/gear:upgrade_skip/i.test(line)) issues.upgrade_skip.push(hit);
+          if (/smart_fail/i.test(line)) issues.smart_fail.push(hit);
+          if (/town_fallback/i.test(line)) issues.town_fallback.push(hit);
+          if (/ReferenceError|TypeError|SyntaxError/i.test(line)) issues.code_err.push(hit);
           if (/\bkill\b/i.test(line) && !/skill/i.test(line)) killLogHits++;
           if (/gear:buy /i.test(line)) gearBuyHits++;
-          if (/gear:upgrade /i.test(line)) gearUpgradeHits++;
+          if (/gear:upgrade /i.test(line) && !/upgrade_skip|upgrade_fail|upgrade_path/i.test(line))
+            gearUpgradeHits++;
           const mm = line.match(/metrics kpm=([\d.]+)\s+gpm=(-?[\d.]+)/i);
           if (mm) {
             metricLines.push({
@@ -247,7 +272,7 @@ async function main() {
       dist(snap.chars.Zarook, j) < 500;
     const lastMet = metricLines.length ? metricLines[metricLines.length - 1] : null;
     console.log(
-      "[+%ss] J=%s/%s,%s Snear=%s thr=%s dlv~%s kpm=%s gpm=%s msg=%s",
+      "[+%ss] J=%s/%s,%s Snear=%s thr=%s dlv~%s skip=%s empty=%s tfail=%s kpm=%s msg=%s",
       Math.round((Date.now() - t0) / 1000),
       j && j.map,
       j && Math.round(j.x),
@@ -255,8 +280,10 @@ async function main() {
       near ? 1 : 0,
       throttleHits.length,
       dlvDone,
+      issues.upgrade_skip.length,
+      issues.empty_send.length,
+      issues.trade_fail.length,
       lastMet ? lastMet.kpm.toFixed(2) : "-",
-      lastMet ? Math.round(lastMet.gpm) : "-",
       (j && j.msg) || ""
     );
     await sleep(20000);
@@ -293,6 +320,9 @@ async function main() {
     fighterHops[n] = [...serversSeen[n]];
   }
 
+  const issueCounts = {};
+  for (const k of Object.keys(issues)) issueCounts[k] = issues[k].length;
+
   const result = {
     minutes,
     samples: samples.length,
@@ -301,6 +331,16 @@ async function main() {
     throttle_samples: throttleHits.slice(0, 20),
     dlv_done_log_hits: dlvDone,
     fighter_servers: fighterHops,
+    issues: issueCounts,
+    issue_samples: {
+      empty_send: issues.empty_send.slice(0, 10),
+      send_fail: issues.send_fail.slice(0, 10),
+      trade_fail: issues.trade_fail.slice(0, 10),
+      upgrade_skip: issues.upgrade_skip.slice(0, 10),
+      smart_fail: issues.smart_fail.slice(0, 10),
+      town_fallback: issues.town_fallback.slice(0, 10),
+      code_err: issues.code_err.slice(0, 10),
+    },
     growth: {
       kill_log_hits: killLogHits,
       kill_log_per_min: killLogHits / elapsedMin,
@@ -315,13 +355,22 @@ async function main() {
       farm90: farmPct >= 90,
       // hops: only one server token expected (US III) unless hold/world issued
       no_extra_fighter_server: ["Jazwyn", "Sarene", "Zarook"].every((n) => fighterHops[n].length <= 1),
+      no_empty_send: issues.empty_send.length === 0,
+      no_code_err: issues.code_err.length === 0,
+      upgrade_skip_quiet: issues.upgrade_skip.length <= 2,
+      trade_fail_quiet: issues.trade_fail.length <= 2,
     },
   };
-  result.ok = result.pass.throttle0 && result.pass.farm90 && result.pass.no_extra_fighter_server;
+  result.ok =
+    result.pass.throttle0 &&
+    result.pass.farm90 &&
+    result.pass.no_extra_fighter_server &&
+    result.pass.no_empty_send &&
+    result.pass.no_code_err;
 
   const out = path.join(ROOT, "_live_v2_observe.json");
   fs.writeFileSync(out, JSON.stringify(result, null, 2));
-  console.log(JSON.stringify({ pass: result.pass, growth: result.growth }, null, 2));
+  console.log(JSON.stringify({ pass: result.pass, issues: issueCounts, growth: result.growth }, null, 2));
   console.log("wrote", out, "ok=" + result.ok);
   if (!result.ok) process.exit(2);
 }

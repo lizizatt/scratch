@@ -9,9 +9,11 @@ const {
   GOLD_FLOAT_FIGHTER,
   GOLD_FLOAT_MERCHANT,
   SELL_WHITELIST,
+  COMBINE_PRIORITY,
   MIN_UPGRADE_CHANCE,
+  SEND_RANGE,
 } = require("./constants");
-const { packCenter } = require("./packs");
+const { packCenter, safeMeet, nearPack, PACK_DANGER_R } = require("./packs");
 const {
   isSellJunk,
   isGearPiece,
@@ -22,6 +24,7 @@ const {
   planVendorBuy,
   eligibleUpgrade,
 } = require("./gear");
+const { planCompounds, cscrollFor } = require("./bank_clean_plan");
 
 /**
  * Merchant logistics under Jazwyn command.
@@ -51,7 +54,57 @@ function bootMerchant(api, opts) {
   const gearAds = {};
   let stallDone = false;
   let giftBusy = false;
+  let lastParkFailAt = null;
+  const PARK_FAIL_BACKOFF_MS = 15000;
+  /** Once-only gear:upgrade_skip logs per name@level (burn-in 60s spam). */
+  const upgradeSkipLogAt = {};
+  let bankHintPrimed = false;
   const metrics = { t0: 0, gold0: 0, emitCount: 0 };
+
+  function logUpgradeSkip(name, level, chance) {
+    // Once per name@level forever — 60s re-logs still flooded burn-in while stall locked park.
+    const key = name + "@" + (level || 0);
+    if (upgradeSkipLogAt[key] != null) return;
+    upgradeSkipLogAt[key] = api._now ? api._now() : Date.now();
+    api.game_log("gear:upgrade_skip chance=" + Number(chance).toFixed(2));
+  }
+
+  /** Live AL nulls character.bank off the bank map; keep _bank snapshot for idle planning. */
+  function snapBank() {
+    if (!api.character.bank) return;
+    try {
+      api.character._bank = JSON.parse(JSON.stringify(api.character.bank));
+    } catch (e) {
+      api.character._bank = api.character.bank;
+    }
+  }
+
+  async function primeBankHint() {
+    if (api.character._bank || api.character.bank) {
+      bankHintPrimed = true;
+      return true;
+    }
+    if (bankHintPrimed) return false;
+    // Never walk bank / closeStand just to hint — that tears down a bag-only stall
+    // and leaves stallDone stuck true with no further openStall.
+    if (api.character.stand || stallDone) return false;
+    api.game_log("bank:prime");
+    if (!(await ensureAtBank())) {
+      api.game_log("bank:prime_fail");
+      // Do not set bankHintPrimed — retry next idle tick (path/mount can be transient).
+      return false;
+    }
+    snapBank();
+    await leaveBankToPlaza();
+    bankHintPrimed = true;
+    api.game_log(
+      "bank:prime_ok packs=" +
+        (api.character._bank
+          ? Object.keys(api.character._bank).filter((k) => k !== "gold").length
+          : 0)
+    );
+    return !!api.character._bank;
+  }
 
   function emitMetrics() {
     const now = api._now ? api._now() : Date.now();
@@ -85,6 +138,120 @@ function bootMerchant(api, opts) {
       if (typeof api.close_stand === "function") api.close_stand();
       else if (api.parent && api.parent.close_merchant) api.parent.close_merchant();
     }
+  }
+
+  function playerDist(t) {
+    if (!t) return 1e9;
+    if (api.parent && typeof api.parent.distance === "function") {
+      return api.parent.distance(api.character, t);
+    }
+    return Math.hypot(
+      (api.character.real_x || 0) - (t.real_x != null ? t.real_x : t.x || 0),
+      (api.character.real_y || 0) - (t.real_y != null ? t.real_y : t.y || 0)
+    );
+  }
+
+  /**
+   * Stand within SEND_RANGE of fighter without entering pack aggro.
+   * If fighter is on pack, approach along the vector toward safeMeet.
+   */
+  function approachPointFor(t, farm) {
+    const fx = t.real_x != null ? t.real_x : t.x;
+    const fy = t.real_y != null ? t.real_y : t.y;
+    const fmap = t.map;
+    if (!farm || !nearPack(farm, fmap, fx, fy)) {
+      return { map: fmap, x: fx, y: fy };
+    }
+    const safe = safeMeet(farm) || { map: fmap, x: fx, y: fy - (PACK_DANGER_R + 80) };
+    let dx = safe.x - fx;
+    let dy = safe.y - fy;
+    const len = Math.hypot(dx, dy) || 1;
+    const want = Math.min((SEND_RANGE || 320) - 40, len);
+    let x = fx + (dx / len) * want;
+    let y = fy + (dy / len) * want;
+    if (nearPack(farm, fmap, x, y)) {
+      x = safe.x;
+      y = safe.y;
+    }
+    return { map: fmap, x: Math.round(x), y: Math.round(y) };
+  }
+
+  /** Delivery destination: safe approach to fighter, or safeMeet if no vision. */
+  function resolveDeliveryMeet(job) {
+    const farm = job.farm;
+    const t = api.get_player(job.who);
+    if (t && !t.rip) return approachPointFor(t, farm);
+    if (farm) {
+      const safe = safeMeet(farm);
+      if (safe) return safe;
+    }
+    if (job.map != null && job.x != null && job.y != null) {
+      if (!farm || !nearPack(farm, job.map, job.x, job.y)) {
+        return { map: job.map, x: job.x, y: job.y };
+      }
+      const safe = safeMeet(farm);
+      if (safe) return safe;
+    }
+    const c = farm && packCenter(farm);
+    if (c) return { map: c.map, x: c.x, y: c.y - 400 };
+    return null;
+  }
+
+  async function retreatPlaza() {
+    closeStandIfOpen();
+    if (api.character.map === "bank" || api.character.map === "main") {
+      const r = await api.smart_move({ map: "main", x: 40, y: -20 });
+      if (r && r.failed) api.game_log("dlv:retreat_fail");
+      else api.game_log("dlv:retreat");
+    }
+  }
+
+  /** Close to SEND_RANGE via approachPointFor — never smart_move onto pack center. */
+  async function ensureSendRange(who, opts) {
+    opts = opts || {};
+    const farm = opts.farm;
+    const limit = SEND_RANGE || 320;
+    closeStandIfOpen();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      closeStandIfOpen();
+      let t = api.get_player(who);
+      if (!t) {
+        const p = (api.get_party() || {})[who];
+        if (p && p.map) {
+          const stub = {
+            map: p.map,
+            real_x: p.real_x != null ? p.real_x : p.x,
+            real_y: p.real_y != null ? p.real_y : p.y,
+            x: p.real_x != null ? p.real_x : p.x,
+            y: p.real_y != null ? p.real_y : p.y,
+          };
+          const dest = approachPointFor(stub, farm);
+          const r0 = await api.smart_move(dest);
+          if (r0 && r0.failed) {
+            api.game_log("dlv:approach_fail");
+            return null;
+          }
+          t = api.get_player(who);
+        }
+      }
+      if (!t) {
+        api.game_log("dlv:no_vision");
+        return null;
+      }
+      const d = playerDist(t);
+      if (d <= limit) return t;
+      const dest = approachPointFor(t, farm);
+      api.game_log("dlv:approach dist=" + Math.floor(d) + " -> " + dest.x + "," + dest.y);
+      const r = await api.smart_move(dest);
+      if (r && r.failed) {
+        api.game_log("dlv:approach_fail");
+        return null;
+      }
+    }
+    const t = api.get_player(who);
+    if (t && playerDist(t) <= limit) return t;
+    api.game_log("dlv:far");
+    return null;
   }
 
   async function hearCm(m) {
@@ -125,12 +292,8 @@ function bootMerchant(api, opts) {
       await api.send_cm(d.who, { dlv_ack: 1, id: d.id, ok: ok ? 1 : 0, reason: ok ? null : "queue" });
       return;
     }
-    if (d.dlv_loc && store.active && d.id === store.active.id) {
-      store.active.map = d.map;
-      store.active.x = d.x;
-      store.active.y = d.y;
-      saveQ(store);
-    }
+    // Ignore dlv_loc pack beacons — merchant uses safeMeet / resolveDeliveryMeet.
+    // Overwriting job xy with fighter pack coords pulled Puppygirl into aggro.
     if (d.job === "meet_home") {
       enqueue({ id: "hold_" + (api._now ? api._now() : Date.now()), kind: "meet_home", who: "party" });
     }
@@ -200,10 +363,10 @@ function bootMerchant(api, opts) {
   /** §5D: leave town with ≥3 free slots for fighter take-backs. */
   async function ensureTakeBackSlots(need, keep) {
     need = need == null ? 3 : need;
-    while ((api.character.esize || 0) < need && bagParkables(keep).length) {
-      const before = bagParkables(keep).length;
-      await parkToBank(keep);
-      if (bagParkables(keep).length >= before) break;
+    while ((api.character.esize || 0) < need && bagParkables(keep, { skipUpgrades: false }).length) {
+      const before = bagParkables(keep, { skipUpgrades: false }).length;
+      await parkToBank(keep, { skipUpgrades: false });
+      if (bagParkables(keep, { skipUpgrades: false }).length >= before) break;
     }
     if ((api.character.esize || 0) < need) {
       api.game_log("dlv:need_space esize=" + (api.character.esize || 0));
@@ -212,13 +375,18 @@ function bootMerchant(api, opts) {
     return true;
   }
 
-  function bagParkables(keep) {
+  function bagParkables(keep, opts) {
+    opts = opts || {};
     const out = [];
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (!it) continue;
       if (/^hpot|^mpot/.test(it.name)) continue;
       if (it.name === "stand0") continue;
+      // Listed / reserved for merchant stand — never park.
+      if (it.price != null) continue;
+      // Sell-whitelist is openStall's job (idle or queued); parking it caused live re-bank linger.
+      if (isSellJunk(it, api.G)) continue;
       if (
         keep &&
         it.name === keep.name &&
@@ -226,6 +394,14 @@ function bootMerchant(api, opts) {
       ) {
         continue;
       }
+      if (opts.onlyBelowGate) {
+        if (!(eligibleUpgrade(it, api.G) && upgradeChance(it) < MIN_UPGRADE_CHANCE)) continue;
+        out.push(i);
+        continue;
+      }
+      // Idle / pre-dequeue park skips all scroll0-upgrade candidates so tryUpgradeOne
+      // can log skip or upgrade. After that, idleEcon force-parks below-gate pieces.
+      if (opts.skipUpgrades !== false && eligibleUpgrade(it, api.G)) continue;
       if (isSellJunk(it, api.G) || isGearPiece(it, api.G)) out.push(i);
     }
     return out;
@@ -248,32 +424,93 @@ function bootMerchant(api, opts) {
     return out;
   }
 
-  async function parkToBank(keep) {
-    const idxs = bagParkables(keep);
-    if (!idxs.length) return true;
+  async function ensureAtBank() {
     closeStandIfOpen();
-    const r = await api.smart_move({ to: "bank" });
+    if (api.character.map === "bank" && api.character.bank) {
+      snapBank();
+      return true;
+    }
+    // Vault coords (not {to:"bank"}) — matches live Cue banker; single attempt so
+    // path_fail inject tests stay one-shot.
+    const r = await api.smart_move({ map: "bank", x: 0, y: -37 });
     if (r && r.failed) {
       api.game_log("bank:path_fail");
       return false;
     }
+    // Live mount only — never treat _bank snapshot as mounted (blocks wait after prime).
+    const t0 = api._now ? api._now() : Date.now();
+    while (!api.character.bank && (api._now ? api._now() : Date.now()) - t0 < 4000) {
+      await api.sleep(200);
+    }
+    if (!api.character.bank) {
+      api.game_log("bank:not_mounted");
+      return false;
+    }
+    snapBank();
+    return true;
+  }
+
+  async function storeBagItemToBank(i) {
+    // Mainframe: bare bank_store(i) often rejects "invalid"; explicit pack works.
+    const bank = api.character.bank || api.character._bank;
+    if (bank) {
+      const packs = Object.keys(bank).filter((p) => p !== "gold" && Array.isArray(bank[p]));
+      for (const p of packs) {
+        if (!bank[p].some((x) => !x)) continue;
+        const r = await api.bank_store(i, p, -1);
+        if (!api.character.items[i]) return r && !r.failed ? r : { success: true, pack: p };
+        if (r && r.failed && r.reason === "bank_full") continue;
+        if (r && !r.failed) return r;
+      }
+    }
+    return api.bank_store(i);
+  }
+
+  async function parkToBank(keep, opts) {
+    opts = opts || {};
+    // Never tear down an open stall to park — that re-banks listed sell junk (live 2026-09-09).
+    if (api.character.stand || stallDone) return true;
+    const idxs = bagParkables(keep, opts);
+    if (!idxs.length) return true;
+    const now = api._now ? api._now() : Date.now();
+    if (lastParkFailAt != null && now - lastParkFailAt < PARK_FAIL_BACKOFF_MS) return false;
+    if (!(await ensureAtBank())) {
+      lastParkFailAt = now;
+      return false;
+    }
     let stored = 0;
+    let lastReason = null;
     for (const i of idxs) {
       const it = api.character.items[i];
       if (!it) continue;
       const nm = it.name;
       const lv = it.level || 0;
-      await api.bank_store(i);
+      const r = await storeBagItemToBank(i);
       if (!api.character.items[i]) {
         stored++;
         api.game_log("bank:store " + nm + "@" + lv);
+      } else {
+        lastReason = (r && r.reason) || "store_fail";
       }
     }
-    if (bagParkables(keep).length && stored === 0) {
-      api.game_log("bank:full");
-      return false;
+    let ok = bagParkables(keep, opts).length === 0;
+    if (bagParkables(keep, opts).length && stored === 0) {
+      api.game_log("bank:store_fail " + (lastReason || "unknown"));
+      const bank = api.character.bank || api.character._bank;
+      let free = 0;
+      if (bank) {
+        for (const p of Object.keys(bank)) {
+          if (p === "gold" || !Array.isArray(bank[p])) continue;
+          for (const x of bank[p]) if (!x) free++;
+        }
+      }
+      if (free <= 0) api.game_log("bank:full");
+      lastParkFailAt = api._now ? api._now() : Date.now();
+      ok = false;
     }
-    return bagParkables(keep).length === 0;
+    // Always leave vault after a park attempt — silent bank linger otherwise.
+    await leaveBankToPlaza();
+    return ok;
   }
 
   async function ensureGearInBag(gear) {
@@ -369,40 +606,76 @@ function bootMerchant(api, opts) {
     return true;
   }
 
+  function countSellJunk(items) {
+    let n = 0;
+    for (const it of items || []) {
+      if (it && SELL_WHITELIST.indexOf(it.name) >= 0) n++;
+    }
+    return n;
+  }
+
+  function countSellJunkBank(bank) {
+    let n = 0;
+    if (!bank) return 0;
+    for (const pack of Object.keys(bank)) {
+      if (pack === "gold") continue;
+      const bag = bank[pack];
+      if (!Array.isArray(bag)) continue;
+      n += countSellJunk(bag);
+    }
+    return n;
+  }
+
+  async function leaveBankToPlaza() {
+    if (api.character.map !== "bank") return true;
+    snapBank();
+    const plaza = { map: "main", x: 40, y: -20 };
+    const r = await api.smart_move(plaza);
+    if (r && r.failed) {
+      api.game_log("bank:exit_fail");
+      return false;
+    }
+    return true;
+  }
+
   async function openStall() {
     if (stallDone) return false;
-    const bank = api.character.bank || api.character._bank;
-    let junk = 0;
-    if (bank) {
-      for (const pack of Object.keys(bank)) {
-        if (pack === "gold") continue;
-        const bag = bank[pack];
-        if (!Array.isArray(bag)) continue;
-        for (const it of bag) {
-          if (it && SELL_WHITELIST.indexOf(it.name) >= 0) junk++;
-        }
-      }
-    }
-    for (const it of api.character.items || []) {
-      if (it && SELL_WHITELIST.indexOf(it.name) >= 0) junk++;
-    }
-    if (junk < 1) return false;
+    const junkBag = countSellJunk(api.character.items);
+    // _bank may be stale while on main — treat as a hint only, re-scan after mount.
+    const hintBank = api.character.bank || api.character._bank;
+    const junkHint = countSellJunkBank(hintBank);
+    if (junkBag + junkHint < 1) return false;
 
     closeStandIfOpen();
     let listI = api.character.items.findIndex((x) => x && SELL_WHITELIST.indexOf(x.name) >= 0);
     if (listI < 0) {
+      if (!(await ensureAtBank())) {
+        api.game_log("stall:bank_path_fail");
+        return false;
+      }
+      // Live bank only — never retrieve using a pre-mount _bank index.
       const ents = listBankItems()
         .filter((e) => SELL_WHITELIST.indexOf(e.name) >= 0)
         .sort((a, b) => SELL_WHITELIST.indexOf(a.name) - SELL_WHITELIST.indexOf(b.name));
-      if (!ents.length) return false;
-      if (api.character.map !== "bank") {
-        const r = await api.smart_move({ to: "bank" });
-        if (r && r.failed) return false;
+      if (!ents.length) {
+        api.game_log("stall:no_junk_live");
+        await leaveBankToPlaza();
+        return false;
       }
-      await api.bank_retrieve(ents[0].pack, ents[0].i);
+      const pull = await api.bank_retrieve(ents[0].pack, ents[0].i);
+      if (pull && pull.failed) {
+        api.game_log("stall:retrieve_fail " + (pull.reason || ""));
+        await leaveBankToPlaza();
+        return false;
+      }
       listI = api.character.items.findIndex((x) => x && SELL_WHITELIST.indexOf(x.name) >= 0);
+      if (listI < 0) {
+        api.game_log("stall:pull_miss");
+        await leaveBankToPlaza();
+        return false;
+      }
+      api.game_log("stall:pull " + api.character.items[listI].name);
     }
-    if (listI < 0) return false;
 
     const plaza = { map: "main", x: 40, y: -20 };
     const r = await api.smart_move(plaza);
@@ -412,11 +685,50 @@ function bootMerchant(api, opts) {
     }
     if (typeof api.open_stand === "function") api.open_stand();
     else if (api.parent && api.parent.open_merchant) api.parent.open_merchant();
-    const nm = api.character.items[listI].name;
+    // Live: open_merchant can restore prior trade listings a beat later (slot_occuppied race).
+    if (typeof api.sleep === "function") await api.sleep(200);
+    const listed = api.character.items[listI];
+    if (!listed) {
+      api.game_log("stall:list_gone");
+      return false;
+    }
+    const nm = listed.name;
     const price = (api.G.items[nm] && api.G.items[nm].g) || 100;
-    api.trade(listI, price);
+    const tried = {};
+    let listedOk = false;
+    for (let attempt = 0; attempt < 16; attempt++) {
+      let tslot = -1;
+      for (let s = 1; s <= 16; s++) {
+        if (tried[s]) continue;
+        if (!(api.character.slots && api.character.slots["trade" + s])) {
+          tslot = s;
+          break;
+        }
+      }
+      if (tslot < 0) {
+        api.game_log("stall:no_slot");
+        return false;
+      }
+      tried[tslot] = 1;
+      // Official AL: trade(num, trade_slot, price, quantity) — 2-arg trade(i,price) is a no-op/miss.
+      const tr = await Promise.resolve(api.trade(listI, tslot, price, listed.q || 1));
+      if (tr && tr.failed) {
+        const why = tr.reason || "";
+        api.game_log("stall:trade_fail " + why);
+        // Ghost/occupied: try next free slot in-call instead of soft-failing the stall.
+        if (why === "slot_occuppied" || why === "slot_occupied") continue;
+        return false;
+      }
+      if (api.character.items[listI] && api.character.items[listI].name === nm) {
+        api.game_log("stall:trade_miss");
+        return false;
+      }
+      listedOk = true;
+      break;
+    }
+    if (!listedOk) return false;
     stallDone = true;
-    api.game_log("stall:open junk=" + junk);
+    api.game_log("stall:open junk=" + (junkBag + countSellJunkBank(api.character._bank || api.character.bank)));
     return true;
   }
 
@@ -494,21 +806,24 @@ function bootMerchant(api, opts) {
   async function tryUpgradeOne() {
     let i = pickUpgradeIndex(api.character.items, api.G);
     if (i < 0) {
+      // Bag has only below-gate pieces: log once per piece key, then leave for park.
+      // Silent while stall locks parkToBank — otherwise burn-in spammed every minute.
       const low = (api.character.items || []).findIndex(
         (it) => eligibleUpgrade(it, api.G) && upgradeChance(it) < MIN_UPGRADE_CHANCE
       );
       if (low >= 0) {
-        api.game_log("gear:upgrade_skip chance=" + upgradeChance(api.character.items[low]).toFixed(2));
+        if (!(api.character.stand || stallDone)) {
+          const it = api.character.items[low];
+          logUpgradeSkip(it.name, it.level || 0, upgradeChance(it));
+        }
         return false;
       }
-      const bankHit = listBankItems().find((e) =>
-        eligibleUpgrade({ name: e.name, level: e.level || 0 }, api.G)
-      );
+      // Bank: only pull pieces we would actually upgrade. Never skip-spam on bank junk.
+      const bankHit = listBankItems().find((e) => {
+        const it = { name: e.name, level: e.level || 0 };
+        return eligibleUpgrade(it, api.G) && upgradeChance(it) >= MIN_UPGRADE_CHANCE;
+      });
       if (!bankHit) return false;
-      if (upgradeChance({ level: bankHit.level || 0 }) < MIN_UPGRADE_CHANCE) {
-        api.game_log("gear:upgrade_skip chance=" + upgradeChance({ level: bankHit.level || 0 }).toFixed(2));
-        return false;
-      }
       if ((api.character.esize || 0) < 1) await parkToBank();
       const bagI = await ensureGearInBag({ name: bankHit.name, level: bankHit.level || 0 });
       if (bagI < 0) return false;
@@ -520,7 +835,7 @@ function bootMerchant(api, opts) {
     if (!scn) return false;
     const chance = upgradeChance(it);
     if (chance < MIN_UPGRADE_CHANCE) {
-      api.game_log("gear:upgrade_skip chance=" + chance.toFixed(2));
+      logUpgradeSkip(it.name, it.level || 0, chance);
       return false;
     }
     let sci = api.character.items.findIndex((x) => x && x.name === scn);
@@ -558,7 +873,12 @@ function bootMerchant(api, opts) {
     try {
       const preview = await api.upgrade(i, sci, null, true);
       if (!preview || preview.chance == null || preview.chance < MIN_UPGRADE_CHANCE) {
-        api.game_log("gear:upgrade_skip chance=" + ((preview && preview.chance) || 0));
+        const cur = api.character.items[i];
+        logUpgradeSkip(
+          (cur && cur.name) || "?",
+          (cur && cur.level) || 0,
+          (preview && preview.chance) || 0
+        );
         return false;
       }
     } catch (e) {
@@ -587,17 +907,122 @@ function bootMerchant(api, opts) {
     }
   }
 
+  /** One compound from bag/bank triples (idle bank clean). */
+  async function tryCombineOne() {
+    if (typeof api.compound !== "function") return false;
+    const bags = [api.character.items || []];
+    const bankHint = api.character.bank || api.character._bank;
+    if (bankHint) {
+      for (const p of Object.keys(bankHint)) {
+        if (p !== "gold" && Array.isArray(bankHint[p])) bags.push(bankHint[p]);
+      }
+    }
+    const cand = planCompounds(bags, api.G, COMBINE_PRIORITY);
+    if (!cand.length) return false;
+    const target = cand[0];
+    closeStandIfOpen();
+
+    function bagThree() {
+      const idxs = [];
+      for (let i = 0; i < api.character.items.length; i++) {
+        const it = api.character.items[i];
+        if (it && it.name === target.name && (it.level || 0) === target.level) idxs.push(i);
+      }
+      return idxs.length >= 3 ? idxs.slice(0, 3) : null;
+    }
+
+    let three = bagThree();
+    if (!three) {
+      if (!(await ensureAtBank())) return false;
+      while (!bagThree() && (api.character.esize || 0) > 0) {
+        const hit = listBankItems().find(
+          (e) => e.name === target.name && (e.level || 0) === target.level
+        );
+        if (!hit) break;
+        await api.bank_retrieve(hit.pack, hit.i);
+      }
+      three = bagThree();
+      await leaveBankToPlaza();
+      if (!three) {
+        api.game_log("bank:combine_pull_fail " + target.name + "@" + target.level);
+        return false;
+      }
+    }
+
+    const scn = cscrollFor(target.name, target.level, api.G);
+    let sci = api.character.items.findIndex((x) => x && x.name === scn);
+    if (sci < 0) {
+      const price = (api.G.items[scn] && api.G.items[scn].g) || 800;
+      if (spendableGold() < price) {
+        api.game_log("bank:cscroll_gold");
+        return false;
+      }
+      if ((api.character.esize || 0) < 1) {
+        let freed = false;
+        for (let i = 0; i < api.character.items.length; i++) {
+          if (!isSellJunk(api.character.items[i], api.G)) continue;
+          await api.sell(i);
+          freed = true;
+          break;
+        }
+        if (!freed || (api.character.esize || 0) < 1) {
+          api.game_log("bank:combine_no_space");
+          return false;
+        }
+        three = bagThree();
+        if (!three) return false;
+      }
+      if (!(await goUpgradeNpc())) {
+        api.game_log("bank:combine_path_fail");
+        return false;
+      }
+      const br = await api.buy(scn, 1);
+      if (br && br.failed) {
+        api.game_log("bank:cscroll_buy_fail");
+        return false;
+      }
+      api.game_log("bank:buy " + scn);
+      sci = api.character.items.findIndex((x) => x && x.name === scn);
+      three = bagThree();
+      if (sci < 0 || !three) return false;
+    }
+
+    if (!(await goUpgradeNpc())) {
+      api.game_log("bank:combine_path_fail");
+      return false;
+    }
+    three = bagThree();
+    sci = api.character.items.findIndex((x) => x && x.name === scn);
+    if (!three || sci < 0) return false;
+    try {
+      const r = await api.compound(three[0], three[1], three[2], sci);
+      if (r && r.failed) {
+        api.game_log("bank:compound_fail " + target.name + "@" + target.level);
+        return false;
+      }
+      api.game_log("bank:compound " + target.name + "@" + target.level);
+      return true;
+    } catch (e) {
+      api.game_log("bank:compound_fail " + target.name);
+      return false;
+    }
+  }
+
   async function idleEcon() {
     await ensureFarmWorld();
-    if (bagParkables().length) {
-      await parkToBank();
-      return;
-    }
-    // Source: buy base → upgrade → gift (self-sustaining vertical)
+    // Live has no _bank until we visit once — without this, stall/gift are blind on main.
+    await primeBankHint();
+    // Buy/upgrade/combine before parking so bank clean progresses while idle.
     if (await tryBuyVendorBase()) return;
     if (await tryUpgradeOne()) return;
+    if (await tryCombineOne()) return;
+    // After skip/upgrade attempt, bank below-gate gear (sell junk reserved for stall).
+    if (bagParkables(null, { skipUpgrades: false }).length) {
+      await parkToBank(null, { skipUpgrades: false });
+      return;
+    }
     if (await tryPlanGearGift()) return;
-    await openStall();
+    if (!stallDone) await openStall();
   }
 
   async function deliverActive() {
@@ -678,53 +1103,32 @@ function bootMerchant(api, opts) {
 
     if (!(await ensureTakeBackSlots(3, job.gear && job.pulled ? job.gear : null))) return;
 
-    let t = api.get_player(job.who);
-    let map = job.map,
-      x = job.x,
-      y = job.y;
-    if (t) {
-      map = t.map;
-      x = t.real_x;
-      y = t.real_y;
-    } else if ((map == null || x == null || y == null) && job.farm) {
-      const c = packCenter(job.farm);
-      if (c) {
-        map = c.map;
-        x = c.x;
-        y = c.y;
-      }
-    }
+    const meet = resolveDeliveryMeet(job);
     await api.send_cm(job.who, {
       status: 1,
       id: job.id,
       phase: "enroute",
-      map: api.character.map,
-      x: api.character.real_x,
-      y: api.character.real_y,
+      meet: 1,
+      map: meet ? meet.map : api.character.map,
+      x: meet ? meet.x : api.character.real_x,
+      y: meet ? meet.y : api.character.real_y,
     });
 
-    const r = await api.smart_move({ map, x, y });
-    if (r && r.failed) {
-      api.game_log("dlv:path_fail");
-      await api.send_cm(job.who, { nack: "path", id: job.id });
-      return;
-    }
-
-    t = api.get_player(job.who);
-    if (!t) {
-      const p = (api.get_party() || {})[job.who];
-      if (p && p.map) {
-        await api.smart_move({
-          map: p.map,
-          x: p.real_x != null ? p.real_x : p.x,
-          y: p.real_y != null ? p.real_y : p.y,
-        });
-        t = api.get_player(job.who);
-      }
-      if (!t) {
-        api.game_log("dlv:no_vision");
+    if (meet) {
+      api.game_log("dlv:meet " + meet.map + " " + Math.round(meet.x) + "," + Math.round(meet.y));
+      const r = await api.smart_move(meet);
+      if (r && r.failed) {
+        api.game_log("dlv:path_fail");
+        await api.send_cm(job.who, { nack: "path", id: job.id });
         return;
       }
+    }
+
+    // Approach to send range outside pack; fighter stays farming.
+    let t = await ensureSendRange(job.who, { farm: job.farm });
+    if (!t) {
+      if (job.kind === "dlv_pots") api.game_log("dlv:empty_send");
+      return;
     }
 
     if ((t.gold || 0) < GOLD_FLOAT_FIGHTER) {
@@ -740,9 +1144,21 @@ function bootMerchant(api, opts) {
       if (!it) continue;
       if (it.name !== "hpot1" && it.name !== "mpot1") continue;
       try {
-        const r = await api.send_item(job.who, i, it.q == null ? 1 : it.q);
-        if (r && r.failed) {
-          api.game_log("dlv:send_fail " + it.name);
+        // Refresh range right before each send — fighter may still be pathing.
+        if (playerDist(api.get_player(job.who) || t) > (SEND_RANGE || 320)) {
+          t = await ensureSendRange(job.who, { farm: job.farm });
+          if (!t) break;
+        }
+        closeStandIfOpen();
+        const sr = await api.send_item(job.who, i, it.q == null ? 1 : it.q);
+        if (sr && sr.failed) {
+          api.game_log("dlv:send_fail " + it.name + (sr.reason ? " " + sr.reason : ""));
+          if (sr.reason === "distance" || sr.reason === "stand_open") {
+            t = await ensureSendRange(job.who, { farm: job.farm });
+            if (!t) break;
+            i--; // retry same slot
+            continue;
+          }
           continue;
         }
         api.game_log("dlv:send " + it.name + " id=" + job.id);
@@ -758,6 +1174,11 @@ function bootMerchant(api, opts) {
     }
 
     if (job.gear) {
+      t = await ensureSendRange(job.who, { farm: job.farm });
+      if (!t) {
+        api.game_log("dlv:gear_far");
+        return;
+      }
       for (let i = 0; i < api.character.items.length; i++) {
         const it = api.character.items[i];
         if (it && it.name === job.gear.name && (it.level || 0) === (job.gear.level || 0)) {
@@ -786,6 +1207,12 @@ function bootMerchant(api, opts) {
     api.game_log("dlv:done id=" + job.id);
     store.active = null;
     saveQ(store);
+    // Leave pack staging immediately — lingering gets aggroed.
+    await retreatPlaza();
+    // Bank fighter take-backs / replaced gear (may be upgrade-eligible — force park).
+    if (bagParkables(null, { skipUpgrades: false }).length) {
+      await parkToBank(null, { skipUpgrades: false });
+    }
   }
 
   async function tick() {
@@ -793,13 +1220,49 @@ function bootMerchant(api, opts) {
     if (busy) return;
     busy = true;
     try {
-      // Park tossed junk/gear before next delivery (P5). On path/full failure,
-      // fall through so pot jobs are not starved by stuck parkables.
-      if (!store.active && bagParkables().length) {
-        const cleared = await parkToBank();
-        if (!cleared && bagParkables().length) api.game_log("bank:park_stuck");
+      // Live: merchant dies on pack during dlv — respawn, abort job, retreat (2026-09-09).
+      if (api.character.rip) {
+        api.game_log("rip:respawn");
+        try {
+          if (typeof api.respawn === "function") await api.respawn();
+        } catch (e) {}
+        if (typeof api.sleep === "function") await api.sleep(1000);
+        if (store.active && (store.active.kind === "dlv_pots" || store.active.kind === "dlv_gear")) {
+          const j = store.active;
+          api.game_log("dlv:rip_abort id=" + j.id);
+          try {
+            await api.send_cm(j.who, { dlv_done: 1, id: j.id, ok: 0, reason: "rip" });
+          } catch (e) {}
+          store.active = null;
+          saveQ(store);
+        }
+        await retreatPlaza();
+        return;
       }
-      // Open stall once junk is banked even if pot queue stays busy
+      // Snapshot vault before any stall/park so live-blind main can see sell junk.
+      await primeBankHint();
+      // Park tossed gear before next delivery (sell junk reserved for openStall).
+      // When stall is about to open, bank below-gate upgrades first — stand/stallDone
+      // locks parkToBank and left gloves@3 in bag → upgrade_skip spam (burn-in).
+      if (!store.active && !stallDone && !api.character.stand) {
+        const junkSoon =
+          countSellJunk(api.character.items) +
+            countSellJunkBank(api.character.bank || api.character._bank) >
+          0;
+        if (junkSoon && bagParkables(null, { onlyBelowGate: true }).length) {
+          await parkToBank(null, { onlyBelowGate: true });
+        }
+        if (bagParkables().length) {
+          const cleared = await parkToBank();
+          if (!cleared && bagParkables().length) {
+            const n = api._now ? api._now() : Date.now();
+            if (lastParkFailAt == null || n - lastParkFailAt >= PARK_FAIL_BACKOFF_MS - 50) {
+              api.game_log("bank:park_stuck");
+            }
+          }
+        }
+      }
+      // Stall before dequeue so sell-junk isn't starved by pot queue (scenarios).
       if (!store.active && !stallDone) {
         const opened = await openStall();
         if (opened) return;

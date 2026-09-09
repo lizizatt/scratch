@@ -35,6 +35,19 @@ function score(it, G, ctype) {
   return (base + res) * (1 + 0.08 * lv);
 }
 
+/** Weapon class gate — live AL rejects wrong wtype; without this warriors spam-equip staff. */
+function classOk(it, ctype, G) {
+  if (!it) return false;
+  const g = itemDef(G, it.name);
+  const w = g.wtype;
+  if (!w) return true;
+  const c = ctype || "warrior";
+  if (c === "warrior") return ["sword", "short_sword", "wblade", "basher", "axe", "mace", "spear"].indexOf(w) >= 0;
+  if (c === "mage" || c === "priest") return ["staff", "great_staff", "wand"].indexOf(w) >= 0;
+  if (c === "merchant") return false;
+  return false;
+}
+
 function candidateSlots(it, G) {
   if (!it) return [];
   const g = itemDef(G, it.name);
@@ -69,8 +82,9 @@ function isGearPiece(it, G) {
 }
 
 function pendingBetter(api, it, G) {
-  const slots = candidateSlots(it, G);
   const ctype = api.character.ctype;
+  if (!classOk(it, ctype, G)) return false;
+  const slots = candidateSlots(it, G);
   for (const s of slots) {
     const worn = api.character.slots[s];
     if (score(it, G, ctype) > score(worn, G, ctype)) return true;
@@ -97,6 +111,7 @@ function equipPending(api, G, giftTtl) {
   for (let i = 0; i < api.character.items.length; i++) {
     const it = api.character.items[i];
     if (!it) continue;
+    if (!classOk(it, ctype, G)) continue;
     const targets = candidateSlots(it, G);
     let best = null;
     for (const s of targets) {
@@ -162,6 +177,7 @@ function planGifts(bankItems, ads, G) {
         const e = bankItems[j];
         if (!e || used[j]) continue;
         const it = { name: e.name, level: e.level || 0 };
+        if (!classOk(it, ctype, G)) continue;
         if (candidateSlots(it, G).indexOf(slot) < 0) continue;
         const sc = score(it, G, ctype);
         if (!(sc > wc)) continue;
@@ -258,6 +274,7 @@ function planVendorBuy(ads, owned, G) {
 module.exports = {
   score,
   candidateSlots,
+  classOk,
   isSellJunk,
   isGearPiece,
   isKeep,

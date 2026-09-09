@@ -24,7 +24,7 @@ const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
 const { createMotion } = require("./motion");
 const { packCenter } = require("./packs");
-const { equipPending, isKeep, wornSnapshot, markGift } = require("./gear");
+const { equipPending, isKeep, wornSnapshot, markGift, classOk } = require("./gear");
 
 /**
  * Boot a fighter into a sim (or real) API environment.
@@ -242,6 +242,10 @@ function bootFighter(api, opts) {
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (it && it.name === d.name && (it.level || 0) === (d.level || 0)) {
+        if (!classOk(it, api.character.ctype, api.G || {})) {
+          api.game_log("gear:class_skip " + it.name);
+          break;
+        }
         if (typeof api.equip === "function") await api.equip(i, d.slot || undefined);
         break;
       }
@@ -615,7 +619,7 @@ function bootFighter(api, opts) {
       // After ack, give merchant PENDING_MS (path can be multi-minute via cave)
       const grace = dlvPending && dlvPending.acked ? PENDING_MS : FALLBACK_SILENCE_MS;
       if (dlvPending && lastStatusAt && now - lastStatusAt < grace) {
-        // wait for merchant
+        // Stay farming — merchant approaches to send range outside pack aggro.
         if (now - lastBeacon > BEACON_MS) {
           lastBeacon = now;
           await api.send_cm(MERCHANT, {

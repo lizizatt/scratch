@@ -656,6 +656,35 @@ function createCharacter(world, over) {
       return { success: true, level: it.level, chance };
     },
 
+    /** AL-shaped compound(a,b,c,scroll): merge three same name@level → +1. Always succeeds in sim. */
+    async compound(a, b, cSlot, scrollI) {
+      const ia = c.items[a];
+      const ib = c.items[b];
+      const ic = c.items[cSlot];
+      const sc = c.items[scrollI];
+      if (!ia || !ib || !ic || !sc) return { failed: true, reason: "args" };
+      if (!/^cscroll\d$/.test(sc.name)) return { failed: true, reason: "scroll" };
+      const nm = ia.name;
+      const lv = ia.level || 0;
+      if (ib.name !== nm || ic.name !== nm) return { failed: true, reason: "mismatch" };
+      if ((ib.level || 0) !== lv || (ic.level || 0) !== lv) return { failed: true, reason: "level" };
+      const def = world.G.items[nm] || {};
+      if (!def.compound) return { failed: true, reason: "not_compound" };
+      const sq = sc.q == null ? 1 : sc.q;
+      if (sq <= 1) {
+        c.items[scrollI] = null;
+        c.esize = (c.esize || 0) + 1;
+      } else {
+        sc.q = sq - 1;
+      }
+      c.items[b] = null;
+      c.items[cSlot] = null;
+      c.esize = (c.esize || 0) + 2;
+      ia.level = lv + 1;
+      log.skills.push("compound:" + nm + "@" + lv);
+      return { success: true, level: ia.level };
+    },
+
     async sell(slot, q) {
       const it = c.items[slot];
       if (!it) return { failed: true, reason: "no_item" };

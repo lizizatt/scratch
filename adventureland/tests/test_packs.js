@@ -14,8 +14,12 @@ const tests = [
     fn() {
       assert.strictEqual(world.FARM_XY, packs.FARM_XY);
       assert.strictEqual(world.packCenter, packs.packCenter);
+      assert.strictEqual(world.safeMeet, packs.safeMeet);
       assert.deepStrictEqual(packs.packCenter("bee"), { map: "main", x: 546, y: 1059 });
       assert.strictEqual(packs.packCenter("nope"), null);
+      assert.deepStrictEqual(packs.safeMeet("armadillo"), { map: "main", x: 750, y: 1800 });
+      assert.ok(packs.nearPack("armadillo", "main", 526, 1846));
+      assert.ok(!packs.nearPack("armadillo", "main", 750, 1800));
     },
   },
   {

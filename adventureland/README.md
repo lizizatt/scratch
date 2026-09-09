@@ -1,18 +1,21 @@
 # Adventure Land party — V2
 
-Sim-first rewrite. Spec: [`V2_PLAN.md`](V2_PLAN.md). Server lessons: [`LESSONS.md`](LESSONS.md). V1 reference: [`legacy/`](legacy/).
+Sim-first rewrite. Spec: [`V2_PLAN.md`](V2_PLAN.md). Server lessons: [`LESSONS.md`](LESSONS.md). Publish: [`PUBLISH.md`](PUBLISH.md). V1 reference: [`legacy/`](legacy/).
 
 ## Layout
 
 ```
 sim/           # multi-character simulator (clock, comms §4.0, path, invariants, trace)
-src/           # readable bot code (fighters + merchant + live slots)
-src/slots/     # Mainframe entrypoints (one slot each)
+src/           # readable bot code (fighters + merchant + live slots) — edit here
+src/slots/     # Mainframe character entrypoints (load_code + class combat)
 data/          # path/vision explorer fixtures (*.sim.json committed; *.live.json local)
-tests/         # unit + integration scenarios
+tests/         # unit + integration scenarios (includes dist smoke tests)
 tools/         # compress, viz record, route/live explorers
+dist/          # generated ≤176-line slots (gitignored) — do not edit
 viz/           # scrubbable sim explorer (static UI)
 legacy/        # frozen V1
+publish.manifest.js  # slot map (sources → dist → upload names)
+publish.js           # build + upload CLI
 ```
 
 ## Run tests
@@ -21,15 +24,21 @@ legacy/        # frozen V1
 node tests/run.js
 ```
 
-## Deploy (Mainframe)
+## Publish (compress → Mainframe)
 
-Needs `.al_mcp_token` or `AL_MCP_TOKEN`. Builds compressed `dist/` slots and pushes via MCP:
+Documented in [`PUBLISH.md`](PUBLISH.md). Needs `.al_mcp_token` or `AL_MCP_TOKEN` for upload.
 
 ```bash
-node tools/compress_code.js
-node deploy_mcp.js
-node live_observe_v2.js   # optional party snapshot dump
+node publish.js --list              # slot map
+node publish.js --build             # src/ → dist/ only
+node publish.js --dry-run           # build + show upload plan
+node publish.js --test --upload     # suite, then compress + save_code
+node publish.js                     # compress + upload
 ```
+
+`node deploy_mcp.js` remains as a wrapper around `publish.js --upload` for older live scripts.
+
+After upload, **relink** characters — `save_code` does not restart running CODE.
 
 ## Monte Carlo (MVP)
 
