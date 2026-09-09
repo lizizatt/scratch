@@ -67,6 +67,7 @@ function createAlApi() {
         setTimeout(r, ms);
       });
     },
+    interact: typeof interact === "function" ? interact : null,
     respawn: typeof respawn === "function" ? respawn : function () {},
     leave: typeof leave === "function" ? leave : async function () {},
   };
@@ -180,18 +181,33 @@ function createAlApi() {
     send_gold(name, amount) {
       return g.send_gold(name, amount);
     },
-    async bank_store(i) {
+    async bank_store(i, pack, pack_num) {
       try {
-        if (typeof bank_store !== "function") return { failed: true, reason: "no_bank_store" };
-        return await bank_store(i);
+        if (typeof g.bank_store !== "function") return { failed: true, reason: "no_bank_store" };
+        // Bare bank_store(i) often rejects reason "invalid" on Mainframe even with free
+        // slots; specifying a pack with an empty slot works (live probe 2026-09-09).
+        if (pack) return await g.bank_store(i, pack, pack_num == null ? -1 : pack_num);
+        const bank = g.character && g.character.bank;
+        if (bank) {
+          const packs = Object.keys(bank).filter((p) => p !== "gold" && Array.isArray(bank[p]));
+          for (const p of packs) {
+            if (!bank[p].some((x) => !x)) continue;
+            try {
+              return await g.bank_store(i, p, -1);
+            } catch (e1) {
+              // try next pack
+            }
+          }
+        }
+        return await g.bank_store(i);
       } catch (e) {
         return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
       }
     },
     async bank_retrieve(pack, i) {
       try {
-        if (typeof bank_retrieve !== "function") return { failed: true, reason: "no_bank_retrieve" };
-        return await bank_retrieve(pack, i);
+        if (typeof g.bank_retrieve !== "function") return { failed: true, reason: "no_bank_retrieve" };
+        return await g.bank_retrieve(pack, i);
       } catch (e) {
         return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
       }
@@ -220,17 +236,33 @@ function createAlApi() {
         return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
       }
     },
-    trade(i, price) {
-      if (typeof trade === "function") return trade(i, price);
+    async trade(i, tradeSlot, price, quantity) {
+      try {
+        if (typeof trade !== "function") return { failed: true, reason: "no_trade" };
+        // Official: trade(num, trade_slot, price, quantity). Reject 2-arg trade(i, price).
+        if (arguments.length < 3 || tradeSlot == null || price == null) {
+          return { failed: true, reason: "bad_args" };
+        }
+        return await trade(i, tradeSlot, price, quantity == null ? 1 : quantity);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
     },
     open_stand() {
       try {
         if (typeof open_stand === "function") open_stand();
+        else if (g.parent && typeof g.parent.open_merchant === "function") {
+          const items = g.character && g.character.items;
+          let si = -1;
+          if (items) for (let i = 0; i < items.length; i++) if (items[i] && items[i].name === "stand0") si = i;
+          if (si >= 0) g.parent.open_merchant(si);
+        }
       } catch (e) {}
     },
     close_stand() {
       try {
         if (typeof close_stand === "function") close_stand();
+        else if (g.parent && typeof g.parent.close_merchant === "function") g.parent.close_merchant();
       } catch (e) {}
     },
     use(skill) {
@@ -270,6 +302,15 @@ function createAlApi() {
     },
     async sleep(ms) {
       return g.sleep(ms);
+    },
+    async interact(name, timeout_ms) {
+      try {
+        if (typeof interact === "function") return await interact(name, timeout_ms);
+        if (typeof g.interact === "function") return await g.interact(name, timeout_ms);
+        return { failed: true, reason: "no_interact" };
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
     },
     async respawn() {
       return g.respawn();

@@ -21,6 +21,8 @@ function createWorld(opts) {
   const roster = new Map();
   /** serverKey -> Set of party leader names / party membership maps */
   const parties = new Map(); // serverKey -> { [memberName]: { map, x, y, real_x, real_y, rip, level } }
+  /** Shared with spawn `self` — characters close over self, not the returned handle. */
+  const huntBridge = { monsterHuntQueue: [], nextMonsterHunt: null };
 
   function sk(region, ident) {
     return region + "/" + ident;
@@ -55,6 +57,18 @@ function createWorld(opts) {
       comms,
       region,
       ident,
+      get monsterHuntQueue() {
+        return huntBridge.monsterHuntQueue;
+      },
+      set monsterHuntQueue(v) {
+        huntBridge.monsterHuntQueue = v || [];
+      },
+      get nextMonsterHunt() {
+        return huntBridge.nextMonsterHunt;
+      },
+      set nextMonsterHunt(fn) {
+        huntBridge.nextMonsterHunt = fn;
+      },
       entitiesOn(serverKey, map) {
         const m = servers.get(serverKey) || new Map();
         const out = {};
@@ -161,6 +175,18 @@ function createWorld(opts) {
       nextKillDrops: self.nextKillDrops,
       oweTime(ms) {
         oweTime(ms);
+      },
+      get monsterHuntQueue() {
+        return huntBridge.monsterHuntQueue;
+      },
+      set monsterHuntQueue(v) {
+        huntBridge.monsterHuntQueue = v || [];
+      },
+      get nextMonsterHunt() {
+        return huntBridge.nextMonsterHunt;
+      },
+      set nextMonsterHunt(fn) {
+        huntBridge.nextMonsterHunt = fn;
       },
     };
 
@@ -428,6 +454,18 @@ function createWorld(opts) {
     },
     roster,
     serverKey: sk,
+    get monsterHuntQueue() {
+      return huntBridge.monsterHuntQueue;
+    },
+    set monsterHuntQueue(v) {
+      huntBridge.monsterHuntQueue = v || [];
+    },
+    get nextMonsterHunt() {
+      return huntBridge.nextMonsterHunt;
+    },
+    set nextMonsterHunt(fn) {
+      huntBridge.nextMonsterHunt = fn;
+    },
     get(name) {
       const r = roster.get(name);
       return r && r.api;

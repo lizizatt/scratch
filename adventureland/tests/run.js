@@ -8,6 +8,15 @@ const suites = [
   require("./test_packs"),
   require("./test_boot_subsets"),
   require("./test_mc_mvp"),
+  require("./test_bank_clean"),
+  require("./test_derive_bank_lists"),
+  require("./test_bank_park"),
+  require("./test_live_regressions"),
+  require("./test_bank_linger"),
+  require("./test_restock_range"),
+  require("./test_stall_gear_spam"),
+  require("./test_equip_class"),
+  require("./test_monsterhunt"),
 ];
 
 async function main() {

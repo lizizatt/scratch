@@ -40,6 +40,10 @@ function baseG() {
       frogt: { g: 120, type: "material", sell: true },
       leatherboots: { g: 200, type: "shoes", upgrade: true, armor: 1, grades: [7, 9] },
       stand0: { g: 40000 },
+      staff: { g: 12400, type: "weapon", wtype: "staff", upgrade: true, attack: 25, grades: [7, 9] },
+      fireblade: { g: 48000, type: "weapon", wtype: "sword", upgrade: true, attack: 30, grades: [5, 8] },
+      blade: { g: 8000, type: "weapon", wtype: "sword", upgrade: true, attack: 18, grades: [7, 9] },
+      monstertoken: { g: 12000, type: "token", npc: "monsterhunter" },
     },
     skills: {
       taunt: { mp: 40, cooldown: 3000 },
@@ -153,6 +157,9 @@ const NPC = {
   bank_exit: { map: "main", x: 40, y: -20 },
   upgrade: { map: "main", x: -207, y: -220 },
   ponty: { map: "main", x: 106, y: -47 },
+  /** Daisy — live maps.main.npcs monsterhunter position [126,-413] */
+  monsterhunt: { map: "main", x: 126, y: -413 },
+  daisy: { map: "main", x: 126, y: -413 },
 };
 
 function dist(a, b) {

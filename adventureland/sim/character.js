@@ -4,6 +4,13 @@ const { dist, isBlocked, VISION_PX, SEND_ITEM_RANGE, LOOT_RANGE, packCenter, NPC
 const { findPath } = require("./path");
 const { createStorage } = require("./storage");
 const knobs = require("./knobs");
+const {
+  DAISY_RANGE,
+  HUNT_DURATION_MS,
+  DEFAULT_HUNT_COUNT,
+  formatHuntSn,
+  canAcceptHunts,
+} = require("../src/monsterhunt");
 
 const WALK_PX_PER_S = knobs.WALK_PX_PER_S;
 const CROSS_MAP_BASE_MS = knobs.CROSS_MAP_BASE_MS;
@@ -36,6 +43,7 @@ function makeCharState(over) {
       items: new Array(42).fill(null),
       slots: {},
       q: {},
+      s: {},
       ping: 40,
       party: null, // set of names, or null
       target: null,
@@ -60,6 +68,8 @@ function createCharacter(world, over) {
   if (over && over._storage) delete over._storage;
   const c = makeCharState(over);
   const smart = { moving: false, map: null, x: null, y: null, failInject: null };
+  /** When true, bare bank_store(i) rejects like Mainframe (`invalid`); pack required. */
+  let bankStoreBareInvalid = false;
   const log = {
     game: [],
     said: [],
@@ -260,6 +270,15 @@ function createCharacter(world, over) {
         const respawnMs = (world.G && world.G.respawnMs) || knobs.RESPAWN_MS || 10000;
         t.respawnAt = world.clock.now() + respawnMs;
         api.game_log("kill " + t.mtype + " id=" + t.id);
+        // Monster hunt: only eligible kills on the issuing server decrement c.
+        if (c.s && c.s.monsterhunt) {
+          const h = c.s.monsterhunt;
+          const sn = formatHuntSn(world.region, world.ident);
+          if (h.c > 0 && h.id === t.mtype && h.sn === sn) {
+            h.c -= 1;
+            api.game_log("mhunt:kill " + t.mtype + " c=" + h.c);
+          }
+        }
         if (typeof world.nextKillDrops === "function" && typeof world.spawnChest === "function") {
           const drops = world.nextKillDrops(t.mtype);
           if (drops && drops.length) {
@@ -308,6 +327,18 @@ function createCharacter(world, over) {
     equip(i, slot) {
       const it = c.items[i];
       if (!it) return Promise.resolve({ failed: true, reason: "no_item" });
+      const def = (world.G && world.G.items && world.G.items[it.name]) || {};
+      if (def.wtype && slot === "mainhand") {
+        const w = def.wtype;
+        const ctype = c.ctype || "warrior";
+        const ok =
+          ctype === "warrior"
+            ? ["sword", "short_sword", "wblade", "basher", "axe", "mace", "spear"].indexOf(w) >= 0
+            : ctype === "mage" || ctype === "priest"
+              ? ["staff", "great_staff", "wand"].indexOf(w) >= 0
+              : false;
+        if (!ok) return Promise.resolve({ failed: true, reason: "wrong_class" });
+      }
       const prev = slot ? c.slots[slot] : null;
       if (slot) {
         c.slots[slot] = { name: it.name, level: it.level || 0 };
@@ -351,6 +382,12 @@ function createCharacter(world, over) {
 
     open_stand() {
       c.stand = true;
+      // Live: prior-session listings can reappear on open while client slots looked empty.
+      if (c._tradeGhost) {
+        for (const k of Object.keys(c._tradeGhost)) {
+          if (!c.slots[k]) c.slots[k] = Object.assign({}, c._tradeGhost[k]);
+        }
+      }
       api.game_log("stand:open");
     },
     close_stand() {
@@ -358,23 +395,38 @@ function createCharacter(world, over) {
       api.game_log("stand:close");
     },
 
-    /** List bag slot on merchant stand (trade1..). */
-    trade(slot, price) {
+    /** List bag slot on merchant stand. Official: trade(num, trade_slot, price, quantity). */
+    trade(slot, tradeSlot, price, quantity) {
       if (!c.stand) return { failed: true, reason: "stand_closed" };
+      if (arguments.length < 3 || price == null) return { failed: true, reason: "bad_args" };
       const it = c.items[slot];
       if (!it) return { failed: true, reason: "no_item" };
       let dest = null;
-      for (let t = 1; t <= 16; t++) {
-        const k = "trade" + t;
-        if (!c.slots[k]) {
-          dest = k;
-          break;
+      if (tradeSlot != null) {
+        const n = parseInt(("" + tradeSlot).replace(/^trade/, ""), 10);
+        if (!(n >= 1 && n <= 16)) return { failed: true, reason: "bad_trade_slot" };
+        const k = "trade" + n;
+        // Live spelling: slot_occuppied
+        if (c.slots[k]) return { failed: true, reason: "slot_occuppied" };
+        dest = k;
+      } else {
+        for (let t = 1; t <= 16; t++) {
+          const k = "trade" + t;
+          if (!c.slots[k]) {
+            dest = k;
+            break;
+          }
         }
       }
       if (!dest) return { failed: true, reason: "no_trade_slot" };
-      c.slots[dest] = Object.assign({}, it, { price: price || 1 });
-      c.items[slot] = null;
-      c.esize = (c.esize || 0) + 1;
+      const q = quantity == null ? it.q || 1 : quantity;
+      c.slots[dest] = Object.assign({}, it, { price: price || 1, q });
+      if (it.q && q < it.q) {
+        it.q -= q;
+      } else {
+        c.items[slot] = null;
+        c.esize = (c.esize || 0) + 1;
+      }
       log.traded.push({ slot: dest, name: it.name, price: price || 1 });
       api.game_log("stall:list " + it.name + " @" + (price || 1));
       return { success: true, slot: dest };
@@ -435,6 +487,10 @@ function createCharacter(world, over) {
         map = NPC.upgrade.map;
         x = NPC.upgrade.x;
         y = NPC.upgrade.y;
+      } else if (dest && (dest.to === "monsterhunt" || dest.to === "daisy" || dest.to === "monsterhunter")) {
+        map = NPC.monsterhunt.map;
+        x = NPC.monsterhunt.x;
+        y = NPC.monsterhunt.y;
       } else if (dest && dest.to === "bank") {
         map = NPC.bank.map;
         x = NPC.bank.x;
@@ -619,6 +675,7 @@ function createCharacter(world, over) {
       const t = world.entity(serverKey(), name);
       if (!it) return { failed: true, reason: "no_item" };
       if (!t) return { failed: true, reason: "no_target" };
+      if (c.stand) return { failed: true, reason: "stand_open" };
       if (t.map !== c.map) return { failed: true, reason: "map" };
       if (dist(c, t) > SEND_ITEM_RANGE) return { failed: true, reason: "distance" };
       if ((t.esize || 0) < 1) return { failed: true, reason: "no_space" };
@@ -647,12 +704,28 @@ function createCharacter(world, over) {
       log.gold.push({ name, amount: a });
     },
 
-    async bank_store(i) {
-      if (c.map !== "bank") return false;
+    async bank_store(i, pack, pack_num) {
+      if (c.map !== "bank") return { failed: true, reason: "not_bank" };
       if (!c.bank) c.bank = { gold: 0, items0: new Array(42).fill(null) };
       const it = c.items[i];
-      if (!it) return false;
-      const bag = c.bank.items0;
+      if (!it) return { failed: true, reason: "no_item" };
+      // Live Mainframe: bank_store(i) often rejects reason "invalid"; pack+(-1) works.
+      if (bankStoreBareInvalid && pack == null) {
+        return { failed: true, reason: "invalid" };
+      }
+      let bag = pack && c.bank[pack] ? c.bank[pack] : null;
+      if (!bag) {
+        // Prefer first pack with a free slot (mirrors live al_api pack pick).
+        for (const p of Object.keys(c.bank)) {
+          if (p === "gold" || !Array.isArray(c.bank[p])) continue;
+          if (c.bank[p].some((x) => !x)) {
+            bag = c.bank[p];
+            pack = p;
+            break;
+          }
+        }
+      }
+      if (!bag) bag = c.bank.items0;
       // Stack quantity items onto matching bank stacks first (frogt, pots, etc.)
       if (it.q != null) {
         const stackI = bag.findIndex(
@@ -666,15 +739,18 @@ function createCharacter(world, over) {
           bag[stackI].q = (bag[stackI].q || 0) + it.q;
           c.items[i] = null;
           c.esize = (c.esize || 0) + 1;
-          return true;
+          return { success: true, pack };
         }
       }
-      const j = bag.findIndex((x) => !x);
-      if (j < 0) return false;
+      let j = pack_num != null && pack_num >= 0 ? pack_num : bag.findIndex((x) => !x);
+      if (j < 0 || bag[j]) {
+        j = bag.findIndex((x) => !x);
+      }
+      if (j < 0) return { failed: true, reason: "bank_full" };
       bag[j] = it;
       c.items[i] = null;
       c.esize = (c.esize || 0) + 1;
-      return true;
+      return { success: true, pack, slot: j };
     },
 
     sleep(ms) {
@@ -683,9 +759,74 @@ function createCharacter(world, over) {
       return Promise.resolve();
     },
 
+    /**
+     * Official: interact("monsterhunt") near Daisy — start or turn in.
+     * Docs: merchants cannot accept; refuse while hunt.c > 0; reward only on turn-in.
+     */
+    async interact(name) {
+      if (name !== "monsterhunt") return { failed: true, reason: "invalid" };
+      if (!c.s) c.s = {};
+      if (c.map !== NPC.monsterhunt.map || dist(c, NPC.monsterhunt) > DAISY_RANGE) {
+        return { failed: true, reason: "distance" };
+      }
+      if (!canAcceptHunts(c.ctype)) {
+        return { failed: true, reason: "merchant" };
+      }
+      // Expire timed hunts
+      if (c.s.monsterhunt && c.s.monsterhunt.expiresAt != null && world.clock.now() >= c.s.monsterhunt.expiresAt) {
+        delete c.s.monsterhunt;
+        api.game_log("mhunt:expired");
+      }
+      const hunt = c.s.monsterhunt;
+      if (hunt && hunt.c > 0) {
+        return { failed: true, reason: "in_progress" };
+      }
+      if (hunt && hunt.c === 0) {
+        delete c.s.monsterhunt;
+        const slot = c.items.findIndex((x) => !x);
+        if (slot < 0) {
+          // Still clear hunt — token grant needs space; leave incomplete token for tests to see
+          api.game_log("mhunt:turnin_nospace");
+          return { failed: true, reason: "no_space" };
+        }
+        const stack = c.items.findIndex((x) => x && x.name === "monstertoken" && x.q != null);
+        if (stack >= 0) c.items[stack].q += 1;
+        else {
+          c.items[slot] = { name: "monstertoken", q: 1 };
+          c.esize = Math.max(0, (c.esize || 1) - 1);
+        }
+        api.game_log("mhunt:token");
+        return { success: true, completed: true };
+      }
+      // Accept
+      let assign = null;
+      if (typeof world.nextMonsterHunt === "function") assign = world.nextMonsterHunt(c);
+      else if (Array.isArray(world.monsterHuntQueue) && world.monsterHuntQueue.length) {
+        assign = world.monsterHuntQueue.shift();
+      }
+      if (!assign) assign = { id: "goo", c: DEFAULT_HUNT_COUNT };
+      if (typeof assign === "string") assign = { id: assign, c: DEFAULT_HUNT_COUNT };
+      const sn = formatHuntSn(world.region, world.ident);
+      if (!sn) return { failed: true, reason: "no_server" };
+      const now = world.clock.now();
+      c.s.monsterhunt = {
+        id: assign.id,
+        c: assign.c != null ? assign.c : DEFAULT_HUNT_COUNT,
+        sn,
+        ms: HUNT_DURATION_MS,
+        expiresAt: now + HUNT_DURATION_MS,
+      };
+      api.game_log("mhunt:accept id=" + c.s.monsterhunt.id + " c=" + c.s.monsterhunt.c);
+      return { success: true, started: true };
+    },
+
     /** Test helpers */
     _injectSmartFail(mode) {
       smart.failInject = mode;
+    },
+    /** Reproduce Mainframe bare bank_store(i) → reason invalid. */
+    _injectBankStoreBareInvalid(on) {
+      bankStoreBareInvalid = !!on;
     },
     _heapAlive() {
       return heapAlive;
