@@ -649,7 +649,7 @@ function bootFighter(api, opts) {
       if (!d.ok) dlvPending = null;
       persist();
     }
-    if (d.status && m.name === MERCHANT) {
+    if (d.status && (m.name || m.from) === MERCHANT) {
       if (dlvPending && (!d.id || d.id === dlvPending.id)) {
         lastStatusAt = api._now();
         dlvPending.phase = d.phase;

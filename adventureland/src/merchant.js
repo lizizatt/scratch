@@ -348,7 +348,7 @@ function bootMerchant(api, opts) {
     if (d.dlv_loc && d.id) {
       const jobs = (store.active ? [store.active] : []).concat(store.q);
       const job = jobs.find((j) => j.id === d.id);
-      if (!job || m.name !== job.who) return;
+      if (!job || (m.name || m.from) !== job.who) return;
       const oldFarm = job.farm;
       const oldMap = job.map;
       const oldX = job.x;
