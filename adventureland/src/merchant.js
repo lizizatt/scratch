@@ -150,10 +150,9 @@ function bootMerchant(api, opts) {
   }
 
   function closeStandIfOpen() {
-    if (api.character.stand) {
-      if (typeof api.close_stand === "function") api.close_stand();
-      else if (api.parent && api.parent.close_merchant) api.parent.close_merchant();
-    }
+    // api.close_stand() already falls back to parent.close_merchant internally
+    // (both live al_api.js and sim character.js define it unconditionally).
+    if (api.character.stand && typeof api.close_stand === "function") api.close_stand();
   }
 
   /**
@@ -760,8 +759,9 @@ function bootMerchant(api, opts) {
     }
     if (!junkSlots.length) return 0;
     if (!api.character.stand) {
+      // api.open_stand() already falls back to parent.open_merchant internally
+      // (both live al_api.js and sim character.js define it unconditionally).
       if (typeof api.open_stand === "function") api.open_stand();
-      else if (api.parent && api.parent.open_merchant) api.parent.open_merchant();
       if (typeof api.sleep === "function") await api.sleep(150);
     }
     let n = 0;

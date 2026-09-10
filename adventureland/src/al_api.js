@@ -204,19 +204,10 @@ function createAlApi() {
         if (typeof g.bank_store !== "function") return { failed: true, reason: "no_bank_store" };
         // Bare bank_store(i) often rejects reason "invalid" on Mainframe even with free
         // slots; specifying a pack with an empty slot works (live probe 2026-09-09).
+        // Picking *which* pack has room is the caller's job (merchant.storeBagItemToBank
+        // already does that pack-scan) -- this is a thin passthrough, not a second copy
+        // of that selection logic.
         if (pack) return await g.bank_store(i, pack, pack_num == null ? -1 : pack_num);
-        const bank = g.character && g.character.bank;
-        if (bank) {
-          const packs = Object.keys(bank).filter((p) => p !== "gold" && Array.isArray(bank[p]));
-          for (const p of packs) {
-            if (!bank[p].some((x) => !x)) continue;
-            try {
-              return await g.bank_store(i, p, -1);
-            } catch (e1) {
-              // try next pack
-            }
-          }
-        }
         return await g.bank_store(i);
       } catch (e) {
         return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
