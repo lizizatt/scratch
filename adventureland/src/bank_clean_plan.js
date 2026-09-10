@@ -10,6 +10,7 @@
  */
 
 const { VENDOR_NPC } = require("./constants");
+const { isSellJunk: gearIsSellJunk } = require("./gear");
 
 const DEFAULT_SELL = VENDOR_NPC;
 const DEFAULT_COMBINE = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
@@ -26,10 +27,16 @@ function bankPlanIsKeep(it) {
   return false;
 }
 
-function bankPlanIsSellJunk(it, sellList) {
+/**
+ * Same junk call as merchant/vendor's gear.isSellJunk (VENDOR_NPC + G .sell
+ * fallback + GEAR_TARGETS protection) -- park and vendor share one source of
+ * truth. `sellList`, when passed explicitly (tests, ops probes), overrides
+ * with a plain name-whitelist check instead of deferring to gear.js.
+ */
+function bankPlanIsSellJunk(it, sellList, G) {
   if (!it || bankPlanIsKeep(it)) return false;
-  const list = sellList || DEFAULT_SELL;
-  return list.indexOf(it.name) >= 0;
+  if (sellList) return sellList.indexOf(it.name) >= 0;
+  return gearIsSellJunk(it, G);
 }
 
 function cscrollFor(name, level, G) {
@@ -84,10 +91,10 @@ function planCompounds(bags, G, combineList) {
 }
 
 /** Bag indices that are sell-junk (whitelist). */
-function planSellBag(items, sellList) {
+function planSellBag(items, sellList, G) {
   const out = [];
   for (let i = 0; i < (items || []).length; i++) {
-    if (bankPlanIsSellJunk(items[i], sellList)) out.push(i);
+    if (bankPlanIsSellJunk(items[i], sellList, G)) out.push(i);
   }
   return out;
 }
@@ -95,7 +102,7 @@ function planSellBag(items, sellList) {
 /**
  * Bank entries to pull for selling: [{pack, i, name, level, q}].
  */
-function planSellBank(bank, sellList) {
+function planSellBank(bank, sellList, G) {
   const out = [];
   if (!bank) return out;
   for (const pack of Object.keys(bank)) {
@@ -104,7 +111,7 @@ function planSellBank(bank, sellList) {
     if (!Array.isArray(bag)) continue;
     for (let i = 0; i < bag.length; i++) {
       const it = bag[i];
-      if (bankPlanIsSellJunk(it, sellList)) out.push({ pack, i, name: it.name, level: it.level || 0, q: it.q });
+      if (bankPlanIsSellJunk(it, sellList, G)) out.push({ pack, i, name: it.name, level: it.level || 0, q: it.q });
     }
   }
   return out;

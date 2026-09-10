@@ -5,6 +5,8 @@
  * Rules blend legacy HOLD/SELL with V2 vendor-gear progression.
  */
 
+const { VENDOR_NPC } = require("./constants");
+
 /** Keep at least this many of each (name → min level to count as hold). */
 const HOLD_TARGETS = [
   ["armorring", 1],
@@ -209,6 +211,14 @@ function deriveBankLists(dump) {
 
     if (LEGACY_SELL.indexOf(name) >= 0) {
       sell.push({ name, level: lv, reason: "legacy_sell", copies: row.copies, locations: row.locations });
+      continue;
+    }
+
+    // Canonical instant-vendor junk (src/constants.VENDOR_NPC) — items that
+    // never showed up in LEGACY_SELL's hand-picked list should still sell,
+    // not fall through to "unknown_keep".
+    if (VENDOR_NPC.indexOf(name) >= 0) {
+      sell.push({ name, level: lv, reason: "vendor_npc_junk", copies: row.copies, locations: row.locations });
       continue;
     }
 

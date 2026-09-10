@@ -4,7 +4,10 @@
  * Does not live in the permanent V2 slot set.
  */
 var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"];
-var SELL = ["dexamulet", "dexearring", "rednose", "strearring", "wcap", "wshoes", "frogt", "leatherboots"];
+// Keep in sync with src/constants.js VENDOR_NPC by hand — this file can't
+// require() (raw Mainframe CODE upload). Do NOT include goal earrings
+// (strearring/vitearring/intearring) or capes; those are never vendor junk.
+var SELL = ["dexamulet", "dexearring", "rednose", "wcap", "wshoes", "frogt", "leatherboots", "beewings", "gslime"];
 var SELL_LV = [{ name: "shoes", level: 3 }]; // vendor dupes below best — level-gated
 var COMBINE = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
 var COMBINE_MAX = 5;
