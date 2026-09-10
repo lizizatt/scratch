@@ -54,8 +54,6 @@ const VENDOR_NPC = [
   "beewings",
   "gslime",
 ];
-/** @deprecated alias — all former stall junk is NPC-vendored now. */
-const SELL_WHITELIST = VENDOR_NPC;
 /** Compound priority for bank clean / merchant combine. */
 const COMBINE_PRIORITY = [
   "ringsj",
@@ -159,7 +157,6 @@ module.exports = {
   KEEP_ALWAYS,
   EXCHANGE_ITEMS,
   VENDOR_NPC,
-  SELL_WHITELIST,
   COMBINE_PRIORITY,
   GEAR_TYPES,
   VENDOR_GEAR,

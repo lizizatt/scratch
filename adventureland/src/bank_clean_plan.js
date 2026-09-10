@@ -1,14 +1,17 @@
 "use strict";
 
 /**
- * Pure helpers for bank clean (combine + sell junk). Shared by tests;
- * live CODE in code/bank_clean.js inlines the same rules for temporary upload.
+ * Pure helpers for bank clean (combine + sell junk). Shared by tests.
+ * `code/bank_clean.js` is a standalone one-shot Mainframe upload (raw globals,
+ * no require()) and intentionally keeps its own inline copy of these rules.
  *
  * Names are prefixed bankPlan* where they would collide with gear.js globals
  * after compress strips requires into shared AL CODE slots.
  */
 
-const DEFAULT_SELL = ["dexamulet", "dexearring", "rednose", "wcap", "wshoes", "frogt", "leatherboots"];
+const { VENDOR_NPC } = require("./constants");
+
+const DEFAULT_SELL = VENDOR_NPC;
 const DEFAULT_COMBINE = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
 const BANK_COMBINE_MAX = 5;
 

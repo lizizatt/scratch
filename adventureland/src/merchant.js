@@ -9,7 +9,6 @@ const {
   POTION_TARGET,
   GOLD_FLOAT_FIGHTER,
   GOLD_FLOAT_MERCHANT,
-  SELL_WHITELIST,
   COMBINE_PRIORITY,
   MIN_UPGRADE_CHANCE,
   SEND_RANGE,
@@ -474,7 +473,7 @@ function bootMerchant(api, opts) {
       if (/^hpot|^mpot/.test(it.name)) continue;
       if (it.name === "stand0") continue;
       if (EXCHANGE_ITEMS.indexOf(it.name) >= 0) continue;
-      if (VENDOR_NPC.indexOf(it.name) >= 0 || SELL_WHITELIST.indexOf(it.name) >= 0) continue;
+      if (isVendorNpcName(it.name)) continue;
       if (isGearTargetName(it.name)) continue;
       // Listed / reserved for merchant stand — never park.
       if (it.price != null) continue;
@@ -711,7 +710,7 @@ function bootMerchant(api, opts) {
   function countSellJunk(items) {
     let n = 0;
     for (const it of items || []) {
-      if (it && (VENDOR_NPC.indexOf(it.name) >= 0 || SELL_WHITELIST.indexOf(it.name) >= 0)) n++;
+      if (it && isVendorNpcName(it.name)) n++;
     }
     return n;
   }
@@ -741,7 +740,7 @@ function bootMerchant(api, opts) {
   }
 
   function isVendorNpcName(name) {
-    return VENDOR_NPC.indexOf(name) >= 0 || SELL_WHITELIST.indexOf(name) >= 0;
+    return VENDOR_NPC.indexOf(name) >= 0;
   }
 
   function isTradeReclaimName(name) {

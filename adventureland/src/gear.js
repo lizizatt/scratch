@@ -1,7 +1,6 @@
 "use strict";
 
 const {
-  SELL_WHITELIST,
   VENDOR_NPC,
   KEEP_ALWAYS,
   GEAR_TYPES,
@@ -251,7 +250,7 @@ function isSellJunk(it, G) {
   if (/^hpot|^mpot/.test(it.name)) return false;
   if (it.name === "stand0" || it.name === "scroll0") return false;
   if (isGearTargetName(it.name)) return false;
-  if (VENDOR_NPC.indexOf(it.name) >= 0 || SELL_WHITELIST.indexOf(it.name) >= 0) return true;
+  if (VENDOR_NPC.indexOf(it.name) >= 0) return true;
   const g = itemDef(G, it.name);
   return !!g.sell;
 }
