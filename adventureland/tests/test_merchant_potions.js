@@ -39,6 +39,31 @@ test("adversary: Puppygirl buys and uses HP/MP potions", async () => {
   assert.ok(c.mp > c.max_mp * 0.4, "MP must increase");
 });
 
+test("adversary: full bag refills existing merchant potion stacks", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  c.items = new Array(42).fill(null).map(() => ({ name: "tracker" }));
+  c.items[0] = { name: "hpot1", q: 1 };
+  c.items[1] = { name: "mpot1", q: 1 };
+  c.esize = 0;
+  c.map = "main";
+  c.real_x = c.x = 56;
+  c.real_y = c.y = -122;
+
+  await p.tickAll();
+
+  const logs = api.log.game.map((g) => g.m);
+  assert.strictEqual(qty(c.items, "hpot1"), POTION_TARGET);
+  assert.strictEqual(qty(c.items, "mpot1"), POTION_TARGET);
+  assert.ok(!logs.some((m) => m === "selfpot:no_space"), "existing stacks need no free slot");
+});
+
 test("adversary: potion delivery preserves Puppygirl's personal reserve", async () => {
   const p = bootParty({
     pack: "armadillo",
