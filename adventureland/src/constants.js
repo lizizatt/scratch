@@ -10,6 +10,10 @@ const CHAT_GAP_MS = 16000;
 const HEARTBEAT_MS = 60000;
 const FORM_R_IN = 220;
 const FORM_R_OUT = 400;
+/** Fighter: max distance from pack center to still consider a found monster "here". */
+const FIGHTER_ENGAGE_R = 280;
+/** Merchant avoid-steering: distance at which a hostile is worth dodge-stepping around. */
+const AVOID_ENGAGE_R = 180;
 /** Loose formation (legacy fighter_core): near/far band + re-anchor. */
 const FORM_NEAR = 18;
 const FORM_FAR = 40;
@@ -133,6 +137,8 @@ module.exports = {
   HEARTBEAT_MS,
   FORM_R_IN,
   FORM_R_OUT,
+  FIGHTER_ENGAGE_R,
+  AVOID_ENGAGE_R,
   FORM_NEAR,
   FORM_FAR,
   FORM_REANCHOR,

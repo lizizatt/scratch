@@ -20,6 +20,7 @@ const {
   SEND_RANGE,
   METRICS_MS,
   FORM_R_OUT,
+  FIGHTER_ENGAGE_R,
   KEEP_ALWAYS,
   HEAL_HP_PCT,
   HEAL_MP_PCT,
@@ -737,7 +738,7 @@ function bootFighter(api, opts) {
         const here = api.character;
         const far =
           here.map !== pc.map ||
-          Math.hypot((here.real_x || 0) - pc.x, (here.real_y || 0) - pc.y) > 280;
+          Math.hypot((here.real_x || 0) - pc.x, (here.real_y || 0) - pc.y) > FIGHTER_ENGAGE_R;
         const mon = api.get_nearest_monster({ type: h.id });
         const inRange = mon && typeof api.is_in_range === "function" ? api.is_in_range(mon) : !!mon;
         if (far && !inRange) {
@@ -1031,7 +1032,7 @@ function bootFighter(api, opts) {
     const mon = api.get_nearest_monster({ type: mtype });
     // Far "seen" mobs (sim ignores vision; live can still be long-range) must not
     // skip pack smart_move — stepToward walks into walls and stalls mid-route.
-    const ENGAGE_R = 280;
+    const ENGAGE_R = FIGHTER_ENGAGE_R;
     const monHere =
       mon &&
       !mon.dead &&

@@ -5,6 +5,8 @@
  * Not used by fighters. Pure geometry; caller supplies can_move_to / sleep / entities.
  */
 
+const { AVOID_ENGAGE_R } = require("./constants");
+
 const DEFAULTS = {
   bodyR: 30,
   margin: 16,
@@ -21,7 +23,7 @@ const DEFAULTS = {
   progressWeight: 1.0,
   unsureFrac: 0.45,
   /** Only engage avoid steering when a hostile is this close (px). Far vision still lists for dodging once engaged. */
-  engageR: 180,
+  engageR: AVOID_ENGAGE_R,
   /** List / predict hostiles out to this radius while avoid is active. */
   visionPx: 600,
 };
