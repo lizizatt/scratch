@@ -157,6 +157,21 @@ function bootMerchant(api, opts) {
     }
   }
 
+  /**
+   * Shared NPC travel: primary smart_move destination, then a coordinate fallback
+   * (Mainframe `{to:"x"}` NPC lookups occasionally miss; explicit coords always land).
+   * Closes the stand first — trade slots must be vacated before walking off.
+   * Optional failTag logs+returns false on failure; otherwise callers check the result.
+   */
+  async function goNpc(primary, fallback, failTag) {
+    closeStandIfOpen();
+    let r = await api.smart_move(primary);
+    if (r && r.failed && fallback) r = await api.smart_move(fallback);
+    const ok = !(r && r.failed);
+    if (!ok && failTag) api.game_log(failTag);
+    return ok;
+  }
+
   function playerDist(t) {
     if (!t) return 1e9;
     if (api.parent && typeof api.parent.distance === "function") {
@@ -609,11 +624,7 @@ function bootMerchant(api, opts) {
       const it = api.character.items[i];
       if (it && it.name === gear.name && (it.level || 0) === (gear.level || 0)) return i;
     }
-    closeStandIfOpen();
-    if (api.character.map !== "bank") {
-      const r = await api.smart_move({ to: "bank" });
-      if (r && r.failed) return -1;
-    }
+    if (!(await ensureAtBank())) return -1;
     const bank = listBankItems();
     const hit = bank.find((e) => e.name === gear.name && (e.level || 0) === (gear.level || 0));
     if (!hit) return -1;
@@ -829,11 +840,7 @@ function bootMerchant(api, opts) {
     }
     if (i < 0) return false;
 
-    closeStandIfOpen();
-    const dest = { map: "main", x: 56, y: -122 };
-    const move = await api.smart_move(dest);
-    if (move && move.failed) {
-      api.game_log("vendor:path_fail");
+    if (!(await goNpc({ map: "main", x: 56, y: -122 }, null, "vendor:path_fail"))) {
       return false;
     }
 
@@ -878,10 +885,7 @@ function bootMerchant(api, opts) {
   }
 
   async function goUpgradeNpc() {
-    closeStandIfOpen();
-    let r = await api.smart_move({ map: "main", x: -207, y: -220 });
-    if (r && r.failed) r = await api.smart_move({ to: "upgrade" });
-    return !(r && r.failed);
+    return goNpc({ map: "main", x: -207, y: -220 }, { to: "upgrade" });
   }
 
   function hasUpgradeableOwned() {
@@ -945,14 +949,8 @@ function bootMerchant(api, opts) {
     }
     if (i < 0) return false;
 
-    closeStandIfOpen();
     const nm = api.character.items[i].name;
-    let move = await api.smart_move({ to: "exchange" });
-    if (move && move.failed) {
-      move = await api.smart_move({ map: "main", x: -25, y: -478 });
-    }
-    if (move && move.failed) {
-      api.game_log("xyn:path_fail");
+    if (!(await goNpc({ to: "exchange" }, { map: "main", x: -25, y: -478 }, "xyn:path_fail"))) {
       return false;
     }
     i = findBagSlot();
@@ -1017,13 +1015,7 @@ function bootMerchant(api, opts) {
       await parkToBank(null, { skipUpgrades: false });
       if ((api.character.esize || 0) < 1) return false;
     }
-    closeStandIfOpen();
-    let move = await api.smart_move({ to: "secondhands" });
-    if (move && move.failed) {
-      move = await api.smart_move({ map: "main", x: 106, y: -47 });
-    }
-    if (move && move.failed) {
-      api.game_log("ponty:path_fail");
+    if (!(await goNpc({ to: "secondhands" }, { map: "main", x: 106, y: -47 }, "ponty:path_fail"))) {
       return false;
     }
     let listed;
@@ -1161,13 +1153,7 @@ function bootMerchant(api, opts) {
 
       // Buy missing vendor weapons at Gabriel (basics).
       if (buys.length) {
-        closeStandIfOpen();
-        let move = await api.smart_move({ to: "basics" });
-        if (move && move.failed) {
-          move = await api.smart_move({ map: "main", x: -89, y: -165 });
-        }
-        if (move && move.failed) {
-          api.game_log("craft:vendor_path_fail");
+        if (!(await goNpc({ to: "basics" }, { map: "main", x: -89, y: -165 }, "craft:vendor_path_fail"))) {
           return false;
         }
         for (const b of buys) {
@@ -1178,10 +1164,7 @@ function bootMerchant(api, opts) {
                 api.game_log("craft:no_space");
                 return false;
               }
-              move = await api.smart_move({ to: "basics" });
-              if (move && move.failed) {
-                move = await api.smart_move({ map: "main", x: -89, y: -165 });
-              }
+              await goNpc({ to: "basics" }, { map: "main", x: -89, y: -165 });
             }
             const br = await api.buy(b.name, 1);
             if (br && br.failed) {
@@ -1215,13 +1198,7 @@ function bootMerchant(api, opts) {
         }
       }
 
-      closeStandIfOpen();
-      let move = await api.smart_move({ to: "craftsman" });
-      if (move && move.failed) {
-        move = await api.smart_move({ map: "main", x: 92, y: 670 });
-      }
-      if (move && move.failed) {
-        api.game_log("craft:path_fail");
+      if (!(await goNpc({ to: "craftsman" }, { map: "main", x: 92, y: 670 }, "craft:path_fail"))) {
         return false;
       }
       try {
@@ -1262,11 +1239,7 @@ function bootMerchant(api, opts) {
       await parkToBank();
       if ((api.character.esize || 0) < 1) return false;
     }
-    closeStandIfOpen();
-    const dest = { map: "main", x: 56, y: -122 };
-    const r = await api.smart_move(dest);
-    if (r && r.failed) {
-      api.game_log("gear:vendor_path_fail");
+    if (!(await goNpc({ map: "main", x: 56, y: -122 }, null, "gear:vendor_path_fail"))) {
       return false;
     }
     const bought = await api.buy(plan.name, 1);
