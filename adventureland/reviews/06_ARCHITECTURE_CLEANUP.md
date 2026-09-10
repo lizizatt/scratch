@@ -23,7 +23,7 @@ Most weight is **ops dumps + god-file size**, not abandoned published modules. H
 ### Keep (looks orphan, has callers)
 | Item | Real role |
 |------|-----------|
-| `src/combat.js` | **Sim-only** combat via `boot_party` — not live slots |
+| `sim/combat.js` (moved from `src/`, 2026-09-11) | **Sim-only** combat via `boot_party` — not live slots |
 | `monsterhunt_runner.js` | Test/sim Daisy driver |
 | `derive_bank_lists.js` | Ops list derivation |
 | `al_api.js` | Live shim in published bundles |
@@ -49,19 +49,19 @@ Rare / mhunt / dlv-client / gear-offer extracts; keep `bootFighter` as sole cont
 
 ```
 Published:  slots/* + v2_lib / v2_fighter / v2_merchant
-Sim-only:   boot_party, combat.js, monsterhunt_runner
+Sim-only:   boot_party, sim/combat.js, monsterhunt_runner
 Ops-only:   live_*.js (repo root), mh_live_*, tools probes
 Generated:  dist/
 Reviews:    reviews/
 ```
 
-Misleaders: `src/combat.js` ≠ slot `combat()`; root `live_*` ≠ `src/live_*_runtime.js`; `boot_party` is sim harness not live boot.
+Misleaders: `sim/combat.js` ≠ slot `combat()`; root `live_*` ≠ `src/live_*_runtime.js`; `boot_party` is sim harness not live boot.
 
 ## Rearrange plan (remaining)
 
 1. Gitignore / move root `_*.json` dumps → `ops/artifacts/`.
 2. Cluster ops scripts → `ops/live/` (path updates only).
-3. Move `combat.js` → `sim/combat.js`; fix `boot_party` require.
+3. ~~Move `combat.js` → `sim/combat.js`; fix `boot_party` require.~~ Done 2026-09-11.
 4. Split delivery/idle from merchant boot once one live observe is green.
 
 **Out of scope:** rewrite slot combat, change sim combat lead hardcode (behavior/succession work).

@@ -15,7 +15,7 @@ const {
   PRIEST_RANGE,
 } = require("./constants");
 const { packCenter } = require("../sim/world");
-const { combatTank, combatAssist } = require("./combat");
+const { combatTank, combatAssist } = require("../sim/combat");
 
 /**
  * Spawn the party in sim and return controllers + world.
