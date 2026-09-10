@@ -301,14 +301,25 @@ function isKeep(api, it, G, giftTtl) {
 /**
  * Equip any bag piece that beats the worn slot.
  * Skips class-illegal and 2H+offhand conflicts (avoids live "Wrong weapon" spam).
+ * `rejectMemo` (optional, caller-owned map key -> ts) remembers recent live
+ * "Wrong weapon" rejections so we don't re-attempt (and re-spam) the same
+ * item/slot every tick — retries after EQUIP_REJECT_COOLDOWN_MS in case gear
+ * state changed (e.g. offhand freed up).
  */
-async function equipPending(api, G, giftTtl) {
+const EQUIP_REJECT_COOLDOWN_MS = 60000;
+
+async function equipPending(api, G, giftTtl, rejectMemo) {
   let n = 0;
+  const now = api._now ? api._now() : Date.now();
   for (let i = 0; i < api.character.items.length; i++) {
     const it = api.character.items[i];
     if (!it) continue;
     const best = pickBestSlot(api, it, G);
     if (!best || typeof api.equip !== "function") continue;
+    const rejectKey = it.name + "@" + (it.level || 0) + "->" + best.slot;
+    if (rejectMemo && rejectMemo[rejectKey] != null && now - rejectMemo[rejectKey] < EQUIP_REJECT_COOLDOWN_MS) {
+      continue;
+    }
     let r;
     try {
       r = await Promise.resolve(api.equip(i, best.slot));
@@ -323,6 +334,7 @@ async function equipPending(api, G, giftTtl) {
     const wornNow = api.character.slots[best.slot];
     if (!wornNow || wornNow.name !== it.name) {
       // Live may reject with only a UI "Wrong weapon" — do not thrash.
+      if (rejectMemo) rejectMemo[rejectKey] = now;
       if (api.game_log) api.game_log("equip:reject " + it.name);
       continue;
     }

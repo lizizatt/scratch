@@ -73,6 +73,13 @@ function bootMerchant(api, opts) {
   let giftBusy = false;
   let lastParkFailAt = null;
   const PARK_FAIL_BACKOFF_MS = 15000;
+  // Throttle full Ponty scan attempts (travel + get_secondhands + scan) so a
+  // steady "nothing to buy" state doesn't re-walk/re-list/re-log every idle
+  // tick — live spam: repeated "ponty:list N" / "ponty:none" plus the game
+  // client's own "Searching for path"/"Path found!" from the redundant
+  // smart_move each attempt made even while already parked at the NPC.
+  let lastPontyAttemptAt = null;
+  const PONTY_RETRY_MS = 30000;
   // Single vault-exit point — matches live Cue banker's plaza doorway. Was
   // hand-copied as a bare literal in 3 places (retreatPlaza / leaveBankToPlaza
   // / gear-pull delivery step); one constant + leaveBankToPlaza() now owns it.
@@ -1013,6 +1020,9 @@ function bootMerchant(api, opts) {
     if (!(PONTY_WANT || []).length) return false;
     const spend = spendableGold();
     if (!(spend > 0)) return false;
+    const now = api._now ? api._now() : Date.now();
+    if (lastPontyAttemptAt != null && now - lastPontyAttemptAt < PONTY_RETRY_MS) return false;
+    lastPontyAttemptAt = now;
     if ((api.character.esize || 0) < 1) {
       await parkToBank(null, { skipUpgrades: false });
       if ((api.character.esize || 0) < 1) return false;

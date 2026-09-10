@@ -71,6 +71,9 @@ function bootFighter(api, opts) {
   /** Intent snapshot taken when entering rare — restored on rare_kill/gone/timeout. */
   let preRareSnap = null;
   const giftTtl = {};
+  // equipPending's live "Wrong weapon" rejection memo — persists across ticks
+  // so a class-illegal / 2H-conflicted item isn't re-attempted every tick.
+  const equipRejectMemo = {};
   const metrics = { t0: 0, kills: 0, gold0: 0, emitCount: 0 };
 
   if (typeof api.attack === "function") {
@@ -198,7 +201,7 @@ function bootFighter(api, opts) {
   /** Free ≥1 bag slot by selling junk, then surplus pots if dry on the other type. */
   async function freeBagSlot() {
     if ((api.character.esize || 0) >= 1) return true;
-    await equipPending(api, api.G || {}, giftTtl);
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo);
     if ((api.character.esize || 0) >= 1) return true;
     async function sellAt(i, it) {
       if (typeof api.sell !== "function") return false;
@@ -371,7 +374,7 @@ function bootFighter(api, opts) {
     const slot = d.slot;
     const prev = slot && api.character.slots[slot] ? Object.assign({}, api.character.slots[slot]) : null;
     markGift(giftTtl, id, d.name, api._now());
-    await equipPending(api, api.G || {}, giftTtl);
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo);
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (it && it.name === d.name && (it.level || 0) === (d.level || 0)) {
@@ -388,7 +391,7 @@ function bootFighter(api, opts) {
         break;
       }
     }
-    await equipPending(api, api.G || {}, giftTtl);
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo);
     const worn = slot && api.character.slots[slot];
     const ok =
       worn && worn.name === d.name && (worn.level || 0) === (d.level || 0) ? 1 : 0;
@@ -1160,7 +1163,7 @@ function bootFighter(api, opts) {
     motion.evalPresent(now);
     if (typeof api.loot === "function") api.loot();
     await stripWrongClass();
-    await equipPending(api, api.G || {}, giftTtl);
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo);
     if (now - lastGearAd >= GEAR_AD_MS) sendGearAd();
     await offloadToMerchant();
     emitMetrics(now);
