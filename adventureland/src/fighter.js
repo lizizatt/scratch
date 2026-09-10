@@ -160,6 +160,17 @@ function bootFighter(api, opts) {
     return lead === name;
   }
 
+  /**
+   * Single lead resolver shared with motion.js: run opts.combat with the
+   * *current* succession lead, not a name baked in at boot. Whoever
+   * currentLeader() names (state.S.lead) becomes tank; everyone else assists.
+   */
+  function runCombat(mtype) {
+    if (!opts.combat) return;
+    const lead = isLead();
+    opts.combat(mtype, { leadName: state.S.lead, isLead: lead });
+  }
+
   /** Lead seq must climb above anything heard (plan §6.6.6). */
   function reseedSeqAboveHeard() {
     let maxH = 0;
@@ -861,7 +872,7 @@ function bootFighter(api, opts) {
           // Live + sim: fight the rare. Slot combat no-ops while smart.moving,
           // so also swing directly once closed.
           if (opts.pre_combat && opts.pre_combat()) return true;
-          if (opts.combat) opts.combat(m.mtype);
+          runCombat(m.mtype);
           try {
             if (typeof api.change_target === "function") api.change_target(m);
             if (typeof api.attack === "function") {
@@ -989,7 +1000,7 @@ function bootFighter(api, opts) {
         persist();
         return;
       }
-      if (opts.combat) opts.combat(mtype);
+      runCombat(mtype);
       return;
     }
 
@@ -1029,7 +1040,7 @@ function bootFighter(api, opts) {
     }
     state.setSelf({ task: "farm" });
     if (opts.pre_combat && opts.pre_combat()) return;
-    if (opts.combat) opts.combat(mtype);
+    runCombat(mtype);
   }
 
   let mapEscapeAt = 0;

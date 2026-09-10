@@ -3,6 +3,9 @@
 /**
  * Lightweight farm combat for sim (and shared shape with live slots).
  * Tank closes to melee; supports follow lead-target for assist DPS.
+ * leadName/isLead always come from the caller (fighter.js `state.S.lead`, the
+ * same dynamic succession source motion.js formation/follow uses) — no
+ * hardcoded fighter name here.
  */
 
 function dist(a, b) {
@@ -31,7 +34,7 @@ function stepToward(api, t, stepPx) {
 
 function pickTarget(api, mtype, opts) {
   opts = opts || {};
-  const leadName = opts.leadName || "Jazwyn";
+  const leadName = opts.leadName || api.character.name;
   const isLead = opts.isLead != null ? opts.isLead : api.character.name === leadName;
   let t = null;
   if (!isLead) {

@@ -66,16 +66,17 @@ function bootParty(opts) {
     };
     if (opts.burnPerTick != null) o.burnPerTick = opts.burnPerTick;
     if (opts.potionTarget != null) o.potionTarget = opts.potionTarget;
+    if (name === "Sarene") o.form = FORM_MAGE;
+    else if (name === "Zarook") o.form = FORM_PRIEST;
     if (!combatOn) return o;
-    if (name === "Jazwyn") {
-      o.combat = (mtype) => combatTank(api, mtype, { leadName: "Jazwyn", isLead: true });
-    } else if (name === "Sarene") {
-      o.form = FORM_MAGE;
-      o.combat = (mtype) => combatAssist(api, mtype, { leadName: "Jazwyn", isLead: false });
-    } else if (name === "Zarook") {
-      o.form = FORM_PRIEST;
-      o.combat = (mtype) => combatAssist(api, mtype, { leadName: "Jazwyn", isLead: false });
-    }
+    // One lead resolver: fighter.js passes the *current* succession lead
+    // (state.S.lead / isLead(), same source motion.js formation uses) on every
+    // call — whoever that is tanks; no name is hardcoded here.
+    o.combat = (mtype, dyn) => {
+      dyn = dyn || {};
+      const fn = dyn.isLead ? combatTank : combatAssist;
+      fn(api, mtype, { leadName: dyn.leadName, isLead: dyn.isLead });
+    };
     return o;
   }
 
