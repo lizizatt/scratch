@@ -71,7 +71,6 @@ function bootMerchant(api, opts) {
   let store = loadQ();
   let busy = false;
   const gearAds = {};
-  let stallDone = false;
   let giftBusy = false;
   let lastParkFailAt = null;
   const PARK_FAIL_BACKOFF_MS = 15000;
@@ -104,9 +103,8 @@ function bootMerchant(api, opts) {
       return true;
     }
     if (bankHintPrimed) return false;
-    // Never walk bank / closeStand just to hint — that tears down a bag-only stall
-    // and leaves stallDone stuck true with no further openStall.
-    if (api.character.stand || stallDone) return false;
+    // Never walk bank / closeStand just to hint — that tears down a bag-only stall.
+    if (api.character.stand) return false;
     api.game_log("bank:prime");
     if (!(await ensureAtBank())) {
       api.game_log("bank:prime_fail");
@@ -170,19 +168,6 @@ function bootMerchant(api, opts) {
     );
   }
 
-  /**
-   * Stand within SEND_RANGE of fighter without entering pack aggro.
-   * If fighter is on pack, approach along the vector toward safeMeet.
-   */
-  function approachPointFor(t, farm) {
-    return meetApproachPoint(t, farm, SEND_RANGE);
-  }
-
-  /** Delivery destination: safe approach to fighter, or safeMeet if no vision. */
-  function resolveDeliveryMeet(job) {
-    return meetResolveDelivery(api, job, SEND_RANGE);
-  }
-
   async function retreatPlaza() {
     closeStandIfOpen();
     // Live 2026-09-09: after winter_cave dlv, retreatPlaza no-op'd off main → rip:respawn loop.
@@ -201,11 +186,6 @@ function bootMerchant(api, opts) {
     }
   }
 
-  /** Monsters that threaten transit — ignore the farm pack (safeMeet standoff handles those). */
-  function transitBlockers(farm) {
-    return meetTransitBlockers(api, farm);
-  }
-
   /**
    * Field travel: dodge non-pack movers on the route; pack approach stays smart_move
    * (safeMeet geometry). Avoid-fail near pack → retreat; else smart_move fallback.
@@ -215,7 +195,7 @@ function bootMerchant(api, opts) {
     if (!dest) return { failed: true, reason: "no_dest" };
     moveOpts = moveOpts || {};
     const farm = moveOpts.farm;
-    const mobs = transitBlockers(farm);
+    const mobs = meetTransitBlockers(api, farm);
     // Far hostiles in list-vision must not engage avoid — town corners trap until fail timeout.
     if (!shouldEngageAvoid(api.character, mobs)) {
       return api.smart_move(dest);
@@ -245,7 +225,7 @@ function bootMerchant(api, opts) {
     return r || { success: true };
   }
 
-  /** Close to SEND_RANGE via approachPointFor — never smart_move onto pack center. */
+  /** Close to SEND_RANGE via meetApproachPoint — never smart_move onto pack center. */
   async function ensureSendRange(who, opts) {
     opts = opts || {};
     const farm = opts.farm;
@@ -264,7 +244,7 @@ function bootMerchant(api, opts) {
             x: p.real_x != null ? p.real_x : p.x,
             y: p.real_y != null ? p.real_y : p.y,
           };
-          const dest = approachPointFor(stub, farm);
+          const dest = meetApproachPoint(stub, farm, SEND_RANGE);
           const r0 = await fieldMove(dest, { farm });
           if (r0 && r0.failed) {
             api.game_log("dlv:approach_fail");
@@ -279,7 +259,7 @@ function bootMerchant(api, opts) {
       }
       const d = playerDist(t);
       if (d <= limit) return t;
-      const dest = approachPointFor(t, farm);
+      const dest = meetApproachPoint(t, farm, SEND_RANGE);
       api.game_log("dlv:approach dist=" + Math.floor(d) + " -> " + dest.x + "," + dest.y);
       const r = await fieldMove(dest, { farm });
       if (r && r.failed) {
@@ -331,7 +311,7 @@ function bootMerchant(api, opts) {
       await api.send_cm(d.who, { dlv_ack: 1, id: d.id, ok: ok ? 1 : 0, reason: ok ? null : "queue" });
       return;
     }
-    // Ignore dlv_loc pack beacons — merchant uses safeMeet / resolveDeliveryMeet.
+    // Ignore dlv_loc pack beacons — merchant uses safeMeet / meetResolveDelivery.
     // Overwriting job xy with fighter pack coords pulled Puppygirl into aggro.
     if (d.job === "meet_home") {
       enqueue({ id: "hold_" + (api._now ? api._now() : Date.now()), kind: "meet_home", who: "party" });
@@ -424,7 +404,7 @@ function bootMerchant(api, opts) {
     api.game_log("dlv:scoop_gold need=" + needGold);
     // Merchant is not in the combat party — get_party() has no fighter xy.
     // Walk to the delivery meet (job beacon / pack-safe) before ensureSendRange.
-    const meet = resolveDeliveryMeet(job);
+    const meet = meetResolveDelivery(api, job, SEND_RANGE);
     if (meet) {
       api.game_log(
         "dlv:scoop_meet " + meet.map + " " + Math.round(meet.x) + "," + Math.round(meet.y)
@@ -580,7 +560,7 @@ function bootMerchant(api, opts) {
   async function parkToBank(keep, opts) {
     opts = opts || {};
     // Never tear down an open stall to park — that re-banks listed sell junk (live 2026-09-09).
-    if (api.character.stand || stallDone) return true;
+    if (api.character.stand) return true;
     const idxs = bagParkables(keep, opts);
     if (!idxs.length) return true;
     const now = api._now ? api._now() : Date.now();
@@ -878,11 +858,6 @@ function bootMerchant(api, opts) {
       }
     }
     return sold > 0;
-  }
-
-  /** @deprecated Stall listing retired for VENDOR_NPC junk — use tryVendorNpc. */
-  async function openStall() {
-    return tryVendorNpc();
   }
 
   function spendableGold() {
@@ -1313,7 +1288,7 @@ function bootMerchant(api, opts) {
         (it) => eligibleUpgrade(it, api.G) && upgradeChance(it) < MIN_UPGRADE_CHANCE
       );
       if (low >= 0) {
-        if (!(api.character.stand || stallDone)) {
+        if (!api.character.stand) {
           const it = api.character.items[low];
           logUpgradeSkip(it.name, it.level || 0, upgradeChance(it));
         }
@@ -1664,7 +1639,7 @@ function bootMerchant(api, opts) {
 
     if (!(await ensureTakeBackSlots(3, job.gear && job.pulled ? job.gear : null))) return;
 
-    const meet = resolveDeliveryMeet(job);
+    const meet = meetResolveDelivery(api, job, SEND_RANGE);
     await api.send_cm(job.who, {
       status: 1,
       id: job.id,
