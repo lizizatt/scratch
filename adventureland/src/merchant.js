@@ -220,6 +220,7 @@ function bootMerchant(api, opts) {
   async function fieldMove(dest, moveOpts) {
     closeStandIfOpen();
     if (!dest) return { failed: true, reason: "no_dest" };
+    if (dest.to && packCenter(dest.to)) return api.smart_move(dest);
     moveOpts = moveOpts || {};
     const farm = moveOpts.farm;
     const mobs = meetTransitBlockers(api, farm);
@@ -1784,8 +1785,13 @@ function bootMerchant(api, opts) {
 
     const routeFarm = job.farm;
     if (meet) {
-      api.game_log("dlv:meet " + meet.map + " " + Math.round(meet.x) + "," + Math.round(meet.y));
-      const r = await fieldMove(meet, { farm: job.farm });
+      const namedRoute =
+        job.farmConfirmed && packCenter(job.farm) && api.character.map !== meet.map
+          ? { to: job.farm }
+          : null;
+      if (namedRoute) api.game_log("dlv:spawn " + job.farm);
+      else api.game_log("dlv:meet " + meet.map + " " + Math.round(meet.x) + "," + Math.round(meet.y));
+      const r = await fieldMove(namedRoute || meet, { farm: job.farm });
       if (r && r.failed) {
         api.game_log("dlv:path_fail");
         await api.send_cm(job.who, { nack: "path", id: job.id });

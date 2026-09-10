@@ -321,6 +321,56 @@ test("adversary: preflight retargets a fresh stale request before first field ro
   assert.ok(msgs.some((x) => x === "dlv:done id=p_preflight"));
 });
 
+test("adversary: confirmed cross-map farm uses named spawn route", async () => {
+  const p = bootParty({
+    pack: "bat",
+    pots: 50,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const zApi = p.bots.Zarook.api;
+  const mApi = p.bots.Puppygirl.api;
+  const z = zApi.character;
+  const m = mApi.character;
+  const snake = packCenter("snake");
+  const bat = packCenter("bat");
+  clearPots(z.items);
+  z.esize = z.items.filter((x) => !x).length;
+  z.map = bat.map;
+  z.real_x = z.x = bat.x;
+  z.real_y = z.y = bat.y;
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+  p.bots.Zarook.ctrl.state.S.intent.mtype = "bat";
+  p.bots.Zarook.ctrl._setDlv({ id: "p_named_bat", kind: "pots", t0: zApi._now(), acked: 1 });
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_named_bat",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ],
+    farm: "snake",
+    map: snake.map,
+    x: snake.x,
+    y: snake.y,
+  });
+
+  for (let i = 0; i < 500; i++) {
+    await p.tickAll();
+    if (mApi.log.game.some((g) => g.m === "dlv:done id=p_named_bat")) break;
+  }
+
+  const msgs = mApi.log.game.map((g) => g.m);
+  assert.ok(msgs.some((x) => x === "dlv:retarget snake->bat"));
+  assert.ok(msgs.some((x) => x === "dlv:spawn bat"));
+  assert.ok(mApi.log.moved.some((d) => d && d.to === "bat"), "must use Adventure Land's named spawn route");
+  assert.ok(msgs.some((x) => x === "dlv:done id=p_named_bat"));
+});
+
 test("adversary: fighter moving packs during delivery reroutes without empty retreat", async () => {
   const p = bootParty({
     pack: "snake",
