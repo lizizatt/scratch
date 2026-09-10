@@ -1,5 +1,12 @@
 load_code("v2_lib");
 load_code("v2_fighter");
+function skillWeaponReady(skill) {
+  var req = typeof G !== "undefined" && G.skills && G.skills[skill] && G.skills[skill].wtype;
+  if (!req || !req.length) return true;
+  var main = character.slots && character.slots.mainhand;
+  var wtype = main && G.items && G.items[main.name] && G.items[main.name].wtype;
+  return req.indexOf(wtype) >= 0;
+}
 function combat(mtype, dyn) {
   if (character.rip || (typeof is_moving === "function" && is_moving(character))) return;
   if (typeof smart !== "undefined" && smart.moving) return;
@@ -24,7 +31,9 @@ function combat(mtype, dyn) {
     move(character.real_x + (t.real_x - character.real_x) / 2, character.real_y + (t.real_y - character.real_y) / 2);
     return;
   }
-  if (character.mp / character.max_mp >= 0.75) try { use_skill("cleave"); } catch (e) {}
+  if (character.mp / character.max_mp >= 0.75 && skillWeaponReady("cleave")) {
+    try { use_skill("cleave"); } catch (e) {}
+  }
   if (can_attack(t)) attack(t);
 }
 v2_start_fighter({ combat: combat, doInvite: true });

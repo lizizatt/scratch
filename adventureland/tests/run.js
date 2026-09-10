@@ -24,6 +24,7 @@ const suites = [
   require("./test_gear_score"),
   require("./test_monsterhunt"),
   require("./test_live_runtime_interval"),
+  require("./test_live_warrior_combat"),
   require("./test_rare_resume"),
   require("./test_merchant_avoid"),
   require("./test_merchant_potions"),
