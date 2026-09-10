@@ -431,6 +431,8 @@ function bootFighter(api, opts) {
       map: api.character.map,
       x: api.character.real_x,
       y: api.character.real_y,
+      serverRegion: api.parent.server_region,
+      serverIdentifier: api.parent.server_identifier,
     });
     if (!r.receivers || !r.receivers.length) {
       api.game_log("cm_unreachable");
@@ -482,6 +484,8 @@ function bootFighter(api, opts) {
           map: api.character.map,
           x: api.character.real_x,
           y: api.character.real_y,
+          serverRegion: api.parent.server_region,
+          serverIdentifier: api.parent.server_identifier,
         });
       } else {
         await requestPots();
@@ -657,6 +661,8 @@ function bootFighter(api, opts) {
           map: api.character.map,
           x: api.character.real_x,
           y: api.character.real_y,
+          serverRegion: api.parent.server_region,
+          serverIdentifier: api.parent.server_identifier,
         });
       }
       persist();
@@ -974,6 +980,8 @@ function bootFighter(api, opts) {
             map: api.character.map,
             x: api.character.real_x,
             y: api.character.real_y,
+            serverRegion: api.parent.server_region,
+            serverIdentifier: api.parent.server_identifier,
           });
         }
         // Lead waits in place; followers still path to pack (do not strand in town).

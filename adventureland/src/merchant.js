@@ -3,7 +3,6 @@
 const {
   FIGHTERS,
   LEADER_ORDER,
-  FARM,
   HOME,
   JOB_MS,
   POTION_TARGET,
@@ -337,6 +336,8 @@ function bootMerchant(api, opts) {
         map: d.map,
         x: d.x,
         y: d.y,
+        serverRegion: d.serverRegion || api.parent.server_region,
+        serverIdentifier: d.serverIdentifier || api.parent.server_identifier,
         locAt: api._now ? api._now() : Date.now(),
         gear: d.gear,
       });
@@ -354,6 +355,8 @@ function bootMerchant(api, opts) {
       job.map = d.map;
       job.x = d.x;
       job.y = d.y;
+      job.serverRegion = d.serverRegion || job.serverRegion;
+      job.serverIdentifier = d.serverIdentifier || job.serverIdentifier;
       job.locAt = api._now ? api._now() : Date.now();
       job.locSeq = (job.locSeq || 0) + 1;
       job.farm = meetFarmAt(oldFarm, d.map, d.x, d.y);
@@ -380,12 +383,14 @@ function bootMerchant(api, opts) {
     }
   }
 
-  async function ensureFarmWorld() {
+  async function ensureDeliveryWorld(job) {
     const reg = api.parent.server_region;
     const id = api.parent.server_identifier;
     if (!reg || !id) return false;
-    if (reg === FARM[0] && id === FARM[1]) return true;
-    api.change_server(FARM[0], FARM[1]);
+    const targetRegion = (job && job.serverRegion) || reg;
+    const targetIdentifier = (job && job.serverIdentifier) || id;
+    if (reg === targetRegion && id === targetIdentifier) return true;
+    api.change_server(targetRegion, targetIdentifier);
     return false;
   }
 
@@ -1541,7 +1546,6 @@ function bootMerchant(api, opts) {
   }
 
   async function idleEcon() {
-    await ensureFarmWorld();
     // Live has no _bank until we visit once — without this, vendor/gift are blind on main.
     await primeBankHint();
     // Keep the merchant's own emergency supply full before spending idle time
@@ -1621,8 +1625,6 @@ function bootMerchant(api, opts) {
     }
 
     closeStandIfOpen();
-    if (!(await ensureFarmWorld())) return;
-
     if (job.kind === "meet_home") {
       const reg = api.parent.server_region;
       const id = api.parent.server_identifier;
@@ -1635,6 +1637,7 @@ function bootMerchant(api, opts) {
       saveQ(store);
       return;
     }
+    if (!(await ensureDeliveryWorld(job))) return;
 
     if (job.kind === "dlv_pots" && !job.bought) {
       // Buy the delivery quantity plus Puppygirl's personal reserve; the send

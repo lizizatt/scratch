@@ -81,6 +81,50 @@ test("merchant: meet_home with server_region unset keeps active", async () => {
   assert.ok(ctrl.store.active && ctrl.store.active.kind === "meet_home");
 });
 
+test("merchant: idle work stays on the current party server", async () => {
+  const w = createWorld();
+  const p = w.spawn(
+    { name: "Puppygirl", map: "main", items: new Array(42).fill(null), esize: 42, gold: 1e6 },
+    "US",
+    "IV"
+  );
+  const ctrl = bootMerchant(p, { now: () => w.clock.now() });
+  p._now = () => w.clock.now();
+
+  await ctrl.tick();
+
+  assert.strictEqual(w.where("Puppygirl").key, "US/IV");
+  assert.ok(!p.log.server.some((s) => s[0] === "US" && s[1] === "III"));
+});
+
+test("merchant: delivery follows its originating server instead of hard-coded farm world", async () => {
+  const w = createWorld();
+  const p = w.spawn(
+    { name: "Puppygirl", map: "main", items: new Array(42).fill(null), esize: 42, gold: 1e6 },
+    "US",
+    "IV"
+  );
+  const ctrl = bootMerchant(p, { now: () => w.clock.now() });
+  p._now = () => w.clock.now();
+  ctrl.enqueue({
+    id: "world4",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [],
+    farm: "snake",
+    map: "main",
+    x: -82,
+    y: 1901,
+    serverRegion: "US",
+    serverIdentifier: "IV",
+  });
+
+  await ctrl.tick();
+
+  assert.strictEqual(w.where("Puppygirl").key, "US/IV");
+  assert.ok(!p.log.server.some((s) => s[0] === "US" && s[1] === "III"));
+});
+
 test("fighter: town_fallback low_gold keeps delivery, no cancel", async () => {
   const p = bootParty({ pack: "armadillo", pots: 0, gold: 100 }); // below float
   await p.bots.Jazwyn.ctrl.requestPots();
