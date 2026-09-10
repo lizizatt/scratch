@@ -271,6 +271,56 @@ test("adversary: another character cannot rewrite a delivery location", async ()
   assert.strictEqual(job.locSeq, undefined);
 });
 
+test("adversary: preflight retargets a fresh stale request before first field route", async () => {
+  const p = bootParty({
+    pack: "bee",
+    pots: 50,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const zApi = p.bots.Zarook.api;
+  const mApi = p.bots.Puppygirl.api;
+  const z = zApi.character;
+  const m = mApi.character;
+  const snake = packCenter("snake");
+  const bee = packCenter("bee");
+  clearPots(z.items);
+  z.esize = z.items.filter((x) => !x).length;
+  z.map = bee.map;
+  z.real_x = z.x = bee.x;
+  z.real_y = z.y = bee.y;
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+  p.bots.Zarook.ctrl.state.S.intent.mtype = "bee";
+  p.bots.Zarook.ctrl._setDlv({ id: "p_preflight", kind: "pots", t0: zApi._now(), acked: 1 });
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_preflight",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ],
+    farm: "snake",
+    map: snake.map,
+    x: snake.x,
+    y: snake.y,
+  });
+
+  for (let i = 0; i < 500; i++) {
+    await p.tickAll();
+    if (mApi.log.game.some((g) => g.m === "dlv:done id=p_preflight")) break;
+  }
+
+  const msgs = mApi.log.game.map((g) => g.m);
+  assert.ok(msgs.some((x) => x === "dlv:retarget snake->bee"));
+  assert.ok(msgs.some((x) => x === "dlv:meet main 300,1059"));
+  assert.ok(!msgs.some((x) => x === "dlv:meet main -280,1810"), "must not visit stale snake meetup");
+  assert.ok(msgs.some((x) => x === "dlv:done id=p_preflight"));
+});
+
 test("adversary: fighter moving packs during delivery reroutes without empty retreat", async () => {
   const p = bootParty({
     pack: "snake",

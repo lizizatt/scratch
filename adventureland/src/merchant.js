@@ -1649,6 +1649,15 @@ function bootMerchant(api, opts) {
     return refreshed;
   }
 
+  function logAwaitLocation(job) {
+    const now = api._now ? api._now() : Date.now();
+    if (job.awaitLocLogAt == null || now - job.awaitLocLogAt >= BEACON_MS) {
+      job.awaitLocLogAt = now;
+      api.game_log("dlv:await_loc");
+      saveQ(store);
+    }
+  }
+
   async function deliverActive() {
     const job = store.active;
     if (!job) return;
@@ -1674,6 +1683,14 @@ function bootMerchant(api, opts) {
       return;
     }
     if (!(await ensureDeliveryWorld(job))) return;
+    if (!job.routeConfirmed) {
+      if (!(await refreshDeliveryLocation(job, "preflight"))) {
+        logAwaitLocation(job);
+        return;
+      }
+      job.routeConfirmed = 1;
+      saveQ(store);
+    }
     if (job.reroutePending) {
       job.reroutePending = null;
       saveQ(store);
@@ -1749,7 +1766,7 @@ function bootMerchant(api, opts) {
     const staleLocation = job.locAt == null || locateAt - job.locAt > BEACON_MS * 2;
     if (staleLocation) {
       if (!(await refreshDeliveryLocation(job, "enroute"))) {
-        api.game_log("dlv:await_loc");
+        logAwaitLocation(job);
         return;
       }
       meet = meetResolveDelivery(api, job, SEND_RANGE);
@@ -1790,7 +1807,7 @@ function bootMerchant(api, opts) {
         return;
       }
     } else if (!api.get_player(job.who)) {
-      api.game_log("dlv:await_loc");
+      logAwaitLocation(job);
       return;
     }
 
