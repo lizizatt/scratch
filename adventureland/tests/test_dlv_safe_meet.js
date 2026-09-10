@@ -371,6 +371,67 @@ test("adversary: confirmed cross-map farm uses named spawn route", async () => {
   assert.ok(msgs.some((x) => x === "dlv:done id=p_named_bat"));
 });
 
+test("adversary: accepted same-farm reroute cannot fall through to empty_send", async () => {
+  const p = bootParty({
+    pack: "bat",
+    pots: 50,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const zApi = p.bots.Zarook.api;
+  const mApi = p.bots.Puppygirl.api;
+  const z = zApi.character;
+  const m = mApi.character;
+  const bat = packCenter("bat");
+  clearPots(z.items);
+  z.esize = z.items.filter((x) => !x).length;
+  z.map = bat.map;
+  z.real_x = z.x = bat.x;
+  z.real_y = z.y = bat.y;
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+  p.bots.Zarook.ctrl.state.S.intent.mtype = "bat";
+  p.bots.Zarook.ctrl._setDlv({ id: "p_same_farm_move", kind: "pots", t0: zApi._now(), acked: 1 });
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_same_farm_move",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ],
+    farm: "bat",
+    map: bat.map,
+    x: bat.x,
+    y: bat.y,
+  });
+
+  let moved = false;
+  const realMove = mApi.smart_move.bind(mApi);
+  mApi.smart_move = async (dest) => {
+    const r = await realMove(dest);
+    if (!moved && dest && dest.to === "bat") {
+      moved = true;
+      z.real_x = z.x = 350;
+      z.real_y = z.y = -200;
+    }
+    return r;
+  };
+
+  for (let i = 0; i < 40; i++) {
+    await p.tickAll();
+    if (moved && mApi.log.game.some((g) => g.m === "dlv:reroute")) break;
+  }
+
+  const msgs = mApi.log.game.map((g) => g.m);
+  assert.ok(moved);
+  assert.ok(msgs.some((x) => x === "dlv:reroute"));
+  assert.ok(!msgs.some((x) => x === "dlv:no_vision"));
+  assert.ok(!msgs.some((x) => x === "dlv:empty_send"));
+});
+
 test("adversary: fighter moving packs during delivery reroutes without empty retreat", async () => {
   const p = bootParty({
     pack: "snake",

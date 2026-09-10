@@ -1786,7 +1786,10 @@ function bootMerchant(api, opts) {
     const routeFarm = job.farm;
     if (meet) {
       const namedRoute =
-        job.farmConfirmed && packCenter(job.farm) && api.character.map !== meet.map
+        job.farmConfirmed &&
+        packCenter(job.farm) &&
+        !api.get_player(job.who) &&
+        (api.character.map !== meet.map || api.character.map !== "main")
           ? { to: job.farm }
           : null;
       if (namedRoute) api.game_log("dlv:spawn " + job.farm);
@@ -1802,6 +1805,7 @@ function bootMerchant(api, opts) {
     // A route can take long enough for the party to switch packs. Reconfirm
     // after arrival before treating lost vision as an empty delivery.
     if (!api.get_player(job.who) && (await refreshDeliveryLocation(job, "arrived"))) {
+      if (job.reroutePending) return;
       const revised = meetResolveDelivery(api, job, SEND_RANGE);
       if (
         revised &&
