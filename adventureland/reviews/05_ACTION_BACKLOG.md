@@ -25,4 +25,4 @@ Updated after 15m live soak + spookytown fix (2026-09-09).
 
 ## Explicit non-goals
 
-- Server Daisy abandon; fighter entity-avoid; V1 craft/Ponty parity; delete legacy
+- Server Daisy abandon; fighter entity-avoid

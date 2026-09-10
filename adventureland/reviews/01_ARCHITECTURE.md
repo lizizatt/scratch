@@ -72,4 +72,4 @@ viz
 | Hunt soft-abandon (3 deaths) | `fighter.js` `noteHuntQuestDeath` |
 | `merchant_avoid` + `fieldMove` | `merchant_avoid.js` / `merchant.js` |
 | `retreatPlaza` towns off-map | `merchant.js` |
-| Live interval dedupe + fighter `tickBusy` | `live_*_runtime.js` |
+| Live interval dedupe + fighter/merchant `tickBusy` | `live_*_runtime.js` |

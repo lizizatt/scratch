@@ -49,6 +49,6 @@ Method: agents were instructed to prefer FALSE/OVERSTATED over OK, verify claims
 - “By design” UX caveats ≠ High residual risk.
 - Publish budgets: **lines used / 176** and **max line / 12000**; ignore total file char as a third cap.
 
-## Open after docs (code still optional)
+## Open after docs (historical)
 
-See [05_ACTION_BACKLOG.md](./05_ACTION_BACKLOG.md) post-ralph priorities — heartbeat apply gate + seq, avoid fallback policy, Jazwyn hardcode, orphan hold, sim limitdc — not implemented in this loop.
+At ralph time these were still open; they later shipped — see [05_ACTION_BACKLOG.md](./05_ACTION_BACKLOG.md) Done and [02_RISKS.md](./02_RISKS.md) closed table (heartbeat gate, avoidFailPolicy, merchant `tickBusy`, cmFighters). Remaining deferred: orphan-hold auto-clear (by design), sim `limitdc`.

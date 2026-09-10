@@ -1,6 +1,6 @@
 # Adventure Land party — V2
 
-Sim-first rewrite. Spec: [`V2_PLAN.md`](V2_PLAN.md). Server lessons: [`LESSONS.md`](LESSONS.md). Publish: [`PUBLISH.md`](PUBLISH.md). V1 reference: [`legacy/`](legacy/).
+Sim-first rewrite. Spec: [`V2_PLAN.md`](V2_PLAN.md). Server lessons: [`LESSONS.md`](LESSONS.md). Publish: [`PUBLISH.md`](PUBLISH.md). Review pack: [`reviews/`](reviews/).
 
 ## Layout
 
@@ -13,7 +13,7 @@ tests/         # unit + integration scenarios (includes dist smoke tests)
 tools/         # compress, viz record, route/live explorers
 dist/          # generated ≤176-line slots (gitignored) — do not edit
 viz/           # scrubbable sim explorer (static UI)
-legacy/        # frozen V1
+reviews/       # architecture / risks / backlog
 publish.manifest.js  # slot map (sources → dist → upload names)
 publish.js           # build + upload CLI
 ```
@@ -38,7 +38,7 @@ node publish.js                     # compress + upload
 
 `node deploy_mcp.js` remains as a wrapper around `publish.js --upload` for older live scripts.
 
-After upload, **relink** characters — `save_code` does not restart running CODE.
+After upload, **relink** characters — `save_code` does not restart CODE.
 
 ## Monte Carlo (MVP)
 
@@ -85,4 +85,4 @@ Unit/comms tests show up in the catalog for coverage even without a timeline; pa
 
 ## Status
 
-Sim suite **72** tests (scenarios cover §6.6.1–8 gaps: resume/world, path-fail, mid-job reload, bee/goo, rejoin, bags). Viz is GPU-light (no auto-draw, flat CSS, ~5fps play). Live explorers measured path + reconnect; vision ~175px low-confidence. Next: 30‑min live farm gate.
+Sim suite via `node tests/run.js` (scenarios cover resume/world, path-fail, mid-job reload, bee/goo, rejoin, bags, avoid, craft, gear score). Viz is GPU-light. Live explorers measured path + reconnect; vision ~175px low-confidence.

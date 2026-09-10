@@ -48,7 +48,7 @@ const {
 /**
  * Merchant logistics under Jazwyn command.
  * Idle on farm world; hops only for meet_home / to reach fighters.
- * When idle: bank junk/gear, push upgrades from bank, open stall for whitelist.
+ * When idle: vendor junk → Xyn exchange → Ponty → craft tools → upgrade/combine/park/gift.
  */
 function bootMerchant(api, opts) {
   opts = opts || {};
@@ -483,7 +483,7 @@ function bootMerchant(api, opts) {
       if (isGearTargetName(it.name)) continue;
       // Listed / reserved for merchant stand — never park.
       if (it.price != null) continue;
-      // Sell-whitelist is openStall's job (idle or queued); parking it caused live re-bank linger.
+      // NPC-vendor junk in idle; do not park VENDOR_NPC names here (re-bank linger).
       if (isSellJunk(it, api.G)) continue;
       if (
         keep &&
@@ -1511,9 +1511,9 @@ function bootMerchant(api, opts) {
 
   async function idleEcon() {
     await ensureFarmWorld();
-    // Live has no _bank until we visit once — without this, stall/gift are blind on main.
+    // Live has no _bank until we visit once — without this, vendor/gift are blind on main.
     await primeBankHint();
-    // NPC-vendor cheap junk first (reclaim full stall) before Xyn burns idle ticks.
+    // NPC-vendor cheap junk first (reclaim trade slots) before Xyn burns idle ticks.
     try {
       if (await tryVendorNpc()) return;
     } catch (e) {
@@ -1545,7 +1545,7 @@ function bootMerchant(api, opts) {
     } catch (e) {
       api.game_log("bank:combine_err " + ((e && e.message) || e));
     }
-    // After skip/upgrade attempt, bank below-gate gear (sell junk reserved for stall).
+    // After skip/upgrade attempt, bank below-gate gear (sell junk reserved for tryVendorNpc).
     if (bagParkables(null, { skipUpgrades: false }).length) {
       await parkToBank(null, { skipUpgrades: false });
       return;

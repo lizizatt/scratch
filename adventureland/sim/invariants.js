@@ -60,7 +60,7 @@ function gradeLogs(lines, opts) {
 }
 
 /**
- * Grade a farm observe JSON shaped like legacy/_live_farm_observe.json
+ * Grade a farm observe JSON shaped like tests/fixtures/live_farm_observe.json
  */
 function gradeFarmObserve(result) {
   const c = emptyCounters();

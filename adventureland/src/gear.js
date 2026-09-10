@@ -121,7 +121,7 @@ function scaledStat(g, it, key) {
 
 /**
  * Combined gear score for upgrade / equip / gift decisions.
- * Warrior: reflection, strength, armor (dreturn counts as reflection-family).
+ * Warrior: reflection, strength, armor (plus dreturn for shields).
  * Mage & priest: intelligence first.
  */
 function score(it, G, ctype) {

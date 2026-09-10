@@ -9,7 +9,7 @@
 | Chat ≥16s gap | `CHAT_GAP_MS` + `chat_queue` | CM / some PM paths share different budgets |
 | Never path rare by **type** | `farm:skip_rare_type` | Daisy hunt **does** `goTo(packCenter(h.id))` — intentional for fixed packs; lethal if pack is ghost/mummy-tier |
 | Merchant never enters pack danger | `approachPointFor` + `avoidFailPolicy` + tests | −400y fallback meet still soft |
-| Single-flight ticks | Fighter: live `tickBusy`; merchant: controller `busy` | Interval-level merchant mirror absent (redundant while `busy` holds) |
+| Single-flight ticks | Fighter + merchant: live `tickBusy`; controllers also `busy` | Both interval mirrors present |
 | Sim ≈ live bank | inject bare-invalid | Easy to forget inject in new tests |
 | mvpPass path_storm | Transfer phoenix + Port town | Other Transfer storms not graded |
 | Hunt soft-abandon stops lead suicide pathing | death counter + skip id | Condition still active; no server abandon; party follows via formation/hb |

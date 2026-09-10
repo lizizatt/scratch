@@ -11,7 +11,7 @@ Idle Puppygirl browses **Ponty** (`secondhands`) for gear that upgrades fighters
 | Who | Slot | Target | Why |
 |-----|------|--------|-----|
 | Jazwyn | offhand | `sshield` | dreturn tank |
-| Jazwyn | mainhand | `fireblade` | keep upgrading |
+| Jazwyn | mainhand | `fireblade` | gift/keep target (`DENY_UPGRADE` — not scroll-upgraded) |
 | Jazwyn | earring1/2 | `strearring` | str |
 | Zarook | offhand | `wbook0` | priest source |
 | Zarook | earring1/2 | `vitearring` | vit |
@@ -28,7 +28,7 @@ Idle Puppygirl browses **Ponty** (`secondhands`) for gear that upgrades fighters
 | Ponty | `get_secondhands()` | `buy_secondhand(rid)` | main ~`(106,-47)` / `smart_move("secondhands")` | **Shipped** |
 | Ron | `get_lost_and_found()` | `buy_lost_and_found(rid)` | `woffice` — **10M one-time access** | **Tabled** |
 
-Legacy reference: `legacy/gear_ops.js` `ponty_buy` + `PONTY_WANT` quotas + fair-price cap (`G.g * PONTY_MULT`).
+Legacy reference: V1 `gear_ops` ponty quotas + fair-price cap (`G.g * PONTY_MULT`) — parity now in `src/constants.js` `PONTY_*` + `tryPontyBuy`.
 
 ## Idle order (current)
 

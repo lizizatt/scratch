@@ -1,14 +1,16 @@
 # LESSONS.md — server-specific facts learned from V1 (drives sim design)
 
-**Purpose:** everything we learned the hard way about how the real Adventure Land server / client / Mainframe behave, with evidence, so the V2 simulator reproduces the *same* invariants and friction. Reference code lives in [`legacy/`](legacy/); pointers are `legacy/<file>:<line>`. The conversation transcript is cited as `chat L<n>` — user reports of live behavior are primary evidence.
+**Purpose:** everything we learned the hard way about how the real Adventure Land server / client / Mainframe behave, with evidence, so the V2 simulator reproduces the *same* invariants and friction. V1 slot code was removed; path cites below name historical files (`fighter_core.js`, `gear_ops.js`, …) not live paths. Chat cites are `chat L<n>` — user reports of live behavior are primary evidence.
 
-**Confidence tags:** `SRC` = read from the open-source server/client (`kaansoral/adventureland`) · `LIVE` = observed on the real server (artifact / user report / Mainframe contract) · `CODE` = inferred from a workaround in legacy code · `ASSUMED` = believed, unverified — expose as a sim knob and let an explorer measure it. **Check `SRC` before building an explorer** — several "unknowns" turned out to be readable.
+**Confidence tags:** `SRC` = read from the open-source server/client (`kaansoral/adventureland`) · `LIVE` = observed on the real server (artifact / user report / Mainframe contract) · `CODE` = inferred from a historical V1 workaround · `ASSUMED` = believed, unverified — expose as a sim knob and let an explorer measure it. **Check `SRC` before building an explorer** — several "unknowns" turned out to be readable.
+
+**V2 constants live in `src/constants.js`** (`CHAT_GAP_MS=16000`, `JOB_MS=480000`, `GOLD_FLOAT_FIGHTER=100000`, `GOLD_FLOAT_MERCHANT=150000`). §7 table below is **V1 historical** — do not treat it as current bot truth.
 
 ---
 
 ## 0. TL;DR for the sim designer
 
-The fake env we tested against (`legacy/tests/al_env.js`) passed **430 tests** while the live party still wandered and got chat-throttled. The gap *is* the lesson:
+The fake env we tested against (V1 (removed)) passed **430 tests** while the live party still wandered and got chat-throttled. The gap *is* the lesson:
 
 | Real server | What `al_env.js` modeled | Consequence |
 | --- | --- | --- |
@@ -23,7 +25,7 @@ The fake env we tested against (`legacy/tests/al_env.js`) passed **430 tests** w
 
 **Sim must have:** a clock; a path engine with travel time, obstacles and a failure model; a chat/CM budget that *errors and can disconnect*; a vision radius distinct from party-list knowledge; a reload-on-hop runtime with `localStorage`; seeded randomness. Everything below is detail for those.
 
-**Mainframe's own definitions we should match** (`LIVE` `legacy/_char_Jazwyn.json:61-64`):
+**Mainframe's own definitions we should match** (`LIVE` V1 (removed)):
 
 ```text
 traffic:     requested_actions_not_confirmation
@@ -147,7 +149,7 @@ Live history:
 - Stand: `parent.open_merchant(slot)` / `close_merchant()`; `trade()` fails unless open; **open stand blocks travel** — `CODE` `merchant.js:74-84`, `gear_ops.js:67`; `slot_occuppied` spam — `LIVE` chat L662.
 - Ponty loop (open→close→ponty→nothing) — `LIVE` chat L858. `get_secondhands()` → `rid/price`; `buy_secondhand(rid)` — `gear_ops.js:43`.
 - Upgrade: `upgrade(i, scroll, null, true)` preview → gate `chance ≥ 0.9` — `gear_ops.js:42`; compound `cscroll0|1|2` by grade — `merchant_ops.js:8`.
-- **Zero-gold/zero-pot deadlock** when fighters had given gold to an absent merchant — `LIVE` chat L2780, L2789, L2827. Fighters keep ~1000 gold float — `fighter_core.js:46`; merchant `GOLD_FLOAT=100000` — `merchant.js:3`.
+- **Zero-gold/zero-pot deadlock** when fighters had given gold to an absent merchant — `LIVE` chat L2780, L2789, L2827. V1 fighters kept ~1000 gold float; **V2** uses `GOLD_FLOAT_FIGHTER=100000` / `GOLD_FLOAT_MERCHANT=150000` (`src/constants.js`).
 - Buy pots on the **current** server after a hop (stocked on II, needed on III) — `CODE` `gear_ops.js:59`, `FIELD_DELIVERY_PLAN.md:225`.
 - `performance_trick()` on boot for unfocused tabs — `merchant.js:173`.
 
@@ -186,7 +188,7 @@ Live history:
 | Mainframe relink wait / connect wait | 55–60 s / ≤180 s | auth release / boot | `live_party_verify.js:216,126` |
 | `FORM_NEAR/FAR/SMART/REANCHOR`, `FARM_NEAR` | 18/40/220/70, 60 px | formation thrash | `fighter_core.js:5` |
 
-Plan docs still cite `ACK 15s` / `JOB 180s` in places; **code values above are truth** (`_peek8.txt` shows the older `JOB_MS=180000`).
+Plan docs still cite `ACK 15s` / `JOB 180s` in places; the table above is **V1 historical**. Current V2 values are in `src/constants.js`.
 
 ---
 
@@ -247,26 +249,25 @@ Encoded in `tests/test_live_regressions.js` + sim `_injectBankStoreBareInvalid`.
 
 1. **`bank:full` was a lie.** Account vault had free slots (`items0` ~13 empty). Root cause: Mainframe `bank_store(i)` (no pack) often rejects `reason: "invalid"`; `bank_store(i, "items0", -1)` succeeds. Our park treated “0 stored” as `bank:full`. **Fix:** always store with an explicit pack that has a free slot; log `bank:store_fail <reason>`; emit `bank:full` only when free slots = 0. Probe: `tools/bank_store_probe.js`.
 2. **`get_bank` MCP** reads account snapshot; **stale while a character has the bank mounted** — disconnect merchant ~20s for a fresh dump. Derive sell/combine lists from dump (`live_bank_dump.js`, `src/derive_bank_lists.js`).
-3. **Solo Puppygirl idle** is econ-only (US III hop → buy/upgrade/park/gift/stall). No fighters ⇒ no pot jobs / gear ads.
+3. **Solo Puppygirl idle** is econ-only (US III hop → vendor/xyn/ponty/craft/upgrade/combine/park/gift). No fighters ⇒ no pot jobs / gear ads.
 4. **`gear:upgrade_skip` bank spam.** `tryUpgradeOne` scanned bank for any `eligibleUpgrade`, then logged skip every tick for below-gate pieces (e.g. gloves@4 → chance 0.68) without pulling. Operator saw: enter bank, spam `upgrade_skip chance=0.68`. **Fix:** only pull bank pieces with `chance ≥ MIN_UPGRADE_CHANCE`; rate-limit bag skip logs (60s / name@level).
 5. **Publish:** edit `src/` only; `node publish.js` compresses → `dist/` → MCP. Relink required after `save_code`.
-6. **Bank linger / “wanders into bank and does nothing”.** `openStall` counted sell-junk from stale `_bank` while on main, walked to bank, `bank_retrieve`’d the **pre-mount index**, missed the item, returned `false` **without leaving bank**. Every idle tick repeated. **Fix:** `ensureAtBank` → re-scan **live** `character.bank` only → retrieve → on miss/empty `leaveBankToPlaza`. Sim adversary: `_bank` index ≠ live bank index (`tests/test_bank_linger.js` + `live_bank_linger_verify.js`).
-7. **Live-blind vault on main.** AL nulls `character.bank` off the bank map; V2 never wrote `_bank`, so after boot on main `openStall`/`planGifts` saw **zero** vault junk despite 10 sellables in account bank — merchant idled forever (only `metrics`). Sim always seeded `_bank`, so it could not catch this. **Fix:** `snapBank()` on mount/exit; one-shot `primeBankHint()` in `idleEcon`. Verifier must require `bank:prime`/`stall:*`, not merely `map===main`.
-8. **Stall then re-park / wrong `trade` arity.** Live 2026-09-09: `stall:pull` → `stall:open` → `bank:store` same item → bank linger. Root: AL docs are `trade(num, trade_slot, price, quantity)`; V2 called `trade(i, price)` so listing never moved the item, then park re-banked it. **Fix:** 4-arg `trade` via `al_api`; verify bag emptied; stall before park in `tick`; skip park while `stallDone`/stand open; leave plaza after park; `ensureAtBank` waits for live `character.bank` only.
+6. **Bank linger / “wanders into bank and does nothing”.** Vendor/reclaim counted sell-junk from stale `_bank` while on main, walked to bank, `bank_retrieve`’d the **pre-mount index**, missed the item, returned `false` **without leaving bank**. Every idle tick repeated. **Fix:** `ensureAtBank` → re-scan **live** `character.bank` only → retrieve → on miss/empty `leaveBankToPlaza`. Adversary: `tests/test_bank_linger.js`.
+7. **Live-blind vault on main.** AL nulls `character.bank` off the bank map; V2 never wrote `_bank`, so after boot on main idle vendor/`planGifts` saw **zero** vault junk despite sellables in account bank — merchant idled forever (only `metrics`). **Fix:** `snapBank()` on mount/exit; one-shot `primeBankHint()` in `idleEcon`. Verifier must require `bank:prime` / `vendor:*`, not merely `map===main`.
+8. **Trade reclaim / wrong `trade` arity (historical stall era).** Live 2026-09-09: 2-arg `trade(i, price)` never listed, then park re-banked. **Fix:** 4-arg `trade` via `al_api`; reclaim trade slots before NPC vendor; leave plaza after park. Junk path is now `tryVendorNpc` (stall listing retired).
 9. **Solo mage/priest Idle.** Live solo trials 2026-09-09: Sarene/Zarook stood on armadillo pack with **0 damage** — combat only followed `get_player("Jazwyn").target`. **Fix:** same soloLead gate as warrior (`name===lead || lead not in party`) then `get_nearest_monster({type:mtype})`. Verifier must require combat metrics, not merely near-pack.
-10. **Restock `send_fail` / `empty_send`.** Live burn-in ~+930s: Zarook `town_fallback`, merchant arrived at meet, fighter still pathing → `send_item` **distance** (>320) → `empty_send` loop; stand-open also blocks sends after stall. **Fix:** `ensureSendRange` (re-acquire + approach up to 3×) before pot/gear send; retry on `distance`/`stand_open`; sim `send_item` rejects `stand_open`. Adversary: `tests/test_restock_range.js`.
-11. **Stall `slot_occuppied` + `gear:upgrade_skip` spam.** Burn-in: early `stall:trade_fail slot_occuppied`; then `upgrade_skip chance=0.76` every ~60s. Roots: (a) stall opened while below-gate gear still in bag — `parkToBank` no-ops under stand/`stallDone`, so gloves@3 stayed and skip re-logged; (b) open_stand can restore prior trade listings → first free-looking slot occupied. **Fix:** park `onlyBelowGate` before stall; sleep after open + retry next trade slot on `slot_occuppied`; skip-log once-only and silent while stall locks park. Adversary: `tests/test_stall_gear_spam.js`.
+10. **Restock `send_fail` / `empty_send`.** Live burn-in ~+930s: Zarook `town_fallback`, merchant arrived at meet, fighter still pathing → `send_item` **distance** (>320) → `empty_send` loop; stand-open also blocks sends. **Fix:** `ensureSendRange` (re-acquire + approach up to 3×) before pot/gear send; retry on `distance`/`stand_open`; sim `send_item` rejects `stand_open`. Adversary: `tests/test_restock_range.js`.
+11. **Vendor reclaim + `gear:upgrade_skip` spam.** Burn-in: trade-slot reclaim / below-gate gear left in bag while park locked → skip re-logged. **Fix:** park below-gate before vendor reclaim; skip-log once-only. Adversary: `tests/test_stall_gear_spam.js` (vendor-oriented).
 12. **Warrior `equip staff` spam + dead merchant.** Live 2026-09-09: Jazwyn logged `equip staff +3 -> mainhand` every tick (staff in bag scored above blade; AL rejects wrong class so item stayed). Puppygirl died on pack during dlv with **no** merchant `rip` handler. **Fix:** `classOk` wtype gate in `equipPending`/`pendingBetter`/`planGifts`/`handleGearOffer`; merchant `rip:respawn` like fighters. Adversary: `tests/test_equip_class.js`.
 12b. **Warrior `Wrong weapon` spam (2H / mage blade).** Live 2026-09-10: AL UI spammed `Wrong weapon` every tick. Root: `classOk` treated `wblade`/`basher`/`axe` as fine warrior 1H; `wblade` is **mage-only**, and `basher`/`axe` are **doublehand** — equip while `sshield` is on fails. **Fix:** hand tables from `G.classes` (+ `CLASS_HANDS` fallback); `canEquipSlot` blocks 2H with occupied offhand; `equipPending` awaits and verifies slot. Class score: warrior reflection/dreturn/str/armor; mage+priest **int**. Tests: `tests/test_gear_score.js`.
 13. **Monster Hunt (Daisy) live.** Guide `monster-hunts`: `character.s.monsterhunt={id,c,sn,ms}`; `interact("monsterhunt")` near Daisy (main 126,-413); merchants cannot accept; refuse while `c>0`; kills only on issuing `sn`; turn-in grants `monstertoken`. **Live:** Puppygirl console `hunt_quest()` / `hunt_quest(0)` → CM all fighters; lead `tickHuntQuest` accept→`!hunt` intent→farm→turn-in loop. Sim runner + `tests/test_monsterhunt.js`. Condition is `persistent:true` — **death does not abandon**. Soft-skip: lead dies 3× on current `hunt.id` → `mhunt:soft_abandon` → default farm until that assignment clears, then resume.
 14. **Merchant death on delivery.** Live: Puppygirl `smart_move` onto fighter pack coords / `packCenter` → armadillo aggro → rip. **Fix:** `approachPointFor` stands within `SEND_RANGE` along the vector toward `safeMeet` (never pack center); fighter keeps farming; `dlv:retreat` after done; rip aborts job + retreat. Adversary: `tests/test_dlv_safe_meet.js`.
-15. **Idle bank combine missing.** Combine/sell lived only in one-shot `code/bank_clean.js`, so idle Puppygirl upgraded/stalled but never compounded bank triples. **Fix:** `tryCombineOne` in `idleEcon` (pull triple → buy cscroll → `compound`); sim `compound` API. Adversary: `tests/test_idle_bank_clean.js`.
+15. **Idle bank combine missing.** Combine lived only in a one-shot script, so idle Puppygirl upgraded but never compounded bank triples. **Fix:** `tryCombineOne` in `idleEcon` (pull triple → buy cscroll → `compound`); sim `compound` API. Adversary: `tests/test_idle_bank_clean.js`.
 16. **Merchant parked by party with full bag.** Overnight 2026-09-09: bag 36/42 of ringsj/hpbelt/hpamulet; bank **not** full (~26 free). Root: `empty_send` storm kept `store.active` so idle park/combine never ran; merchant lingered near pack. **Fix:** `noteEmptySend` → `dlv:retreat` each miss, abort after 5; park `COMBINE_PRIORITY` names; job_ttl also retreats.
 17. **Rare ends → default armadillo.** After `rare_kill`/`gone`/`timeout`, mode was forced to `farm` without restoring prior `!hunt` intent; far pack targets also skipped `smart_move` (sim `get_nearest_monster` ignores vision → `move()` into walls). **Fix:** `preRareSnap` + `rare_resume`; engage-radius gate before combat; `!resume` keeps hunt kind. Adversary: `tests/test_rare_resume.js`.
-18. **Merchant walks into mobs on delivery / arrive-and-wait.** (a) Full fighter bag → meet arrives → `send_fail no_space` → `empty_send` loop with `store.active` held until space frees or abort×5. Scenario: `tests/test_merchant_avoid.js` wait→resolve. (b) `smart_move` ignores entities → pack/corridor contact rip. **Fix:** isolated `merchant_avoid.js` (velocity predict + lateral dodge); `fieldMove` uses it when monsters visible; sim `_wander` for valley bats. Adversary: cave-valley dodge scenario in same test file.
+18. **Merchant walks into mobs on delivery / arrive-and-wait.** (a) Full fighter bag → meet arrives → `send_fail no_space` → `empty_send` loop with `store.active` held until space frees or abort×5. Scenario: `tests/test_merchant_avoid.js` wait→resolve. (b) `smart_move` ignores entities → pack/corridor contact rip. **Fix:** `merchant_avoid.js` (velocity predict + lateral dodge); `fieldMove` engages avoid only when a hostile is within `engageR` (~180px), else `smart_move`. Adversary: cave-valley + engageR unit tests in `test_merchant_avoid.js`.
 19. **`retreatPlaza` no-op off main → winter_cave rip loop.** Live 2026-09-09: Puppygirl `dlv:done` at `winter_cave 35,-71`, then `rip:respawn` every ~1.2s — `retreatPlaza` only `smart_move`d on `main`/`bank`. **Fix:** `use("town")` + `dlv:retreat_town` when map is neither, then plaza. Adversary: `tests/test_equip_class.js` winter_cave retreat.
 20. **Review backlog hardening (2026-09-09).** … (f) Rare combat gap. (g) **Sarene town-bridge stall:** in party with lead coords but `smart_move` continually `interrupted` — lead `Transfer armadillo` farm echoes triggered follower `stop("smart")`. Fix: only stop on `port town` / `world`; Transfer announce only for cross-map; mage/priest pass `form`; follower no-lead → packCenter fallback.
-
 ## 11. Open questions for explorers (numbers the sim needs)
 
 1. ~~Chat rate limit / CM budget / `limitdc`~~ — **resolved from server source, see §3.** Remaining: the numeric `limits.calls` value in production.

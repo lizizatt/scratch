@@ -14,7 +14,9 @@
 | Hunt soft-abandon (lead) | `test_monsterhunt` |
 | Idle combine | `test_idle_bank_clean` |
 | Stall / upgrade_skip / trade arity | `test_stall_gear_spam`, scenarios |
-| Equip class gate | `test_equip_class` |
+| Vendor reclaim / NPC sell junk | `test_vendor_sshield`, `test_bank_linger`, `test_stall_gear_spam` |
+| Equip class / Wrong weapon / score | `test_equip_class`, `test_gear_score` |
+| Xyn / Ponty / craft idle | `test_xyn_exchange`, `test_earring_cape`, `test_craft_idle` |
 | Chat 15s / CM same-server (+ cross-server omitted) | `test_comms` |
 | Merchant queue survives hop + onReload | `test_adversarial` |
 | World hop / hold HOME | `test_scenarios`, `test_adversarial`, viz `world-hop` |

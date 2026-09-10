@@ -40,7 +40,7 @@ function baseG() {
       shoes: { g: 800, type: "shoes", upgrade: true, armor: 4, grades: [7, 9] },
       helmet: { g: 1200, type: "helmet", upgrade: true, armor: 8, grades: [7, 9] },
       ringsj: { g: 24000, type: "ring", compound: { str: 2 }, grades: [2, 5] },
-      /** Whitelisted junk — sell/stall (legacy SELL) */
+      /** Whitelisted junk — NPC vendor (VENDOR_NPC) */
       frogt: { g: 120, type: "material", sell: true },
       leatherboots: { g: 200, type: "shoes", upgrade: true, armor: 1, grades: [7, 9] },
       stand0: { g: 40000 },

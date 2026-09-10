@@ -20,19 +20,16 @@ After 3 **lead** deaths on current `hunt.id`: intent → default farm; condition
 
 ## P2 — sim / ops fidelity
 
-### 5. Merchant interval lacks `tickBusy` mirror (Low)
-Controller `busy` already wraps async `tick`. Interval mirror is defense-in-depth only.
-
-### 6. Sim never `limitdc` (Med)
+### 5. Sim never `limitdc` (Med)
 `sim/comms.bumpCall` increments but does not disconnect.
 
-### 7. No Mainframe “stuck move” invariant in sim (Med)
+### 6. No Mainframe “stuck move” invariant in sim (Med)
 LESSONS §0: 15s stationary + ≥10 move requests. Not modeled.
 
-### 8. Publish without relink (High ops, Low code)
+### 7. Publish without relink (High ops, Low code)
 `save_code` does not restart CODE. Relink is mandatory.
 
-### 9. Slots/sim combat still hardcode lead `"Jazwyn"` in places (Low→Med)
+### 8. Slots/sim combat still hardcode lead `"Jazwyn"` in places (Low→Med)
 Merchant console is succession-safe; sim `boot_party` combat opts and some slot solo gates may still assume Jazwyn.
 
 ## Recently closed (do not re-open without evidence)
@@ -48,3 +45,4 @@ Merchant console is succession-safe; sim `boot_party` combat opts and some slot 
 | Heartbeat non-lead / stale seq poison | `applyHeartbeat` gate + `test_party_state` |
 | Merchant hunt/world → Jazwyn only | `cmFighters` + succession adversary in `test_adversarial` |
 | `exitRare` mode=farm vs hunt intent | Normal; covered by rare_resume |
+| Merchant interval `tickBusy` | `live_merchant_runtime.js` + `test_live_runtime_interval.js` |

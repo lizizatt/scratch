@@ -264,7 +264,7 @@ Fixtures land in `adventureland/sim/fixtures/paths/` and feed the sim’s delay/
 `test_sim_parity` is three concrete checks, not a document:
 
 1. **Rules by construction**: comms/persistence models cite `server.js` lines (§4.0) and have unit tests for each rule (e.g. two code chats 10 s apart → second rejected; human chat at t=0 → code chat at t=10 rejected; CM to off-server name → not in `receivers`).
-2. **Shared invariant monitor**: the same module that grades sim traces also grades Mainframe log dumps. Replay `legacy/_live_farm_observe.json` and `legacy/_live_phoenix_observe_run.txt` and assert it reproduces the recorded verdicts (throttle count, hop count, together %, the 63× phoenix path storm).
+2. **Shared invariant monitor**: the same module that grades sim traces also grades Mainframe log dumps. Replay `tests/fixtures/live_farm_observe.json` and `tests/fixtures/live_phoenix_observe_run.txt` and assert it reproduces the recorded verdicts (throttle count, hop count, together %, the 63× phoenix path storm).
 3. **Path distributions**: per route class, sim `smart_move` duration/fail samples fall within the explorer fixture bands (§6.3).
 
 **Confidence ladder:** unit path fixtures → short farm scenarios → **compressed 30 min farms** → Monte Carlo → only then Mainframe 30 min gate.

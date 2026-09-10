@@ -239,7 +239,7 @@ test("send_item requires same map + range + space", async () => {
 });
 
 test("invariant monitor grades farm observe artifact", async () => {
-  const p = path.join(__dirname, "..", "legacy", "_live_farm_observe.json");
+  const p = path.join(__dirname, "fixtures", "live_farm_observe.json");
   const result = JSON.parse(fs.readFileSync(p, "utf8"));
   const c = gradeFarmObserve(result);
   assert.strictEqual(c.chat_throttle, 0);
@@ -248,7 +248,7 @@ test("invariant monitor grades farm observe artifact", async () => {
 });
 
 test("invariant monitor detects phoenix path storm", async () => {
-  const p = path.join(__dirname, "..", "legacy", "_live_phoenix_observe_run.txt");
+  const p = path.join(__dirname, "fixtures", "live_phoenix_observe_run.txt");
   const buf = fs.readFileSync(p);
   const text = buf[0] === 0xff && buf[1] === 0xfe ? buf.toString("utf16le") : buf.toString("utf8");
   const lines = text.split(/\r?\n/);
