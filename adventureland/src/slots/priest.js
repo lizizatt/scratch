@@ -24,13 +24,14 @@ function pre_combat() {
   }
   return false;
 }
-function combat(mtype) {
+function combat(mtype, dyn) {
   if (character.rip || (typeof is_moving === "function" && is_moving(character))) return;
   if (typeof smart !== "undefined" && smart.moving) return;
-  var leadName = typeof LEADER_ORDER !== "undefined" ? LEADER_ORDER[0] : "Jazwyn";
+  dyn = dyn || {};
+  var leadName = dyn.leadName || (typeof LEADER_ORDER !== "undefined" ? LEADER_ORDER[0] : "Jazwyn");
   var lead = get_player(leadName);
   var t = null;
-  var soloLead = character.name === leadName || !(get_party() || {})[leadName];
+  var soloLead = dyn.isLead != null ? dyn.isLead : character.name === leadName || !(get_party() || {})[leadName];
   if (!soloLead && lead && lead.target) {
     t = get_monster(lead.target) || parent.entities[lead.target];
   } else {

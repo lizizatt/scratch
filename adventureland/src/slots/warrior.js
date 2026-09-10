@@ -1,12 +1,15 @@
 load_code("v2_lib");
 load_code("v2_fighter");
-function combat(mtype) {
+function combat(mtype, dyn) {
   if (character.rip || (typeof is_moving === "function" && is_moving(character))) return;
   if (typeof smart !== "undefined" && smart.moving) return;
-  var leadName = typeof LEADER_ORDER !== "undefined" ? LEADER_ORDER[0] : "Jazwyn";
+  dyn = dyn || {};
+  // v2_start_fighter's runCombat() passes the live succession leader here —
+  // fall back to static LEADER_ORDER[0] only if called without dyn (e.g. console).
+  var leadName = dyn.leadName || (typeof LEADER_ORDER !== "undefined" ? LEADER_ORDER[0] : "Jazwyn");
   var lead = get_player(leadName);
   var t = null;
-  var isLead = character.name === leadName || !(get_party() || {})[leadName];
+  var isLead = dyn.isLead != null ? dyn.isLead : character.name === leadName || !(get_party() || {})[leadName];
   if (!isLead && lead && lead.target) {
     t = get_monster(lead.target) || parent.entities[lead.target];
   } else {
