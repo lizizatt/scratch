@@ -3,15 +3,10 @@
 /**
  * Live helpers appended to v2_fighter slot (globals after compress).
  * Expects: bootFighter, createAlApi, FIGHTERS, character, use_skill, …
+ * Emergency heal-pot use (hp/mp below trigger %) now lives in fighter.js's
+ * own tick (maybeUsePots) so it's simulation-testable; no separate interval
+ * needed here anymore.
  */
-
-function v2_use_pots() {
-  try {
-    if (typeof is_on_cooldown === "function" && is_on_cooldown("use_hp")) return;
-    if (character.hp / character.max_hp < 0.55) use_skill("use_hp");
-    else if (character.mp / character.max_mp < 0.5) use_skill("use_mp");
-  } catch (e) {}
-}
 
 function v2_invite_party(ctrl) {
   try {
@@ -42,7 +37,6 @@ function v2_start_fighter(opts) {
     if (tickBusy) return;
     tickBusy = true;
     try {
-      v2_use_pots();
       try {
         loot();
       } catch (e) {}

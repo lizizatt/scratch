@@ -29,6 +29,10 @@ function createAlApi() {
     is_in_range: typeof is_in_range === "function" ? is_in_range : function () {
       return false;
     },
+    is_on_cooldown: typeof is_on_cooldown === "function" ? is_on_cooldown : function () {
+      return false;
+    },
+    use_skill: typeof use_skill === "function" ? use_skill : function () {},
     can_move_to: typeof can_move_to === "function" ? can_move_to : function () {
       return true;
     },
@@ -159,6 +163,9 @@ function createAlApi() {
     },
     is_in_range(e) {
       return g.is_in_range(e);
+    },
+    is_on_cooldown(skill) {
+      return g.is_on_cooldown(skill);
     },
     can_move_to(x, y) {
       return g.can_move_to(x, y);

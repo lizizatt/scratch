@@ -21,6 +21,8 @@ const {
   METRICS_MS,
   FORM_R_OUT,
   KEEP_ALWAYS,
+  HEAL_HP_PCT,
+  HEAL_MP_PCT,
 } = require("./constants");
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
@@ -265,6 +267,26 @@ function bootFighter(api, opts) {
         api.game_log("strip:err " + ((e && e.message) || e));
       }
     }
+  }
+
+  /**
+   * Emergency heal-pot use: hp/mp below live's use_hp/use_mp trigger points.
+   * Runs every tick (live ran this on its own 250ms interval, outside
+   * bootFighter/ctrl.tick(), so it was untested in sim); folded in here so
+   * combat/pot-supply behavior is exercised the same way in sim and live.
+   */
+  async function maybeUsePots() {
+    if (typeof api.use_skill !== "function") return;
+    const c = api.character;
+    if (!c || c.max_hp == null) return;
+    try {
+      if (typeof api.is_on_cooldown === "function" && api.is_on_cooldown("use_hp")) return;
+      if (c.hp / c.max_hp < HEAL_HP_PCT) {
+        await Promise.resolve(api.use_skill("use_hp"));
+      } else if (c.max_mp && c.mp / c.max_mp < HEAL_MP_PCT) {
+        await Promise.resolve(api.use_skill("use_mp"));
+      }
+    } catch (e) {}
   }
 
   function sendGearAd() {
@@ -1133,6 +1155,7 @@ function bootFighter(api, opts) {
       persist();
       return;
     }
+    await maybeUsePots();
     motion.evalPresent(now);
     if (typeof api.loot === "function") api.loot();
     await stripWrongClass();

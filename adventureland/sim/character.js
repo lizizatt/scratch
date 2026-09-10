@@ -235,8 +235,43 @@ function createCharacter(world, over) {
     can_use() {
       return true;
     },
-    is_on_cooldown() {
-      return false;
+    is_on_cooldown(skill) {
+      if (!skill) return false;
+      return !!(c._skillCd && c._skillCd[skill] > world.clock.now());
+    },
+    /**
+     * Minimal sim model of use_hp/use_mp: consumes the strongest matching pot
+     * (hpot1 over hpot0, mpot1 over mpot0), restores a fixed amount, and sets
+     * a shared skill cooldown so fighter.js's heal-check can't spam it.
+     */
+    use_skill(skill, target) {
+      if (skill !== "use_hp" && skill !== "use_mp") {
+        return { failed: true, reason: "unmodeled_skill" };
+      }
+      if (api.is_on_cooldown(skill)) return { failed: true, reason: "cooldown" };
+      const isHp = skill === "use_hp";
+      const potNames = isHp ? ["hpot1", "hpot0"] : ["mpot1", "mpot0"];
+      const amounts = isHp ? knobs.HEAL_HP_AMOUNT : knobs.HEAL_MP_AMOUNT;
+      for (const nm of potNames) {
+        for (let i = 0; i < c.items.length; i++) {
+          const it = c.items[i];
+          if (!it || it.name !== nm) continue;
+          const q = it.q == null ? 1 : it.q;
+          it.q = q - 1;
+          if (it.q <= 0) {
+            c.items[i] = null;
+            c.esize = (c.esize || 0) + 1;
+          }
+          const amt = (amounts && amounts[nm]) || 200;
+          if (isHp) c.hp = Math.min(c.max_hp, c.hp + amt);
+          else c.mp = Math.min(c.max_mp, c.mp + amt);
+          c._skillCd = c._skillCd || {};
+          c._skillCd[skill] = world.clock.now() + (knobs.HEAL_SKILL_CD_MS || 2000);
+          api.game_log((isHp ? "heal:hp +" : "heal:mp +") + amt);
+          return { success: true };
+        }
+      }
+      return { failed: true, reason: "no_pot" };
     },
 
     change_target(t) {
@@ -261,7 +296,8 @@ function createCharacter(world, over) {
     },
     attack(t) {
       if (!api.can_attack(t)) return Promise.resolve({ failed: true });
-      c._lastAttackAt = world.clock.now();
+      const now = world.clock.now();
+      c._lastAttackAt = now;
       c.target = t.id;
       const dmg = c.attack || (c.ctype === "mage" ? 110 : c.ctype === "priest" ? 70 : 95);
       t.hp = Math.max(0, (t.hp != null ? t.hp : t.max_hp || 200) - dmg);
@@ -272,7 +308,7 @@ function createCharacter(world, over) {
         t.dead = true;
         t.hp = 0;
         const respawnMs = (world.G && world.G.respawnMs) || knobs.RESPAWN_MS || 10000;
-        t.respawnAt = world.clock.now() + respawnMs;
+        t.respawnAt = now + respawnMs;
         api.game_log("kill " + t.mtype + " id=" + t.id);
         // Monster hunt: only eligible kills on the issuing server decrement c.
         if (c.s && c.s.monsterhunt) {
@@ -288,6 +324,22 @@ function createCharacter(world, over) {
           if (drops && drops.length) {
             world.spawnChest(serverKey(), c.map, { x: t.real_x || t.x, y: t.real_y || t.y }, drops);
             api.game_log("drop " + drops.map((d) => d.name + (d.level != null ? "@" + d.level : "")).join(","));
+          }
+        }
+      } else {
+        // Minimal player-damage model: a still-live target retaliates on its
+        // own cadence (independent of the player's attack speed) so fighter.js
+        // heal-pot logic (use_hp/use_mp) has something real to react to.
+        const mgap = knobs.MONSTER_ATTACK_MS || 1500;
+        if (now - (t._lastAtkAt || 0) >= mgap) {
+          t._lastAtkAt = now;
+          const mAtk = t.attack != null ? t.attack : 10;
+          c.hp = Math.max(0, (c.hp != null ? c.hp : c.max_hp) - mAtk);
+          api.game_log("hurt " + t.mtype + " -" + mAtk + " hp=" + c.hp);
+          if (c.hp <= 0) {
+            c.hp = 0;
+            c.rip = true;
+            api.game_log("death " + t.mtype);
           }
         }
       }

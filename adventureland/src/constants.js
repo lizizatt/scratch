@@ -31,6 +31,9 @@ const GOLD_FLOAT_FIGHTER = 100000; // keep ~100k on fighters for town buys / flo
 const POTION_TARGET = 200;
 const POTION_LOW = 80;
 const POTION_DRY = 0;
+/** Emergency heal thresholds (live use_hp/use_mp trigger points; also used in sim). */
+const HEAL_HP_PCT = 0.55;
+const HEAL_MP_PCT = 0.5;
 const SEND_RANGE = 320;
 const ASSEMBLE_TIMEOUT_MS = 60000;
 const RARE_GONE_MS = 20000;
@@ -150,6 +153,8 @@ module.exports = {
   POTION_TARGET,
   POTION_LOW,
   POTION_DRY,
+  HEAL_HP_PCT,
+  HEAL_MP_PCT,
   SEND_RANGE,
   ASSEMBLE_TIMEOUT_MS,
   RARE_GONE_MS,
