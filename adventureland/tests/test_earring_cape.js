@@ -148,4 +148,44 @@ test("adversary: ponty buys cape under fair cap when needed", async () => {
   assert.ok(m.items.some((x) => x && x.name === "cape"), "cape in bag");
 });
 
+test("adversary: merchant polls Ponty no faster than once per second", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 100,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const m = mApi.character;
+  m.gold = 500000;
+  for (let i = 0; i < m.items.length; i++) {
+    const it = m.items[i];
+    if (it && (it.name === "stand0" || /^hpot|^mpot|^scroll/.test(it.name))) continue;
+    if (it) {
+      m.items[i] = null;
+      m.esize = (m.esize || 0) + 1;
+    }
+  }
+  m._bank = { gold: 0, items0: new Array(42).fill(null) };
+  m.map = "main";
+  m.real_x = m.x = 106;
+  m.real_y = m.y = -47;
+  m.stand = false;
+  p.world.ponty = [];
+
+  const polls = [];
+  const realGetSecondhands = mApi.get_secondhands.bind(mApi);
+  mApi.get_secondhands = async () => {
+    polls.push(mApi._now());
+    return realGetSecondhands();
+  };
+
+  for (let i = 0; i < 200; i++) await p.tickAll();
+
+  assert.ok(polls.length >= 2, "must keep polling Ponty, polls=" + polls.length);
+  for (let i = 1; i < polls.length; i++) {
+    assert.ok(polls[i] - polls[i - 1] >= 1000, "Ponty polls too close: " + polls.join(","));
+  }
+});
+
 module.exports = { tests };
