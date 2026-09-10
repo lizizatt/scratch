@@ -48,7 +48,14 @@ function v2_start_merchant() {
 
   let tickBusy = false;
   const iv = setInterval(function () {
-    if (tickBusy) return;
+    // Long smart_move/delivery awaits keep tickBusy true for seconds. Keep
+    // checking emergency potions from the interval while that work is active.
+    if (tickBusy) {
+      try {
+        ctrl.usePots();
+      } catch (e) {}
+      return;
+    }
     tickBusy = true;
     try {
       const p = ctrl.tick();

@@ -19,6 +19,7 @@ const {
   PONTY_MULT,
   CRAFT_TARGETS,
 } = require("./constants");
+const { maybeUsePots } = require("./potions");
 const {
   isSellJunk,
   isGearPiece,
@@ -348,7 +349,17 @@ function bootMerchant(api, opts) {
     return false;
   }
 
-  async function buyPots(items) {
+  function bagQty(name) {
+    let n = 0;
+    for (const it of api.character.items || []) {
+      if (it && it.name === name) n += it.q == null ? 1 : it.q;
+    }
+    return n;
+  }
+
+  async function buyPots(items, reserve, tag) {
+    reserve = reserve || 0;
+    tag = tag || "dlv";
     closeStandIfOpen();
     const dest = { map: "main", x: 56, y: -122 };
     const nearVendor = () =>
@@ -358,63 +369,69 @@ function bootMerchant(api, opts) {
     if (!nearVendor()) {
       const r = await api.smart_move(dest);
       if (r && r.failed) {
-        api.game_log("dlv:vendor_path_fail");
+        api.game_log(tag + ":vendor_path_fail");
         return false;
       }
     }
     if (!nearVendor() && Math.hypot(api.character.real_x - dest.x, api.character.real_y - dest.y) > 60) {
-      api.game_log("dlv:vendor_far");
+      api.game_log(tag + ":vendor_far");
       return false;
     }
     for (const it of items || []) {
-      const need = it.q || POTION_TARGET;
-      let have = 0;
-      for (const bag of api.character.items || []) {
-        if (bag && bag.name === it.name) have += bag.q == null ? 1 : bag.q;
-      }
+      const need = (it.q || POTION_TARGET) + reserve;
+      const have = bagQty(it.name);
       const buyQ = need - have;
       if (buyQ <= 0) {
-        api.game_log("dlv:have " + it.name + " " + have);
+        api.game_log(tag + ":have " + it.name + " " + have);
         continue;
       }
-      if ((api.character.esize || 0) < 1) {
-        api.game_log("dlv:no_space");
+      // Existing potion stacks can absorb a refill even when the bag is full.
+      if (have <= 0 && (api.character.esize || 0) < 1) {
+        api.game_log(tag + ":no_space");
         return false;
       }
       const price = (api.G.items[it.name] && api.G.items[it.name].g) || 20;
       if ((api.character.gold || 0) - price * buyQ < GOLD_FLOAT_MERCHANT) {
-        api.game_log("dlv:buy_float");
+        api.game_log(tag + ":buy_float");
         return "float";
       }
       await api.buy(it.name, buyQ);
-      let after = 0;
-      for (const bag of api.character.items || []) {
-        if (bag && bag.name === it.name) after += bag.q == null ? 1 : bag.q;
-      }
+      const after = bagQty(it.name);
       if (after <= have) {
-        api.game_log("dlv:buy_fail " + it.name);
+        api.game_log(tag + ":buy_fail " + it.name);
         return false;
       }
-      api.game_log("dlv:buy " + it.name + " " + buyQ);
+      api.game_log(tag + ":buy " + it.name + " " + buyQ);
     }
     return true;
   }
 
   /** Gold required to buy remaining pots while keeping GOLD_FLOAT_MERCHANT. */
-  function potBuyNeedGold(items) {
+  function potBuyNeedGold(items, reserve) {
+    reserve = reserve || 0;
     let cost = 0;
     for (const it of items || []) {
-      const need = it.q || POTION_TARGET;
-      let have = 0;
-      for (const bag of api.character.items || []) {
-        if (bag && bag.name === it.name) have += bag.q == null ? 1 : bag.q;
-      }
+      const need = (it.q || POTION_TARGET) + reserve;
+      const have = bagQty(it.name);
       const buyQ = need - have;
       if (buyQ <= 0) continue;
       const price = (api.G.items[it.name] && api.G.items[it.name].g) || 20;
       cost += price * buyQ;
     }
     return GOLD_FLOAT_MERCHANT + cost;
+  }
+
+  /** Keep Puppygirl's own emergency potion stacks at the party target. */
+  async function restockSelfPots() {
+    const wants = [
+      { name: "hpot1", q: POTION_TARGET },
+      { name: "mpot1", q: POTION_TARGET },
+    ];
+    if (wants.every((it) => bagQty(it.name) >= it.q)) return false;
+    // Do not leave a nearby fighter (or spam buy_float) when the merchant
+    // cannot yet afford the refill while preserving her gold float.
+    if ((api.character.gold || 0) < potBuyNeedGold(wants, 0)) return false;
+    return (await buyPots(wants, 0, "selfpot")) === true;
   }
 
   /**
@@ -1470,6 +1487,9 @@ function bootMerchant(api, opts) {
     await ensureFarmWorld();
     // Live has no _bank until we visit once — without this, vendor/gift are blind on main.
     await primeBankHint();
+    // Keep the merchant's own emergency supply full before spending idle time
+    // on optional economy work.
+    await restockSelfPots();
     // NPC-vendor cheap junk first (reclaim trade slots) before Xyn burns idle ticks.
     try {
       if (await tryVendorNpc()) return;
@@ -1560,14 +1580,19 @@ function bootMerchant(api, opts) {
     }
 
     if (job.kind === "dlv_pots" && !job.bought) {
-      const ok = await buyPots(job.items);
+      // Buy the delivery quantity plus Puppygirl's personal reserve; the send
+      // loop below transfers only the requested amount.
+      let ok = await buyPots(job.items, POTION_TARGET);
+      // Fighter survival wins when current gold can fund the delivery but not
+      // both delivery and a brand-new merchant reserve. Refill self when idle.
+      if (ok === "float") ok = await buyPots(job.items, 0);
       if (ok === true) {
         job.bought = 1;
         saveQ(store);
       } else if (ok === "float") {
         const now = api._now ? api._now() : Date.now();
         if (!job.scoopUntil || now >= job.scoopUntil) {
-          const got = await scoopGoldForBuy(job, potBuyNeedGold(job.items));
+          const got = await scoopGoldForBuy(job, potBuyNeedGold(job.items, 0));
           // Retry sooner after a failed scoop (no_vision / path); longer after a try.
           job.scoopUntil = now + (got ? 45000 : 8000);
           saveQ(store);
@@ -1669,10 +1694,17 @@ function bootMerchant(api, opts) {
     }
 
     let sentPots = 0;
+    const sendNeed = {};
+    for (const want of job.items || []) {
+      if (!want || (want.name !== "hpot1" && want.name !== "mpot1")) continue;
+      sendNeed[want.name] = (sendNeed[want.name] || 0) + (want.q || POTION_TARGET);
+    }
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (!it) continue;
       if (it.name !== "hpot1" && it.name !== "mpot1") continue;
+      const sendQ = Math.min(it.q == null ? 1 : it.q, sendNeed[it.name] || 0);
+      if (sendQ <= 0) continue;
       try {
         // Refresh range right before each send — fighter may still be pathing.
         if (playerDist(api.get_player(job.who) || t) > (SEND_RANGE || 320)) {
@@ -1680,7 +1712,7 @@ function bootMerchant(api, opts) {
           if (!t) break;
         }
         closeStandIfOpen();
-        const sr = await api.send_item(job.who, i, it.q == null ? 1 : it.q);
+        const sr = await api.send_item(job.who, i, sendQ);
         if (sr && sr.failed) {
           api.game_log("dlv:send_fail " + it.name + (sr.reason ? " " + sr.reason : ""));
           if (sr.reason === "distance" || sr.reason === "stand_open") {
@@ -1692,6 +1724,7 @@ function bootMerchant(api, opts) {
           continue;
         }
         api.game_log("dlv:send " + it.name + " id=" + job.id);
+        sendNeed[it.name] -= sendQ;
         sentPots++;
       } catch (e) {
         api.game_log("dlv:send_fail " + it.name);
@@ -1769,6 +1802,7 @@ function bootMerchant(api, opts) {
         await retreatPlaza();
         return;
       }
+      await maybeUsePots(api);
       // Snapshot vault before any stall/park so live-blind main can see sell junk.
       await primeBankHint();
       // Park tossed gear before next delivery (sell junk reserved for tryVendorNpc).
@@ -1916,6 +1950,7 @@ function bootMerchant(api, opts) {
 
   return {
     tick,
+    usePots: () => maybeUsePots(api),
     enqueue,
     hunt,
     hunt_quest,

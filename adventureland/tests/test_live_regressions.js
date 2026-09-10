@@ -41,8 +41,14 @@ test("live: bare bank_store(i) invalid — pack store still parks (Mainframe)", 
 
   for (let n = 0; n < 40; n++) await p.tickAll();
 
-  assert.strictEqual(api.character.items[2], null, "gloves parked via pack store");
-  assert.strictEqual(api.character.items[3], null, "helmet parked via pack store");
+  assert.ok(!api.character.items.some((it) => it && it.name === "gloves"), "gloves removed from bag");
+  assert.ok(!api.character.items.some((it) => it && it.name === "helmet"), "helmet removed from bag");
+  const bankItems = Object.values(api.character._bank)
+    .filter(Array.isArray)
+    .flat()
+    .filter(Boolean);
+  assert.ok(bankItems.some((it) => it.name === "gloves"), "gloves parked via pack store");
+  assert.ok(bankItems.some((it) => it.name === "helmet"), "helmet parked via pack store");
   const msgs = api.log.game.map((g) => g.m);
   assert.ok(msgs.some((m) => /^bank:store gloves/.test(m)));
   assert.ok(!msgs.some((m) => m === "bank:full"), "must not mislabel free vault as full");

@@ -109,6 +109,59 @@ test("live runtime: v2_start_merchant clears prior interval on reload", () => {
   assert.strictEqual(r.activeCount, 1, "only one active interval");
 });
 
+test("live runtime: busy merchant tick still checks emergency potions", async () => {
+  const root = path.join(__dirname, "..");
+  let intervalFn = null;
+  let resolveTick = null;
+  let usePotsCalls = 0;
+  const sandbox = {
+    console,
+    Date,
+    Math,
+    JSON,
+    globalThis: {},
+    character: { name: "Puppygirl" },
+    game_log() {},
+    createAlApi() {
+      return { character: { name: "Puppygirl" } };
+    },
+    bootMerchant() {
+      return {
+        tick() {
+          return new Promise((resolve) => {
+            resolveTick = resolve;
+          });
+        },
+        usePots() {
+          usePotsCalls++;
+        },
+        hunt() {},
+        hunt_quest() {},
+        grind() {},
+        hold() {},
+        resume() {},
+        world() {},
+      };
+    },
+    setInterval(fn) {
+      intervalFn = fn;
+      return 1;
+    },
+    clearInterval() {},
+  };
+  vm.createContext(sandbox);
+  const src = fs.readFileSync(path.join(root, "src", "live_merchant_runtime.js"), "utf8");
+  vm.runInContext(src, sandbox);
+
+  sandbox.v2_start_merchant();
+  intervalFn();
+  assert.ok(resolveTick, "first interval starts the long merchant tick");
+  intervalFn();
+  assert.strictEqual(usePotsCalls, 1, "busy interval checks potions instead of skipping everything");
+  resolveTick();
+  await Promise.resolve();
+});
+
 test("live runtime: v2_start_fighter clears prior interval on reload", () => {
   const r = bootRuntimeTwice({
     name: "Jazwyn",

@@ -26,6 +26,7 @@ const suites = [
   require("./test_live_runtime_interval"),
   require("./test_rare_resume"),
   require("./test_merchant_avoid"),
+  require("./test_merchant_potions"),
   require("./test_craft_idle"),
   require("./test_party_state"),
 ];

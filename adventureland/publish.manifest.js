@@ -38,6 +38,7 @@ const SLOTS = [
     role: "Shared constants, packs, gear helpers, chat queue, party state, motion",
     sources: [
       "src/constants.js",
+      "src/potions.js",
       "src/packs.js",
       "src/gear.js",
       "src/monsterhunt.js",
