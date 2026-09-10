@@ -171,6 +171,7 @@ test("adversary: delivery status elicits current location before fighter is dry"
   const mApi = p.bots.Puppygirl.api;
   const bee = packCenter("bee");
   const z = zApi.character;
+  p.bots.Zarook.ctrl.state.S.intent.mtype = "bee";
   z.map = bee.map;
   z.real_x = z.x = bee.x;
   z.real_y = z.y = bee.y;
@@ -202,6 +203,162 @@ test("adversary: delivery status elicits current location before fighter is dry"
   assert.strictEqual(job.map, bee.map);
   assert.strictEqual(job.x, bee.x);
   assert.strictEqual(job.y, bee.y);
+});
+
+test("adversary: fresh fighter farm intent overrides stale delivery coordinates", async () => {
+  const p = bootParty({
+    pack: "snake",
+    pots: 50,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const snake = packCenter("snake");
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_farm_intent",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [],
+    farm: "snake",
+    map: snake.map,
+    x: snake.x,
+    y: snake.y,
+  });
+  const job = p.bots.Puppygirl.ctrl.store.q[0];
+
+  await p.bots.Zarook.api.send_cm("Puppygirl", {
+    dlv_loc: 1,
+    id: "p_farm_intent",
+    farm: "bee",
+    map: "main",
+    x: snake.x,
+    y: snake.y,
+  });
+
+  assert.strictEqual(job.farm, "bee", "explicit live farm intent wins over stale pack coordinates");
+  assert.deepStrictEqual(meetResolveDelivery({ get_player: () => null }, job, SEND_RANGE), safeMeet("bee"));
+});
+
+test("adversary: another character cannot rewrite a delivery location", async () => {
+  const p = bootParty({
+    pack: "snake",
+    pots: 50,
+    gold: 500000,
+    members: ["Sarene", "Zarook", "Puppygirl"],
+  });
+  const snake = packCenter("snake");
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_spoofed_loc",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [],
+    farm: "snake",
+    map: snake.map,
+    x: snake.x,
+    y: snake.y,
+  });
+  const job = p.bots.Puppygirl.ctrl.store.q[0];
+
+  await p.bots.Sarene.api.send_cm("Puppygirl", {
+    dlv_loc: 1,
+    id: "p_spoofed_loc",
+    farm: "bee",
+    map: "main",
+    x: packCenter("bee").x,
+    y: packCenter("bee").y,
+  });
+
+  assert.strictEqual(job.farm, "snake");
+  assert.strictEqual(job.locSeq, undefined);
+});
+
+test("adversary: fighter moving packs during delivery reroutes without empty retreat", async () => {
+  const p = bootParty({
+    pack: "snake",
+    pots: 50,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const zApi = p.bots.Zarook.api;
+  const mApi = p.bots.Puppygirl.api;
+  const z = zApi.character;
+  const m = mApi.character;
+  const snake = packCenter("snake");
+  const bee = packCenter("bee");
+  clearPots(z.items);
+  z.esize = z.items.filter((x) => !x).length;
+  z.map = snake.map;
+  z.real_x = z.x = snake.x;
+  z.real_y = z.y = snake.y;
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+  p.bots.Zarook.ctrl.state.S.intent.mtype = "snake";
+  p.bots.Zarook.ctrl._setDlv({ id: "p_move_midroute", kind: "pots", t0: zApi._now(), acked: 1 });
+
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_move_midroute",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ],
+    farm: "snake",
+    map: snake.map,
+    x: snake.x,
+    y: snake.y,
+  });
+
+  let moved = false;
+  let delayedLocation = null;
+  const realFighterSend = zApi.send_cm.bind(zApi);
+  const realMove = mApi.smart_move.bind(mApi);
+  mApi.smart_move = async (dest) => {
+    const r = await realMove(dest);
+    if (!moved && dest && dest.map === safeMeet("snake").map && dest.x === safeMeet("snake").x) {
+      moved = true;
+      z.map = bee.map;
+      z.real_x = z.x = bee.x;
+      z.real_y = z.y = bee.y;
+      p.bots.Zarook.ctrl.state.S.intent.mtype = "bee";
+      zApi.send_cm = async (to, message) => {
+        if (to === "Puppygirl" && message && message.dlv_loc) {
+          delayedLocation = message;
+          return { receivers: [], locals: [] };
+        }
+        return realFighterSend(to, message);
+      };
+    }
+    return r;
+  };
+
+  for (let i = 0; i < 100; i++) {
+    await p.tickAll();
+    if (moved && mApi.log.game.some((g) => g.m === "dlv:await_loc")) break;
+  }
+
+  let msgs = mApi.log.game.map((g) => g.m);
+  assert.ok(moved, "fighter must move after merchant commits to the first route");
+  assert.ok(delayedLocation, "post-arrival location response must be delayed");
+  assert.ok(msgs.some((x) => x === "dlv:await_loc"), "merchant must wait through delayed CM response");
+  assert.ok(!msgs.some((x) => x === "dlv:empty_send"), "delayed response must not count as an empty send");
+
+  zApi.send_cm = realFighterSend;
+  await realFighterSend("Puppygirl", delayedLocation);
+  for (let i = 0; i < 500; i++) {
+    await p.tickAll();
+    if (mApi.log.game.some((g) => g.m === "dlv:done id=p_move_midroute")) break;
+  }
+
+  msgs = mApi.log.game.map((g) => g.m);
+  assert.ok(msgs.some((x) => x === "dlv:reroute"), "lost vision must trigger a fresh route");
+  assert.ok(msgs.some((x) => x === "dlv:meet main 300,1059"), "merchant must route to the new bee spawn");
+  assert.ok(
+    msgs.some((x) => x === "dlv:done id=p_move_midroute"),
+    "delivery must complete at the new pack; logs=" + msgs.filter((x) => /^dlv:/.test(x)).join(" | ")
+  );
+  assert.ok(!msgs.some((x) => x === "dlv:empty_send"), "stale route must not count as an empty send");
 });
 
 test("adversary: merchant approaches send-range outside pack; fighter stays", async () => {
@@ -337,7 +494,7 @@ test("adversary: town fallback fighter — meet at fighter not packCenter", asyn
   );
 });
 
-test("adversary: empty_send retreats and aborts after 5 misses", async () => {
+test("adversary: missing fighter waits for location instead of empty retreat", async () => {
   const p = bootParty({
     pack: "armadillo",
     pots: 0,
@@ -375,14 +532,14 @@ test("adversary: empty_send retreats and aborts after 5 misses", async () => {
     y: 1846,
   });
 
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 20; i++) {
     await p.tickAll();
-    if (mApi.log.game.some((g) => /^dlv:abort_empty/.test(g.m))) break;
   }
   const msgs = mApi.log.game.map((g) => g.m);
-  assert.ok(msgs.filter((x) => x === "dlv:retreat").length >= 1, "must retreat on empty");
-  assert.ok(msgs.some((x) => /^dlv:abort_empty/.test(x)), "must abort after empties");
-  assert.ok(!p.bots.Puppygirl.ctrl.store.active, "active cleared");
+  assert.ok(msgs.some((x) => x === "dlv:await_loc"), "must wait for a fresh location");
+  assert.ok(!msgs.some((x) => x === "dlv:empty_send"), "missing reply must not count as an empty send");
+  assert.ok(!msgs.some((x) => x === "dlv:retreat"), "must not wander back and forth while awaiting location");
+  assert.ok(p.bots.Puppygirl.ctrl.store.active, "active remains pending until its normal TTL");
 });
 
 module.exports = { tests };

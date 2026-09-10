@@ -481,6 +481,7 @@ function bootFighter(api, opts) {
         await api.send_cm(MERCHANT, {
           dlv_loc: 1,
           id: dlvPending.id,
+          farm: state.S.intent.mtype,
           map: api.character.map,
           x: api.character.real_x,
           y: api.character.real_y,
@@ -648,16 +649,17 @@ function bootFighter(api, opts) {
       if (!d.ok) dlvPending = null;
       persist();
     }
-    if (d.status) {
+    if (d.status && m.name === MERCHANT) {
       if (dlvPending && (!d.id || d.id === dlvPending.id)) {
         lastStatusAt = api._now();
         dlvPending.phase = d.phase;
       }
-      if (d.meet && (lastBeacon == null || api._now() - lastBeacon > BEACON_MS)) {
+      if (d.meet && d.id) {
         lastBeacon = api._now();
         await api.send_cm(MERCHANT, {
           dlv_loc: 1,
           id: d.id || (dlvPending && dlvPending.id),
+          farm: state.S.intent.mtype,
           map: api.character.map,
           x: api.character.real_x,
           y: api.character.real_y,
@@ -977,6 +979,7 @@ function bootFighter(api, opts) {
           await api.send_cm(MERCHANT, {
             dlv_loc: 1,
             id: dlvPending.id,
+            farm: state.S.intent.mtype,
             map: api.character.map,
             x: api.character.real_x,
             y: api.character.real_y,

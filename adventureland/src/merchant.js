@@ -45,6 +45,7 @@ const {
   meetTransitBlockers,
   meetTransitBlockerFilter,
 } = require("./merchant_meet");
+const { packCenter } = require("./packs");
 
 /**
  * Merchant logistics under Jazwyn command.
@@ -347,7 +348,7 @@ function bootMerchant(api, opts) {
     if (d.dlv_loc && d.id) {
       const jobs = (store.active ? [store.active] : []).concat(store.q);
       const job = jobs.find((j) => j.id === d.id);
-      if (!job) return;
+      if (!job || m.name !== job.who) return;
       const oldFarm = job.farm;
       const oldMap = job.map;
       const oldX = job.x;
@@ -359,7 +360,9 @@ function bootMerchant(api, opts) {
       job.serverIdentifier = d.serverIdentifier || job.serverIdentifier;
       job.locAt = api._now ? api._now() : Date.now();
       job.locSeq = (job.locSeq || 0) + 1;
-      job.farm = meetFarmAt(oldFarm, d.map, d.x, d.y);
+      const reportedFarm = d.farm && packCenter(d.farm) ? d.farm : null;
+      job.farm = reportedFarm || meetFarmAt(oldFarm, d.map, d.x, d.y);
+      job.farmConfirmed = !!reportedFarm;
       const changedFarm = job.farm && oldFarm && job.farm !== oldFarm;
       if (changedFarm) {
         api.game_log("dlv:retarget " + oldFarm + "->" + job.farm);
@@ -371,6 +374,7 @@ function bootMerchant(api, opts) {
         Math.hypot(oldX - d.x, oldY - d.y) > SEND_RANGE;
       if (store.active === job && (changedFarm || moved)) {
         if (typeof api.stop === "function") api.stop("smart");
+        job.reroutePending = 1;
         api.game_log("dlv:reroute");
       }
       saveQ(store);
@@ -1613,6 +1617,38 @@ function bootMerchant(api, opts) {
     return false;
   }
 
+  async function refreshDeliveryLocation(job, phase) {
+    const now = api._now ? api._now() : Date.now();
+    if (job.locProbeSeq != null && (job.locSeq || 0) !== job.locProbeSeq) {
+      job.locProbeAt = null;
+      job.locProbeSeq = null;
+      saveQ(store);
+      return true;
+    }
+    if (job.locProbeAt != null && now - job.locProbeAt < BEACON_MS) return false;
+    const beforeSeq = job.locSeq || 0;
+    job.locProbeAt = now;
+    job.locProbeSeq = beforeSeq;
+    saveQ(store);
+    await api.send_cm(job.who, {
+      status: 1,
+      id: job.id,
+      phase: phase || "enroute",
+      meet: 1,
+      map: api.character.map,
+      x: api.character.real_x,
+      y: api.character.real_y,
+    });
+    await api.sleep(250);
+    const refreshed = (job.locSeq || 0) !== beforeSeq;
+    if (refreshed) {
+      job.locProbeAt = null;
+      job.locProbeSeq = null;
+      saveQ(store);
+    }
+    return refreshed;
+  }
+
   async function deliverActive() {
     const job = store.active;
     if (!job) return;
@@ -1638,6 +1674,12 @@ function bootMerchant(api, opts) {
       return;
     }
     if (!(await ensureDeliveryWorld(job))) return;
+    if (job.reroutePending) {
+      job.reroutePending = null;
+      saveQ(store);
+      await retreatPlaza();
+      return;
+    }
 
     if (job.kind === "dlv_pots" && !job.bought) {
       // Buy the delivery quantity plus Puppygirl's personal reserve; the send
@@ -1705,25 +1747,25 @@ function bootMerchant(api, opts) {
     let meet = meetResolveDelivery(api, job, SEND_RANGE);
     const locateAt = api._now ? api._now() : Date.now();
     const staleLocation = job.locAt == null || locateAt - job.locAt > BEACON_MS * 2;
-    await api.send_cm(job.who, {
-      status: 1,
-      id: job.id,
-      phase: "enroute",
-      meet: 1,
-      map: meet ? meet.map : api.character.map,
-      x: meet ? meet.x : api.character.real_x,
-      y: meet ? meet.y : api.character.real_y,
-    });
     if (staleLocation) {
-      const beforeSeq = job.locSeq || 0;
-      await api.sleep(250);
-      if ((job.locSeq || 0) === beforeSeq) {
+      if (!(await refreshDeliveryLocation(job, "enroute"))) {
         api.game_log("dlv:await_loc");
         return;
       }
       meet = meetResolveDelivery(api, job, SEND_RANGE);
+    } else {
+      await api.send_cm(job.who, {
+        status: 1,
+        id: job.id,
+        phase: "enroute",
+        meet: 1,
+        map: meet ? meet.map : api.character.map,
+        x: meet ? meet.x : api.character.real_x,
+        y: meet ? meet.y : api.character.real_y,
+      });
     }
 
+    const routeFarm = job.farm;
     if (meet) {
       api.game_log("dlv:meet " + meet.map + " " + Math.round(meet.x) + "," + Math.round(meet.y));
       const r = await fieldMove(meet, { farm: job.farm });
@@ -1732,6 +1774,24 @@ function bootMerchant(api, opts) {
         await api.send_cm(job.who, { nack: "path", id: job.id });
         return;
       }
+    }
+
+    // A route can take long enough for the party to switch packs. Reconfirm
+    // after arrival before treating lost vision as an empty delivery.
+    if (!api.get_player(job.who) && (await refreshDeliveryLocation(job, "arrived"))) {
+      const revised = meetResolveDelivery(api, job, SEND_RANGE);
+      if (
+        revised &&
+        (!meet ||
+          job.farm !== routeFarm ||
+          revised.map !== meet.map ||
+          Math.hypot(revised.x - meet.x, revised.y - meet.y) > SEND_RANGE)
+      ) {
+        return;
+      }
+    } else if (!api.get_player(job.who)) {
+      api.game_log("dlv:await_loc");
+      return;
     }
 
     // Approach to send range outside pack; fighter stays farming.

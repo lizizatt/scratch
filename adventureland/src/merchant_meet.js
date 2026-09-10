@@ -66,7 +66,7 @@ function meetApproachPoint(t, farm, sendRange) {
 
 /** Delivery destination: safe approach to fighter, or safeMeet if no vision. */
 function meetResolveDelivery(api, job, sendRange) {
-  const farm = meetFarmAt(job.farm, job.map, job.x, job.y);
+  const farm = job.farmConfirmed ? job.farm : meetFarmAt(job.farm, job.map, job.x, job.y);
   const t = api.get_player(job.who);
   if (t && !t.rip) {
     const tx = t.real_x != null ? t.real_x : t.x;
@@ -74,6 +74,10 @@ function meetResolveDelivery(api, job, sendRange) {
     return meetApproachPoint(t, meetFarmAt(farm, t.map, tx, ty), sendRange);
   }
   if (job.map != null && job.x != null && job.y != null) {
+    if (job.farmConfirmed && farm) {
+      const safe = safeMeet(farm);
+      if (safe) return safe;
+    }
     const observedFarm = meetFarmAt(null, job.map, job.x, job.y);
     if (observedFarm) {
       const safe = safeMeet(observedFarm);
