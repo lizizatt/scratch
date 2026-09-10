@@ -41,7 +41,7 @@ const HEAL_MP_PCT = 0.5;
 const SEND_RANGE = 320;
 const ASSEMBLE_TIMEOUT_MS = 60000;
 const RARE_GONE_MS = 20000;
-const RARE_WHITELIST = ["phoenix"];
+const RARE_WHITELIST = ["phoenix", "goldenbat"];
 /** Never toss/sell — Tracktrix (`tracker`) stays on Jazwyn permanently; craft tools stay parked. */
 const KEEP_ALWAYS = ["stand0", "tracker", "pickaxe", "rod"];
 /** Merchant idle: exchange these with Xyn (NPC `exchange`). */

@@ -120,6 +120,27 @@ test("fighter: !hunt phoenix never smart_move to phoenix type", async () => {
   assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /skip_rare_type|farm:skip/.test(g.m)));
 });
 
+test("fighter: golden bat sighting enters rare coordination", async () => {
+  const p = bootParty({ pots: 200 });
+  const j = p.bots.Jazwyn.api.character;
+  p.world.spawnMonster(
+    "US/III",
+    j.map,
+    "goldenbat",
+    { x: j.real_x, y: j.real_y },
+    "goldenbat_spot"
+  );
+
+  for (let i = 0; i < 8; i++) await p.tickAll();
+
+  assert.ok(
+    p.bots.Jazwyn.api.log.game.some((g) => g.m === "rare_spot goldenbat"),
+    "golden bat must be logged as a rare sighting"
+  );
+  assert.strictEqual(p.bots.Jazwyn.ctrl.state.S.mode, "rare");
+  assert.strictEqual(p.bots.Jazwyn.ctrl.state.S.rare.mtype, "goldenbat");
+});
+
 test("succession: Sarene leads when Jazwyn not in party", async () => {
   const w = createWorld();
   const pc = packCenter("armadillo");

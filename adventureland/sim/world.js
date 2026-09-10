@@ -20,6 +20,7 @@ function baseG() {
       wolfie: { attack: 320, xp: 16400 },
       wolf: { attack: 480, xp: 48800 },
       phoenix: { attack: 400, xp: 120000, rare: true },
+      goldenbat: { attack: 50, hp: 24000, xp: 20000, rare: true },
       spider: { attack: 80, xp: 12000 },
       scorpion: { attack: 100, xp: 20000 },
       target: { attack: 0, xp: 0, unlist: true },
