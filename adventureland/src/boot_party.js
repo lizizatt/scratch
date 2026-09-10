@@ -29,7 +29,7 @@ function bootParty(opts) {
   const w = createWorld();
   const region = (opts.server && opts.server[0]) || FARM[0];
   const ident = (opts.server && opts.server[1]) || FARM[1];
-  const pack = opts.pack || "armadillo";
+  const pack = opts.pack || "bat";
   const pc = packCenter(pack);
   const want = opts.members
     ? new Set(opts.members)

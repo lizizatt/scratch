@@ -1192,7 +1192,7 @@ test("scenario: boot Zarook-only subset farms without crash", async () => {
   });
   w.formParty("US/III", ["Zarook"]);
   w.spawnMonster("US/III", pc.map, "armadillo", pc);
-  const ctrl = bootFighter(api, { now: () => w.clock.now() });
+  const ctrl = bootFighter(api, { now: () => w.clock.now(), farm: "armadillo" });
   for (let i = 0; i < 40; i++) {
     await ctrl.tick();
     w.advance(250);

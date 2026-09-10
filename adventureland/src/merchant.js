@@ -745,7 +745,7 @@ function bootMerchant(api, opts) {
         kind: "dlv_gear",
         who: g.who,
         gear: { name: g.it.name, level: g.it.level || 0, slot: g.slot },
-        farm: "armadillo",
+        farm: "bat",
         items: [],
       });
       return true;

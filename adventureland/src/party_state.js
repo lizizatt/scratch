@@ -29,7 +29,7 @@ function createPartyState(selfName) {
   const S = {
     seq: {},
     lead: "Jazwyn",
-    intent: { kind: "farm", mtype: "armadillo", hold: 0, t: 0 },
+    intent: { kind: "farm", mtype: "bat", hold: 0, t: 0 },
     mode: "farm",
     rare: null,
     dlv: null,

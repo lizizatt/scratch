@@ -66,7 +66,7 @@ function bootFighter(api, opts) {
   let mhuntDeaths = 0;
   let mhuntDeathForId = null;
   let mhuntSoftSkipId = null;
-  const defaultFarm = opts.farm || "armadillo";
+  const defaultFarm = opts.farm || "bat";
   /** Intent snapshot taken when entering rare — restored on rare_kill/gone/timeout. */
   let preRareSnap = null;
   const giftTtl = {};
@@ -1008,7 +1008,7 @@ function bootFighter(api, opts) {
       const followed = opts.form
         ? await motion.followFormation(opts.form)
         : await motion.followLeader();
-      const mtype = state.S.intent.mtype || "armadillo";
+      const mtype = state.S.intent.mtype || "bat";
       const pc = packCenter(mtype);
       // Out of party / no lead coords / follow "ok" but still far (stale party xy):
       // hard-path to pack instead of standing Idle at town forever.
@@ -1033,7 +1033,7 @@ function bootFighter(api, opts) {
     }
 
     // Leader farms
-    const mtype = state.S.intent.mtype || "armadillo";
+    const mtype = state.S.intent.mtype || "bat";
     const mon = api.get_nearest_monster({ type: mtype });
     // Far "seen" mobs (sim ignores vision; live can still be long-range) must not
     // skip pack smart_move — stepToward walks into walls and stalls mid-route.
@@ -1091,7 +1091,7 @@ function bootFighter(api, opts) {
     const map = api.character.map;
     if (map && map !== "main" && map !== "bank" && map !== "cave" && map !== "winterland" && map !== "winter_cave" && map !== "tunnel") {
       const farmMaps = { main: 1, cave: 1, winterland: 1, winter_cave: 1, tunnel: 1 };
-      const want = packCenter(state.S.intent.mtype || "armadillo");
+      const want = packCenter(state.S.intent.mtype || "bat");
       if (want && want.map && map !== want.map && !farmMaps[map]) {
         if (now - mapEscapeAt < 12000) {
           persist();
@@ -1190,7 +1190,7 @@ function bootFighter(api, opts) {
   }
 
   restore();
-  // Fresh boot: party_state defaults mtype to armadillo — honor opts.farm (bee/goo/…).
+  // Fresh boot: honor an explicit simulation/test farm over the production default.
   // After hop, storage restore already applied intent; leave it.
   if (opts.farm) {
     let hadIntent = false;

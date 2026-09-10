@@ -15,6 +15,12 @@ function test(name, fn) {
   tests.push({ name, fn });
 }
 
+test("default grind targets bats", async () => {
+  const p = bootParty();
+  assert.strictEqual(p.bots.Jazwyn.ctrl.state.S.intent.mtype, "bat");
+  assert.strictEqual(p.bots.Jazwyn.api.character.map, packCenter("bat").map);
+});
+
 test("chat_queue: reject does not storm-retry within gap", async () => {
   const w = createWorld();
   const j = w.spawn({ name: "Jazwyn" });
@@ -292,7 +298,7 @@ test("hop: heap wipe clears handlers; storage restores hold; party re-invite", a
 });
 
 test("clock: smart_move owes time; tickAll is sole advancer", async () => {
-  const p = bootParty({ pots: 200 });
+  const p = bootParty({ pack: "armadillo", pots: 200 });
   // Stay south of the ridge (same-map direct leg) so travel is owed, not scrub-sliced
   const j = p.bots.Jazwyn.api;
   const t0 = p.world.clock.now();
@@ -328,7 +334,7 @@ test("world intent survives go_s:wait until server_region ready", async () => {
 });
 
 test("rare_gone: spotter loses phoenix → resume farm", async () => {
-  const p = bootParty({ pots: 200 });
+  const p = bootParty({ pack: "armadillo", pots: 200 });
   const mon = p.world.spawnMonster("US/III", "main", "phoenix", { x: 526, y: 1846 }, "phx_gone");
   for (let i = 0; i < 8; i++) await p.tickAll();
   assert.ok(
