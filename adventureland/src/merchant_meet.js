@@ -8,8 +8,25 @@
  * local wrappers inside merchant.js.
  */
 
-const { packCenter, safeMeet, nearPack, PACK_DANGER_R } = require("./packs");
+const { FARM_XY, packCenter, safeMeet, nearPack, PACK_DANGER_R } = require("./packs");
 const { merchantAvoidListMonsters } = require("./merchant_avoid");
+
+/** Prefer the pack nearest a fresh fighter location over stale persisted intent. */
+function meetFarmAt(farm, map, x, y) {
+  if (map == null || x == null || y == null) return farm;
+  let found = null;
+  let best = Infinity;
+  for (const mtype of Object.keys(FARM_XY)) {
+    const p = FARM_XY[mtype];
+    if (!p || p.map !== map) continue;
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (d < best) {
+      found = mtype;
+      best = d;
+    }
+  }
+  return found && best <= PACK_DANGER_R + 120 ? found : farm;
+}
 
 /**
  * On avoid fail: never smart_move into/through pack danger — town/retreat instead.
@@ -49,17 +66,24 @@ function meetApproachPoint(t, farm, sendRange) {
 
 /** Delivery destination: safe approach to fighter, or safeMeet if no vision. */
 function meetResolveDelivery(api, job, sendRange) {
-  const farm = job.farm;
+  const farm = meetFarmAt(job.farm, job.map, job.x, job.y);
   const t = api.get_player(job.who);
-  if (t && !t.rip) return meetApproachPoint(t, farm, sendRange);
-  if (farm) {
-    const safe = safeMeet(farm);
-    if (safe) return safe;
+  if (t && !t.rip) {
+    const tx = t.real_x != null ? t.real_x : t.x;
+    const ty = t.real_y != null ? t.real_y : t.y;
+    return meetApproachPoint(t, meetFarmAt(farm, t.map, tx, ty), sendRange);
   }
   if (job.map != null && job.x != null && job.y != null) {
+    const observedFarm = meetFarmAt(null, job.map, job.x, job.y);
+    if (observedFarm) {
+      const safe = safeMeet(observedFarm);
+      if (safe) return safe;
+    }
     if (!farm || !nearPack(farm, job.map, job.x, job.y)) {
       return { map: job.map, x: job.x, y: job.y };
     }
+  }
+  if (farm) {
     const safe = safeMeet(farm);
     if (safe) return safe;
   }
@@ -86,6 +110,7 @@ function meetTransitBlockerFilter(api, farm) {
 
 module.exports = {
   avoidFailPolicy,
+  meetFarmAt,
   meetApproachPoint,
   meetResolveDelivery,
   meetTransitBlockers,

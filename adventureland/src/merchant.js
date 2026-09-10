@@ -40,6 +40,7 @@ const {
 const {
   avoidFailPolicy,
   meetApproachPoint,
+  meetFarmAt,
   meetResolveDelivery,
   meetTransitBlockers,
   meetTransitBlockerFilter,
@@ -319,12 +320,16 @@ function bootMerchant(api, opts) {
       return;
     }
     if (d.job === "dlv_pots" || d.job === "dlv_gear") {
+      const farm = meetFarmAt(d.farm, d.map, d.x, d.y);
+      if (farm && d.farm && farm !== d.farm) {
+        api.game_log("dlv:retarget " + d.farm + "->" + farm);
+      }
       const ok = enqueue({
         id: d.id,
         kind: d.job,
         who: d.who,
         items: d.items,
-        farm: d.farm,
+        farm,
         map: d.map,
         x: d.x,
         y: d.y,
@@ -333,8 +338,23 @@ function bootMerchant(api, opts) {
       await api.send_cm(d.who, { dlv_ack: 1, id: d.id, ok: ok ? 1 : 0, reason: ok ? null : "queue" });
       return;
     }
-    // Ignore dlv_loc pack beacons — merchant uses safeMeet / meetResolveDelivery.
-    // Overwriting job xy with fighter pack coords pulled Puppygirl into aggro.
+    if (d.dlv_loc && d.id) {
+      const jobs = (store.active ? [store.active] : []).concat(store.q);
+      const job = jobs.find((j) => j.id === d.id);
+      if (!job) return;
+      const oldFarm = job.farm;
+      job.map = d.map;
+      job.x = d.x;
+      job.y = d.y;
+      job.farm = meetFarmAt(oldFarm, d.map, d.x, d.y);
+      if (job.farm && oldFarm && job.farm !== oldFarm) {
+        api.game_log("dlv:retarget " + oldFarm + "->" + job.farm);
+      }
+      saveQ(store);
+      return;
+    }
+    // Location beacons update the job above, but meetResolveDelivery always
+    // converts pack coordinates to a safe staging point.
     if (d.job === "meet_home") {
       enqueue({ id: "hold_" + (api._now ? api._now() : Date.now()), kind: "meet_home", who: "party" });
     }

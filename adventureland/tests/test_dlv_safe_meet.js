@@ -7,6 +7,7 @@
 const assert = require("assert");
 const { bootParty } = require("../src/boot_party");
 const { packCenter, safeMeet, nearPack, PACK_DANGER_R } = require("../src/packs");
+const { meetResolveDelivery } = require("../src/merchant_meet");
 const { SEND_RANGE } = require("../src/constants");
 
 const tests = [];
@@ -27,6 +28,55 @@ function dist(a, b) {
     (a.real_y != null ? a.real_y : a.y) - (b.real_y != null ? b.real_y : b.y)
   );
 }
+
+test("adversary: stale reboot farm retargets from current fighter coordinates", async () => {
+  const bee = packCenter("bee");
+  const meet = meetResolveDelivery(
+    { get_player: () => null },
+    {
+      who: "Zarook",
+      farm: "armadillo",
+      map: bee.map,
+      x: bee.x,
+      y: bee.y,
+    },
+    SEND_RANGE
+  );
+  assert.deepStrictEqual(meet, safeMeet("bee"), "current pack coordinates override stale farm intent");
+
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const ctrl = p.bots.Puppygirl.ctrl;
+  ctrl.enqueue({
+    id: "p_stale_reboot",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [],
+    farm: "armadillo",
+    map: packCenter("armadillo").map,
+    x: packCenter("armadillo").x,
+    y: packCenter("armadillo").y,
+  });
+  ctrl.store.active = ctrl.store.q.shift();
+
+  await p.bots.Zarook.api.send_cm("Puppygirl", {
+    dlv_loc: 1,
+    id: "p_stale_reboot",
+    map: bee.map,
+    x: bee.x,
+    y: bee.y,
+  });
+
+  assert.strictEqual(ctrl.store.active.farm, "bee", "fresh beacon retargets persisted active job");
+  assert.ok(
+    p.bots.Puppygirl.api.log.game.some((g) => g.m === "dlv:retarget armadillo->bee"),
+    "retarget is visible in merchant logs"
+  );
+});
 
 test("adversary: merchant approaches send-range outside pack; fighter stays", async () => {
   const p = bootParty({
