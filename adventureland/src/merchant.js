@@ -73,6 +73,10 @@ function bootMerchant(api, opts) {
   let giftBusy = false;
   let lastParkFailAt = null;
   const PARK_FAIL_BACKOFF_MS = 15000;
+  // Single vault-exit point — matches live Cue banker's plaza doorway. Was
+  // hand-copied as a bare literal in 3 places (retreatPlaza / leaveBankToPlaza
+  // / gear-pull delivery step); one constant + leaveBankToPlaza() now owns it.
+  const PLAZA = { map: "main", x: 40, y: -20 };
   /** Once-only gear:upgrade_skip logs per name@level (burn-in 60s spam). */
   const upgradeSkipLogAt = {};
   let bankHintPrimed = false;
@@ -193,7 +197,7 @@ function bootMerchant(api, opts) {
       api.game_log("dlv:retreat_town");
     }
     if (api.character.map === "bank" || api.character.map === "main") {
-      const r = await api.smart_move({ map: "main", x: 40, y: -20 });
+      const r = await api.smart_move(PLAZA);
       if (r && r.failed) api.game_log("dlv:retreat_fail");
       else api.game_log("dlv:retreat");
     }
@@ -729,8 +733,7 @@ function bootMerchant(api, opts) {
   async function leaveBankToPlaza() {
     if (api.character.map !== "bank") return true;
     snapBank();
-    const plaza = { map: "main", x: 40, y: -20 };
-    const r = await api.smart_move(plaza);
+    const r = await api.smart_move(PLAZA);
     if (r && r.failed) {
       api.game_log("bank:exit_fail");
       return false;
@@ -1602,11 +1605,7 @@ function bootMerchant(api, opts) {
 
     // Leave bank after retrieve before field walk
     if (api.character.map === "bank") {
-      const out = await api.smart_move({ map: "main", x: 40, y: -20 });
-      if (out && out.failed) {
-        api.game_log("dlv:bank_exit_fail");
-        return;
-      }
+      if (!(await leaveBankToPlaza())) return;
     }
 
     if (!(await ensureTakeBackSlots(3, job.gear && job.pulled ? job.gear : null))) return;
