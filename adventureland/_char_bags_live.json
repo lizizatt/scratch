@@ -1,0 +1,109 @@
+{
+  "Jazwyn": {
+    "connected": true,
+    "map": "main",
+    "x": 526.5064147310188,
+    "y": 1880.3711443263837,
+    "gold": 212707,
+    "slots": null,
+    "items": [
+      {
+        "name": "hpot1",
+        "level": 0,
+        "q": 445
+      },
+      {
+        "name": "mpot1",
+        "level": 0,
+        "q": 824
+      }
+    ]
+  },
+  "Sarene": {
+    "connected": true,
+    "map": "main",
+    "x": 528,
+    "y": 1848,
+    "gold": 151761,
+    "slots": null,
+    "items": [
+      {
+        "name": "mpot1",
+        "level": 0,
+        "q": 449
+      },
+      {
+        "name": "hpot1",
+        "level": 0,
+        "q": 500
+      }
+    ]
+  },
+  "Zarook": {
+    "connected": true,
+    "map": "main",
+    "x": 498.2554188076306,
+    "y": 1755.9983271981698,
+    "gold": 251761,
+    "slots": null,
+    "items": [
+      {
+        "name": "hpot1",
+        "level": 0,
+        "q": 800
+      },
+      {
+        "name": "mpot1",
+        "level": 0,
+        "q": 170
+      }
+    ]
+  },
+  "Puppygirl": {
+    "connected": false,
+    "map": "bank",
+    "x": 0,
+    "y": -37,
+    "gold": 5946250,
+    "slots": null,
+    "items": [
+      {
+        "name": "hpot0",
+        "level": 0,
+        "q": 1250
+      },
+      {
+        "name": "mpot0",
+        "level": 0,
+        "q": 916
+      },
+      {
+        "name": "stand0",
+        "level": 0
+      },
+      {
+        "name": "wshoes",
+        "level": 0
+      },
+      {
+        "name": "scroll0",
+        "level": 0,
+        "q": 52
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "ascale",
+        "level": 0,
+        "q": 1
+      },
+      {
+        "name": "anniversarygift",
+        "level": 0,
+        "q": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,807 @@
+{
+  "success": true,
+  "active": true,
+  "retention_days": 30,
+  "logs": [
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:27.963Z",
+      "level": "info",
+      "values": [
+        "dlv:path_fail"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:27.967Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-2013"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:28.211Z",
+      "level": "info",
+      "values": [
+        "dlv:meet main -82,1720"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:34.326Z",
+      "level": "info",
+      "values": [
+        "dlv:path_fail"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:34.612Z",
+      "level": "info",
+      "values": [
+        "dlv:meet main -82,1720"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:40.788Z",
+      "level": "info",
+      "values": [
+        "dlv:path_fail"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:41.018Z",
+      "level": "info",
+      "values": [
+        "dlv:meet main -82,1720"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:47.102Z",
+      "level": "info",
+      "values": [
+        "dlv:path_fail"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:47.419Z",
+      "level": "info",
+      "values": [
+        "dlv:meet main -82,1720"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:53.503Z",
+      "level": "info",
+      "values": [
+        "dlv:path_fail"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:55.625Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:55.634Z",
+      "level": "info",
+      "values": [
+        "dlv:send hpot1 id=p1788973728853_Sar"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:55.640Z",
+      "level": "info",
+      "values": [
+        "dlv:send mpot1 id=p1788973728853_Sar"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:55.650Z",
+      "level": "info",
+      "values": [
+        "dlv:done id=p1788973728853_Sar"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:13:55.655Z",
+      "level": "info",
+      "values": [
+        "dlv:loot_done n=0"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:14:26.547Z",
+      "level": "info",
+      "values": [
+        "dlv:retreat"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:14:26.547Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-6092"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:15:24.694Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-5856"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:16:24.750Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-5630"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:17:24.792Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-5422"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:18:24.835Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-5228"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:18:49.656Z",
+      "level": "info",
+      "values": [
+        "dlv:active dlv_pots -> Zarook"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:18:51.430Z",
+      "level": "info",
+      "values": [
+        "dlv:buy hpot1 200"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:18:51.434Z",
+      "level": "info",
+      "values": [
+        "dlv:buy mpot1 200"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:18:51.445Z",
+      "level": "info",
+      "values": [
+        "dlv:meet main -138,1946"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:19:28.398Z",
+      "level": "info",
+      "values": [
+        "dlv:approach dist=864 -> -232,1048"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:19:43.954Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:19:43.957Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:19:43.964Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:19:43.965Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:03.044Z",
+      "level": "info",
+      "values": [
+        "dlv:retreat"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:03.045Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-6289"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:03.293Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:04.301Z",
+      "level": "info",
+      "values": [
+        "dlv:rip_abort id=p1788974324373_Zar"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:16.925Z",
+      "level": "info",
+      "values": [
+        "dlv:retreat"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:17.377Z",
+      "level": "info",
+      "values": [
+        "dlv:active dlv_pots -> Zarook"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:19.257Z",
+      "level": "info",
+      "values": [
+        "dlv:have hpot1 200"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:19.258Z",
+      "level": "info",
+      "values": [
+        "dlv:have mpot1 200"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:19.266Z",
+      "level": "info",
+      "values": [
+        "dlv:meet main -232,1048"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:40.883Z",
+      "level": "info",
+      "values": [
+        "dlv:approach dist=729 -> -8,312"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:54.502Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:54.505Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:54.509Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:20:54.510Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:21:01.020Z",
+      "level": "info",
+      "values": [
+        "dlv:send hpot1 id=p1788974399270_Zar"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:21:01.025Z",
+      "level": "info",
+      "values": [
+        "dlv:send mpot1 id=p1788974399270_Zar"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:21:01.035Z",
+      "level": "info",
+      "values": [
+        "dlv:done id=p1788974399270_Zar"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:21:01.040Z",
+      "level": "info",
+      "values": [
+        "dlv:loot_done n=0"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:21:02.095Z",
+      "level": "info",
+      "values": [
+        "dlv:retreat"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:21:24.972Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-9237"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:22:25.022Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8948"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:23:24.703Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8679"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:24:24.707Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8423"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:25:24.754Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8182"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:26:24.795Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7955"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:27:24.858Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7740"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:28:24.902Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7536"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:29:24.964Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7343"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:30:25.017Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7159"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:31:24.660Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-6985"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:32:24.713Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-6819"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:33:24.765Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-6660"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:34:24.813Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-6509"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:35:24.857Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-6364"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:35:34.062Z",
+      "level": "info",
+      "values": [
+        "dlv:active dlv_pots -> Jazwyn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:35:35.927Z",
+      "level": "info",
+      "values": [
+        "dlv:buy hpot1 200"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:35:35.933Z",
+      "level": "info",
+      "values": [
+        "dlv:buy mpot1 200"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:35:35.944Z",
+      "level": "info",
+      "values": [
+        "dlv:meet winter_cave 35,-71"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:16.124Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:16.141Z",
+      "level": "info",
+      "values": [
+        "dlv:send hpot1 id=p1788975328675_Jaz"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:16.155Z",
+      "level": "info",
+      "values": [
+        "dlv:send mpot1 id=p1788975328675_Jaz"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:16.170Z",
+      "level": "info",
+      "values": [
+        "dlv:loot_done n=0"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:16.217Z",
+      "level": "info",
+      "values": [
+        "dlv:done id=p1788975328675_Jaz"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:24.910Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-9269"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:41.707Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:42.907Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:44.106Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:45.307Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:46.508Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:47.708Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:48.908Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:50.109Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:51.309Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:52.513Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:36:53.766Z",
+      "level": "info",
+      "values": [
+        "rip:respawn"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:37:07.538Z",
+      "level": "info",
+      "values": [
+        "dlv:retreat"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:37:24.955Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-9071"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:38:25.020Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8882"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:39:24.678Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8702"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:40:24.729Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8528"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:41:24.765Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8360"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:42:24.816Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8200"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:43:24.862Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-8045"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:44:24.915Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7896"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:45:24.969Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7752"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:46:25.029Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7613"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:47:24.689Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7481"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:48:24.728Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7352"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:49:24.792Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7227"
+      ]
+    },
+    {
+      "assignment_id": "c1767768c1db96fb300333ca8b5a9b4e",
+      "at": "2026-09-09T17:50:24.841Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-7106"
+      ]
+    }
+  ]
+}

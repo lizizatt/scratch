@@ -1,0 +1,191 @@
+{
+  "shells": 772,
+  "chars": [
+    {
+      "name": "Sarene",
+      "assignment": {
+        "assignment_id": "c6f834d00f389884073c1006363a3c99",
+        "character": "Sarene",
+        "character_id": "CH_0EquGf0dJfIrmvKmlb5pa6KfSITh3",
+        "code_slot": "CH_0EquGf0dJfIrmvKmlb5pa6KfSITh3",
+        "server": "US III",
+        "desired_state": "running",
+        "stop_reason": null,
+        "last_failure": {
+          "code": "GAME_DISCONNECTED",
+          "reason": "io server disconnect",
+          "at": "2026-09-10T02:04:10.111Z"
+        },
+        "mainframe_event": {
+          "id": "2d7a9d3b966dbf62f6b46000dacdd517",
+          "assignment_id": "c6f834d00f389884073c1006363a3c99",
+          "at": "2026-09-10T02:04:29.765Z",
+          "level": "info",
+          "code": "worker_recovered",
+          "message": "Worker recovered and reconnected to Adventure Land.",
+          "detail": null
+        },
+        "mainframe_error": {
+          "id": "743a387ccc3149c82df472de6b6cade0",
+          "assignment_id": "c6f834d00f389884073c1006363a3c99",
+          "at": "2026-09-10T02:04:10.431Z",
+          "level": "error",
+          "code": "worker_restart",
+          "message": "Worker stopped unexpectedly. Mainframe will restart it.",
+          "detail": null
+        },
+        "revision": 118,
+        "execution": "dedicated_microvm",
+        "billing_mode": "dedicated",
+        "included_with": null,
+        "worker_slot": 1
+      },
+      "runtime": {
+        "game_connected": true,
+        "server": "US III"
+      }
+    },
+    {
+      "name": "Jazwyn",
+      "assignment": {
+        "assignment_id": "aaae78ade86ca9ed31ffc49b0ebb7a11",
+        "character": "Jazwyn",
+        "character_id": "CH_xOVr1MS2DN8qlv1ntZ0VB1IEy3Sp9",
+        "code_slot": "CH_xOVr1MS2DN8qlv1ntZ0VB1IEy3Sp9",
+        "server": "US III",
+        "desired_state": "running",
+        "stop_reason": null,
+        "last_failure": null,
+        "mainframe_event": {
+          "id": "07f4b5917492351708335d281c8e4295",
+          "assignment_id": "aaae78ade86ca9ed31ffc49b0ebb7a11",
+          "at": "2026-09-10T01:27:12.283Z",
+          "level": "info",
+          "code": "access_renewed",
+          "message": "1 Shell charged for 60 minutes.",
+          "detail": "1 character active · Next renewal 2026-09-10T02:27:12.232Z",
+          "phrase": "mainframe.event.renewed_shell",
+          "phrase_args": {
+            "minutes": 60
+          },
+          "detail_phrase": "mainframe.event.renewal_one",
+          "detail_phrase_args": {
+            "count": 1,
+            "date": "2026-09-10T02:27:12.232Z"
+          }
+        },
+        "mainframe_error": {
+          "id": "a28cd0a61b25e738de4016c00158e426",
+          "assignment_id": "fee624d6ad47b8c43327a67d41890dad",
+          "at": "2026-09-09T20:25:12.288Z",
+          "level": "error",
+          "code": "worker_restart",
+          "message": "Worker stopped unexpectedly. Mainframe will restart it.",
+          "detail": null
+        },
+        "revision": 142,
+        "execution": "dedicated_microvm",
+        "billing_mode": "dedicated",
+        "included_with": null,
+        "worker_slot": 1
+      },
+      "runtime": {
+        "game_connected": true,
+        "server": "US III"
+      }
+    },
+    {
+      "name": "Zarook",
+      "assignment": {
+        "assignment_id": "15f5ee17b778c0be3964535d68f86d6f",
+        "character": "Zarook",
+        "character_id": "CH_d4UbsANUGP3e4HGOB2DrwV3uLyeLz",
+        "code_slot": "CH_d4UbsANUGP3e4HGOB2DrwV3uLyeLz",
+        "server": "US III",
+        "desired_state": "running",
+        "stop_reason": null,
+        "last_failure": {
+          "code": "GAME_DISCONNECTED",
+          "reason": "io server disconnect",
+          "at": "2026-09-10T02:01:43.305Z"
+        },
+        "mainframe_event": {
+          "id": "105bb6699299b4a8abe60d85dab9b833",
+          "assignment_id": "15f5ee17b778c0be3964535d68f86d6f",
+          "at": "2026-09-10T02:02:01.350Z",
+          "level": "info",
+          "code": "worker_recovered",
+          "message": "Worker recovered and reconnected to Adventure Land.",
+          "detail": null
+        },
+        "mainframe_error": {
+          "id": "c4a812d739fcbe844ef55870dbb6d3e2",
+          "assignment_id": "15f5ee17b778c0be3964535d68f86d6f",
+          "at": "2026-09-10T02:01:43.670Z",
+          "level": "error",
+          "code": "worker_restart",
+          "message": "Worker stopped unexpectedly. Mainframe will restart it.",
+          "detail": null
+        },
+        "revision": 110,
+        "execution": "dedicated_microvm",
+        "billing_mode": "dedicated",
+        "included_with": null,
+        "worker_slot": 1
+      },
+      "runtime": {
+        "game_connected": true,
+        "server": "US III"
+      }
+    },
+    {
+      "name": "Puppygirl",
+      "assignment": {
+        "assignment_id": "1744b7bb41b46809dc54aed264690c40",
+        "character": "Puppygirl",
+        "character_id": "CH_q7h90Mhg5era0mD5DBIMAKFcLp9xe",
+        "code_slot": "CH_q7h90Mhg5era0mD5DBIMAKFcLp9xe",
+        "server": "US III",
+        "desired_state": "running",
+        "stop_reason": null,
+        "last_failure": null,
+        "mainframe_event": {
+          "id": "128f248bf4e15dddb90ebda5a0d45088",
+          "assignment_id": "1744b7bb41b46809dc54aed264690c40",
+          "at": "2026-09-10T01:27:10.350Z",
+          "level": "info",
+          "code": "access_renewed",
+          "message": "1 Shell charged for 60 minutes.",
+          "detail": "1 character active · Next renewal 2026-09-10T02:27:10.264Z",
+          "phrase": "mainframe.event.renewed_shell",
+          "phrase_args": {
+            "minutes": 60
+          },
+          "detail_phrase": "mainframe.event.renewal_one",
+          "detail_phrase_args": {
+            "count": 1,
+            "date": "2026-09-10T02:27:10.264Z"
+          }
+        },
+        "mainframe_error": {
+          "id": "90d882106b6729f3d27d806eb0db1372",
+          "assignment_id": "0336a16c539707cd12d219b1cd0200f0",
+          "at": "2026-09-09T20:25:11.949Z",
+          "level": "error",
+          "code": "worker_restart",
+          "message": "Worker stopped unexpectedly. Mainframe will restart it.",
+          "detail": null
+        },
+        "revision": 158,
+        "execution": "dedicated_microvm",
+        "billing_mode": "dedicated",
+        "included_with": null,
+        "worker_slot": 1
+      },
+      "runtime": {
+        "game_connected": true,
+        "server": "US III"
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+﻿node : Expected property name or '}' in JSON at position 1
+At C:\Users\liz\AppData\Local\Temp\ps-script-ccd0ed05-5503-4c03-8ee5-0bf51b746af4.ps1:108 char:1
++ node live_mcp.js call mainframe_get_character '{"character":"Zarook"} ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Expected proper...N at position 1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

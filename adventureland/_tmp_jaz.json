@@ -1,0 +1,1020 @@
+{
+  "success": true,
+  "contract": {
+    "version": 7,
+    "billing": "auto_renewing_prepaid",
+    "shells_per_period": 1,
+    "period_minutes": 60,
+    "renewal_minutes_by_active_characters": [
+      {
+        "characters": 1,
+        "minutes": 60
+      },
+      {
+        "characters": 2,
+        "minutes": 50
+      },
+      {
+        "characters": 3,
+        "minutes": 45
+      },
+      {
+        "characters": 4,
+        "minutes": 40
+      }
+    ],
+    "renewal_character_count": "sampled_at_renewal_boundary",
+    "free_time": "optional_shared_steam_hours_used_before_shells",
+    "initial_charge": "before_start_when_no_paid_time_remains",
+    "renewal": "automatic_while_assignment_is_running",
+    "stop_conditions": [
+      "explicit_disconnect",
+      "not_enough_shells_at_renewal"
+    ],
+    "restart_persistence": [
+      "http_service",
+      "mainframe_controller",
+      "host",
+      "microvm"
+    ],
+    "code_started_workers": {
+      "max_included": 3,
+      "max_characters_per_machine": 4,
+      "billing": "included_with_group_root",
+      "renewal_duration": "based_on_active_group_size_at_the_next_renewal",
+      "root_stop": "stops_all_included_workers",
+      "child_stop": "stops_only_that_worker",
+      "direct_mainframe_links": "separately_billed_dedicated_microvms",
+      "containment": "separate_worker_identities_and_limits_inside_one_microvm",
+      "shared_cpu": "one_fixed_microvm_cpu_budget",
+      "shared_guest_memory_mib": 192,
+      "dynamic_host_memory_cap_mib": [
+        192,
+        224,
+        240,
+        256
+      ]
+    },
+    "code_log_retention_days": 30,
+    "mainframe_event_retention_days": 30,
+    "disconnected_time_counts": true,
+    "traffic": "requested_actions_not_confirmation",
+    "observation": "authenticated_game_server_events",
+    "movement": "confirmed_position_and_map_changes_only",
+    "stuck": "stationary_for_15s_with_10_recent_move_requests"
+  },
+  "shells": 756,
+  "character": "Jazwyn",
+  "character_id": "CH_xOVr1MS2DN8qlv1ntZ0VB1IEy3Sp9",
+  "profile": {
+    "source": "last_account_snapshot",
+    "synchronized_at": "2026-09-10T06:20:17.293Z",
+    "name": "Jazwyn",
+    "class": "warrior",
+    "level": 54,
+    "xp": 1029847,
+    "server": null,
+    "online": false,
+    "map": "main",
+    "x": 488.60322898911863,
+    "y": 1816.5810187462025,
+    "rip": false,
+    "hp": 4448,
+    "mp": 548,
+    "gold": 135295,
+    "inventory_slots": 42,
+    "inventory_items": 2,
+    "equipment": {
+      "amulet": {
+        "grace": 0.4,
+        "level": 0,
+        "name": "skullamulet",
+        "oo": "Puppygirl",
+        "rid": "lpd4o",
+        "src": "scnd"
+      },
+      "belt": {
+        "grace": 0.4,
+        "level": 3,
+        "name": "hpbelt",
+        "o": "Puppygirl",
+        "oo": "Zarook",
+        "p": null
+      },
+      "chest": {
+        "grace": 0.8,
+        "level": 0,
+        "name": "epyjamas",
+        "oo": "Puppygirl",
+        "price": 72000,
+        "rid": "Q9rK",
+        "src": "scnd"
+      },
+      "gloves": {
+        "level": 0,
+        "name": "wgloves",
+        "oo": "Jazwyn"
+      },
+      "helmet": {
+        "level": 0,
+        "name": "eears",
+        "oo": "Puppygirl",
+        "price": 48000,
+        "rid": "RSV6",
+        "src": "scnd"
+      },
+      "mainhand": {
+        "acc": 1,
+        "level": 1,
+        "name": "fireblade",
+        "oo": "Puppygirl",
+        "rid": "l0Kbf",
+        "src": "lost"
+      },
+      "offhand": {
+        "grace": 0.4,
+        "level": 0,
+        "name": "sshield",
+        "oo": "Zarook"
+      },
+      "pants": {
+        "acc": 28,
+        "ach": "gooped",
+        "grace": 0.4,
+        "level": 5,
+        "name": "pants",
+        "oo": "Jazwyn"
+      },
+      "ring1": {
+        "grace": 0,
+        "level": 3,
+        "name": "ringsj",
+        "oo": "Puppygirl",
+        "p": null,
+        "rid": "fOrw2",
+        "src": "scnd"
+      },
+      "ring2": {
+        "grace": 0,
+        "level": 2,
+        "name": "ringsj",
+        "o": "Puppygirl",
+        "oo": "Jazwyn",
+        "p": null
+      },
+      "shoes": {
+        "grace": 0.4,
+        "level": 0,
+        "name": "eslippers",
+        "oo": "Puppygirl",
+        "price": 36300,
+        "rid": "KvzL",
+        "src": "scnd"
+      }
+    },
+    "inventory": [
+      {
+        "name": "hpot1",
+        "oo": "Jazwyn",
+        "q": 26
+      },
+      {
+        "name": "mpot1",
+        "oo": "Jazwyn",
+        "q": 723
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "conditions": {
+      "encouragement_new": {
+        "expires": 1791851311055,
+        "gold_multiplier": 5,
+        "luck_multiplier": 5,
+        "ms": 2830094150,
+        "phase": 1,
+        "phase_ends": 1789259311055,
+        "xp_multiplier": 5
+      },
+      "newcomersblessing": {
+        "f": "Rataladin",
+        "ms": 1797585
+      },
+      "patronsgrace": {
+        "f": "Oragon",
+        "ms": 118070
+      }
+    },
+    "quests": {},
+    "progress": {
+      "achievements": {},
+      "acx": {},
+      "ap": {},
+      "cgrace": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "dt": {
+        "agitate": "2026-09-03T01:26:30.636Z",
+        "charge": "2026-09-10T06:19:51.963Z",
+        "cleave": "2026-09-03T01:26:30.636Z",
+        "dash": "2026-09-03T01:26:30.636Z",
+        "hardshell": "2026-09-03T01:26:30.636Z",
+        "stomp": "2026-09-03T01:26:30.636Z",
+        "taunt": "2026-09-07T16:33:43.924Z",
+        "warcry": "2026-09-03T01:26:30.636Z"
+      },
+      "encouragement": {
+        "group": "pid:76561198002404349",
+        "oldest": 1788395311055,
+        "return_until": 0
+      },
+      "entries": [
+        [
+          "USIII",
+          "Mon Sep 07 2026 16:36:38 GMT+0000 (Coordinated Universal Time)"
+        ]
+      ],
+      "first": false,
+      "history": [
+        {
+          "item": "hpbelt",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpamulet",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 19
+        },
+        {
+          "amount": 344,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 30586,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 17
+        },
+        {
+          "amount": 387,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 22888,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpbelt",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "wbook0",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 19
+        },
+        {
+          "amount": 378,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 20581,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpamulet",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 17
+        },
+        {
+          "amount": 651,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 22513,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "bwing",
+          "level": null,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "ringsj",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 18
+        },
+        {
+          "amount": 449,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 25054,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpbelt",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 17
+        },
+        {
+          "amount": 390,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 20785,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "gem0",
+          "level": null,
+          "name": "item",
+          "q": 2,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "bwing",
+          "level": null,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 17
+        },
+        {
+          "amount": 376,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 22637,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 19
+        },
+        {
+          "amount": 468,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 19712,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 16
+        },
+        {
+          "amount": 399,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 20669,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "wgloves",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpamulet",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 345,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 17
+        },
+        {
+          "amount": 20603,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 19
+        },
+        {
+          "amount": 380,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 24012,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpbelt",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "seashell",
+          "level": null,
+          "name": "item",
+          "q": 2,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "reefglass",
+          "level": null,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 20
+        },
+        {
+          "amount": 23108,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 36,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 32
+        },
+        {
+          "amount": 78,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 1158,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "sshield",
+          "level": 0,
+          "name": "item",
+          "q": 1
+        },
+        {
+          "amount": 46538,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 75960,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpbelt",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpbelt",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "gem0",
+          "level": null,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "ascale",
+          "level": null,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "item": "ringsj",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 107,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 63,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 72,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 45,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 63,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 846,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 46,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 51,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 65,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 48,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 417,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 91,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 55,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 60,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 22492,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 74,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 54,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 63,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 43,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 48,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 54,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 89,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 68,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "amount": 35949,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "carrotsword",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "hpbelt",
+          "level": 2,
+          "name": "item",
+          "q": 1
+        },
+        {
+          "from": "Puppygirl",
+          "item": "ringsj",
+          "level": 2,
+          "name": "item",
+          "q": 1
+        },
+        {
+          "from": "Puppygirl",
+          "item": "hpot1",
+          "level": null,
+          "name": "item",
+          "q": 200
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 200
+        },
+        {
+          "amount": 2374,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "hpot1",
+          "level": null,
+          "name": "item",
+          "q": 111
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 132
+        },
+        {
+          "from": "Puppygirl",
+          "item": "hpot1",
+          "level": null,
+          "name": "item",
+          "q": 4
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 3
+        },
+        {
+          "amount": 4539,
+          "name": "gold",
+          "to": "Puppygirl"
+        },
+        {
+          "item": "hpamulet",
+          "level": 0,
+          "name": "item",
+          "q": 1,
+          "to": "Puppygirl"
+        },
+        {
+          "from": "Puppygirl",
+          "item": "hpot1",
+          "level": null,
+          "name": "item",
+          "q": 4
+        },
+        {
+          "from": "Puppygirl",
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 3
+        }
+      ],
+      "home": "USII",
+      "item_num": 24,
+      "max_xp_multiplier": 13.828879907621246,
+      "minutes": 7246,
+      "ograce": 0,
+      "stats": {
+        "exchanges": {},
+        "monsters": {
+          "arcticbee": 737,
+          "armadillo": 15655,
+          "bat": 1917,
+          "bbpompom": 4,
+          "bee": 4583,
+          "crab": 26,
+          "croc": 309,
+          "frog": 2,
+          "goo": 418,
+          "gscorpion": 8,
+          "mummy": 2,
+          "phoenix": 4,
+          "snake": 4234,
+          "spider": 1069,
+          "squigtoad": 4,
+          "tortoise": 125
+        },
+        "monsters_diff": {
+          "arcticbee": 442.20000000000533,
+          "armadillo": 8485.099999999857,
+          "bat": 1081.9000000000185,
+          "bbpompom": 2.2,
+          "bee": 2676.399999999789,
+          "crab": 0,
+          "croc": 184.89999999999895,
+          "frog": 1.2000000000000002,
+          "goo": 216.89999999999864,
+          "gscorpion": 4.600000000000001,
+          "mummy": 1.2000000000000002,
+          "phoenix": 1.0499999999999994,
+          "snake": 2431.599999999874,
+          "spider": 615.6000000000084,
+          "squigtoad": 2.2,
+          "tortoise": 74.7
+        }
+      },
+      "steam_id": "76561198002404349",
+      "trades": null,
+      "ugrace": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "xcx": []
+    }
+  },
+  "access": {
+    "active": true,
+    "access_until": "2026-09-10T06:27:50.512Z",
+    "remaining_seconds": 185,
+    "billing_source": "shell",
+    "shells_per_period": 1,
+    "period_minutes": 60,
+    "active_characters": 1,
+    "renewal_minutes_by_characters": [
+      {
+        "characters": 1,
+        "minutes": 60
+      },
+      {
+        "characters": 2,
+        "minutes": 50
+      },
+      {
+        "characters": 3,
+        "minutes": 45
+      },
+      {
+        "characters": 4,
+        "minutes": 40
+      }
+    ],
+    "auto_renew": false,
+    "next_charge_at": null
+  },
+  "assignment": {
+    "assignment_id": "b970ea3a58b24f491811a1f8d4e99556",
+    "character": "Jazwyn",
+    "character_id": "CH_xOVr1MS2DN8qlv1ntZ0VB1IEy3Sp9",
+    "code_slot": "CH_xOVr1MS2DN8qlv1ntZ0VB1IEy3Sp9",
+    "server": "US III",
+    "desired_state": "stopped",
+    "stop_reason": "explicit_disconnect",
+    "last_failure": {
+      "code": "GAME_AUTH_REJECTED",
+      "reason": null,
+      "at": "2026-09-10T03:28:05.564Z"
+    },
+    "mainframe_event": {
+      "id": "2f63068f3df657b2749e6a8574457b93",
+      "assignment_id": "b970ea3a58b24f491811a1f8d4e99556",
+      "at": "2026-09-10T05:28:10.868Z",
+      "level": "info",
+      "code": "explicit_disconnect",
+      "message": "Disconnected by the account owner.",
+      "detail": null,
+      "phrase": "mainframe.event.explicit_disconnect",
+      "phrase_args": {}
+    },
+    "mainframe_error": {
+      "id": "b69b18f1cc08850d00c41129f1d106aa",
+      "assignment_id": "b970ea3a58b24f491811a1f8d4e99556",
+      "at": "2026-09-10T03:28:05.904Z",
+      "level": "error",
+      "code": "worker_restart",
+      "message": "Worker stopped unexpectedly. Mainframe will restart it.",
+      "detail": null
+    },
+    "revision": 146,
+    "execution": "dedicated_microvm",
+    "billing_mode": "dedicated",
+    "included_with": null,
+    "worker_slot": 1
+  },
+  "available": true,
+  "runtime": null
+}

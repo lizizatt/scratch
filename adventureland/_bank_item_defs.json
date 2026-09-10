@@ -1,0 +1,266 @@
+{
+  "anniversarygift": {
+    "type": "gem",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 100,
+    "e": 1
+  },
+  "ascale": {
+    "type": "material",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 500
+  },
+  "carrotsword": {
+    "type": "weapon",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 92000,
+    "grades": [
+      0,
+      7,
+      10,
+      12
+    ],
+    "wtype": "short_sword"
+  },
+  "dexamulet": {
+    "type": "amulet",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 30000,
+    "grades": [
+      3,
+      5,
+      6,
+      7
+    ]
+  },
+  "dexearring": {
+    "type": "earring",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 38000,
+    "grades": [
+      2,
+      5,
+      6,
+      7
+    ]
+  },
+  "gem0": {
+    "type": "gem",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 240000,
+    "e": 1
+  },
+  "hpamulet": {
+    "type": "amulet",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 20000,
+    "grades": [
+      3,
+      5,
+      6,
+      7
+    ]
+  },
+  "hpbelt": {
+    "type": "belt",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 20000,
+    "grades": [
+      3,
+      5,
+      6,
+      7
+    ]
+  },
+  "hpot0": {
+    "type": "pot",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 20
+  },
+  "hpot1": {
+    "type": "pot",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 100
+  },
+  "mpot0": {
+    "type": "pot",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 20
+  },
+  "mpot1": {
+    "type": "pot",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 100
+  },
+  "rednose": {
+    "type": "helmet",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 32000,
+    "grades": [
+      2,
+      4,
+      6,
+      7
+    ]
+  },
+  "reefglass": {
+    "type": "material",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 180
+  },
+  "ringsj": {
+    "type": "ring",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 24000,
+    "grades": [
+      3,
+      5,
+      6,
+      7
+    ]
+  },
+  "scroll0": {
+    "type": "uscroll",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 1000
+  },
+  "seashell": {
+    "type": "quest",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 800,
+    "e": 20
+  },
+  "shoes": {
+    "type": "shoes",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 12100,
+    "grades": [
+      7,
+      9,
+      10,
+      12
+    ]
+  },
+  "skullamulet": {
+    "type": "amulet",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 30000,
+    "grades": [
+      2,
+      4,
+      6,
+      7
+    ]
+  },
+  "staff": {
+    "type": "weapon",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 12400,
+    "grades": [
+      7,
+      9,
+      10,
+      12
+    ],
+    "wtype": "staff"
+  },
+  "stand0": {
+    "type": "stand",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 40000
+  },
+  "strearring": {
+    "type": "earring",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 38000,
+    "grades": [
+      2,
+      5,
+      6,
+      7
+    ]
+  },
+  "wbook0": {
+    "type": "source",
+    "compound": true,
+    "upgrade": false,
+    "sell": false,
+    "g": 12000,
+    "grades": [
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "wcap": {
+    "type": "helmet",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 6400,
+    "grades": [
+      7,
+      9,
+      10,
+      12
+    ]
+  },
+  "wshoes": {
+    "type": "shoes",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 24200,
+    "grades": [
+      7,
+      9,
+      10,
+      12
+    ]
+  }
+}
