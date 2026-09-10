@@ -29,7 +29,18 @@ function v2_start_fighter(opts) {
   const api = createAlApi();
   const ctrl = bootFighter(api, opts);
   let lastInvite = 0;
-  setInterval(function () {
+
+  // Mainframe hot-reload can re-run slot code in the same worker.
+  // Prevent multiple interval tickers from piling up.
+  const key = "__al_v2_fighter_tick_iv_" + (api.character && api.character.name ? api.character.name : "unknown");
+  try {
+    if (typeof globalThis !== "undefined" && globalThis[key]) clearInterval(globalThis[key]);
+  } catch (e) {}
+
+  let tickBusy = false;
+  const iv = setInterval(function () {
+    if (tickBusy) return;
+    tickBusy = true;
     try {
       v2_use_pots();
       try {
@@ -41,15 +52,26 @@ function v2_start_fighter(opts) {
         v2_invite_party(ctrl);
       }
       const p = ctrl.tick();
-      if (p && typeof p.then === "function") p.catch(function (e) {
-        const msg = e && e.message ? e.message : e && e.reason ? e.reason : e;
-        game_log("tick:" + (typeof msg === "string" ? msg : JSON.stringify(msg)));
-      });
+      if (p && typeof p.then === "function") {
+        p.catch(function (e) {
+          const msg = e && e.message ? e.message : e && e.reason ? e.reason : e;
+          game_log("tick:" + (typeof msg === "string" ? msg : JSON.stringify(msg)));
+        }).finally(function () {
+          tickBusy = false;
+        });
+      } else {
+        tickBusy = false;
+      }
     } catch (e) {
+      tickBusy = false;
       const msg = e && e.message ? e.message : e && e.reason ? e.reason : e;
       game_log("tick:" + (typeof msg === "string" ? msg : JSON.stringify(msg)));
     }
   }, 250);
+
+  try {
+    if (typeof globalThis !== "undefined") globalThis[key] = iv;
+  } catch (e) {}
   return ctrl;
 }
 

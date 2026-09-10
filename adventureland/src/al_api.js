@@ -42,8 +42,19 @@ function createAlApi() {
     bank_store: typeof bank_store === "function" ? bank_store : async function () {},
     bank_retrieve: typeof bank_retrieve === "function" ? bank_retrieve : async function () {},
     equip: typeof equip === "function" ? equip : async function () {},
+    unequip: typeof unequip === "function" ? unequip : async function () {},
     upgrade: typeof upgrade === "function" ? upgrade : async function () {},
     compound: typeof compound === "function" ? compound : async function () {},
+    exchange: typeof exchange === "function" ? exchange : async function () {},
+    get_secondhands: typeof get_secondhands === "function" ? get_secondhands : async function () {
+      return { success: true, items: [] };
+    },
+    buy_secondhand: typeof buy_secondhand === "function" ? buy_secondhand : async function () {
+      return { failed: true, reason: "no_buy_secondhand" };
+    },
+    auto_craft: typeof auto_craft === "function" ? auto_craft : async function () {
+      return { failed: true, reason: "no_auto_craft" };
+    },
     trade: typeof trade === "function" ? trade : function () {},
     open_stand: typeof open_stand === "function" ? open_stand : function () {},
     close_stand: typeof close_stand === "function" ? close_stand : function () {},
@@ -220,6 +231,14 @@ function createAlApi() {
         return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
       }
     },
+    async unequip(slot) {
+      try {
+        if (typeof unequip !== "function") return { failed: true, reason: "no_unequip" };
+        return await unequip(slot);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
+    },
     async upgrade(itemI, scrollI, offering, calculate) {
       try {
         if (typeof upgrade !== "function") return { failed: true, reason: "no_upgrade" };
@@ -232,6 +251,39 @@ function createAlApi() {
       try {
         if (typeof compound !== "function") return { failed: true, reason: "no_compound" };
         return await compound(a, b, cSlot, scrollI);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
+    },
+    async exchange(item_num) {
+      try {
+        if (typeof exchange !== "function") return { failed: true, reason: "no_exchange" };
+        return await exchange(item_num);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
+    },
+    async get_secondhands(timeout_ms) {
+      try {
+        if (typeof g.get_secondhands !== "function") return { failed: true, reason: "no_get_secondhands" };
+        return await g.get_secondhands(timeout_ms);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
+    },
+    async buy_secondhand(rid, timeout_ms) {
+      try {
+        if (typeof g.buy_secondhand !== "function") return { failed: true, reason: "no_buy_secondhand" };
+        return await g.buy_secondhand(rid, timeout_ms);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
+    },
+    async auto_craft(name) {
+      try {
+        if (typeof auto_craft === "function") return await auto_craft(name);
+        if (typeof g.auto_craft === "function") return await g.auto_craft(name);
+        return { failed: true, reason: "no_auto_craft" };
       } catch (e) {
         return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
       }
@@ -318,20 +370,52 @@ function createAlApi() {
     async leave() {
       return g.leave();
     },
+    transport(map, spawn) {
+      try {
+        if (typeof transport === "function") return transport(map, spawn);
+        if (typeof g.transport === "function") return g.transport(map, spawn);
+        return { failed: true, reason: "no_transport" };
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
+    },
     on(ev, fn) {
       const ch = typeof character !== "undefined" ? character : g.character;
       if (!ch || !ch.on) return;
+      const hkey = "__al_api_handlers_" + (ch.name || "unknown");
+      if (typeof globalThis !== "undefined") {
+        if (!globalThis[hkey]) globalThis[hkey] = { cm: [], partym: [], pm: [] };
+      }
       if (ev === "cm") {
-        ch.on("cm", function (m) {
+        const wrapper = function (m) {
           if (m && m.message == null && m.data != null) {
             m = Object.assign({}, m, { message: m.data });
           }
           fn(m);
-        });
-      } else if (ev === "partym") ch.on("partym", fn);
-      else if (ev === "pm") ch.on("pm", fn);
+        };
+        if (typeof globalThis !== "undefined") globalThis[hkey].cm.push(wrapper);
+        ch.on("cm", wrapper);
+      } else if (ev === "partym") {
+        if (typeof globalThis !== "undefined") globalThis[hkey].partym.push(fn);
+        ch.on("partym", fn);
+      } else if (ev === "pm") {
+        if (typeof globalThis !== "undefined") globalThis[hkey].pm.push(fn);
+        ch.on("pm", fn);
+      }
     },
-    clearHandlers() {},
+    clearHandlers() {
+      const ch = typeof character !== "undefined" ? character : g.character;
+      if (!ch) return;
+      const hkey = "__al_api_handlers_" + (ch.name || "unknown");
+      const bucket = typeof globalThis !== "undefined" ? globalThis[hkey] : null;
+      if (!bucket || typeof ch.removeListener !== "function") return;
+      for (let i = 0; i < bucket.cm.length; i++) ch.removeListener("cm", bucket.cm[i]);
+      for (let i = 0; i < bucket.partym.length; i++) ch.removeListener("partym", bucket.partym[i]);
+      for (let i = 0; i < bucket.pm.length; i++) ch.removeListener("pm", bucket.pm[i]);
+      bucket.cm = [];
+      bucket.partym = [];
+      bucket.pm = [];
+    },
   };
   return api;
 }

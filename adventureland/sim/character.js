@@ -4,6 +4,7 @@ const { dist, isBlocked, VISION_PX, SEND_ITEM_RANGE, LOOT_RANGE, packCenter, NPC
 const { findPath } = require("./path");
 const { createStorage } = require("./storage");
 const knobs = require("./knobs");
+const { classOk, canEquipSlot } = require("../src/gear");
 const {
   DAISY_RANGE,
   HUNT_DURATION_MS,
@@ -86,6 +87,9 @@ function createCharacter(world, over) {
     looted: [],
     traded: [],
     retrieved: [],
+    exchanged: [],
+    secondhand: [],
+    crafted: [],
   };
   let heapAlive = true;
 
@@ -327,17 +331,14 @@ function createCharacter(world, over) {
     equip(i, slot) {
       const it = c.items[i];
       if (!it) return Promise.resolve({ failed: true, reason: "no_item" });
-      const def = (world.G && world.G.items && world.G.items[it.name]) || {};
-      if (def.wtype && slot === "mainhand") {
-        const w = def.wtype;
-        const ctype = c.ctype || "warrior";
-        const ok =
-          ctype === "warrior"
-            ? ["sword", "short_sword", "wblade", "basher", "axe", "mace", "spear"].indexOf(w) >= 0
-            : ctype === "mage" || ctype === "priest"
-              ? ["staff", "great_staff", "wand"].indexOf(w) >= 0
-              : false;
-        if (!ok) return Promise.resolve({ failed: true, reason: "wrong_class" });
+      if (slot) {
+        if (!canEquipSlot(api, it, slot, world.G)) {
+          api.game_log("Wrong weapon");
+          return Promise.resolve({ failed: true, reason: "wrong_weapon" });
+        }
+      } else if (!classOk(it, c.ctype || "warrior", world.G)) {
+        api.game_log("Wrong weapon");
+        return Promise.resolve({ failed: true, reason: "wrong_weapon" });
       }
       const prev = slot ? c.slots[slot] : null;
       if (slot) {
@@ -491,6 +492,22 @@ function createCharacter(world, over) {
         map = NPC.monsterhunt.map;
         x = NPC.monsterhunt.x;
         y = NPC.monsterhunt.y;
+      } else if (dest && (dest.to === "exchange" || dest.to === "xyn")) {
+        map = NPC.exchange.map;
+        x = NPC.exchange.x;
+        y = NPC.exchange.y;
+      } else if (dest && (dest.to === "secondhands" || dest.to === "ponty")) {
+        map = NPC.secondhands.map;
+        x = NPC.secondhands.x;
+        y = NPC.secondhands.y;
+      } else if (dest && (dest.to === "basics" || dest.to === "weapons")) {
+        map = NPC.basics.map;
+        x = NPC.basics.x;
+        y = NPC.basics.y;
+      } else if (dest && dest.to === "craftsman") {
+        map = NPC.craftsman.map;
+        x = NPC.craftsman.x;
+        y = NPC.craftsman.y;
       } else if (dest && dest.to === "bank") {
         map = NPC.bank.map;
         x = NPC.bank.x;
@@ -625,6 +642,110 @@ function createCharacter(world, over) {
       c.esize = Math.max(0, (c.esize || 1) - 1);
       log.bought.push({ name, q });
       return { num: i };
+    },
+
+    /** AL-shaped exchange(item_num) — consume e units at Xyn. */
+    async exchange(item_num) {
+      if (c.stand) return { failed: true, reason: "stand_open" };
+      const npc = NPC.exchange;
+      if (c.map !== npc.map || dist(c, npc) > 40) {
+        return { failed: true, reason: "distance" };
+      }
+      const it = c.items[item_num];
+      if (!it) return { failed: true, reason: "no_item" };
+      const def = world.G.items[it.name] || {};
+      if (!def.e) return { failed: true, reason: "not_exchangeable" };
+      const need = def.e || 1;
+      const q = it.q == null ? 1 : it.q;
+      if (q < need) return { failed: true, reason: "quantity" };
+      const nm = it.name;
+      if (q === need) {
+        c.items[item_num] = null;
+        c.esize = (c.esize || 0) + 1;
+      } else {
+        it.q = q - need;
+      }
+      log.exchanged.push({ name: nm, num: item_num });
+      api.game_log("exchange " + nm);
+      return { success: true, name: nm };
+    },
+
+    async get_secondhands() {
+      const npc = NPC.secondhands;
+      if (c.map !== npc.map || dist(c, npc) > 40) {
+        return { failed: true, reason: "distance" };
+      }
+      const items = Array.isArray(world.ponty) ? world.ponty.slice() : [];
+      return { success: true, items };
+    },
+
+    async buy_secondhand(rid) {
+      const npc = NPC.secondhands;
+      if (c.map !== npc.map || dist(c, npc) > 40) {
+        return { failed: true, reason: "distance" };
+      }
+      if ((c.esize || 0) < 1) return { failed: true, reason: "no_space" };
+      const stock = Array.isArray(world.ponty) ? world.ponty : [];
+      const idx = stock.findIndex((x) => x && x.rid === rid);
+      if (idx < 0) return { failed: true, reason: "gone" };
+      const it = stock[idx];
+      const price = it.price != null ? it.price : (world.G.items[it.name] && world.G.items[it.name].g) || 1000;
+      if (c.gold < price) return { failed: true, reason: "gold" };
+      c.gold -= price;
+      stock.splice(idx, 1);
+      const slot = c.items.findIndex((x) => !x);
+      c.items[slot] = { name: it.name, level: it.level || 0, q: it.q };
+      c.esize = Math.max(0, (c.esize || 1) - 1);
+      log.secondhand.push({ rid, name: it.name, price });
+      api.game_log("ponty " + it.name + " @" + price);
+      return { success: true, name: it.name, price };
+    },
+
+    /** AL-shaped auto_craft(name) at Leo — consume recipe ingredients + gold. */
+    async auto_craft(name) {
+      if (c.stand) return { failed: true, reason: "stand_open" };
+      const npc = NPC.craftsman;
+      if (c.map !== npc.map || dist(c, npc) > 40) {
+        return { failed: true, reason: "distance" };
+      }
+      const rec = world.G.craft && world.G.craft[name];
+      if (!rec) return { failed: true, reason: "no_recipe" };
+      const cost = rec.cost || 0;
+      if (c.gold < cost) return { failed: true, reason: "gold" };
+      const slots = [];
+      for (const ing of rec.items || []) {
+        const need = ing[0] || 1;
+        const nm = ing[1];
+        const wantLv = ing[2] || 0;
+        let left = need;
+        for (let i = 0; i < c.items.length && left > 0; i++) {
+          const it = c.items[i];
+          if (!it || it.name !== nm || (it.level || 0) !== wantLv) continue;
+          slots.push(i);
+          left--;
+        }
+        if (left > 0) return { failed: true, reason: "ingredients" };
+      }
+      if ((c.esize || 0) < 1 && slots.length === 0) return { failed: true, reason: "space" };
+      for (const i of slots) {
+        if (!c.items[i]) continue;
+        const it = c.items[i];
+        if (it.q != null && it.q > 1) {
+          it.q -= 1;
+        } else {
+          c.items[i] = null;
+          c.esize = (c.esize || 0) + 1;
+        }
+      }
+      const outI = c.items.findIndex((x) => !x);
+      if (outI < 0) return { failed: true, reason: "space" };
+      c.gold -= cost;
+      c.items[outI] = { name, q: 1 };
+      c.esize = Math.max(0, (c.esize || 1) - 1);
+      c.q = Object.assign(c.q || {}, { craft: { ms: 400 } });
+      log.crafted.push(name);
+      api.game_log("craft " + name);
+      return { success: true, num: outI };
     },
 
     /**

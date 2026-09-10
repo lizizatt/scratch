@@ -20,6 +20,11 @@ const tests = [
       assert.deepStrictEqual(packs.safeMeet("armadillo"), { map: "main", x: 750, y: 1800 });
       assert.ok(packs.nearPack("armadillo", "main", 526, 1846));
       assert.ok(!packs.nearPack("armadillo", "main", 750, 1800));
+      // Live goo boundary center — must not be town plaza (0,180)
+      const goo = packs.packCenter("goo");
+      assert.ok(goo && goo.y > 600, "goo pack south of plaza, got y=" + (goo && goo.y));
+      assert.ok(Math.hypot(goo.x - -32, goo.y - 787) < 5, "goo near live boundary center");
+      assert.ok(!packs.nearPack("goo", "main", 0, 180), "plaza is not goo pack");
     },
   },
   {

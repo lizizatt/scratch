@@ -19,12 +19,21 @@ const {
   GEAR_AD_MS,
   SEND_RANGE,
   METRICS_MS,
+  FORM_R_OUT,
+  KEEP_ALWAYS,
 } = require("./constants");
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
 const { createMotion } = require("./motion");
 const { packCenter } = require("./packs");
-const { equipPending, isKeep, wornSnapshot, markGift, classOk } = require("./gear");
+const { equipPending, isKeep, wornSnapshot, markGift, classOk, canEquipSlot } = require("./gear");
+const {
+  DAISY,
+  getHunt,
+  huntComplete,
+  shouldInteractDaisy,
+  canAcceptHunts,
+} = require("./monsterhunt");
 
 /**
  * Boot a fighter into a sim (or real) API environment.
@@ -48,6 +57,16 @@ function bootFighter(api, opts) {
   let rareGoneAt = 0;
   let bootQuietUntil = 0;
   let lastGearAd = 0;
+  /** Daisy Monster Hunt chain (lead only) — toggled via merchant hunt_quest() / CM. */
+  let huntQuest = false;
+  /** Soft-skip: after MHUNT_DEATH_LIMIT deaths on hunt.id, farm default until that hunt clears. */
+  const MHUNT_DEATH_LIMIT = 3;
+  let mhuntDeaths = 0;
+  let mhuntDeathForId = null;
+  let mhuntSoftSkipId = null;
+  const defaultFarm = opts.farm || "armadillo";
+  /** Intent snapshot taken when entering rare — restored on rare_kill/gone/timeout. */
+  let preRareSnap = null;
   const giftTtl = {};
   const metrics = { t0: 0, kills: 0, gold0: 0, emitCount: 0 };
 
@@ -94,6 +113,11 @@ function bootFighter(api, opts) {
           assembleUntil,
           rareGoneAt,
           lastStatusAt,
+          huntQuest: huntQuest ? 1 : 0,
+          preRareSnap: preRareSnap,
+          mhuntDeaths: mhuntDeaths,
+          mhuntDeathForId: mhuntDeathForId,
+          mhuntSoftSkipId: mhuntSoftSkipId,
         })
       );
     } catch (e) {}
@@ -114,6 +138,11 @@ function bootFighter(api, opts) {
       if (d.assembleUntil) assembleUntil = d.assembleUntil;
       if (d.rareGoneAt) rareGoneAt = d.rareGoneAt;
       if (d.lastStatusAt) lastStatusAt = d.lastStatusAt;
+      if (d.huntQuest != null) huntQuest = !!d.huntQuest;
+      if (d.preRareSnap) preRareSnap = d.preRareSnap;
+      if (d.mhuntDeaths != null) mhuntDeaths = d.mhuntDeaths | 0;
+      if (d.mhuntDeathForId) mhuntDeathForId = d.mhuntDeathForId;
+      if (d.mhuntSoftSkipId) mhuntSoftSkipId = d.mhuntSoftSkipId;
     } catch (e) {}
   }
 
@@ -155,7 +184,7 @@ function bootFighter(api, opts) {
   /** Free ≥1 bag slot by selling junk, then surplus pots if dry on the other type. */
   async function freeBagSlot() {
     if ((api.character.esize || 0) >= 1) return true;
-    equipPending(api, api.G || {}, giftTtl);
+    await equipPending(api, api.G || {}, giftTtl);
     if ((api.character.esize || 0) >= 1) return true;
     async function sellAt(i, it) {
       if (typeof api.sell !== "function") return false;
@@ -170,10 +199,11 @@ function bootFighter(api, opts) {
       if (isKeep(api, it, api.G || {}, giftTtl)) continue;
       if (await sellAt(i, it)) return true;
     }
-    // Still full of "keep" gear duplicates — sell any non-pot
+    // Still full of "keep" gear duplicates — sell any non-pot (never Tracktrix/stand)
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (!it || /^hpot|^mpot/.test(it.name)) continue;
+      if (KEEP_ALWAYS.indexOf(it.name) >= 0) continue;
       if (await sellAt(i, it)) return true;
     }
     // Pot-only full bag: dry on one type while the other fills every slot
@@ -190,6 +220,42 @@ function bootFighter(api, opts) {
     return (api.character.esize || 0) >= 1;
   }
 
+  /** Unequip shields on non-warriors / wrong-class weapons so they toss to merchant. */
+  async function stripWrongClass() {
+    const G = api.G || {};
+    const ctype = api.character.ctype;
+    const slots = api.character.slots || {};
+    const keys = ["mainhand", "offhand", "helmet", "chest", "pants", "shoes", "gloves", "cape", "belt", "amulet", "earring1", "earring2"];
+    for (const slot of keys) {
+      const it = slots[slot];
+      if (!it) continue;
+      if (classOk(it, ctype, G)) continue;
+      if ((api.character.esize || 0) < 1) {
+        await freeBagSlot();
+        if ((api.character.esize || 0) < 1) {
+          api.game_log("strip:no_space " + it.name);
+          return;
+        }
+      }
+      if (typeof api.unequip !== "function") return;
+      try {
+        const r = await Promise.resolve(api.unequip(slot));
+        if (r && r.failed) {
+          api.game_log("strip:fail " + it.name + " " + (r.reason || ""));
+          continue;
+        }
+        // Live may resolve without clearing — only count success if slot empty.
+        if (api.character.slots[slot] && api.character.slots[slot].name === it.name) {
+          api.game_log("strip:stuck " + it.name + " on " + slot);
+          continue;
+        }
+        api.game_log("strip " + it.name + " from " + slot);
+      } catch (e) {
+        api.game_log("strip:err " + ((e && e.message) || e));
+      }
+    }
+  }
+
   function sendGearAd() {
     const snap = wornSnapshot(api);
     api.send_cm(MERCHANT, {
@@ -203,15 +269,43 @@ function bootFighter(api, opts) {
     api.game_log("gear_ad");
   }
 
+  let lastGoldOffload = 0;
+
+  function merchantDist(m) {
+    if (!m) return 1e9;
+    if (typeof api.parent.distance === "function") return api.parent.distance(api.character, m);
+    return Math.hypot(
+      (api.character.real_x || 0) - (m.real_x != null ? m.real_x : m.x || 0),
+      (api.character.real_y || 0) - (m.real_y != null ? m.real_y : m.y || 0)
+    );
+  }
+
+  /** Send gold above GOLD_FLOAT_FIGHTER when merchant is in send range (legacy offload). */
+  async function offloadGold() {
+    const now = api._now();
+    if (now - lastGoldOffload < 2500) return 0;
+    const m = api.get_player(MERCHANT);
+    if (!m || m.rip || api.character.bank) return 0;
+    const excess = Math.floor((api.character.gold || 0) - GOLD_FLOAT_FIGHTER);
+    if (excess <= 0) return 0;
+    if (!(merchantDist(m) <= (SEND_RANGE || 320))) return 0;
+    lastGoldOffload = now;
+    try {
+      await api.send_gold(MERCHANT, excess);
+      api.game_log("gold_offload " + excess);
+      return excess;
+    } catch (e) {
+      lastGoldOffload = 0;
+      api.game_log("gold_offload_fail");
+      return 0;
+    }
+  }
+
   async function tossLoot() {
     const m = api.get_player(MERCHANT);
     if (!m || m.rip) return 0;
     if (api.character.bank) return 0;
-    const d =
-      typeof api.parent.distance === "function"
-        ? api.parent.distance(api.character, m)
-        : Math.hypot((api.character.real_x || 0) - (m.real_x || m.x || 0), (api.character.real_y || 0) - (m.real_y || m.y || 0));
-    if (!(d <= (SEND_RANGE || 320))) return 0;
+    if (!(merchantDist(m) <= (SEND_RANGE || 320))) return 0;
     let n = 0;
     for (let i = 0; i < api.character.items.length && n < 12; i++) {
       const it = api.character.items[i];
@@ -232,13 +326,18 @@ function bootFighter(api, opts) {
     return n;
   }
 
+  async function offloadToMerchant() {
+    await offloadGold();
+    return tossLoot();
+  }
+
   async function handleGearOffer(d) {
     if (!d || !d.name) return;
     const id = d.id || d.name;
     const slot = d.slot;
     const prev = slot && api.character.slots[slot] ? Object.assign({}, api.character.slots[slot]) : null;
     markGift(giftTtl, id, d.name, api._now());
-    equipPending(api, api.G || {}, giftTtl);
+    await equipPending(api, api.G || {}, giftTtl);
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (it && it.name === d.name && (it.level || 0) === (d.level || 0)) {
@@ -246,11 +345,16 @@ function bootFighter(api, opts) {
           api.game_log("gear:class_skip " + it.name);
           break;
         }
-        if (typeof api.equip === "function") await api.equip(i, d.slot || undefined);
+        const slotWant = d.slot || undefined;
+        if (slotWant && !canEquipSlot(api, it, slotWant, api.G || {})) {
+          api.game_log("gear:slot_skip " + it.name);
+          break;
+        }
+        if (typeof api.equip === "function") await api.equip(i, slotWant);
         break;
       }
     }
-    equipPending(api, api.G || {}, giftTtl);
+    await equipPending(api, api.G || {}, giftTtl);
     const worn = slot && api.character.slots[slot];
     const ok =
       worn && worn.name === d.name && (worn.level || 0) === (d.level || 0) ? 1 : 0;
@@ -261,8 +365,8 @@ function bootFighter(api, opts) {
     ) {
       api.game_log("gear:replaced " + prev.name + "@" + (prev.level || 0));
     }
-    // Return replaced / non-keep pieces while merchant is still in range (P5)
-    const tossed = await tossLoot();
+    // Return replaced / non-keep pieces (+ excess gold) while merchant is still in range (P5)
+    const tossed = await offloadToMerchant();
     if (tossed) api.game_log("gear:toss_after n=" + tossed);
     await api.send_cm(MERCHANT, {
       gear_got: 1,
@@ -423,19 +527,24 @@ function bootFighter(api, opts) {
       chat.setLastOk(api._now());
       return;
     }
-    if (parsed.type === "hb") state.applyHeartbeat(from, parsed);
+    if (parsed.type === "hb") {
+      const party = Object.keys(api.get_party() || {});
+      state.applyHeartbeat(from, parsed, party.length ? party : [name]);
+    }
     else if (parsed.type === "diff") state.applyDiff(from, parsed);
     else if (parsed.type === "rare") {
-      state.applyRare(from, parsed.mtype);
+      noteRareEnter(from, parsed.mtype);
       assembleUntil = api._now() + ASSEMBLE_TIMEOUT_MS;
       rareGoneAt = 0;
       persist();
     } else if (parsed.type === "cmd") {
       applyCmd(parsed, from === name);
     }
-    // leave announces
+    // Real leave announces only — do NOT stop on "Transfer <mtype>" farm echoes.
+    // Live 2026-09-09: Sarene stranded at town bridge; lead Transfer armadillo
+    // interrupted her smart_move every chat tick.
     const m = ("" + msg.message).toLowerCase();
-    if (m.indexOf("port town") >= 0 || m.indexOf("transfer ") === 0 || m.indexOf("world ") === 0) {
+    if (m.indexOf("port town") >= 0 || m.indexOf("world ") === 0) {
       try {
         api.stop("smart");
       } catch (e) {}
@@ -449,20 +558,23 @@ function bootFighter(api, opts) {
     // Lead owns intent broadcast; every fighter must apply hold/resume/hunt locally
     // or followers never hop (adversarial: setIntent is lead-only).
     if (cmd === "hold") {
-      if (isLead()) state.setIntent({ hold: 1, kind: "hold" }, present);
+      // Hold is orthogonal to hunt/farm kind — do not clobber !hunt mtype/kind.
+      if (isLead()) state.setIntent({ hold: 1 }, present);
       else {
         state.S.intent.hold = 1;
-        state.S.intent.kind = "hold";
       }
       state.S.mode = "hold";
     } else if (cmd === "resume") {
-      if (isLead()) state.setIntent({ hold: 0, kind: "farm" }, present);
+      // Keep hunt kind/mtype — only clear hold (don't demote !hunt → default farm).
+      const kind = state.S.intent.kind === "hunt" ? "hunt" : "farm";
+      if (isLead()) state.setIntent({ hold: 0, kind }, present);
       else {
         state.S.intent.hold = 0;
-        state.S.intent.kind = "farm";
+        state.S.intent.kind = kind;
       }
       state.S.mode = "farm";
       state.S.rare = null;
+      preRareSnap = null;
     } else if (cmd === "hunt" && parsed.args[0]) {
       if (isLead()) state.setIntent({ kind: "hunt", mtype: parsed.args[0], hold: 0 }, present);
       else {
@@ -496,13 +608,19 @@ function bootFighter(api, opts) {
   async function hearCm(m) {
     const d = m.message;
     if (!d || typeof d !== "object") return;
-    // Merchant console → CM (Puppygirl hunt/world/hold)
+    // Merchant console → CM (Puppygirl hunt/world/hold/hunt_quest)
     if (d.hunt) applyCmd({ type: "cmd", cmd: "hunt", args: ["" + d.hunt] }, isLead());
     if (d.grind) applyCmd({ type: "cmd", cmd: "grind", args: [] }, isLead());
     if (d.world && Array.isArray(d.world))
       applyCmd({ type: "cmd", cmd: "world", args: [d.world[0] + "/" + d.world[1]] }, isLead());
     if (d.hold === 1) applyCmd({ type: "cmd", cmd: "hold", args: [] }, isLead());
     if (d.hold === 0) applyCmd({ type: "cmd", cmd: "resume", args: [] }, isLead());
+    if (d.hunt_quest != null) {
+      huntQuest = !!(d.hunt_quest === 1 || d.hunt_quest === true);
+      api.game_log("hunt_quest " + (huntQuest ? "on" : "off"));
+      api.set_message(huntQuest ? "HQ on" : "HQ off");
+      persist();
+    }
     if (d.dlv_ack && dlvPending && d.id === dlvPending.id) {
       dlvPending.acked = d.ok ? 1 : 0;
       lastStatusAt = api._now();
@@ -522,15 +640,195 @@ function bootFighter(api, opts) {
       persist();
     }
     if (d.dlv_loot_q) {
-      const n = await tossLoot();
+      const n = await offloadToMerchant();
       api.game_log("dlv:toss n=" + n);
       api.send_cm(MERCHANT, { dlv_loot_done: 1, id: d.id || null, n });
     }
     if (d.gear_offer) await handleGearOffer(d);
     if (d.job === "meet_home" || d.hold === 1) {
-      state.setIntent({ hold: 1, kind: "hold" });
+      state.setIntent({ hold: 1 });
       persist();
     }
+  }
+
+  async function goDaisy() {
+    let r = await motion.goTo({ map: DAISY.map, x: DAISY.x, y: DAISY.y });
+    if (r && r.failed) r = await api.smart_move({ to: "monsterhunt" });
+    return !(r && r.failed);
+  }
+
+  /**
+   * Lead-only Daisy Monster Hunt chain.
+   * Soft-skip: if we died MHUNT_DEATH_LIMIT times on hunt.id, farm defaultFarm until
+   * that assignment clears (expire / turn-in), then resume accepting.
+   * @returns {boolean} true if this tick was consumed (path/interact)
+   */
+  async function tickHuntQuest(now) {
+    if (!huntQuest || !isLead()) return false;
+    if (state.S.intent.hold) return false;
+    if (!canAcceptHunts(api.character.ctype)) return false;
+
+    const h = getHunt(api.character);
+
+    // Soft-abandon clears when the skipped assignment is gone or replaced.
+    if (mhuntSoftSkipId) {
+      if (!h || h.id !== mhuntSoftSkipId || !(h.c > 0)) {
+        api.game_log("mhunt:soft_resume was=" + mhuntSoftSkipId);
+        mhuntSoftSkipId = null;
+        mhuntDeaths = 0;
+        mhuntDeathForId = null;
+        persist();
+      } else {
+        // Still stuck with lethal hunt — stay on default farm; do not path to pack.
+        if (state.S.intent.mtype === mhuntSoftSkipId || state.S.intent.kind === "hunt") {
+          const party = Object.keys(api.get_party() || {});
+          const present = party.length ? party : [name];
+          state.setIntent({ kind: "farm", mtype: defaultFarm, hold: 0 }, present);
+          persist();
+        }
+        return false;
+      }
+    }
+
+    // Active hunt — sync party farm target, walk to pack if far, then tickFarm combat.
+    if (h && h.c > 0) {
+      if (state.S.intent.mtype !== h.id || state.S.intent.kind !== "hunt") {
+        const party = Object.keys(api.get_party() || {});
+        const present = party.length ? party : [name];
+        state.setIntent({ kind: "hunt", mtype: h.id, hold: 0 }, present);
+        api.game_log("mhunt:farm id=" + h.id + " c=" + h.c);
+        persist();
+      }
+      const pc = packCenter(h.id);
+      if (pc) {
+        const here = api.character;
+        const far =
+          here.map !== pc.map ||
+          Math.hypot((here.real_x || 0) - pc.x, (here.real_y || 0) - pc.y) > 280;
+        const mon = api.get_nearest_monster({ type: h.id });
+        const inRange = mon && typeof api.is_in_range === "function" ? api.is_in_range(mon) : !!mon;
+        if (far && !inRange) {
+          state.setSelf({ task: "moving" });
+          await motion.goTo({ map: pc.map, x: pc.x, y: pc.y });
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // No hunt or c===0 → Daisy accept / turn-in
+    if (!shouldInteractDaisy(api.character)) return false;
+
+    state.setSelf({ task: "mhunt" });
+    api.set_message(h && huntComplete(h) ? "MH turnin" : "MH Daisy");
+    if (!(await goDaisy())) {
+      api.game_log("mhunt:daisy_path_fail");
+      return true;
+    }
+    let r = null;
+    try {
+      r = await api.interact("monsterhunt");
+    } catch (e) {
+      api.game_log("mhunt:interact_err");
+      return true;
+    }
+    if (r && r.failed) {
+      // Already-have is fine — snap and farm next tick
+      if (r.reason === "monsterhunt_already") {
+        const cur = getHunt(api.character);
+        if (cur && cur.id) {
+          api.game_log("mhunt:already id=" + cur.id + " c=" + cur.c);
+          const party = Object.keys(api.get_party() || {});
+          const present = party.length ? party : [name];
+          state.setIntent({ kind: "hunt", mtype: cur.id, hold: 0 }, present);
+          persist();
+        }
+        return true;
+      }
+      api.game_log("mhunt:interact_fail " + (r.reason || ""));
+      return true;
+    }
+
+    const h2 = getHunt(api.character);
+    if (h2 && h2.c > 0) {
+      // New assignment — reset death counter for this id.
+      if (mhuntDeathForId !== h2.id) {
+        mhuntDeathForId = h2.id;
+        mhuntDeaths = 0;
+      }
+      api.game_log("mhunt:start id=" + h2.id + " c=" + h2.c + " sn=" + (h2.sn || ""));
+      const party = Object.keys(api.get_party() || {});
+      const present = party.length ? party : [name];
+      state.setIntent({ kind: "hunt", mtype: h2.id, hold: 0 }, present);
+      persist();
+    } else if (!h2) {
+      api.game_log("mhunt:done");
+      mhuntDeaths = 0;
+      mhuntDeathForId = null;
+    }
+    return true;
+  }
+
+  /** Lead death while farming Daisy hunt target → soft-abandon after limit. */
+  function noteHuntQuestDeath() {
+    if (!huntQuest || !isLead()) return;
+    const h = getHunt(api.character);
+    if (!h || !(h.c > 0) || !h.id) return;
+    if (mhuntSoftSkipId === h.id) return;
+    if (mhuntDeathForId !== h.id) {
+      mhuntDeathForId = h.id;
+      mhuntDeaths = 0;
+    }
+    mhuntDeaths += 1;
+    api.game_log("mhunt:death id=" + h.id + " n=" + mhuntDeaths + "/" + MHUNT_DEATH_LIMIT);
+    if (mhuntDeaths >= MHUNT_DEATH_LIMIT) {
+      mhuntSoftSkipId = h.id;
+      const party = Object.keys(api.get_party() || {});
+      const present = party.length ? party : [name];
+      state.setIntent({ kind: "farm", mtype: defaultFarm, hold: 0 }, present);
+      api.game_log("mhunt:soft_abandon id=" + h.id + " farm=" + defaultFarm);
+      api.set_message("HQ skip " + h.id);
+    }
+  }
+
+  function noteRareEnter(from, mtype) {
+    if (state.S.mode !== "rare") {
+      preRareSnap = {
+        kind: state.S.intent.kind || "farm",
+        mtype: state.S.intent.mtype || null,
+        hold: state.S.intent.hold ? 1 : 0,
+      };
+    }
+    state.applyRare(from, mtype);
+  }
+
+  function exitRare(reason) {
+    state.S.rare = null;
+    rareGoneAt = 0;
+    if (preRareSnap) {
+      const party = Object.keys(api.get_party() || {});
+      const present = party.length ? party : [name];
+      const snap = preRareSnap;
+      preRareSnap = null;
+      if (isLead()) {
+        state.setIntent(
+          {
+            kind: snap.kind || "farm",
+            mtype: snap.mtype || state.S.intent.mtype,
+            hold: snap.hold ? 1 : 0,
+          },
+          present
+        );
+      } else {
+        state.S.intent.kind = snap.kind || state.S.intent.kind || "farm";
+        if (snap.mtype) state.S.intent.mtype = snap.mtype;
+        state.S.intent.hold = snap.hold ? 1 : 0;
+      }
+      api.game_log("rare_resume " + (snap.kind || "farm") + " " + (snap.mtype || "-"));
+    }
+    state.S.mode = "farm";
+    if (reason) api.game_log(reason);
+    persist();
   }
 
   async function tickRare(now) {
@@ -538,49 +836,69 @@ function bootFighter(api, opts) {
       const seen = motion.spotRare();
       if (seen) {
         chat.enqueue("~R " + seen.mtype, "rare");
-        state.applyRare(name, seen.mtype);
+        noteRareEnter(name, seen.mtype);
         assembleUntil = now + ASSEMBLE_TIMEOUT_MS;
         api.game_log("rare_spot " + seen.mtype);
         persist();
       }
       return false;
     }
-    // Assemble to spotter via party-list coords
+    // Assemble to spotter via party-list coords; fight the rare when visible.
     const by = state.S.rare.by;
     const p = (api.get_party() || {})[by] || api.get_player(by);
     if (p) {
       const m = motion.spotRare();
       if (m) {
         rareGoneAt = 0;
-        // kill: walk to entity coords
-        if (!api.is_in_range(m)) await motion.goTo({ map: m.map || api.character.map, x: m.real_x, y: m.real_y });
-        // sim: mark dead when leader attacks
-        if (isLead() && api.is_in_range(m)) {
-          m.dead = true;
-          m.hp = 0;
-          api.game_log("rare_kill " + m.mtype);
-          state.S.rare = null;
-          state.S.mode = "farm";
-          persist();
-          return true;
+        if (!api.is_in_range(m)) {
+          await motion.goTo({
+            map: m.map || api.character.map,
+            x: m.real_x != null ? m.real_x : m.x,
+            y: m.real_y != null ? m.real_y : m.y,
+          });
+        }
+        if (api.is_in_range(m)) {
+          // Live + sim: fight the rare. Slot combat no-ops while smart.moving,
+          // so also swing directly once closed.
+          if (opts.pre_combat && opts.pre_combat()) return true;
+          if (opts.combat) opts.combat(m.mtype);
+          try {
+            if (typeof api.change_target === "function") api.change_target(m);
+            if (typeof api.attack === "function") {
+              if (!api.can_attack || api.can_attack(m)) api.attack(m);
+            }
+          } catch (eAtk) {}
+          if (m.dead || !(m.hp > 0)) {
+            exitRare("rare_kill " + m.mtype);
+            return true;
+          }
+          // Sim rares are low-HP (phoenix≈4k); live phoenix is ~240k — keep swinging live,
+          // but finish sim assemble scenarios once the lead has closed to range.
+          if (isLead() && m.max_hp != null && m.max_hp <= 10000) {
+            m.dead = true;
+            m.hp = 0;
+            exitRare("rare_kill " + m.mtype);
+            return true;
+          }
         }
       } else {
         if (!rareGoneAt) rareGoneAt = now;
         else if (now - rareGoneAt > RARE_GONE_MS) {
-          api.game_log("rare_gone");
-          state.S.rare = null;
-          state.S.mode = "farm";
-          persist();
+          exitRare("rare_gone");
         }
       }
     }
     if (now > assembleUntil) {
-      api.game_log("rare_timeout");
-      state.S.rare = null;
-      state.S.mode = "farm";
-      persist();
+      exitRare("rare_timeout");
     } else if (p && (p.map !== api.character.map || motion.dist(api.character, p) > 100)) {
-      await motion.goTo({ map: p.map, x: p.real_x != null ? p.real_x : p.x, y: p.real_y != null ? p.real_y : p.y });
+      // Only chase spotter when we do not currently see the rare (otherwise fight it).
+      if (!motion.spotRare()) {
+        await motion.goTo({
+          map: p.map,
+          x: p.real_x != null ? p.real_x : p.x,
+          y: p.real_y != null ? p.real_y : p.y,
+        });
+      }
     }
     return true;
   }
@@ -619,7 +937,7 @@ function bootFighter(api, opts) {
       // After ack, give merchant PENDING_MS (path can be multi-minute via cave)
       const grace = dlvPending && dlvPending.acked ? PENDING_MS : FALLBACK_SILENCE_MS;
       if (dlvPending && lastStatusAt && now - lastStatusAt < grace) {
-        // Stay farming — merchant approaches to send range outside pack aggro.
+        // Merchant approaches to send range outside pack aggro.
         if (now - lastBeacon > BEACON_MS) {
           lastBeacon = now;
           await api.send_cm(MERCHANT, {
@@ -630,25 +948,43 @@ function bootFighter(api, opts) {
             y: api.character.real_y,
           });
         }
-        return;
-      }
-      if (dlvPending && now - dlvPending.t0 > grace) {
+        // Lead waits in place; followers still path to pack (do not strand in town).
+        if (isLead()) return;
+      } else if (dlvPending && now - dlvPending.t0 > grace) {
         await townFallback();
         return;
+      } else {
+        if (!dlvPending) await requestPots();
+        // Lead: wait for delivery. Followers: fall through to follow/pack path.
+        if (isLead()) return;
       }
-      if (!dlvPending) await requestPots();
-      return;
     }
     if (pots === "low" && !dlvPending) await requestPots();
 
     // Burn after restock checks so dry-wait does not waste pots
-    burnPotsNow(now);
+    if (pots !== "dry") burnPotsNow(now);
 
     if (!isLead()) {
       state.setSelf({ task: "follow" });
-      if (opts.form) await motion.followFormation(opts.form);
-      else await motion.followLeader();
+      const followed = opts.form
+        ? await motion.followFormation(opts.form)
+        : await motion.followLeader();
       const mtype = state.S.intent.mtype || "armadillo";
+      const pc = packCenter(mtype);
+      // Out of party / no lead coords / follow "ok" but still far (stale party xy):
+      // hard-path to pack instead of standing Idle at town forever.
+      if (pc && RARE_WHITELIST.indexOf(mtype) < 0) {
+        const d = api.character.map === pc.map ? motion.dist(api.character, pc) : 1e9;
+        if (d > FORM_R_OUT) {
+          api.game_log((followed ? "follow:far_pack" : "follow:no_lead") + " -> " + mtype);
+          await motion.goTo({ map: pc.map, x: pc.x, y: pc.y });
+        }
+      }
+      // No combat while dry — pots first; keep closing on lead/pack above.
+      if (pots === "dry") {
+        persist();
+        return;
+      }
       if (opts.pre_combat && opts.pre_combat()) {
         persist();
         return;
@@ -660,7 +996,15 @@ function bootFighter(api, opts) {
     // Leader farms
     const mtype = state.S.intent.mtype || "armadillo";
     const mon = api.get_nearest_monster({ type: mtype });
-    if (!mon) {
+    // Far "seen" mobs (sim ignores vision; live can still be long-range) must not
+    // skip pack smart_move — stepToward walks into walls and stalls mid-route.
+    const ENGAGE_R = 280;
+    const monHere =
+      mon &&
+      !mon.dead &&
+      (api.character.map === (mon.map || api.character.map)) &&
+      motion.dist(api.character, mon) <= ENGAGE_R;
+    if (!monHere) {
       state.setSelf({ task: "moving" });
       if (RARE_WHITELIST.indexOf(mtype) >= 0) {
         // Never path by type for rares (LESSONS #6) — wait for spot / coords
@@ -668,8 +1012,13 @@ function bootFighter(api, opts) {
         return;
       }
       if (isLead()) {
-        chat.enqueue("Transfer " + mtype, "echo");
-        chat.tick(now);
+        const pc0 = packCenter(mtype);
+        // Only announce Transfer when leaving the current map (true hop/leave).
+        // Same-map pack walks must not spam Transfer — followers stop("smart") on it.
+        if (pc0 && pc0.map && pc0.map !== api.character.map) {
+          chat.enqueue("Transfer " + mtype, "echo");
+          chat.tick(now);
+        }
         // Brief cohesion window; always proceed after (followers use followLeader)
         await motion.waitParty(now, 5000);
       }
@@ -683,6 +1032,8 @@ function bootFighter(api, opts) {
     if (opts.combat) opts.combat(mtype);
   }
 
+  let mapEscapeAt = 0;
+
   async function tick() {
     const now = api._now();
     // Jail / death before any farm motion (LESSONS)
@@ -695,8 +1046,75 @@ function bootFighter(api, opts) {
       persist();
       return;
     }
+    // Event / dead-end maps (e.g. spookytown): cross-map smart_move often
+    // local_route_not_found. Live fix: town (reset xy) → walk/move to door → transport.
+    // spookytown doors dest="halloween" (not main); still exits the trap.
+    const map = api.character.map;
+    if (map && map !== "main" && map !== "bank" && map !== "cave" && map !== "winterland" && map !== "winter_cave" && map !== "tunnel") {
+      const farmMaps = { main: 1, cave: 1, winterland: 1, winter_cave: 1, tunnel: 1 };
+      const want = packCenter(state.S.intent.mtype || "armadillo");
+      if (want && want.map && map !== want.map && !farmMaps[map]) {
+        if (now - mapEscapeAt < 12000) {
+          persist();
+          return;
+        }
+        mapEscapeAt = now;
+        api.game_log("map:escape " + map + "->" + want.map);
+        try {
+          if (typeof api.stop === "function") api.stop("smart");
+        } catch (e0) {}
+        try {
+          if (typeof api.use === "function") api.use("town");
+        } catch (eTown) {}
+        await api.sleep(2200);
+        let door = null;
+        try {
+          const GG = api.G;
+          const doors = (GG && GG.maps && GG.maps[map] && GG.maps[map].doors) || [];
+          for (let i = 0; i < doors.length; i++) {
+            if (doors[i] && doors[i][4] && doors[i][4] !== map) {
+              door = doors[i];
+              break;
+            }
+          }
+          api.game_log("map:escape_door n=" + doors.length + (door ? " dest=" + door[4] : " none"));
+        } catch (e1) {}
+        if (door) {
+          const dx = door[0];
+          const dy = door[1];
+          // smart_move may fail inside event maps — step with move().
+          for (let step = 0; step < 50; step++) {
+            const cx = api.character.real_x != null ? api.character.real_x : api.character.x;
+            const cy = api.character.real_y != null ? api.character.real_y : api.character.y;
+            const dist = Math.hypot(cx - dx, cy - dy);
+            if (dist < 40) break;
+            const len = dist || 1;
+            try {
+              api.move(cx + ((dx - cx) / len) * 28, cy + ((dy - cy) / len) * 28);
+            } catch (eM) {}
+            await api.sleep(320);
+          }
+          try {
+            if (typeof api.transport === "function") {
+              api.transport(door[4], door[5] == null ? 0 : door[5]);
+            }
+          } catch (e3) {
+            api.game_log("map:escape_transport_err");
+          }
+          try {
+            if (api.parent && api.parent.socket && typeof api.parent.socket.emit === "function") {
+              api.parent.socket.emit("transport", { to: door[4] });
+            }
+          } catch (e4) {}
+          await api.sleep(2000);
+        }
+        persist();
+        return;
+      }
+    }
     if (api.character.rip) {
       api.game_log("rip:respawn");
+      noteHuntQuestDeath();
       try {
         if (typeof api.respawn === "function") await api.respawn();
       } catch (e) {}
@@ -706,9 +1124,10 @@ function bootFighter(api, opts) {
     }
     motion.evalPresent(now);
     if (typeof api.loot === "function") api.loot();
-    equipPending(api, api.G || {}, giftTtl);
+    await stripWrongClass();
+    await equipPending(api, api.G || {}, giftTtl);
     if (now - lastGearAd >= GEAR_AD_MS) sendGearAd();
-    await tossLoot();
+    await offloadToMerchant();
     emitMetrics(now);
     if (isLead() && now >= bootQuietUntil && now - lastHb >= HEARTBEAT_MS) {
       reseedSeqAboveHeard();
@@ -718,6 +1137,10 @@ function bootFighter(api, opts) {
     chat.tick(now);
 
     if (await tickRare(now)) {
+      persist();
+      return;
+    }
+    if (await tickHuntQuest(now)) {
       persist();
       return;
     }
@@ -764,6 +1187,17 @@ function bootFighter(api, opts) {
     persist,
     freeBagSlot,
     applyCmd: (c) => applyCmd(c, true),
+    setHuntQuest(v) {
+      huntQuest = !!v;
+      api.game_log("hunt_quest " + (huntQuest ? "on" : "off"));
+      persist();
+    },
+    get huntQuest() {
+      return huntQuest;
+    },
+    get mhuntSoftSkipId() {
+      return mhuntSoftSkipId;
+    },
     get dlvPending() {
       return dlvPending;
     },

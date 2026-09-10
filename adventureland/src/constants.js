@@ -16,7 +16,6 @@ const FORM_FAR = 40;
 const FORM_REANCHOR = 70;
 const FORM_MAGE = { dx: -45, dy: 55, face: 1 };
 const FORM_PRIEST = { dx: 45, dy: 55, face: 1 };
-const ATTACK_MS = 800;
 const PACK_COUNT = 5;
 const RESPAWN_MS = 10000;
 const MELEE_RANGE = 40;
@@ -36,14 +35,83 @@ const SEND_RANGE = 320;
 const ASSEMBLE_TIMEOUT_MS = 60000;
 const RARE_GONE_MS = 20000;
 const RARE_WHITELIST = ["phoenix"];
-/** Merchant stall / bank junk whitelist (derived from live bank dump 2026-09-09). */
-const SELL_WHITELIST = ["dexamulet", "dexearring", "rednose", "strearring", "wcap", "wshoes", "frogt", "leatherboots"];
+/** Never toss/sell — Tracktrix (`tracker`) stays on Jazwyn permanently; craft tools stay parked. */
+const KEEP_ALWAYS = ["stand0", "tracker", "pickaxe", "rod"];
+/** Merchant idle: exchange these with Xyn (NPC `exchange`). */
+const EXCHANGE_ITEMS = ["gem0", "anniversarygift"];
+/**
+ * Instant NPC vendor (`sell`) — holiday junk + materials that never move on stall.
+ * Do NOT vendor goal earrings (strearring / vitearring / intearring) or capes.
+ */
+const VENDOR_NPC = [
+  "dexamulet",
+  "dexearring",
+  "rednose",
+  "wcap",
+  "wshoes",
+  "frogt",
+  "leatherboots",
+  "beewings",
+  "gslime",
+];
+/** @deprecated alias — all former stall junk is NPC-vendored now. */
+const SELL_WHITELIST = VENDOR_NPC;
 /** Compound priority for bank clean / merchant combine. */
-const COMBINE_PRIORITY = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
-const GEAR_TYPES = ["gloves", "shoes", "helmet", "pants", "coat", "ringsj"];
+const COMBINE_PRIORITY = [
+  "ringsj",
+  "strearring",
+  "vitearring",
+  "intearring",
+  "hpbelt",
+  "hpamulet",
+  "wbook0",
+  "stramulet",
+  "intbelt",
+  "vitring",
+  "armorring",
+];
+const GEAR_TYPES = ["gloves", "shoes", "helmet", "pants", "coat", "ringsj", "cape"];
 /** Vendor base pieces we may buy for empty fighter slots (post-MVP sourcing). */
 const VENDOR_GEAR = ["gloves", "shoes", "helmet", "pants", "coat"];
-const SCROLL0_ALLOW = ["pants", "coat", "gloves", "shoes", "helmet"];
+/** scroll0 upgrade allowlist — armor bases + cape + Jazwyn spiked shield. */
+const SCROLL0_ALLOW = ["pants", "coat", "gloves", "shoes", "helmet", "sshield", "cape"];
+/**
+ * Named gear targets (gift / keep / Ponty·Ron browse).
+ * Earrings: str → warrior, vit → priest, int → mage. Cape: basic cape for all fighters.
+ */
+const GEAR_TARGETS = {
+  Jazwyn: {
+    offhand: "sshield",
+    mainhand: "fireblade",
+    earring1: "strearring",
+    earring2: "strearring",
+    cape: "cape",
+  },
+  Zarook: {
+    offhand: "wbook0",
+    earring1: "vitearring",
+    earring2: "vitearring",
+    cape: "cape",
+  },
+  Sarene: {
+    offhand: "wbook0",
+    earring1: "intearring",
+    earring2: "intearring",
+    cape: "cape",
+  },
+};
+/** Ponty browse quotas: [name, wantCount] across bag+bank+equipped. */
+const PONTY_WANT = [
+  ["strearring", 6],
+  ["vitearring", 6],
+  ["intearring", 4],
+  ["cape", 3],
+  ["sshield", 2],
+  ["wbook0", 2],
+];
+const PONTY_MULT = 1.25;
+/** Idle craft at Leo — fishing rod item id is `rod` (cheaper first). */
+const CRAFT_TARGETS = ["rod", "pickaxe"];
 const MAX_SAFE_UPGRADE = 5;
 const MIN_UPGRADE_CHANCE = 0.9;
 /** Merchant keeps this gold floor for pot deliveries before gear buys. */
@@ -69,7 +137,6 @@ module.exports = {
   FORM_REANCHOR,
   FORM_MAGE,
   FORM_PRIEST,
-  ATTACK_MS,
   PACK_COUNT,
   RESPAWN_MS,
   MELEE_RANGE,
@@ -89,11 +156,18 @@ module.exports = {
   ASSEMBLE_TIMEOUT_MS,
   RARE_GONE_MS,
   RARE_WHITELIST,
+  KEEP_ALWAYS,
+  EXCHANGE_ITEMS,
+  VENDOR_NPC,
   SELL_WHITELIST,
   COMBINE_PRIORITY,
   GEAR_TYPES,
   VENDOR_GEAR,
   SCROLL0_ALLOW,
+  GEAR_TARGETS,
+  PONTY_WANT,
+  PONTY_MULT,
+  CRAFT_TARGETS,
   MAX_SAFE_UPGRADE,
   MIN_UPGRADE_CHANCE,
   GOLD_FLOAT_MERCHANT,

@@ -44,10 +44,71 @@ function baseG() {
       frogt: { g: 120, type: "material", sell: true },
       leatherboots: { g: 200, type: "shoes", upgrade: true, armor: 1, grades: [7, 9] },
       stand0: { g: 40000 },
+      tracker: { g: 12000, type: "tracker" },
+      gem0: { g: 24000, e: 1, type: "gem" },
+      anniversarygift: { g: 0, e: 1, type: "misc" },
+      sshield: {
+        g: 24000,
+        type: "shield",
+        armor: 60,
+        resistance: 20,
+        dreturn: 3,
+        upgrade: { dreturn: 1.5, armor: 10, resistance: 7 },
+        grades: [4, 8, 10, 12],
+      },
+      shield: {
+        g: 24000,
+        type: "shield",
+        armor: 60,
+        resistance: 20,
+        upgrade: { armor: 12.5, resistance: 7.5 },
+        grades: [4, 8, 10, 12],
+      },
+      wbook0: { g: 12000, type: "source", int: 3 },
+      beewings: { g: 20, type: "material", sell: true },
+      strearring: { g: 38000, type: "earring", str: 3, compound: { str: 2 }, grades: [2, 5] },
+      vitearring: { g: 38000, type: "earring", vit: 3, compound: { vit: 2 }, grades: [2, 5] },
+      intearring: { g: 38000, type: "earring", int: 3, compound: { int: 2 }, grades: [2, 5] },
+      dexearring: { g: 38000, type: "earring", dex: 3, compound: { dex: 2 }, grades: [2, 5] },
+      cape: { g: 20000, type: "cape", armor: 10, resistance: 8, stat: 4, upgrade: true, grades: [0, 8, 10, 12] },
       staff: { g: 12400, type: "weapon", wtype: "staff", upgrade: true, attack: 25, grades: [7, 9] },
-      fireblade: { g: 48000, type: "weapon", wtype: "sword", upgrade: true, attack: 30, grades: [5, 8] },
-      blade: { g: 8000, type: "weapon", wtype: "sword", upgrade: true, attack: 18, grades: [7, 9] },
+      fireblade: {
+        g: 48000,
+        type: "weapon",
+        wtype: "short_sword",
+        upgrade: { attack: 4.5, range: 1.5 },
+        attack: 21,
+        grades: [0, 8],
+      },
+      blade: { g: 8000, type: "weapon", wtype: "short_sword", upgrade: { attack: 4 }, attack: 15, grades: [7, 9] },
+      wblade: { g: 100000, type: "weapon", wtype: "wblade", attack: 48, upgrade: { attack: 8 }, grades: [0, 0] },
+      basher: { g: 40000, type: "weapon", wtype: "basher", attack: 35, armor: 20, upgrade: { attack: 9, armor: 4 }, grades: [0, 7] },
+      bataxe: { g: 50000, type: "weapon", wtype: "axe", attack: 41, reflection: 4, upgrade: { attack: 10 }, grades: [0, 6] },
+      spidersilk: { g: 300, type: "material", s: 9999 },
+      pickaxe: { g: 2000, type: "tool", wtype: "pickaxe" },
+      rod: { g: 2000, type: "tool", wtype: "rod" },
       monstertoken: { g: 12000, type: "token", npc: "monsterhunter" },
+    },
+    craft: {
+      pickaxe: { items: [[1, "staff"], [1, "spidersilk"], [1, "blade"]], cost: 100 },
+      rod: { items: [[1, "staff"], [1, "spidersilk"]], cost: 100 },
+    },
+    classes: {
+      warrior: {
+        mainhand: { spear: {}, short_sword: {}, sword: {}, fist: {}, mace: {} },
+        offhand: { shield: {}, short_sword: {}, sword: {}, misc_offhand: {}, fist: {}, mace: {} },
+        doublehand: { rapier: {}, bow: {}, axe: {}, scythe: {}, basher: {}, great_sword: {} },
+      },
+      mage: {
+        mainhand: { staff: {}, wblade: {}, wand: {} },
+        offhand: { source: {}, misc_offhand: {} },
+        doublehand: {},
+      },
+      priest: {
+        mainhand: { pmace: {}, staff: {} },
+        offhand: { shield: {}, source: {}, misc_offhand: {} },
+        doublehand: { wand: {} },
+      },
     },
     skills: {
       taunt: { mp: 40, cooldown: 3000 },
@@ -61,7 +122,7 @@ function baseG() {
     maps: {
       main: {
         monsters: [
-          { type: "goo", boundary: [-80, 100, 80, 260] },
+          { type: "goo", boundary: [-282, 702, 218, 872] },
           { type: "bee", boundary: [500, 1000, 580, 1100] },
           { type: "crab", boundary: [-1240, -100, -1160, -30] },
           { type: "snake", boundary: [-120, 1860, -40, 1940] },
@@ -164,6 +225,17 @@ const NPC = {
   /** Daisy — live maps.main.npcs monsterhunter position [126,-413] */
   monsterhunt: { map: "main", x: 126, y: -413 },
   daisy: { map: "main", x: 126, y: -413 },
+  /** Xyn — live maps.main.npcs exchange position [-25,-478] */
+  exchange: { map: "main", x: -25, y: -478 },
+  xyn: { map: "main", x: -25, y: -478 },
+  /** Ponty — live maps.main.npcs secondhands ≈ [106,-47] */
+  secondhands: { map: "main", x: 106, y: -47 },
+  ponty: { map: "main", x: 106, y: -47 },
+  /** Gabriel — basics/weapons vendor ≈ [-89,-165] */
+  basics: { map: "main", x: -89, y: -165 },
+  weapons: { map: "main", x: -89, y: -165 },
+  /** Leo — craftsman ≈ [92,670] */
+  craftsman: { map: "main", x: 92, y: 670 },
 };
 
 function dist(a, b) {

@@ -2,7 +2,7 @@
 
 const { createClock } = require("./clock");
 const { createComms } = require("./comms");
-const { baseG, dist, VISION_PX } = require("./world");
+const { baseG, dist, VISION_PX, isBlocked } = require("./world");
 const { createCharacter, RECONNECT_MS, SERVER_REGION_DELAY_MS } = require("./character");
 
 /**
@@ -22,7 +22,7 @@ function createWorld(opts) {
   /** serverKey -> Set of party leader names / party membership maps */
   const parties = new Map(); // serverKey -> { [memberName]: { map, x, y, real_x, real_y, rip, level } }
   /** Shared with spawn `self` — characters close over self, not the returned handle. */
-  const huntBridge = { monsterHuntQueue: [], nextMonsterHunt: null };
+  const huntBridge = { monsterHuntQueue: [], nextMonsterHunt: null, ponty: [] };
 
   function sk(region, ident) {
     return region + "/" + ident;
@@ -68,6 +68,12 @@ function createWorld(opts) {
       },
       set nextMonsterHunt(fn) {
         huntBridge.nextMonsterHunt = fn;
+      },
+      get ponty() {
+        return huntBridge.ponty;
+      },
+      set ponty(v) {
+        huntBridge.ponty = Array.isArray(v) ? v : [];
       },
       entitiesOn(serverKey, map) {
         const m = servers.get(serverKey) || new Map();
@@ -188,6 +194,12 @@ function createWorld(opts) {
       set nextMonsterHunt(fn) {
         huntBridge.nextMonsterHunt = fn;
       },
+      get ponty() {
+        return huntBridge.ponty;
+      },
+      set ponty(v) {
+        huntBridge.ponty = Array.isArray(v) ? v : [];
+      },
     };
 
     // Pre-register stub so region getters work during init
@@ -290,32 +302,57 @@ function createWorld(opts) {
     return bag[mid];
   }
 
-  /** Respawn dead pack mobs; call from world.advance. */
+  function hashStr(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return h;
+  }
+
+  /** Optional random walk inside a box (`m._wander`); used by merchant avoidance scenarios. */
+  function tickWander(m, now) {
+    const w = m._wander;
+    if (!w || m.dead) return;
+    const period = w.periodMs != null ? w.periodMs : 300;
+    const tick = Math.floor(now / period);
+    if (m._wanderTick === tick) return;
+    m._wanderTick = tick;
+    const h = Math.abs(hashStr(m.id + "@" + tick));
+    const ang = ((h % 360) * Math.PI) / 180;
+    const spd = w.speed != null ? w.speed : 22;
+    let nx = m.real_x + Math.cos(ang) * spd;
+    let ny = m.real_y + Math.sin(ang) * spd;
+    if (w.x0 != null) nx = Math.max(w.x0, Math.min(w.x1, nx));
+    if (w.y0 != null) ny = Math.max(w.y0, Math.min(w.y1, ny));
+    if (!isBlocked(m.map, nx, ny, G)) {
+      m.real_x = nx;
+      m.real_y = ny;
+      m.x = nx;
+      m.y = ny;
+    }
+  }
+
+  /** Respawn dead pack mobs + optional wander; call from world.advance. */
   function tickMonsters() {
     const now = clock.now();
     for (const bag of monsterBags.values()) {
       for (const id of Object.keys(bag)) {
         const m = bag[id];
-        if (!m || !m.dead || !m.respawnAt || now < m.respawnAt) continue;
+        if (!m) continue;
+        if (m._wander) tickWander(m, now);
+        if (!m.dead || !m.respawnAt || now < m.respawnAt) continue;
         m.dead = false;
         m.hp = m.max_hp;
         m.target = null;
         m.respawnAt = 0;
         // Small jitter so respawns "pop" nearby rather than exact corpse xy
-        const jx = ((Math.abs(hashStr(id + now)) % 70) - 35);
-        const jy = ((Math.abs(hashStr(id + "y" + now)) % 70) - 35);
+        const jx = (Math.abs(hashStr(id + now)) % 70) - 35;
+        const jy = (Math.abs(hashStr(id + "y" + now)) % 70) - 35;
         m.real_x = (m._homeX != null ? m._homeX : m.real_x) + jx;
         m.real_y = (m._homeY != null ? m._homeY : m.real_y) + jy;
         m.x = m.real_x;
         m.y = m.real_y;
       }
     }
-  }
-
-  function hashStr(s) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-    return h;
   }
 
   function spawnPack(serverKey, map, mtype, center, count) {
@@ -465,6 +502,12 @@ function createWorld(opts) {
     },
     set nextMonsterHunt(fn) {
       huntBridge.nextMonsterHunt = fn;
+    },
+    get ponty() {
+      return huntBridge.ponty;
+    },
+    set ponty(v) {
+      huntBridge.ponty = Array.isArray(v) ? v : [];
     },
     get(name) {
       const r = roster.get(name);

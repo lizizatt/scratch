@@ -251,6 +251,20 @@ test("scenario: 15 min farm loot→equip / bank / gift / stall", async () => {
     bankSeed: [{ name: "gloves", level: 2 }],
   });
   await p.runFor(20 * 60 * 1000);
+  const farmEndT = p.world.clock.now();
+  // Stall is idle-only now — satiate fighters and drain queue so frogt can vendor.
+  for (const n of ["Jazwyn", "Sarene", "Zarook"]) {
+    const bag = p.bots[n].api.character.items || [];
+    for (const it of bag) {
+      if (it && it.name && it.name.indexOf("hpot") === 0) it.q = 200;
+      if (it && it.name && it.name.indexOf("mpot") === 0) it.q = 200;
+    }
+  }
+  for (let i = 0; i < 250; i++) {
+    await p.tickAll();
+    const early = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+    if (early.some((m) => /^vendor:sell frogt/.test(m))) break;
+  }
 
   const allGame = [];
   for (const n of Object.keys(p.bots)) {
@@ -261,6 +275,7 @@ test("scenario: 15 min farm loot→equip / bank / gift / stall", async () => {
     m: g.m,
     t: g.t != null ? g.t : 0,
   }));
+  const mFarm = mGame.filter((g) => g.t <= farmEndT);
   const mLog = mGame.map((g) => g.m);
 
   function first(logs, re) {
@@ -307,10 +322,10 @@ test("scenario: 15 min farm loot→equip / bank / gift / stall", async () => {
   const tossFrogt = allGame.filter((g) => /^toss frogt/.test(g.m));
   const storeFrogt = mGame.filter((g) => /^bank:store frogt/.test(g.m));
   assert.ok(tossFrogt.length >= 1, "expected toss frogt to merchant");
-  // Sell junk goes to stall directly (not park) — bank:store frogt is optional.
+  // Sell junk vendors from idleEcon when idle (see post-run drain above).
   assert.ok(
-    storeFrogt.length >= 1 || mGame.some((g) => /^stall:list frogt/.test(g.m) || /^stall:pull frogt/.test(g.m)),
-    "expected frogt banked or stalled"
+    storeFrogt.length >= 1 || mLog.some((m) => /^vendor:sell frogt/.test(m)),
+    "expected frogt banked or NPC-vendored after idle drain"
   );
   if (storeFrogt.length) {
     assert.ok(
@@ -320,11 +335,11 @@ test("scenario: 15 min farm loot→equip / bank / gift / stall", async () => {
   }
 
   // --- Ordered gift chain from bankSeed gloves@2 (batched onto pots or standalone) ---
-  const planEv = first(mGame, /^gear:plan gloves@2->(\w+)/);
+  const planEv = first(mFarm, /^gear:plan gloves@2->(\w+)/);
   assert.ok(planEv, "expected gear:plan gloves@2");
   const giftWho = planEv.m.match(/^gear:plan gloves@2->(\w+)/)[1];
-  const retrieveEv = first(mGame, /bank_retrieve gloves@2/);
-  const sendEv = first(mGame, /^dlv:send_gear gloves@2/);
+  const retrieveEv = first(mFarm, /bank_retrieve gloves@2/);
+  const sendEv = first(mFarm, /^dlv:send_gear gloves@2/);
   const gotEv = allGame.find((g) => g.who === giftWho && /^gear_got gloves ok=1/.test(g.m));
   assert.ok(retrieveEv, "expected bank_retrieve gloves@2");
   assert.ok(sendEv, "expected dlv:send_gear gloves@2");
@@ -335,48 +350,23 @@ test("scenario: 15 min farm loot→equip / bank / gift / stall", async () => {
   const worn = p.bots[giftWho].api.character.slots.gloves;
   assert.ok(worn && worn.name === "gloves" && (worn.level || 0) >= 2, giftWho + " should wear gloves@2");
   // P3 under burn: gift must ride a pot job (no standalone dlv_gear)
-  const batchEv = mGame.find((g) => /^gear:batch id=/.test(g.m));
+  const batchEv = mFarm.find((g) => /^gear:batch id=/.test(g.m));
   assert.ok(batchEv, "expected gear:batch under burnPots");
   assert.ok(
-    !mGame.some((g) => /^dlv:active dlv_gear/.test(g.m)),
+    !mFarm.some((g) => /^dlv:active dlv_gear/.test(g.m)),
     "must not spawn standalone dlv_gear while pots are burning"
   );
   const batchId = batchEv.m.match(/^gear:batch id=(\S+)/)[1];
   assert.ok(
-    mGame.some((g) => g.m === "dlv:done id=" + batchId),
+    mFarm.some((g) => g.m === "dlv:done id=" + batchId),
     "gear:batch id must match a pot dlv:done id"
   );
 
-  // --- Stall from farm frogt (no frogt in bankSeed) ---
-  const stallOpen = first(mGame, /^stall:open /);
-  const stallList = first(mGame, /^stall:list frogt /);
-  assert.ok(stallOpen, "expected stall:open");
-  assert.ok(stallList, "expected stall:list frogt");
-  if (storeFrogt.length) {
-    assert.ok(
-      storeFrogt.some((s) => s.t <= stallList.t),
-      "expected bank:store frogt before stall:list when parked"
-    );
-  }
+  // --- NPC vendor from farm frogt (no frogt in bankSeed) ---
+  const vendorSell = first(mGame, /^vendor:sell frogt/);
+  assert.ok(vendorSell, "expected vendor:sell frogt");
   assert.strictEqual(FROGT_SEED, 0, "test invariant: no frogt seed");
-  const bank = p.bots.Puppygirl.api.character._bank || p.bots.Puppygirl.api.character.bank;
-  let frogtBank = 0;
-  if (bank) {
-    for (const pack of Object.keys(bank)) {
-      if (!Array.isArray(bank[pack])) continue;
-      for (const it of bank[pack]) {
-        if (it && it.name === "frogt") frogtBank += it.q == null ? 1 : it.q;
-      }
-    }
-  }
-  let frogtTrade = 0;
-  for (const it of Object.values(p.bots.Puppygirl.api.character.slots || {})) {
-    if (it && it.name === "frogt") frogtTrade += it.q == null ? 1 : it.q;
-  }
-  assert.ok(
-    frogtBank + frogtTrade >= 1,
-    "farm frogt should remain in bank and/or stall (got bank=" + frogtBank + " trade=" + frogtTrade + ")"
-  );
+  assert.ok(!mLog.some((m) => /^stall:list frogt/.test(m)), "must not stall-list frogt");
 
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
   assert.strictEqual(gradeSim(p.world, {}).chat_throttle, 0);
@@ -518,8 +508,8 @@ test("scenario: gift swap tosses replaced piece to bank (P5)", async () => {
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
 });
 
-test("scenario: continuous pot queue parks then stalls before next dequeue", async () => {
-  // Non-empty q must not starve bank:store / stall:open (regression for park-before-dequeue).
+test("scenario: continuous pot queue skips stall flash before delivery", async () => {
+  // Non-empty q must go straight to delivery — not open stall then close on dequeue (live flash).
   const p = bootParty({
     pack: "armadillo",
     pots: 40,
@@ -528,7 +518,6 @@ test("scenario: continuous pot queue parks then stalls before next dequeue", asy
   });
   const mCtrl = p.bots.Puppygirl.ctrl;
   const mApi = p.bots.Puppygirl.api;
-  // Seed whitelist junk into merchant bag + keep queue busy with pot jobs
   const bag = mApi.character.items;
   const slot = bag.findIndex((x) => !x);
   assert.ok(slot >= 0, "merchant needs a free bag slot");
@@ -552,37 +541,37 @@ test("scenario: continuous pot queue parks then stalls before next dequeue", asy
       { name: "mpot1", q: 5 },
     ],
   });
-  assert.ok(mCtrl.store.q.length >= 2, "queue must stay non-empty during park/stall");
+  assert.ok(mCtrl.store.q.length >= 2, "queue must stay non-empty during delivery");
 
-  let stallEv = null;
+  let firstActive = null;
   for (let i = 0; i < 200; i++) {
     await p.tickAll();
-    const mGame = mApi.log.game;
-    if (!stallEv) stallEv = mGame.find((g) => /^stall:open /.test(g.m) || /^stall:list frogt/.test(g.m));
-    if (stallEv) break;
+    firstActive = mApi.log.game.find((g) => /^dlv:active dlv_pots/.test(g.m));
+    if (firstActive) break;
   }
-  assert.ok(stallEv, "expected stall:open/list while queue busy (sell junk skips park)");
-
-  let afterStall = null;
-  for (let i = 0; i < 200; i++) {
-    await p.tickAll();
-    afterStall = mApi.log.game.find(
-      (g) => g.t >= stallEv.t && /^dlv:active dlv_pots/.test(g.m)
-    );
-    if (afterStall) break;
-  }
-  assert.ok(afterStall, "expected a pot job to activate after stall");
-  assert.ok(stallEv.t <= afterStall.t, "stall before next dlv:active");
+  assert.ok(firstActive, "expected dlv:active");
+  const stallBeforeActive = mApi.log.game.find(
+    (g) => g.t < firstActive.t && (/^stall:open /.test(g.m) || /^stall:list frogt/.test(g.m) || /^vendor:sell frogt/.test(g.m))
+  );
+  assert.ok(!stallBeforeActive, "must not flash-open stall/vendor before delivery when queue busy");
 
   let done = false;
   for (let i = 0; i < 400; i++) {
     await p.tickAll();
-    if (mApi.log.game.some((g) => /^dlv:done id=/.test(g.m))) {
+    if (mApi.log.game.filter((g) => /^dlv:done id=/.test(g.m)).length >= 2) {
       done = true;
       break;
     }
   }
-  assert.ok(done, "pot delivery must still complete after park/stall");
+  assert.ok(done, "pot deliveries must complete");
+
+  let vendorAfterIdle = null;
+  for (let i = 0; i < 200; i++) {
+    await p.tickAll();
+    vendorAfterIdle = mApi.log.game.find((g) => /^vendor:sell frogt/.test(g.m));
+    if (vendorAfterIdle) break;
+  }
+  assert.ok(vendorAfterIdle, "expected vendor:sell after queue drained (idleEcon)");
   assert.strictEqual(gradeSim(p.world, {}).fighter_hop, 0);
 });
 
@@ -1546,6 +1535,118 @@ test("scenario: Jazwyn rejoins → leadership returns from Sarene", async () => 
   }
   assert.strictEqual(cj.isLead(), true);
   assert.strictEqual(cs.isLead(), false);
+});
+
+test("scenario: dry follower still paths to pack (no town strand)", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 100000,
+    members: ["Jazwyn", "Sarene", "Puppygirl"],
+  });
+  const lead = p.bots.Jazwyn.api.character;
+  const mage = p.bots.Sarene.api.character;
+  // Strand mage at town plaza while lead farms pack
+  mage.map = "main";
+  mage.x = mage.real_x = -32;
+  mage.y = mage.real_y = -80;
+  for (let i = 0; i < mage.items.length; i++) mage.items[i] = null;
+  mage.esize = mage.items.length;
+  for (let i = 0; i < 40; i++) {
+    await p.tickAll();
+    const d = Math.hypot(mage.real_x - lead.real_x, mage.real_y - lead.real_y);
+    if (d < 500) break;
+  }
+  const d = Math.hypot(mage.real_x - lead.real_x, mage.real_y - lead.real_y);
+  const logs = p.bots.Sarene.api.log.game.map((g) => g.m).join("\n");
+  assert.ok(
+    d < 500 || /follow:(far_pack|no_lead)/.test(logs),
+    "dry Sarene should leave town toward pack; d=" + Math.round(d)
+  );
+});
+
+test("scenario: fighter gold_offload above GOLD_FLOAT_FIGHTER to merchant", async () => {
+  const { GOLD_FLOAT_FIGHTER } = require("../src/constants");
+  const slots = {
+    helmet: { name: "helmet", level: 7 },
+    chest: { name: "coat", level: 7 },
+    pants: { name: "pants", level: 7 },
+    shoes: { name: "shoes", level: 7 },
+    gloves: { name: "gloves", level: 7 },
+    mainhand: { name: "blade", level: 7 },
+    offhand: { name: "shield", level: 7 },
+  };
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    members: ["Jazwyn", "Puppygirl"],
+    fighterSlots: slots,
+    bankSeed: [],
+  });
+  const j = p.bots.Jazwyn.api.character;
+  const m = p.bots.Puppygirl.api.character;
+  m.map = j.map;
+  m.x = m.real_x = j.real_x + 40;
+  m.y = m.real_y = j.real_y;
+  m.gold = 0;
+  j.gold = GOLD_FLOAT_FIGHTER + 500000;
+  for (let i = 0; i < 20; i++) await p.tickAll();
+  assert.ok(
+    p.bots.Jazwyn.api.log.game.some((g) => /^gold_offload /.test(g.m)),
+    "expected gold_offload log"
+  );
+  assert.ok(j.gold <= GOLD_FLOAT_FIGHTER + 1, "fighter keeps float, got " + j.gold);
+  assert.ok(m.gold >= 400000, "merchant received excess, got " + m.gold);
+});
+
+test("scenario: broke merchant scoops fighter gold then buys pots", async () => {
+  const { GOLD_FLOAT_FIGHTER } = require("../src/constants");
+  const slots = {
+    helmet: { name: "helmet", level: 7 },
+    chest: { name: "coat", level: 7 },
+    pants: { name: "pants", level: 7 },
+    shoes: { name: "shoes", level: 7 },
+    gloves: { name: "gloves", level: 7 },
+    mainhand: { name: "blade", level: 7 },
+    offhand: { name: "shield", level: 7 },
+  };
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    members: ["Jazwyn", "Puppygirl"],
+    potionTarget: 20,
+    fighterSlots: slots,
+    bankSeed: [],
+  });
+  const j = p.bots.Jazwyn.api.character;
+  const m = p.bots.Puppygirl.api.character;
+  m.gold = 0;
+  j.gold = GOLD_FLOAT_FIGHTER + 800000;
+  // Merchant at vendor — buy_float then scoop to pack
+  m.map = "main";
+  m.x = m.real_x = 56;
+  m.y = m.real_y = -122;
+  await p.bots.Jazwyn.ctrl.requestPots();
+  let bought = false;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    if (p.bots.Puppygirl.api.log.game.some((g) => /^dlv:buy /.test(g.m))) {
+      bought = true;
+      break;
+    }
+  }
+  const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
+  assert.ok(mLog.some((x) => x === "dlv:buy_float"), "expected initial buy_float");
+  assert.ok(mLog.some((x) => /^dlv:scoop_gold/.test(x)), "expected scoop");
+  assert.ok(
+    mLog.some((x) => /^dlv:scoop_meet /.test(x)) || mLog.some((x) => /^dlv:scoop_got gold=/.test(x)),
+    "expected scoop meet or got gold"
+  );
+  assert.ok(
+    mLog.some((x) => /^dlv:scoop_got gold=/.test(x) && !/^dlv:scoop_got gold=0$/.test(x)),
+    "scoop should receive gold: " + mLog.filter((x) => /^dlv:scoop/.test(x)).join(" | ")
+  );
+  assert.ok(bought, "merchant must buy pots after scoop: " + mLog.filter((x) => /^dlv:/.test(x)).slice(0, 25).join(" | "));
 });
 
 module.exports = { tests };

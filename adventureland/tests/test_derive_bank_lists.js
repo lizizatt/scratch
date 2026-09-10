@@ -33,7 +33,7 @@ test("derive: legacy sell + combine ringsj x3", () => {
   };
   const d = deriveBankLists({ packs, defs, bags: {} });
   assert.ok(d.combine.some((c) => c.name === "ringsj" && c.level === 0 && c.copies === 3));
-  assert.ok(d.proposed.SELL_WHITELIST.indexOf("strearring") >= 0);
+  assert.ok(d.proposed.SELL_WHITELIST.indexOf("strearring") < 0, "goal earrings are not legacy sell");
   assert.ok(d.proposed.SELL_WHITELIST.indexOf("wcap") >= 0);
   assert.ok(d.proposed.SELL_WHITELIST.indexOf("shoes") < 0, "shoes must be level-gated, not name whitelist");
   assert.ok(d.sell.some((s) => s.name === "shoes" && s.level === 3));

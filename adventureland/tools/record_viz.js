@@ -40,7 +40,7 @@ function tagsFor(name) {
   if (/rare|phoenix|assemble/.test(n)) tags.push("rare");
   if (/boot|succession|subset|zarook|sarene/.test(n)) tags.push("boot");
   if (/farm|armadillo|30 min|together/.test(n)) tags.push("farm");
-  if (/smart_move|path|spider|blocked|clock|owe|sleep/.test(n)) tags.push("motion");
+  if (/smart_move|path|spider|blocked|clock|owe|sleep|dodge|valley|avoid/.test(n)) tags.push("motion");
   if (/gear/.test(n)) tags.push("gear");
   if (/invariant|grade|hop lines/.test(n)) tags.push("invariants");
   if (!tags.length) tags.push("unit");
@@ -70,6 +70,7 @@ function buildCatalog() {
     { id: "packs", mod: require("../tests/test_packs") },
     { id: "dist", mod: require("../tests/test_dist") },
     { id: "mc", mod: require("../tests/test_mc_mvp") },
+    { id: "merchant_avoid", mod: require("../tests/test_merchant_avoid") },
   ];
   const tests = [];
   for (const s of suites) {
@@ -283,6 +284,79 @@ async function main() {
     })
   );
 
+  recorded.push(
+    await record("valley-dodge", "merchant dodges wandering bats in cave valley", ["motion", "delivery"], async (o) => {
+      const avoid = require("../src/merchant_avoid");
+      const p = bootParty(
+        Object.assign({ pack: "armadillo", pots: 200, members: ["Puppygirl"] }, o, {
+          // Fine scrub so lateral dodges are visible between ticks.
+          trace: Object.assign({}, o.trace, { sampleMs: 140, maxFrames: 4000 }),
+        })
+      );
+      const api = p.bots.Puppygirl.api;
+      api._now = () => p.world.clock.now();
+      const c = api.character;
+      c.map = "cave";
+      c.real_x = c.x = 0;
+      c.real_y = c.y = -90;
+      c.rip = false;
+      c.hp = c.max_hp;
+
+      const valley = { x0: 30, y0: -112, x1: 560, y1: -68 };
+      const inValley = (x, y) =>
+        api.can_move_to(x, y) && y >= valley.y0 && y <= valley.y1 && x >= -10 && x <= 700;
+
+      for (let i = 0; i < 5; i++) {
+        const m = p.world.spawnMonster(
+          "US/III",
+          "cave",
+          "bat",
+          { x: 90 + i * 120, y: -90 },
+          "valley_bat_" + i
+        );
+        m.avoidR = 24;
+        m._wander = {
+          x0: valley.x0,
+          y0: valley.y0,
+          x1: valley.x1,
+          y1: valley.y1,
+          speed: 10,
+          periodMs: 400,
+        };
+      }
+
+      api.game_log("avoid:valley_start");
+      p.world.clock.advance(1); // snap initial cave frame into the trace
+      const dest = { map: "cave", x: 640, y: -90 };
+      const result = await avoid.goTo(api, dest, {
+        blockers: () => avoid.listMonsters(api, 800),
+        canMoveTo: inValley,
+        maxSteps: 500,
+        stepPx: 18,
+        tickMs: 140,
+        contactR: 16,
+        bodyR: 24,
+        margin: 14,
+        horizonMs: 900,
+        unsureFrac: 0.6,
+        progressWeight: 1.0,
+        clearWeight: 2.0,
+        angleFan: 10,
+        angleStepDeg: 14,
+      });
+      api.game_log(
+        "avoid:valley_done ok=" +
+          (result && result.success ? 1 : 0) +
+          " dodges=" +
+          ((result && result.dodges) || 0) +
+          " brakes=" +
+          ((result && result.brakes) || 0)
+      );
+      p.world.clock.advance(1);
+      return p;
+    })
+  );
+
   const byId = {};
   for (const r of recorded) byId[r.id] = r;
 
@@ -301,6 +375,7 @@ async function main() {
     "scenario: !world hop-prep lands party on target server": "world-hop",
     "scenario: path fail injection during farm — no Transfer/Port storm": "path-fail-farm",
     "scenario: short farm bee pack stays together": "farm-bee",
+    "scenario: merchant dodges wandering bats in cave valley": "valley-dodge",
   };
 
   for (const t of catalog) {

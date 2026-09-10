@@ -1,8 +1,7 @@
 "use strict";
 
 /**
- * Live burn-in 2026-09-09: stall:trade_fail slot_occuppied on boot;
- * gear:upgrade_skip chance=0.76 every ~60s while stand open (gloves@3 stuck in bag).
+ * Below-gate gear parks while NPC-vendoring junk; trade-slot tests kept for sim API.
  */
 const assert = require("assert");
 const { bootParty } = require("../src/boot_party");
@@ -20,8 +19,7 @@ function advance(p, n) {
   })();
 }
 
-test("adversary: below-gate gear must park before stall — no upgrade_skip spam with stand open", async () => {
-  // chance@3 = 0.76 < MIN 0.9 — the burn-in spam line
+test("adversary: below-gate gear must park while vendor sells — no upgrade_skip spam", async () => {
   assert.ok(upgradeChance({ level: 3 }) < MIN_UPGRADE_CHANCE);
   assert.ok(Math.abs(upgradeChance({ level: 3 }) - 0.76) < 0.001);
 
@@ -30,8 +28,8 @@ test("adversary: below-gate gear must park before stall — no upgrade_skip spam
   const bag = api.character.items;
   for (let i = 0; i < bag.length; i++) bag[i] = null;
   bag[0] = { name: "stand0" };
-  bag[1] = { name: "frogt", level: 0 }; // sell junk → stall
-  bag[2] = { name: "gloves", level: 3 }; // below-gate → must park before stall
+  bag[1] = { name: "frogt", level: 0 };
+  bag[2] = { name: "gloves", level: 3 };
   api.character.esize = bag.filter((x) => !x).length;
   api.character.gold = 500000;
   api.character.map = "main";
@@ -43,20 +41,19 @@ test("adversary: below-gate gear must park before stall — no upgrade_skip spam
     items1: new Array(42).fill(null),
   };
 
-  await advance(p, 40);
+  await advance(p, 60);
 
   const msgs = api.log.game.map((g) => g.m);
-  assert.ok(msgs.some((m) => /^stall:open/.test(m)), "stall should open, got: " + msgs.filter((m) => /stall:|bank:|gear:/.test(m)).join(" | "));
-  assert.ok(api.character.stand || msgs.some((m) => /^stall:open/.test(m)), "stand open");
-
-  // gloves@3 must not remain in bag after stall (park-before-stall)
+  assert.ok(
+    msgs.some((m) => /^vendor:sell frogt/.test(m)),
+    "must vendor frogt, got: " + msgs.filter((m) => /vendor:|bank:|gear:/.test(m)).join(" | ")
+  );
   assert.ok(
     !api.character.items.some((x) => x && x.name === "gloves" && (x.level || 0) === 3),
-    "below-gate gloves must be parked before stall locks parkToBank"
+    "below-gate gloves must be parked"
   );
 
   const t0 = p.world.clock.now();
-  // Simulate ~4 minutes of idle with stand up (old bug: skip every 60s)
   while (p.world.clock.now() - t0 < 240000) {
     await p.tickAll();
     p.world.clock.advance(15000);
@@ -65,68 +62,59 @@ test("adversary: below-gate gear must park before stall — no upgrade_skip spam
   const skips = api.log.game.filter((g) => /^gear:upgrade_skip/.test(g.m));
   assert.ok(
     skips.length <= 1,
-    "upgrade_skip must not re-spam while stall open, got " + skips.length + ": " + skips.map((g) => g.m).join(",")
+    "upgrade_skip must not re-spam, got " + skips.length + ": " + skips.map((g) => g.m).join(",")
   );
 });
 
-test("adversary: trade into occupied slot retries next free slot (slot_occuppied)", async () => {
+test("adversary: reclaim ghost trade junk then NPC-vendor", async () => {
   const p = bootParty({ pack: "armadillo", pots: 50, gold: 100000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
   const bag = api.character.items;
   for (let i = 0; i < bag.length; i++) bag[i] = null;
   bag[0] = { name: "stand0" };
-  bag[1] = { name: "frogt", level: 0 };
+  bag[1] = { name: "hpot0", q: 20 };
+  bag[2] = { name: "mpot0", q: 20 };
   api.character.esize = bag.filter((x) => !x).length;
   api.character.map = "main";
   api.character.real_x = api.character.x = 40;
   api.character.real_y = api.character.y = -20;
-  // Ghost listing: looks empty until stand opens (live race / prior session restore)
-  api.character._tradeGhost = {
-    trade1: { name: "elixirluck", price: 1000, q: 1 },
-  };
-  api.character.slots = {};
+  api.character.stand = true;
+  api.character.slots.trade1 = { name: "wcap", level: 0, price: 6400 };
+  api.character.slots.trade2 = { name: "frogt", q: 1, price: 120 };
+  api.character._bank = { gold: 0, items0: new Array(42).fill(null) };
 
-  await advance(p, 50);
+  await advance(p, 80);
 
   const msgs = api.log.game.map((g) => g.m);
-  const fails = msgs.filter((m) => /^stall:trade_fail/.test(m));
-  assert.ok(msgs.some((m) => /^stall:open/.test(m)), "stall must open despite ghost trade1, logs=" + msgs.filter((m) => /stall:/.test(m)).join(" | "));
-  assert.ok(api.character.slots.trade1 && api.character.slots.trade1.name === "elixirluck", "ghost restored on open");
   assert.ok(
-    api.character.slots.trade2 || Object.keys(api.character.slots).some((k) => /^trade\d+$/.test(k) && api.character.slots[k] && api.character.slots[k].name === "frogt"),
-    "frogt listed on a free trade slot"
+    msgs.some((m) => /^vendor:reclaim /.test(m) || /^vendor:sell /.test(m)),
+    "must reclaim/sell trade junk, logs=" + msgs.filter((m) => /vendor:/.test(m)).join(" | ")
   );
-  // May log one fail if first pick raced; must not soft-fail the stall
-  assert.ok(fails.length <= 2, "should not spam trade_fail, got " + fails.length);
-  assert.ok(!bag[1] || bag[1].name !== "frogt", "frogt left bag into trade slot");
+  assert.ok(!api.character.slots.trade1 || api.character.slots.trade1.name !== "wcap", "wcap reclaimed");
 });
 
-test("adversary: trade_fail slot_occuppied retries next attempt in-call", async () => {
-  const p = bootParty({ pack: "armadillo", pots: 50, gold: 100000, members: ["Puppygirl"] });
-  const api = p.bots.Puppygirl.api;
-  const bag = api.character.items;
-  for (let i = 0; i < bag.length; i++) bag[i] = null;
-  bag[0] = { name: "stand0" };
-  bag[1] = { name: "frogt", level: 0 };
-  api.character.esize = bag.filter((x) => !x).length;
-  api.character.map = "main";
-  api.character.real_x = api.character.x = 40;
-  api.character.real_y = api.character.y = -20;
-  api.character.slots = {};
-  let calls = 0;
-  const realTrade = api.trade.bind(api);
-  api.trade = async function (i, slot, price, q) {
-    calls++;
-    if (calls === 1) return { failed: true, reason: "slot_occuppied" };
-    return realTrade(i, slot, price, q);
-  };
-
-  await advance(p, 50);
-
-  const msgs = api.log.game.map((g) => g.m);
-  assert.ok(msgs.some((m) => m === "stall:trade_fail slot_occuppied"), "expected one occupied fail");
-  assert.ok(msgs.some((m) => /^stall:open/.test(m)), "stall recovers via retry");
-  assert.ok(calls >= 2, "must retry trade after slot_occuppied");
+test("adversary: queued delivery must not flash-vendor before dlv:active", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 40, gold: 200000, members: ["Jazwyn", "Puppygirl"] });
+  const mCtrl = p.bots.Puppygirl.ctrl;
+  const mApi = p.bots.Puppygirl.api;
+  mCtrl.enqueue({
+    id: "flash_q",
+    kind: "dlv_pots",
+    who: "Jazwyn",
+    items: [
+      { name: "hpot1", q: 5 },
+      { name: "mpot1", q: 5 },
+    ],
+  });
+  let firstActive = null;
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    firstActive = mApi.log.game.find((g) => /^dlv:active dlv_pots/.test(g.m));
+    if (firstActive) break;
+  }
+  assert.ok(firstActive, "expected dlv:active");
+  const flash = mApi.log.game.find((g) => g.t < firstActive.t && /^vendor:sell /.test(g.m));
+  assert.ok(!flash, "vendor must not run before queued delivery starts");
 });
 
 test("adversary: occupied trade slot arg returns slot_occuppied (sim matches live spelling)", async () => {

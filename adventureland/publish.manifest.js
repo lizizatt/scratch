@@ -60,7 +60,7 @@ const SLOTS = [
     out: "v2_merchant.js",
     kind: "bundle",
     role: "Merchant runtime (AL API shim + merchant + live hooks)",
-    sources: ["src/al_api.js", "src/merchant.js", "src/live_merchant_runtime.js"],
+    sources: ["src/al_api.js", "src/bank_clean_plan.js", "src/merchant_avoid.js", "src/merchant_meet.js", "src/merchant.js", "src/live_merchant_runtime.js"],
     upload: { name: "v2_merchant", match: /^v2_merchant$/i },
   },
   {

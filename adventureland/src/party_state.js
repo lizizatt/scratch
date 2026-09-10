@@ -69,18 +69,28 @@ function createPartyState(selfName) {
     return names[0] || selfName;
   }
 
-  function applyHeartbeat(from, parsed) {
+  function applyHeartbeat(from, parsed, presentNames) {
     if (!parsed) return;
+    // Stale seq: ignore entirely (do not rewrite farm/mode/hold).
     if (from && S.seq[from] != null && parsed.seq != null && parsed.seq < S.seq[from]) {
-      // older — ignore unless from current lead for intent
+      return;
     }
     if (parsed.seq != null) S.seq[from] = Math.max(S.seq[from] || 0, parsed.seq);
+
+    // Owner-write: only the current lead may publish shared intent fields.
+    // presentNames should be the live party list (same as setIntent); fall back to
+    // sender+self so succession still works when the caller omitted the list.
+    const present =
+      presentNames && presentNames.length
+        ? presentNames
+        : [from, selfName].filter(Boolean);
+    const lead = currentLeader(present);
+    if (from !== lead) return;
+
+    S.lead = from;
     if (parsed.f) S.intent.mtype = parsed.f;
     if (parsed.m) S.mode = parsed.m;
     if (parsed.h != null) S.intent.hold = parsed.h;
-    if (from === S.lead || from === currentLeader()) {
-      S.lead = from;
-    }
   }
 
   function applyDiff(from, parsed) {

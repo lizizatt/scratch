@@ -17,12 +17,6 @@ function formatHuntSn(region, ident) {
   return region + " " + ident;
 }
 
-function parseHuntSn(sn) {
-  const p = ("" + (sn || "")).trim().split(/\s+/);
-  if (p.length < 2) return null;
-  return { region: p[0], ident: p.slice(1).join(" ") };
-}
-
 function getHunt(character) {
   return character && character.s && character.s.monsterhunt ? character.s.monsterhunt : null;
 }
@@ -60,7 +54,6 @@ module.exports = {
   HUNT_DURATION_MS,
   DEFAULT_HUNT_COUNT,
   formatHuntSn,
-  parseHuntSn,
   getHunt,
   huntRemaining,
   huntComplete,

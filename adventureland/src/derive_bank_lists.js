@@ -23,10 +23,7 @@ const HOLD_TARGETS = [
 
 /** Always sell these names when not held for a combine triple. */
 const LEGACY_SELL = [
-  "strearring",
-  "intearring",
   "dexearring",
-  "vitearring",
   "stramulet",
   "intamulet",
   "dexamulet",

@@ -107,7 +107,9 @@ test("smart_move to goo pack arrives with travel time owed", async () => {
   const r = await j.smart_move({ to: "goo" });
   assert.strictEqual(r.success, true);
   assert.strictEqual(j.character.map, "main");
-  assert.ok(Math.abs(j.character.real_y - 180) < 1);
+  // Live goo pack center (~-32,787), not town plaza (0,180)
+  assert.ok(Math.abs(j.character.real_y - 787) < 5, "y=" + j.character.real_y);
+  assert.ok(Math.abs(j.character.real_x - -32) < 5, "x=" + j.character.real_x);
   assert.ok(w.getOwedMs() > 0, "travel should be owed");
   w.drainOwedTime();
   assert.ok(w.clock.now() > t0);

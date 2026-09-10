@@ -1,8 +1,7 @@
 "use strict";
 
 /**
- * Idle merchant should compound bank triples + sell whitelist junk (bank clean).
- * Previously only upgrade/stall ran — combine lived in one-shot code/bank_clean.js.
+ * Idle merchant should compound bank triples + NPC-vendor whitelist junk (bank clean).
  */
 const assert = require("assert");
 const { bootParty } = require("../src/boot_party");
@@ -33,7 +32,6 @@ test("adversary: idle merchant compounds bank ringsj triple", async () => {
   const mApi = p.bots.Puppygirl.api;
   const m = mApi.character;
   m.gold = 500000;
-  // Empty bag of gear so idle goes to bank clean (no upgrade noise).
   for (let i = 0; i < m.items.length; i++) {
     const it = m.items[i];
     if (it && (it.name === "stand0" || /^hpot|^mpot|^scroll/.test(it.name))) continue;
@@ -42,7 +40,6 @@ test("adversary: idle merchant compounds bank ringsj triple", async () => {
       m.esize = (m.esize || 0) + 1;
     }
   }
-  // Seed bank with compoundable triple + sell junk.
   m._bank = {
     gold: 0,
     items0: [
@@ -54,7 +51,6 @@ test("adversary: idle merchant compounds bank ringsj triple", async () => {
       null,
     ],
   };
-  // Start on main plaza so idleEcon primes then visits bank.
   m.map = "main";
   m.real_x = m.x = 40;
   m.real_y = m.y = -20;
@@ -78,12 +74,11 @@ test("adversary: idle merchant compounds bank ringsj triple", async () => {
   if (m._bank) {
     for (const k of Object.keys(m._bank)) if (k !== "gold" && Array.isArray(m._bank[k])) bags.push(m._bank[k]);
   }
-  // Three @0 → one @1 (sim always succeeds).
   assert.ok(countNameLevel(bags, "ringsj", 1) >= 1, "should have ringsj@1 after compound");
   assert.ok(countNameLevel(bags, "ringsj", 0) <= 0, "no leftover @0 triple");
 });
 
-test("adversary: idle merchant stalls/sells bank whitelist junk", async () => {
+test("adversary: idle merchant NPC-vendors bank whitelist junk", async () => {
   const p = bootParty({
     pack: "armadillo",
     pots: 200,
@@ -102,7 +97,6 @@ test("adversary: idle merchant stalls/sells bank whitelist junk", async () => {
       m.esize = (m.esize || 0) + 1;
     }
   }
-  // Ensure stand0 in bag for openStall.
   if (!m.items.some((it) => it && it.name === "stand0")) {
     const slot = m.items.findIndex((x) => !x);
     m.items[slot] = { name: "stand0" };
@@ -119,13 +113,13 @@ test("adversary: idle merchant stalls/sells bank whitelist junk", async () => {
 
   for (let i = 0; i < 250; i++) {
     await p.tickAll();
-    if (mApi.log.game.some((g) => /^stall:open/.test(g.m) || /^stall:pull/.test(g.m))) break;
+    if (mApi.log.game.some((g) => /^vendor:sell /.test(g.m) || /^vendor:pull /.test(g.m))) break;
   }
 
   const msgs = mApi.log.game.map((g) => g.m);
   assert.ok(
-    msgs.some((x) => /^stall:open/.test(x) || /^stall:pull/.test(x) || /^stall:trade/.test(x)),
-    "must pull/list bank junk, logs=" + msgs.filter((x) => /^stall:|^bank:/.test(x)).join(" | ")
+    msgs.some((x) => /^vendor:sell /.test(x) || /^vendor:pull /.test(x)),
+    "must pull/vendor bank junk, logs=" + msgs.filter((x) => /^vendor:|^bank:/.test(x)).join(" | ")
   );
 });
 

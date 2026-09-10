@@ -28,4 +28,4 @@ function combat(mtype) {
   }
   if (can_attack(t)) attack(t);
 }
-v2_start_fighter({ combat: combat });
+v2_start_fighter({ combat: combat, form: FORM_MAGE });

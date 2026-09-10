@@ -161,4 +161,52 @@ test("adversary: town fallback fighter — meet at fighter not packCenter", asyn
   );
 });
 
+test("adversary: empty_send retreats and aborts after 5 misses", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 0,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const z = p.bots.Zarook.api.character;
+  const m = mApi.character;
+  z.gold = m.gold = 500000;
+  clearPots(z.items);
+  // Fighter unreachable — no vision so ensureSendRange fails.
+  z.map = "cave";
+  z.real_x = z.x = -100;
+  z.real_y = z.y = -200;
+  m.map = "main";
+  m.real_x = m.x = 750;
+  m.real_y = m.y = 1800;
+  m.items[0] = { name: "hpot1", q: 50 };
+  m.items[1] = { name: "mpot1", q: 50 };
+  m.esize = m.items.filter((x) => !x).length;
+
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_empty_abort",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ],
+    farm: "armadillo",
+    bought: 1,
+    map: "main",
+    x: 526,
+    y: 1846,
+  });
+
+  for (let i = 0; i < 80; i++) {
+    await p.tickAll();
+    if (mApi.log.game.some((g) => /^dlv:abort_empty/.test(g.m))) break;
+  }
+  const msgs = mApi.log.game.map((g) => g.m);
+  assert.ok(msgs.filter((x) => x === "dlv:retreat").length >= 1, "must retreat on empty");
+  assert.ok(msgs.some((x) => /^dlv:abort_empty/.test(x)), "must abort after empties");
+  assert.ok(!p.bots.Puppygirl.ctrl.store.active, "active cleared");
+});
+
 module.exports = { tests };

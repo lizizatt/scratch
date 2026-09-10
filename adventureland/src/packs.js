@@ -2,7 +2,9 @@
 
 /** Pack centers — shared by sim and live (no G dependency). */
 const FARM_XY = {
-  goo: { map: "main", x: 0, y: 180 },
+  // Live G.maps.main goo boundary [-282,702,218,872] → center (~-32,787).
+  // Legacy (0,180) was town plaza south — Daisy goo hunts parked there forever.
+  goo: { map: "main", x: -32, y: 787 },
   bee: { map: "main", x: 546, y: 1059 },
   crab: { map: "main", x: -1202, y: -66 },
   snake: { map: "main", x: -82, y: 1901 },
@@ -23,7 +25,7 @@ const FARM_XY = {
  * Armadillo: SE cave mouth (sim spawn 4 / door), not packCenter (526,1846).
  */
 const SAFE_MEET = {
-  goo: { map: "main", x: 0, y: 40 },
+  goo: { map: "main", x: -32, y: 560 },
   bee: { map: "main", x: 546, y: 900 },
   crab: { map: "main", x: -1202, y: -220 },
   snake: { map: "main", x: -82, y: 1720 },

@@ -52,4 +52,4 @@ function combat(mtype) {
   if (character.mp / character.max_mp >= 0.7) try { use_skill("curse", t); } catch (e) {}
   if (can_attack(t)) attack(t);
 }
-v2_start_fighter({ combat: combat, pre_combat: pre_combat });
+v2_start_fighter({ combat: combat, pre_combat: pre_combat, form: FORM_PRIEST });

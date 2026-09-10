@@ -3,25 +3,28 @@
 /**
  * Pure helpers for bank clean (combine + sell junk). Shared by tests;
  * live CODE in code/bank_clean.js inlines the same rules for temporary upload.
+ *
+ * Names are prefixed bankPlan* where they would collide with gear.js globals
+ * after compress strips requires into shared AL CODE slots.
  */
 
-const DEFAULT_SELL = ["dexamulet", "dexearring", "rednose", "strearring", "wcap", "wshoes", "frogt", "leatherboots"];
+const DEFAULT_SELL = ["dexamulet", "dexearring", "rednose", "wcap", "wshoes", "frogt", "leatherboots"];
 const DEFAULT_COMBINE = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
-const COMBINE_MAX = 5;
+const BANK_COMBINE_MAX = 5;
 
-function isPot(it) {
+function bankPlanIsPot(it) {
   return it && (/^hpot/.test(it.name) || /^mpot/.test(it.name));
 }
 
-function isKeepAlways(it) {
+function bankPlanIsKeep(it) {
   if (!it) return true;
-  if (isPot(it) || it.name === "stand0" || it.name === "tracker" || it.l) return true;
+  if (bankPlanIsPot(it) || it.name === "stand0" || it.name === "tracker" || it.l) return true;
   if (/^scroll\d$/.test(it.name) || /^cscroll\d$/.test(it.name)) return true;
   return false;
 }
 
-function isSellJunk(it, sellList) {
-  if (!it || isKeepAlways(it)) return false;
+function bankPlanIsSellJunk(it, sellList) {
+  if (!it || bankPlanIsKeep(it)) return false;
   const list = sellList || DEFAULT_SELL;
   return list.indexOf(it.name) >= 0;
 }
@@ -49,7 +52,7 @@ function countOwned(bags, name, level) {
 }
 
 /**
- * Find compound candidates: names with ≥3 copies at same level < COMBINE_MAX.
+ * Find compound candidates: names with ≥3 copies at same level < BANK_COMBINE_MAX.
  * Returns [{name, level, priority}] sorted by combine priority then higher level.
  */
 function planCompounds(bags, G, combineList) {
@@ -63,7 +66,7 @@ function planCompounds(bags, G, combineList) {
       const g = (G && G.items && G.items[it.name]) || {};
       if (!g.compound) continue;
       const lv = it.level || 0;
-      if (lv >= COMBINE_MAX) continue;
+      if (lv >= BANK_COMBINE_MAX) continue;
       const key = it.name + "@" + lv;
       if (seen[key]) continue;
       seen[key] = 1;
@@ -81,7 +84,7 @@ function planCompounds(bags, G, combineList) {
 function planSellBag(items, sellList) {
   const out = [];
   for (let i = 0; i < (items || []).length; i++) {
-    if (isSellJunk(items[i], sellList)) out.push(i);
+    if (bankPlanIsSellJunk(items[i], sellList)) out.push(i);
   }
   return out;
 }
@@ -98,7 +101,7 @@ function planSellBank(bank, sellList) {
     if (!Array.isArray(bag)) continue;
     for (let i = 0; i < bag.length; i++) {
       const it = bag[i];
-      if (isSellJunk(it, sellList)) out.push({ pack, i, name: it.name, level: it.level || 0, q: it.q });
+      if (bankPlanIsSellJunk(it, sellList)) out.push({ pack, i, name: it.name, level: it.level || 0, q: it.q });
     }
   }
   return out;
@@ -107,10 +110,14 @@ function planSellBank(bank, sellList) {
 module.exports = {
   DEFAULT_SELL,
   DEFAULT_COMBINE,
-  COMBINE_MAX,
-  isPot,
-  isKeepAlways,
-  isSellJunk,
+  COMBINE_MAX: BANK_COMBINE_MAX,
+  BANK_COMBINE_MAX,
+  isPot: bankPlanIsPot,
+  isKeepAlways: bankPlanIsKeep,
+  isSellJunk: bankPlanIsSellJunk,
+  bankPlanIsPot,
+  bankPlanIsKeep,
+  bankPlanIsSellJunk,
   cscrollFor,
   countOwned,
   planCompounds,

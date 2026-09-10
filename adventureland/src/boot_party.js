@@ -79,9 +79,24 @@ function bootParty(opts) {
     return o;
   }
 
+  function merchantOpts() {
+    return {
+      now: () => w.clock.now(),
+      // Sim is single-threaded: while merchant awaits scoop/gold, tick fighters
+      // so gold_offload can run (live VMs tick in parallel — peerTick unused).
+      peerTick: async () => {
+        for (const n of FIGHTERS) {
+          if (bots[n]) await bots[n].ctrl.tick();
+        }
+        w.drainOwedTime();
+        w.advance(tickMs);
+      },
+    };
+  }
+
   function wireReload(name, bootFn) {
     w.setOnReload(name, (api) => {
-      const ctrl = bootFn(api, name === "Puppygirl" ? { now: () => w.clock.now() } : fighterOpts(name, api));
+      const ctrl = bootFn(api, name === "Puppygirl" ? merchantOpts() : fighterOpts(name, api));
       bots[name].ctrl = ctrl;
       bots[name].api = api;
       reInviteIfNeeded(name);
@@ -145,7 +160,7 @@ function bootParty(opts) {
       region,
       ident
     );
-    bots.Puppygirl = { api: mApi, ctrl: bootMerchant(mApi, { now: () => w.clock.now() }) };
+    bots.Puppygirl = { api: mApi, ctrl: bootMerchant(mApi, merchantOpts()) };
     wireReload("Puppygirl", bootMerchant);
   }
 

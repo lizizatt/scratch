@@ -39,6 +39,8 @@ test("adversary: warrior must not spam-equip staff from bag", async () => {
   );
   // Wrong-class weapon is not "keep" — toss/park can clear it.
   assert.ok(!isKeep(api, { name: "staff", level: 3 }, G, {}), "staff is not keep on warrior");
+  assert.ok(isKeep(api, { name: "tracker" }, G, {}), "Tracktrix is permanent keep");
+  assert.ok(isKeep(api, { name: "stand0" }, G, {}), "stand0 is permanent keep");
 });
 
 test("adversary: planGifts must not gift staff to warrior", () => {
@@ -83,11 +85,36 @@ test("adversary: merchant rip:respawn when dead at pack", async () => {
   assert.ok(api.character.hp > 0, "merchant hp restored");
 });
 
-test("unit: equipPending skips wrong-class even if score wins", () => {
+test("adversary: retreatPlaza towns out of winter_cave (no in-place rip loop)", async () => {
+  // Live: dlv meet winter_cave → dlv:done → retreatPlaza no-op off main → rip:respawn spam.
+  const p = bootParty({ pack: "armadillo", pots: 50, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  api.character.map = "winter_cave";
+  api.character.real_x = api.character.x = 35;
+  api.character.real_y = api.character.y = -71;
+  api.character.rip = true;
+  api.character.hp = 0;
+
+  for (let i = 0; i < 8; i++) await p.tickAll();
+
+  const msgs = api.log.game.map((g) => g.m);
+  assert.ok(msgs.some((m) => m === "rip:respawn"), "must attempt respawn");
+  assert.ok(msgs.some((m) => m === "dlv:retreat_town" || m === "dlv:retreat"), "must town/retreat off winter_cave");
+  assert.strictEqual(api.character.map, "main", "must leave winter_cave");
+  assert.ok(
+    Math.hypot(api.character.real_x - 40, api.character.real_y - -20) < 80 ||
+      Math.hypot(api.character.real_x, api.character.real_y) < 80,
+    "near plaza/town after retreat"
+  );
+  const ripSpam = msgs.filter((m) => m === "rip:respawn").length;
+  assert.ok(ripSpam <= 3, "must not rip-loop forever, saw " + ripSpam);
+});
+
+test("unit: equipPending skips wrong-class even if score wins", async () => {
   const G = {
     items: {
       staff: { type: "weapon", wtype: "staff", attack: 100 },
-      blade: { type: "weapon", wtype: "sword", attack: 5 },
+      blade: { type: "weapon", wtype: "short_sword", attack: 5 },
     },
   };
   const logs = [];
@@ -100,12 +127,13 @@ test("unit: equipPending skips wrong-class even if score wins", () => {
     G,
     equip(i, slot) {
       logs.push("equip " + api.character.items[i].name + " -> " + slot);
+      return { failed: true, reason: "should_not_run" };
     },
     game_log(m) {
       logs.push(m);
     },
   };
-  const n = equipPending(api, G, {});
+  const n = await equipPending(api, G, {});
   assert.strictEqual(n, 0);
   assert.ok(!logs.some((m) => /staff/.test(m)));
 });

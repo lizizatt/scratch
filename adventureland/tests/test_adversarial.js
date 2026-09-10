@@ -428,4 +428,50 @@ test("boot subset: Sarene+Zarook no Jazwyn — Sarene leads", async () => {
   assert.strictEqual(cz.isLead(), false);
 });
 
+test("merchant console hunt/grind/world fan-out reaches Sarene lead (no Jazwyn)", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 50,
+    members: ["Sarene", "Zarook", "Puppygirl"],
+  });
+  for (let i = 0; i < 8; i++) {
+    await p.tickAll();
+  }
+  assert.strictEqual(p.bots.Sarene.ctrl.isLead(), true);
+
+  const mApi = p.bots.Puppygirl.api;
+  const sent = [];
+  const realSend = mApi.send_cm.bind(mApi);
+  mApi.send_cm = async function (to, msg) {
+    sent.push({ to, msg });
+    return realSend(to, msg);
+  };
+
+  p.bots.Puppygirl.ctrl.hunt("bee");
+  for (let i = 0; i < 5; i++) await p.tickAll();
+  assert.ok(
+    sent.some((s) => s.to === "Sarene" && s.msg && s.msg.hunt === "bee"),
+    "hunt must CM Sarene, sent=" + JSON.stringify(sent)
+  );
+  assert.ok(
+    sent.some((s) => s.to === "Zarook" && s.msg && s.msg.hunt === "bee"),
+    "fan-out also hits Zarook"
+  );
+  assert.strictEqual(p.bots.Sarene.ctrl.state.S.intent.mtype, "bee");
+  assert.strictEqual(p.bots.Sarene.ctrl.state.S.intent.kind, "hunt");
+
+  sent.length = 0;
+  p.bots.Puppygirl.ctrl.grind();
+  p.bots.Puppygirl.ctrl.world("US III");
+
+  assert.ok(
+    sent.some((s) => s.to === "Sarene" && s.msg && s.msg.grind === 1),
+    "grind must CM Sarene"
+  );
+  assert.ok(
+    sent.some((s) => s.to === "Sarene" && s.msg && Array.isArray(s.msg.world)),
+    "world must CM Sarene"
+  );
+});
+
 module.exports = { tests };

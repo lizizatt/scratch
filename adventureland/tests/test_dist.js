@@ -70,7 +70,7 @@ test("dist: production packs contain gear batch/replace symbols", () => {
   assert.ok(/gear:batch/.test(merchant), "v2_merchant must include gear:batch");
   assert.ok(/maybeBatchGear|gear:batch id=/.test(merchant), "v2_merchant batch path present");
   assert.ok(/bank:park_stuck|bank:full/.test(merchant), "v2_merchant must not starve pots on park fail");
-  assert.ok(/stall:open/.test(merchant), "v2_merchant stall path present");
+  assert.ok(/vendor:sell|tryVendorNpc/.test(merchant), "v2_merchant NPC vendor path present");
   assert.ok(/dlv:need_space|ensureTakeBackSlots/.test(merchant), "v2_merchant take-back reserve present");
   assert.ok(/dlv:empty_send|dlv:no_space/.test(merchant), "v2_merchant empty-send guard present");
   assert.ok(/gear:buy |gear:upgrade |tryUpgradeOne|planVendorBuy/.test(merchant), "v2_merchant buy→upgrade path");
