@@ -26,7 +26,8 @@ const FARM_XY = {
  */
 const SAFE_MEET = {
   goo: { map: "main", x: -32, y: 560 },
-  bee: { map: "main", x: 546, y: 900 },
+  // West edge of the bee meadow. (546,900) is inside the walled grove north of it.
+  bee: { map: "main", x: 300, y: 1059 },
   crab: { map: "main", x: -1202, y: -220 },
   snake: { map: "main", x: -82, y: 1720 },
   armadillo: { map: "main", x: 750, y: 1800 },

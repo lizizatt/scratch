@@ -141,7 +141,8 @@ function baseG() {
       main: {
         monsters: [
           { type: "goo", boundary: [-282, 702, 218, 872] },
-          { type: "bee", boundary: [500, 1000, 580, 1100] },
+          { type: "bee", boundary: [424, 1014, 668, 1104] },
+          { type: "bee", boundary: [418, 994, 570, 1208] },
           { type: "crab", boundary: [-1240, -100, -1160, -30] },
           { type: "snake", boundary: [-120, 1860, -40, 1940] },
           { type: "armadillo", boundary: [480, 1800, 560, 1880] },
@@ -169,6 +170,8 @@ function baseG() {
         blocked: [
           // Water / spider-island (LESSONS §1.2)
           { x0: 304, y0: -300, x1: 688, y1: 120 },
+          // Walled grove immediately north of the main bee meadow.
+          { x0: 416, y0: 856, x1: 680, y1: 984 },
           // Full-width ridge south of bee belt: SE farms (armadillo/croc) need cave;
           // bee (~y1059) stays overland-reachable from town.
           { x0: -4000, y0: 1200, x1: 4000, y1: 1580 },

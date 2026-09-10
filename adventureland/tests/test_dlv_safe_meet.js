@@ -9,6 +9,8 @@ const { bootParty } = require("../src/boot_party");
 const { packCenter, safeMeet, nearPack, PACK_DANGER_R } = require("../src/packs");
 const { meetResolveDelivery } = require("../src/merchant_meet");
 const { SEND_RANGE } = require("../src/constants");
+const { baseG } = require("../sim/world");
+const { findPath } = require("../sim/path");
 
 const tests = [];
 function test(name, fn) {
@@ -87,6 +89,62 @@ test("adversary: stale reboot farm retargets from current fighter coordinates", 
     p.bots.Puppygirl.api.log.game.some((g) => g.m === "dlv:reroute"),
     "route interruption is visible in merchant logs"
   );
+});
+
+test("adversary: bee fallback avoids the unreachable north grove", async () => {
+  const G = baseG();
+  const plaza = { map: "main", x: 40, y: -20 };
+  const oldMeet = { map: "main", x: 546, y: 900 };
+  const meet = safeMeet("bee");
+  const bee = packCenter("bee");
+
+  assert.strictEqual(findPath(plaza, oldMeet, "main", G), null, "old live failure must be blocked");
+  assert.ok(findPath(plaza, meet, "main", G), "replacement meetup must be reachable");
+  assert.ok(!nearPack("bee", meet.map, meet.x, meet.y), "replacement must remain outside bee danger");
+  assert.ok(Math.hypot(meet.x - bee.x, meet.y - bee.y) <= SEND_RANGE, "replacement must be in send range");
+
+  const p = bootParty({
+    pack: "bee",
+    pots: 0,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const zApi = p.bots.Zarook.api;
+  const mApi = p.bots.Puppygirl.api;
+  const z = zApi.character;
+  const m = mApi.character;
+  clearPots(z.items);
+  z.esize = z.items.filter((x) => !x).length;
+  z.map = bee.map;
+  z.real_x = z.x = bee.x;
+  z.real_y = z.y = bee.y;
+  m.map = plaza.map;
+  m.real_x = m.x = plaza.x;
+  m.real_y = m.y = plaza.y;
+  m.stand = false;
+
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_bee_geometry",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [
+      { name: "hpot1", q: 50 },
+      { name: "mpot1", q: 50 },
+    ],
+    farm: "bee",
+    map: bee.map,
+    x: bee.x,
+    y: bee.y,
+  });
+
+  for (let i = 0; i < 500; i++) {
+    await p.tickAll();
+    if (mApi.log.game.some((g) => g.m === "dlv:done id=p_bee_geometry")) break;
+  }
+
+  const msgs = mApi.log.game.map((g) => g.m);
+  assert.ok(msgs.some((x) => x === "dlv:done id=p_bee_geometry"), "bee delivery must complete");
+  assert.ok(!msgs.some((x) => /^dlv:path_fail/.test(x)), "bee delivery must not path_fail");
 });
 
 test("adversary: delivery status elicits current location before fighter is dry", async () => {
