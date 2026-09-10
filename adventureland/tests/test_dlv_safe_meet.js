@@ -62,6 +62,12 @@ test("adversary: stale reboot farm retargets from current fighter coordinates", 
     y: packCenter("armadillo").y,
   });
   ctrl.store.active = ctrl.store.q.shift();
+  let stops = 0;
+  const realStop = p.bots.Puppygirl.api.stop.bind(p.bots.Puppygirl.api);
+  p.bots.Puppygirl.api.stop = (what) => {
+    stops++;
+    return realStop(what);
+  };
 
   await p.bots.Zarook.api.send_cm("Puppygirl", {
     dlv_loc: 1,
@@ -72,10 +78,59 @@ test("adversary: stale reboot farm retargets from current fighter coordinates", 
   });
 
   assert.strictEqual(ctrl.store.active.farm, "bee", "fresh beacon retargets persisted active job");
+  assert.strictEqual(stops, 1, "active stale movement is interrupted");
   assert.ok(
     p.bots.Puppygirl.api.log.game.some((g) => g.m === "dlv:retarget armadillo->bee"),
     "retarget is visible in merchant logs"
   );
+  assert.ok(
+    p.bots.Puppygirl.api.log.game.some((g) => g.m === "dlv:reroute"),
+    "route interruption is visible in merchant logs"
+  );
+});
+
+test("adversary: delivery status elicits current location before fighter is dry", async () => {
+  const p = bootParty({
+    pack: "croc",
+    pots: 50,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const zApi = p.bots.Zarook.api;
+  const mApi = p.bots.Puppygirl.api;
+  const bee = packCenter("bee");
+  const z = zApi.character;
+  z.map = bee.map;
+  z.real_x = z.x = bee.x;
+  z.real_y = z.y = bee.y;
+  p.bots.Zarook.ctrl._setDlv({ id: "p_low_reboot", kind: "pots", t0: zApi._now(), acked: 1 });
+  p.bots.Puppygirl.ctrl.enqueue({
+    id: "p_low_reboot",
+    kind: "dlv_pots",
+    who: "Zarook",
+    items: [],
+    farm: "croc",
+    map: packCenter("croc").map,
+    x: packCenter("croc").x,
+    y: packCenter("croc").y,
+  });
+  const job = p.bots.Puppygirl.ctrl.store.q[0];
+  delete job.locAt;
+
+  await mApi.send_cm("Zarook", {
+    status: 1,
+    id: "p_low_reboot",
+    phase: "enroute",
+    meet: 1,
+    map: "main",
+    x: 750,
+    y: 1800,
+  });
+
+  assert.strictEqual(job.farm, "bee", "status response corrects stale farm while pots are merely low");
+  assert.strictEqual(job.map, bee.map);
+  assert.strictEqual(job.x, bee.x);
+  assert.strictEqual(job.y, bee.y);
 });
 
 test("adversary: merchant approaches send-range outside pack; fighter stays", async () => {
@@ -237,7 +292,7 @@ test("adversary: empty_send retreats and aborts after 5 misses", async () => {
   p.bots.Puppygirl.ctrl.enqueue({
     id: "p_empty_abort",
     kind: "dlv_pots",
-    who: "Zarook",
+    who: "MissingFighter",
     items: [
       { name: "hpot1", q: 50 },
       { name: "mpot1", q: 50 },

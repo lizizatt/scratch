@@ -193,7 +193,9 @@ test("adversary: rare_kill during hunt_quest keeps Daisy hunt target", async () 
     members: ["Jazwyn", "Sarene", "Zarook", "Puppygirl"],
     packCount: 5,
   });
-  p.world.monsterHuntQueue = [{ id: "goo", c: 8 }];
+  // Keep enough remaining kills that the post-rare observation window tests
+  // resume behavior rather than accidentally completing the Daisy hunt.
+  p.world.monsterHuntQueue = [{ id: "goo", c: 80 }];
   p.bots.Puppygirl.ctrl.hunt_quest();
   for (let i = 0; i < 120; i++) {
     await p.tickAll();

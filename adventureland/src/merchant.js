@@ -12,6 +12,7 @@ const {
   COMBINE_PRIORITY,
   MIN_UPGRADE_CHANCE,
   SEND_RANGE,
+  BEACON_MS,
   EXCHANGE_ITEMS,
   VENDOR_NPC,
   GEAR_TARGETS,
@@ -154,6 +155,9 @@ function bootMerchant(api, opts) {
     }
     if (store.q.some((j) => j.id === job.id)) return true;
     job.t0 = api._now ? api._now() : Date.now();
+    if (job.locAt == null && job.map != null && job.x != null && job.y != null) {
+      job.locAt = job.t0;
+    }
     store.q.push(job);
     saveQ(store);
     return true;
@@ -333,6 +337,7 @@ function bootMerchant(api, opts) {
         map: d.map,
         x: d.x,
         y: d.y,
+        locAt: api._now ? api._now() : Date.now(),
         gear: d.gear,
       });
       await api.send_cm(d.who, { dlv_ack: 1, id: d.id, ok: ok ? 1 : 0, reason: ok ? null : "queue" });
@@ -343,12 +348,27 @@ function bootMerchant(api, opts) {
       const job = jobs.find((j) => j.id === d.id);
       if (!job) return;
       const oldFarm = job.farm;
+      const oldMap = job.map;
+      const oldX = job.x;
+      const oldY = job.y;
       job.map = d.map;
       job.x = d.x;
       job.y = d.y;
+      job.locAt = api._now ? api._now() : Date.now();
+      job.locSeq = (job.locSeq || 0) + 1;
       job.farm = meetFarmAt(oldFarm, d.map, d.x, d.y);
-      if (job.farm && oldFarm && job.farm !== oldFarm) {
+      const changedFarm = job.farm && oldFarm && job.farm !== oldFarm;
+      if (changedFarm) {
         api.game_log("dlv:retarget " + oldFarm + "->" + job.farm);
+      }
+      const moved =
+        oldMap !== d.map ||
+        oldX == null ||
+        oldY == null ||
+        Math.hypot(oldX - d.x, oldY - d.y) > SEND_RANGE;
+      if (store.active === job && (changedFarm || moved)) {
+        if (typeof api.stop === "function") api.stop("smart");
+        api.game_log("dlv:reroute");
       }
       saveQ(store);
       return;
@@ -1679,7 +1699,9 @@ function bootMerchant(api, opts) {
 
     if (!(await ensureTakeBackSlots(3, job.gear && job.pulled ? job.gear : null))) return;
 
-    const meet = meetResolveDelivery(api, job, SEND_RANGE);
+    let meet = meetResolveDelivery(api, job, SEND_RANGE);
+    const locateAt = api._now ? api._now() : Date.now();
+    const staleLocation = job.locAt == null || locateAt - job.locAt > BEACON_MS * 2;
     await api.send_cm(job.who, {
       status: 1,
       id: job.id,
@@ -1689,6 +1711,15 @@ function bootMerchant(api, opts) {
       x: meet ? meet.x : api.character.real_x,
       y: meet ? meet.y : api.character.real_y,
     });
+    if (staleLocation) {
+      const beforeSeq = job.locSeq || 0;
+      await api.sleep(250);
+      if ((job.locSeq || 0) === beforeSeq) {
+        api.game_log("dlv:await_loc");
+        return;
+      }
+      meet = meetResolveDelivery(api, job, SEND_RANGE);
+    }
 
     if (meet) {
       api.game_log("dlv:meet " + meet.map + " " + Math.round(meet.x) + "," + Math.round(meet.y));

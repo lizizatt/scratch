@@ -53,7 +53,7 @@ function bootFighter(api, opts) {
 
   let lastHb = 0;
   let dlvPending = null;
-  let lastBeacon = 0;
+  let lastBeacon = null;
   let lastStatusAt = 0;
   let assembleUntil = 0;
   let rareGoneAt = 0;
@@ -644,9 +644,21 @@ function bootFighter(api, opts) {
       if (!d.ok) dlvPending = null;
       persist();
     }
-    if (d.status && dlvPending && (!d.id || d.id === dlvPending.id)) {
-      lastStatusAt = api._now();
-      dlvPending.phase = d.phase;
+    if (d.status) {
+      if (dlvPending && (!d.id || d.id === dlvPending.id)) {
+        lastStatusAt = api._now();
+        dlvPending.phase = d.phase;
+      }
+      if (d.meet && (lastBeacon == null || api._now() - lastBeacon > BEACON_MS)) {
+        lastBeacon = api._now();
+        await api.send_cm(MERCHANT, {
+          dlv_loc: 1,
+          id: d.id || (dlvPending && dlvPending.id),
+          map: api.character.map,
+          x: api.character.real_x,
+          y: api.character.real_y,
+        });
+      }
       persist();
     }
     if (d.dlv_done && dlvPending && d.id === dlvPending.id) {
@@ -954,7 +966,7 @@ function bootFighter(api, opts) {
       const grace = dlvPending && dlvPending.acked ? PENDING_MS : FALLBACK_SILENCE_MS;
       if (dlvPending && lastStatusAt && now - lastStatusAt < grace) {
         // Merchant approaches to send range outside pack aggro.
-        if (now - lastBeacon > BEACON_MS) {
+        if (lastBeacon == null || now - lastBeacon > BEACON_MS) {
           lastBeacon = now;
           await api.send_cm(MERCHANT, {
             dlv_loc: 1,
