@@ -261,16 +261,28 @@ function isGearPiece(it, G) {
   return GEAR_TYPES.indexOf(it.name) >= 0 || !!(g.type && candidateSlots(it, G).length);
 }
 
-function pendingBetter(api, it, G) {
+/**
+ * Best (lowest-scoring currently-worn) equip slot for `it`, or null if it
+ * beats nothing worn / can't be equipped by this class. Single source of
+ * truth shared by pendingBetter (bool check) and equipPending (actual pick).
+ */
+function pickBestSlot(api, it, G) {
   const ctype = api.character.ctype;
-  if (!classOk(it, ctype, G)) return false;
+  if (!classOk(it, ctype, G)) return null;
   const slots = candidateSlots(it, G);
+  const sc = score(it, G, ctype);
+  let best = null;
   for (const s of slots) {
     if (!canEquipSlot(api, it, s, G)) continue;
     const worn = api.character.slots[s];
-    if (score(it, G, ctype) > score(worn, G, ctype)) return true;
+    const sw = score(worn, G, ctype);
+    if (sc > sw && (!best || sw < best.sw)) best = { slot: s, sw };
   }
-  return false;
+  return best;
+}
+
+function pendingBetter(api, it, G) {
+  return !!pickBestSlot(api, it, G);
 }
 
 function isKeep(api, it, G, giftTtl) {
@@ -292,20 +304,10 @@ function isKeep(api, it, G, giftTtl) {
  */
 async function equipPending(api, G, giftTtl) {
   let n = 0;
-  const ctype = api.character.ctype;
   for (let i = 0; i < api.character.items.length; i++) {
     const it = api.character.items[i];
     if (!it) continue;
-    if (!classOk(it, ctype, G)) continue;
-    const targets = candidateSlots(it, G);
-    let best = null;
-    for (const s of targets) {
-      if (!canEquipSlot(api, it, s, G)) continue;
-      const worn = api.character.slots[s];
-      const sw = score(worn, G, ctype);
-      const sc = score(it, G, ctype);
-      if (sc > sw && (!best || sw < best.sw)) best = { slot: s, sw };
-    }
+    const best = pickBestSlot(api, it, G);
     if (!best || typeof api.equip !== "function") continue;
     let r;
     try {
