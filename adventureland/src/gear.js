@@ -220,6 +220,7 @@ function candidateSlots(it, G) {
   if (t === "shoes") return ["shoes"];
   if (t === "gloves") return ["gloves"];
   if (t === "cape") return ["cape"];
+  if (t === "orb") return ["orb"];
   if (t === "shield" || t === "source") return ["offhand"];
   if (t === "weapon" || g.wtype) {
     // Offhand-capable 1H swords stay mainhand-first for tank (shield stays).
@@ -365,6 +366,7 @@ function wornSnapshot(api) {
     "earring2",
     "ring1",
     "ring2",
+    "orb",
   ];
   for (const k of keys) {
     const it = s[k];

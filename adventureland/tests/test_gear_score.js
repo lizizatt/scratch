@@ -13,7 +13,11 @@ const {
   canEquipSlot,
   weaponHandKind,
   equipPending,
+  candidateSlots,
+  wornSnapshot,
+  planGifts,
 } = require("../src/gear");
+const { GEAR_TARGETS, COMBINE_PRIORITY } = require("../src/constants");
 
 const tests = [];
 function test(name, fn) {
@@ -47,6 +51,7 @@ function Gish(extra) {
         pickaxe: { type: "tool", wtype: "pickaxe" },
         gcape: { type: "cape", reflection: 1, armor: 5 },
         cape: { type: "cape", armor: 10, resistance: 8, stat: 4 },
+        orbg: { type: "orb", str: 2, int: 2, dex: 2, compound: { str: 1, int: 1, dex: 1 } },
       },
       extra || {}
     ),
@@ -78,6 +83,55 @@ test("unit: SCORE_WEIGHTS — warrior reflection/str/armor; casters int", () => 
   assert.ok(SCORE_WEIGHTS.priest.int >= SCORE_WEIGHTS.priest.vit);
   assert.strictEqual(SCORE_WEIGHTS.mage.str, 0);
   assert.strictEqual(SCORE_WEIGHTS.warrior.int, 0);
+});
+
+test("unit: beginning orbs flow through compound, gift, and equip for every fighter", async () => {
+  const G = Gish();
+  assert.strictEqual(COMBINE_PRIORITY[0], "orbg");
+  assert.deepStrictEqual(candidateSlots({ name: "orbg" }, G), ["orb"]);
+
+  const ads = {};
+  const ctypes = { Jazwyn: "warrior", Sarene: "mage", Zarook: "priest" };
+  for (const who of Object.keys(ctypes)) {
+    assert.strictEqual(GEAR_TARGETS[who].orb, "orbg");
+    ads[who] = {
+      ctype: ctypes[who],
+      esize: 2,
+      slots: { orb: null },
+    };
+  }
+  const gifts = planGifts(
+    [
+      { name: "orbg", level: 1 },
+      { name: "orbg", level: 1 },
+      { name: "orbg", level: 1 },
+    ],
+    ads,
+    G
+  );
+  assert.deepStrictEqual(gifts.map((g) => g.who).sort(), ["Jazwyn", "Sarene", "Zarook"]);
+  assert.ok(gifts.every((g) => g.slot === "orb" && g.it.name === "orbg"));
+
+  for (const who of Object.keys(ctypes)) {
+    const api = {
+      character: {
+        name: who,
+        ctype: ctypes[who],
+        items: [{ name: "orbg", level: 1 }],
+        slots: { orb: null },
+      },
+      equip(i, slot) {
+        this.character.slots[slot] = this.character.items[i];
+        this.character.items[i] = null;
+        return { success: true };
+      },
+      _now: () => 0,
+      game_log() {},
+    };
+    assert.strictEqual(wornSnapshot(api).slots.orb, null);
+    assert.strictEqual(await equipPending(api, G, {}, {}), 1);
+    assert.deepStrictEqual(api.character.slots.orb, { name: "orbg", level: 1 });
+  }
 });
 
 test("unit: scaledStat applies upgrade and compound growth", () => {

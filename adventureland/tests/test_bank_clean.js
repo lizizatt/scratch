@@ -17,6 +17,7 @@ function test(name, fn) {
 
 const G = {
   items: {
+    orbg: { compound: true, grades: [4, 6, 6, 7] },
     ringsj: { compound: true, grades: [2, 5] },
     hpbelt: { compound: true, grades: [2, 5] },
     frogt: { g: 10 },
@@ -58,7 +59,21 @@ test("planCompounds needs 3 same name@level", () => {
   ];
   const c = planCompounds(bags, G);
   assert.strictEqual(c.length, 1);
-  assert.deepStrictEqual(c[0], { name: "ringsj", level: 0, priority: 0 });
+  assert.deepStrictEqual(c[0], { name: "ringsj", level: 0, priority: 1 });
+});
+
+test("planCompounds prioritizes Orb of Beginnings triples", () => {
+  const bags = [[
+    { name: "ringsj", level: 0 },
+    { name: "ringsj", level: 0 },
+    { name: "ringsj", level: 0 },
+    { name: "orbg", level: 0 },
+    { name: "orbg", level: 0 },
+    { name: "orbg", level: 0 },
+  ]];
+  const c = planCompounds(bags, G);
+  assert.strictEqual(c[0].name, "orbg");
+  assert.strictEqual(c[0].priority, 0);
 });
 
 test("planCompounds skips level >= COMBINE_MAX", () => {

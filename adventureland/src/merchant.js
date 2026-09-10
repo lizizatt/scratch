@@ -1137,7 +1137,7 @@ function bootMerchant(api, opts) {
     return name === "staff" || name === "blade";
   }
 
-  /** Idle: craft one pickaxe / fishing rod (`rod`) at Leo when mats+gold allow. */
+  /** Idle: trade gathered orb materials at Cole, then craft missing tools at Leo. */
   async function tryCraftOne() {
     if (typeof api.auto_craft !== "function") return false;
     const recipes = (api.G && api.G.craft) || {};
@@ -1145,7 +1145,9 @@ function bootMerchant(api, opts) {
     for (const name of targets) {
       const rec = recipes[name];
       if (!rec || !Array.isArray(rec.items)) continue;
-      if (craftHave(name) >= 1) continue;
+      // Orbs feed a 3:1 compound chain; tools only need one owned copy.
+      if (name !== "orbg" && craftHave(name) >= 1) continue;
+      const tag = rec.quest ? "collector" : "craft";
 
       const buys = [];
       let blocked = false;
@@ -1169,7 +1171,7 @@ function bootMerchant(api, opts) {
       const craftCost = rec.cost || 0;
       const buyCost = buys.reduce((s, b) => s + b.price * b.q, 0);
       if (spendableGold() < buyCost + craftCost) {
-        api.game_log("craft:gold " + name);
+        api.game_log(tag + ":gold " + name);
         continue;
       }
 
@@ -1236,27 +1238,42 @@ function bootMerchant(api, opts) {
           return false;
         }
       }
-      if ((api.character.esize || 0) < 1) {
+      // A consumed singleton ingredient frees the output slot. Stacked
+      // materials do not, so make room before asking the server to craft.
+      const consumesSlot = rec.items.some((ing) => {
+        const need = ing[0] || 1;
+        const nm = ing[1];
+        const lv = ing[2] || 0;
+        return (api.character.items || []).some((it) => {
+          if (!it || it.name !== nm || (it.level || 0) !== lv) return false;
+          return (it.q == null ? 1 : it.q) <= need;
+        });
+      });
+      if ((api.character.esize || 0) < 1 && !consumesSlot) {
         await parkToBank(null, { skipUpgrades: false });
         if ((api.character.esize || 0) < 1) {
-          api.game_log("craft:no_space");
+          api.game_log(tag + ":no_space");
           return false;
         }
       }
 
-      if (!(await goNpc({ to: "craftsman" }, { map: "main", x: 92, y: 670 }, "craft:path_fail"))) {
+      const npc = rec.quest || "craftsman";
+      const fallback = rec.quest === "mcollector"
+        ? { map: "main", x: 81, y: -283 }
+        : { map: "main", x: 92, y: 670 };
+      if (!(await goNpc({ to: npc }, fallback, tag + ":path_fail"))) {
         return false;
       }
       try {
         const r = await api.auto_craft(name);
         if (r && r.failed) {
-          api.game_log("craft:fail " + name + " " + (r.reason || ""));
+          api.game_log(tag + ":fail " + name + " " + (r.reason || ""));
           return false;
         }
-        api.game_log("craft:ok " + name);
+        api.game_log(tag + ":ok " + name);
         return true;
       } catch (e) {
-        api.game_log("craft:fail " + name);
+        api.game_log(tag + ":fail " + name);
         return false;
       }
     }

@@ -47,6 +47,19 @@ function baseG() {
       tracker: { g: 12000, type: "tracker" },
       gem0: { g: 24000, e: 1, type: "gem" },
       anniversarygift: { g: 0, e: 1, type: "misc" },
+      ascale: { g: 500, type: "material", s: 9999 },
+      pleather: { g: 400, type: "material", s: 9999 },
+      cscale: { g: 200, type: "material", s: 9999 },
+      bfur: { g: 5, type: "material", s: 9999 },
+      orbg: {
+        g: 60000,
+        type: "orb",
+        str: 2,
+        int: 2,
+        dex: 2,
+        compound: { str: 1, int: 1, dex: 1 },
+        grades: [4, 6, 6, 7],
+      },
       sshield: {
         g: 24000,
         type: "shield",
@@ -90,6 +103,11 @@ function baseG() {
       monstertoken: { g: 12000, type: "token", npc: "monsterhunter" },
     },
     craft: {
+      orbg: {
+        items: [[1, "ascale"], [1, "pleather"], [1, "cscale"], [1, "bfur"]],
+        cost: 0,
+        quest: "mcollector",
+      },
       pickaxe: { items: [[1, "staff"], [1, "spidersilk"], [1, "blade"]], cost: 100 },
       rod: { items: [[1, "staff"], [1, "spidersilk"]], cost: 100 },
     },
@@ -236,6 +254,8 @@ const NPC = {
   weapons: { map: "main", x: -89, y: -165 },
   /** Leo — craftsman ≈ [92,670] */
   craftsman: { map: "main", x: 92, y: 670 },
+  /** Cole — Material Collector, official maps.main position [81,-283] */
+  mcollector: { map: "main", x: 81, y: -283 },
 };
 
 function dist(a, b) {

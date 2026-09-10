@@ -63,6 +63,7 @@ const VENDOR_NPC = [
 ];
 /** Compound priority for bank clean / merchant combine. */
 const COMBINE_PRIORITY = [
+  "orbg",
   "ringsj",
   "strearring",
   "vitearring",
@@ -86,6 +87,7 @@ const SCROLL0_ALLOW = ["pants", "coat", "gloves", "shoes", "helmet", "sshield", 
  */
 const GEAR_TARGETS = {
   Jazwyn: {
+    orb: "orbg",
     offhand: "sshield",
     mainhand: "fireblade",
     earring1: "strearring",
@@ -93,12 +95,14 @@ const GEAR_TARGETS = {
     cape: "cape",
   },
   Zarook: {
+    orb: "orbg",
     offhand: "wbook0",
     earring1: "vitearring",
     earring2: "vitearring",
     cape: "cape",
   },
   Sarene: {
+    orb: "orbg",
     offhand: "wbook0",
     earring1: "intearring",
     earring2: "intearring",
@@ -115,8 +119,8 @@ const PONTY_WANT = [
   ["wbook0", 2],
 ];
 const PONTY_MULT = 1.25;
-/** Idle craft at Leo — fishing rod item id is `rod` (cheaper first). */
-const CRAFT_TARGETS = ["rod", "pickaxe"];
+/** Idle recipes: gathered-material orb at Cole, then one each of Leo's tools. */
+const CRAFT_TARGETS = ["orbg", "rod", "pickaxe"];
 const MAX_SAFE_UPGRADE = 5;
 const MIN_UPGRADE_CHANCE = 0.9;
 /** Merchant keeps this gold floor for pot deliveries before gear buys. */

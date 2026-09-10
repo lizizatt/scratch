@@ -43,7 +43,7 @@ const LEGACY_SELL = [
 /** V2 vendor bases — keep the best copy for upgrade/gift; sell lower dupes. */
 const VENDOR_GEAR = ["gloves", "shoes", "helmet", "pants", "coat"];
 
-const COMBINE_PRIORITY = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
+const COMBINE_PRIORITY = ["orbg", "ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
 const COMBINE_MAX = 5;
 const ALWAYS_KEEP = new Set([
   "stand0",
@@ -51,6 +51,10 @@ const ALWAYS_KEEP = new Set([
   "gem0",
   "gem1",
   "ascale",
+  "pleather",
+  "cscale",
+  "bfur",
+  "orbg",
   "reefglass",
   "seashell",
   "essenceoffire",

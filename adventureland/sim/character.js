@@ -560,6 +560,10 @@ function createCharacter(world, over) {
         map = NPC.craftsman.map;
         x = NPC.craftsman.x;
         y = NPC.craftsman.y;
+      } else if (dest && dest.to === "mcollector") {
+        map = NPC.mcollector.map;
+        x = NPC.mcollector.x;
+        y = NPC.mcollector.y;
       } else if (dest && dest.to === "bank") {
         map = NPC.bank.map;
         x = NPC.bank.x;
@@ -753,15 +757,15 @@ function createCharacter(world, over) {
       return { success: true, name: it.name, price };
     },
 
-    /** AL-shaped auto_craft(name) at Leo — consume recipe ingredients + gold. */
+    /** AL-shaped auto_craft(name) — consume recipe ingredients at its recipe NPC. */
     async auto_craft(name) {
       if (c.stand) return { failed: true, reason: "stand_open" };
-      const npc = NPC.craftsman;
+      const rec = world.G.craft && world.G.craft[name];
+      if (!rec) return { failed: true, reason: "no_recipe" };
+      const npc = rec.quest ? NPC[rec.quest] : NPC.craftsman;
       if (c.map !== npc.map || dist(c, npc) > 40) {
         return { failed: true, reason: "distance" };
       }
-      const rec = world.G.craft && world.G.craft[name];
-      if (!rec) return { failed: true, reason: "no_recipe" };
       const cost = rec.cost || 0;
       if (c.gold < cost) return { failed: true, reason: "gold" };
       const slots = [];
@@ -792,7 +796,8 @@ function createCharacter(world, over) {
       const outI = c.items.findIndex((x) => !x);
       if (outI < 0) return { failed: true, reason: "space" };
       c.gold -= cost;
-      c.items[outI] = { name, q: 1 };
+      const def = world.G.items[name] || {};
+      c.items[outI] = def.upgrade || def.compound ? { name, level: 0 } : { name, q: 1 };
       c.esize = Math.max(0, (c.esize || 1) - 1);
       c.q = Object.assign(c.q || {}, { craft: { ms: 400 } });
       log.crafted.push(name);

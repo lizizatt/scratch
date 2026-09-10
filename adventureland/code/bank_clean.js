@@ -9,7 +9,7 @@ var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"];
 // (strearring/vitearring/intearring) or capes; those are never vendor junk.
 var SELL = ["dexamulet", "dexearring", "rednose", "wcap", "wshoes", "frogt", "leatherboots", "beewings", "gslime"];
 var SELL_LV = [{ name: "shoes", level: 3 }]; // vendor dupes below best — level-gated
-var COMBINE = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
+var COMBINE = ["orbg", "ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
 var COMBINE_MAX = 5;
 var GOLD_FLOAT = 100000;
 var GOLD_MERCH_FLOOR = 150000;

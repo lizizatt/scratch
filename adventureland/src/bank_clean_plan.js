@@ -13,7 +13,7 @@ const { VENDOR_NPC } = require("./constants");
 const { isSellJunk: gearIsSellJunk } = require("./gear");
 
 const DEFAULT_SELL = VENDOR_NPC;
-const DEFAULT_COMBINE = ["ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
+const DEFAULT_COMBINE = ["orbg", "ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
 const BANK_COMBINE_MAX = 5;
 
 function bankPlanIsPot(it) {

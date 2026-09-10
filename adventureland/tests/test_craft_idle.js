@@ -20,16 +20,22 @@ function putBag(c, it) {
   return i;
 }
 
-test("constants: CRAFT_TARGETS are pickaxe + rod; tools kept", () => {
-  assert.deepStrictEqual(CRAFT_TARGETS.slice().sort(), ["pickaxe", "rod"]);
+test("constants: CRAFT_TARGETS include beginning orb + tools; tools kept", () => {
+  assert.deepStrictEqual(CRAFT_TARGETS, ["orbg", "rod", "pickaxe"]);
   assert.ok(KEEP_ALWAYS.indexOf("pickaxe") >= 0);
   assert.ok(KEEP_ALWAYS.indexOf("rod") >= 0);
 });
 
-test("sim: G.craft recipes match live pickaxe/rod", () => {
+test("sim: G.craft recipes match live beginning orb/pickaxe/rod", () => {
   const p = bootParty({ pack: "armadillo", pots: 10, members: ["Puppygirl"] });
   const craft = p.world.G.craft;
-  assert.ok(craft.pickaxe && craft.rod);
+  assert.ok(craft.orbg && craft.pickaxe && craft.rod);
+  assert.strictEqual(craft.orbg.quest, "mcollector");
+  assert.deepStrictEqual(p.world.G.items.orbg.grades, [4, 6, 6, 7]);
+  assert.deepStrictEqual(
+    craft.orbg.items.map((x) => x[1]).sort(),
+    ["ascale", "bfur", "cscale", "pleather"]
+  );
   assert.deepStrictEqual(
     craft.pickaxe.items.map((x) => x[1]).sort(),
     ["blade", "spidersilk", "staff"]
@@ -38,6 +44,77 @@ test("sim: G.craft recipes match live pickaxe/rod", () => {
     craft.rod.items.map((x) => x[1]).sort(),
     ["spidersilk", "staff"]
   );
+});
+
+test("scenario: gathered materials become a compounded beginning orb", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c.stand = false;
+  c.gold = 500000;
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+  for (const name of ["ascale", "pleather", "cscale", "bfur"]) {
+    putBag(c, { name, q: 3 });
+  }
+
+  let done = false;
+  for (let i = 0; i < 400; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "bank:compound orbg@0")) {
+      done = true;
+      break;
+    }
+  }
+
+  const logs = api.log.game.map((g) => g.m);
+  assert.strictEqual(logs.filter((m) => m === "collector:ok orbg").length, 3);
+  assert.ok(done, "expected orbg compound, logs=" + logs.filter((m) => /collector:|compound/.test(m)).join(" | "));
+  assert.ok(c.items.some((x) => x && x.name === "orbg" && x.level === 1), "result is orbg +1");
+});
+
+test("adversary: idle merchant trades gathered materials for Orb of Beginnings", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c.stand = false;
+  c.gold = 500000;
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+  for (const name of ["ascale", "pleather", "cscale", "bfur"]) {
+    putBag(c, { name, q: 1 });
+  }
+
+  let done = false;
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "collector:ok orbg")) {
+      done = true;
+      break;
+    }
+  }
+
+  assert.ok(done, "expected collector:ok orbg");
+  assert.ok(c.items.some((x) => x && x.name === "orbg" && (x.level || 0) === 0));
+  assert.ok(api.log.crafted.indexOf("orbg") >= 0, "sim records material trade");
+  assert.ok(Math.abs(c.real_x - 81) < 50 && Math.abs(c.real_y - (-283)) < 50, "near Cole");
+  for (const name of ["ascale", "pleather", "cscale", "bfur"]) {
+    assert.ok(!c.items.some((x) => x && x.name === name), name + " consumed");
+  }
 });
 
 test("adversary: idle crafts rod when silk in bag (buys staff)", async () => {
