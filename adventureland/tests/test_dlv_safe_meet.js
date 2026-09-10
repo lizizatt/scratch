@@ -147,6 +147,19 @@ test("adversary: bee fallback avoids the unreachable north grove", async () => {
   assert.ok(!msgs.some((x) => /^dlv:path_fail/.test(x)), "bee delivery must not path_fail");
 });
 
+test("adversary: snake fallback avoids the unreachable north grove", async () => {
+  const G = baseG();
+  const plaza = { map: "main", x: 40, y: -20 };
+  const oldMeet = { map: "main", x: -82, y: 1720 };
+  const meet = safeMeet("snake");
+  const snake = packCenter("snake");
+
+  assert.strictEqual(findPath(plaza, oldMeet, "main", G), null, "old live failure must be blocked");
+  assert.ok(findPath(plaza, meet, "main", G), "replacement meetup must be reachable");
+  assert.ok(!nearPack("snake", meet.map, meet.x, meet.y), "replacement must remain outside snake danger");
+  assert.ok(Math.hypot(meet.x - snake.x, meet.y - snake.y) <= SEND_RANGE, "replacement must be in send range");
+});
+
 test("adversary: delivery status elicits current location before fighter is dry", async () => {
   const p = bootParty({
     pack: "croc",

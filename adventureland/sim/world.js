@@ -173,6 +173,8 @@ function baseG() {
           { x0: 304, y0: -300, x1: 688, y1: 120 },
           // Walled grove immediately north of the main bee meadow.
           { x0: 416, y0: 856, x1: 680, y1: 984 },
+          // Walled grove immediately north of the snake basin.
+          { x0: -200, y0: 1544, x1: 104, y1: 1800 },
           // Full-width ridge south of bee belt: SE farms (armadillo/croc) need cave;
           // bee (~y1059) stays overland-reachable from town.
           { x0: -4000, y0: 1200, x1: 4000, y1: 1580 },
