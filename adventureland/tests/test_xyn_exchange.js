@@ -80,6 +80,10 @@ test("adversary: full bag lists surplus before exchanging a stacked box", async 
   const msgs = api.log.game.map((g) => g.m);
   assert.ok(msgs.some((m) => m === "xyn:no_space armorbox"), "full stacked exchange is deferred");
   assert.ok(msgs.some((m) => /^stall:list dagger@0/.test(m)), "stall frees the output slot");
+  assert.ok(
+    api.log.game.find((g) => /^stall:list dagger@0/.test(g.m)).t < 3000,
+    "zero-reserve surplus must not wait on the reserve stability gate"
+  );
   assert.ok(msgs.some((m) => m === "xyn:exchange armorbox"), "exchange succeeds after space is freed");
 });
 

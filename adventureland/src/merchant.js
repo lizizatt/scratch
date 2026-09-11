@@ -1391,8 +1391,9 @@ function bootMerchant(api, opts) {
     return Math.max(rule.floor || 0, Math.ceil(upgraded / 100) * 100);
   }
 
-  function stallCandidate(preferBag) {
+  function stallCandidate(preferBag, reserveStable) {
     for (const rule of STALL_SELL || []) {
+      if (rule.keep > 0 && !reserveStable) continue;
       if (!stallReserveReady(rule)) continue;
       let choices = stallCopies(rule);
       if (preferBag && choices.some((x) => x.i != null)) choices = choices.filter((x) => x.i != null);
@@ -1418,8 +1419,8 @@ function bootMerchant(api, opts) {
 
   /** List one reserve-safe surplus item per idle pass. */
   async function tryStallOne() {
-    if (!stallBagStable()) return false;
-    let cand = stallCandidate((api.character.esize || 0) < 1);
+    const reserveStable = stallBagStable();
+    let cand = stallCandidate((api.character.esize || 0) < 1, reserveStable);
     if (!cand) return false;
     if (!(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
     if (!api.character.stand) {
@@ -1443,7 +1444,7 @@ function bootMerchant(api, opts) {
         return false;
       }
       await leaveBankToPlaza();
-      cand = stallCandidate(false);
+      cand = stallCandidate(false, true);
       if (!cand || cand.i == null) return false;
       if (!(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
       api.open_stand();
