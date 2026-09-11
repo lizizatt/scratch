@@ -108,6 +108,7 @@ function bootMerchant(api, opts) {
   const metrics = { t0: 0, gold0: 0, emitCount: 0 };
   let stallBagDigest = null;
   let stallBagStableAt = api._now();
+  let lastXynNoSpaceAt = null;
 
   function logUpgradeSkip(name, level, chance) {
     // Once per name@level forever — 60s re-logs still flooded burn-in while stall locked park.
@@ -1403,7 +1404,9 @@ function bootMerchant(api, opts) {
 
   function stallBagStable() {
     const digest = JSON.stringify(
-      (api.character.items || []).map((it) => (it ? [it.name, it.level || 0, it.q || 1, it.l || null, it.p || null] : null))
+      (api.character.items || []).map((it) =>
+        it && stallRule(it.name) ? [it.name, it.level || 0, it.l || null, it.p || null] : null
+      )
     );
     if (digest !== stallBagDigest) {
       stallBagDigest = digest;
@@ -1663,7 +1666,11 @@ function bootMerchant(api, opts) {
     const needed = ((api.G.items && api.G.items[nm]) || {}).e || 1;
     const held = api.character.items[i].q == null ? 1 : api.character.items[i].q;
     if (held > needed && (api.character.esize || 0) < 1) {
-      api.game_log("xyn:no_space " + nm);
+      const now = api._now();
+      if (lastXynNoSpaceAt == null || now - lastXynNoSpaceAt >= 15000) {
+        api.game_log("xyn:no_space " + nm);
+        lastXynNoSpaceAt = now;
+      }
       return false;
     }
     if (!(await goNpc({ to: "exchange" }, { map: "main", x: -25, y: -478 }, "xyn:path_fail"))) {
