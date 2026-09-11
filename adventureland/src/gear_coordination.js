@@ -1,6 +1,7 @@
 "use strict";
 
-const { FIGHTERS, MERCHANT } = require("./constants");
+const { FIGHTERS, MERCHANT, GEAR_TARGETS } = require("./constants");
+const { score, classOk, candidateSlots } = require("./gear");
 
 const ITEM_VOLATILE_KEYS = { index: 1, slot: 1 };
 const EQUIPMENT_SLOTS = [
@@ -20,6 +21,15 @@ const EQUIPMENT_SLOTS = [
   "ring2",
   "orb",
 ];
+const DIRECT_GEAR_GROUPS = [
+  ["earring1", "earring2"],
+  ["ring1", "ring2"],
+  ["amulet"],
+  ["belt"],
+  ["cape"],
+  ["orb"],
+];
+const TARGET_BONUS = 10000;
 
 function stableValue(v) {
   if (v == null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
@@ -133,6 +143,108 @@ function isFighterName(name) {
   return FIGHTERS.indexOf(name) >= 0;
 }
 
+function assignmentValue(item, who, slot, ctype, G) {
+  if (!item || !classOk(item, ctype, G)) return -Infinity;
+  if (candidateSlots(item, G).indexOf(slot) < 0) return -Infinity;
+  const target = GEAR_TARGETS[who] && GEAR_TARGETS[who][slot];
+  return score(item, G, ctype) + (target && item.name === target ? TARGET_BONUS : 0);
+}
+
+function planGroup(ads, G, group) {
+  const slots = [];
+  const items = [];
+  for (const who of FIGHTERS) {
+    const ad = ads[who];
+    if (!ad || !ad.slots || !ad.ctype) return null;
+    for (const slot of group) {
+      slots.push({ who, slot, ctype: ad.ctype });
+      const it = ad.slots[slot];
+      if (it && !it.l && (ad.reservations || []).indexOf(it.uid) < 0) {
+        items.push({ owner: who, sourceSlot: slot, ref: it });
+      }
+    }
+  }
+
+  let states = new Map();
+  states.set(0, { value: 0, assignment: [] });
+  for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+    const next = new Map(states);
+    for (const [mask, state] of states) {
+      for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+        if (mask & (1 << slotIndex)) continue;
+        const slot = slots[slotIndex];
+        const value = assignmentValue(items[itemIndex].ref, slot.who, slot.slot, slot.ctype, G);
+        if (!Number.isFinite(value)) continue;
+        const nextMask = mask | (1 << slotIndex);
+        const candidate = {
+          value: state.value + value,
+          assignment: state.assignment.concat([{ itemIndex, slotIndex, value }]),
+        };
+        const old = next.get(nextMask);
+        if (!old || candidate.value > old.value) next.set(nextMask, candidate);
+      }
+    }
+    states = next;
+  }
+
+  let best = null;
+  for (const state of states.values()) {
+    if (!best || state.value > best.value) best = state;
+  }
+  if (!best) return null;
+
+  const currentByWho = {};
+  const finalByWho = {};
+  for (const who of FIGHTERS) {
+    currentByWho[who] = 0;
+    finalByWho[who] = 0;
+    const ad = ads[who];
+    for (const slot of group) {
+      const it = ad.slots[slot];
+      if (it) currentByWho[who] += Math.max(0, assignmentValue(it, who, slot, ad.ctype, G));
+    }
+  }
+  for (const a of best.assignment) {
+    const slot = slots[a.slotIndex];
+    finalByWho[slot.who] += a.value;
+  }
+  for (const who of FIGHTERS) {
+    if (finalByWho[who] + 0.001 < currentByWho[who]) return null;
+  }
+
+  const legs = [];
+  for (const a of best.assignment) {
+    const item = items[a.itemIndex];
+    const target = slots[a.slotIndex];
+    if (item.owner === target.who) continue;
+    legs.push({
+      from: item.owner,
+      to: target.who,
+      fromSlot: item.sourceSlot,
+      toSlot: target.slot,
+      item: item.ref,
+    });
+  }
+  if (!legs.length) return null;
+  legs.sort(
+    (a, b) =>
+      a.from.localeCompare(b.from) ||
+      a.to.localeCompare(b.to) ||
+      a.toSlot.localeCompare(b.toSlot) ||
+      a.item.name.localeCompare(b.item.name)
+  );
+  return { gain: best.value - Object.values(currentByWho).reduce((a, b) => a + b, 0), legs };
+}
+
+function planPeerGearTransfers(ads, G) {
+  let best = null;
+  for (const group of DIRECT_GEAR_GROUPS) {
+    const plan = planGroup(ads || {}, G || {}, group);
+    if (plan && plan.gain > 0.001 && (!best || plan.gain > best.gain)) best = plan;
+  }
+  return best;
+}
+
 module.exports = {
   compactGearItem,
   itemFingerprint,
@@ -142,4 +254,5 @@ module.exports = {
   cmSender,
   isMerchantMessage,
   isFighterName,
+  planPeerGearTransfers,
 };

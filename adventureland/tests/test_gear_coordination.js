@@ -6,6 +6,7 @@ const {
   inventoryDigest,
   makeInventorySnapshot,
   resolveObservedItem,
+  planPeerGearTransfers,
 } = require("../src/gear_coordination");
 
 const tests = [];
@@ -70,6 +71,38 @@ test("fighter ignores gear control from another fighter", async () => {
   await Promise.resolve();
 
   assert.ok(!j.slots.earring1 || j.slots.earring1.name !== "strearring");
+});
+
+test("party planner finds the cross-equipped earring exchange", async () => {
+  const p = bootParty({ pack: "bat" });
+  const setup = {
+    Jazwyn: [
+      { name: "intearring", level: 2 },
+      { name: "intearring", level: 2 },
+    ],
+    Sarene: [
+      { name: "intearring", level: 0 },
+      { name: "vitearring", level: 0 },
+    ],
+    Zarook: [{ name: "strearring", level: 0 }, null],
+  };
+  const ads = {};
+  for (const who of ["Jazwyn", "Sarene", "Zarook"]) {
+    const api = p.bots[who].api;
+    api.character.slots.earring1 = setup[who][0];
+    api.character.slots.earring2 = setup[who][1];
+    ads[who] = makeInventorySnapshot(api, 1, {});
+  }
+
+  const plan = planPeerGearTransfers(ads, p.world.G);
+  assert.ok(plan && plan.legs.length >= 2);
+  assert.ok(
+    plan.legs.some((x) => x.from === "Zarook" && x.to === "Jazwyn" && x.item.name === "strearring")
+  );
+  assert.ok(
+    plan.legs.some((x) => x.from === "Jazwyn" && x.item.name === "intearring"),
+    "Jazwyn should release an intelligence earring as part of the improving assignment"
+  );
 });
 
 module.exports = { tests };
