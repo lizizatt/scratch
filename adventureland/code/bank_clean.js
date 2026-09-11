@@ -8,7 +8,7 @@ var FIGHTERS = ["Jazwyn", "Sarene", "Zarook"];
 // require() (raw Mainframe CODE upload). Do NOT include goal earrings
 // (strearring/vitearring/intearring) or capes; those are never vendor junk.
 var SELL = ["dexamulet", "dexearring", "rednose", "wcap", "wshoes", "frogt", "leatherboots", "beewings", "gslime"];
-var SELL_LV = [{ name: "shoes", level: 3 }]; // vendor dupes below best — level-gated
+var SELL_LV = [{ name: "shoes", level: 3 }, { name: "wattire", level: 0 }, { name: "wgloves", level: 0 }, { name: "partyhat", level: 0 }];
 var COMBINE = ["orbg", "ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
 var COMBINE_MAX = 5;
 var GOLD_FLOAT = 100000;

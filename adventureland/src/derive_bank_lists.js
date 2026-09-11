@@ -5,7 +5,7 @@
  * Rules blend legacy HOLD/SELL with V2 vendor-gear progression.
  */
 
-const { VENDOR_NPC } = require("./constants");
+const { VENDOR_NPC, VENDOR_NPC_LEVEL0 } = require("./constants");
 
 /** Keep at least this many of each (name → min level to count as hold). */
 const HOLD_TARGETS = [
@@ -26,18 +26,11 @@ const HOLD_TARGETS = [
 /** Always sell these names when not held for a combine triple. */
 const LEGACY_SELL = [
   "dexearring",
-  "stramulet",
   "intamulet",
   "dexamulet",
   "rednose",
-  "gloves",
-  "pants",
-  "coat",
-  "helmet",
-  "wattire",
   "wcap",
   "wshoes",
-  "wgloves",
 ];
 
 /** V2 vendor bases — keep the best copy for upgrade/gift; sell lower dupes. */
@@ -225,6 +218,10 @@ function deriveBankLists(dump) {
       sell.push({ name, level: lv, reason: "vendor_npc_junk", copies: row.copies, locations: row.locations });
       continue;
     }
+    if (VENDOR_NPC_LEVEL0.indexOf(name) >= 0 && lv === 0) {
+      sell.push({ name, level: lv, reason: "vendor_npc_level0", copies: row.copies, locations: row.locations });
+      continue;
+    }
 
     if (VENDOR_GEAR.indexOf(name) >= 0 && def.upgrade) {
       // Keep only the highest level copy; sell lower duplicates
@@ -271,7 +268,11 @@ function deriveBankLists(dump) {
   }
 
   const sellNames = [
-    ...new Set(sell.filter((s) => VENDOR_GEAR.indexOf(s.name) < 0).map((s) => s.name)),
+    ...new Set(
+      sell
+        .filter((s) => VENDOR_GEAR.indexOf(s.name) < 0 && VENDOR_NPC_LEVEL0.indexOf(s.name) < 0)
+        .map((s) => s.name)
+    ),
   ];
   const combineNames = [...new Set(combine.map((c) => c.name))];
   const buyNow = buy.filter((b) => /^cscroll\d$/.test(b.name) || b.via == null);

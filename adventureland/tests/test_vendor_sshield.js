@@ -6,7 +6,7 @@
 const assert = require("assert");
 const { bootParty } = require("../src/boot_party");
 const { classOk, planGifts, score, isSellJunk, eligibleUpgrade } = require("../src/gear");
-const { VENDOR_NPC, GEAR_TARGETS, SCROLL0_ALLOW } = require("../src/constants");
+const { VENDOR_NPC, VENDOR_NPC_LEVEL0, GEAR_TARGETS, SCROLL0_ALLOW } = require("../src/constants");
 
 const tests = [];
 function test(name, fn) {
@@ -20,6 +20,13 @@ test("constants: VENDOR_NPC covers stuck stall junk; sshield is Jazwyn offhand t
   assert.strictEqual(GEAR_TARGETS.Jazwyn.offhand, "sshield");
   assert.ok(SCROLL0_ALLOW.indexOf("sshield") >= 0, "upgrade spiked shield");
   assert.ok(SCROLL0_ALLOW.indexOf("wcap") < 0, "do not upgrade wcap");
+});
+
+test("unit: wearable duplicate junk is vendored only at level zero", () => {
+  for (const n of ["wattire", "wgloves", "partyhat"]) assert.ok(VENDOR_NPC_LEVEL0.indexOf(n) >= 0, n);
+  const G = { items: { wattire: { type: "chest", upgrade: true } } };
+  assert.ok(isSellJunk({ name: "wattire", level: 0 }, G));
+  assert.ok(!isSellJunk({ name: "wattire", level: 1 }, G));
 });
 
 test("unit: sshield classOk warrior only; scores above plain shield", () => {

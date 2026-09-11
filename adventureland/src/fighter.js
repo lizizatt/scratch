@@ -576,6 +576,7 @@ function bootFighter(api, opts) {
         break;
       }
     }
+    if (n) sendGearAd();
     return n;
   }
 

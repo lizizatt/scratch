@@ -26,7 +26,61 @@ test("constants: KEEP_ALWAYS includes tracker; EXCHANGE_ITEMS are Xyn targets", 
   assert.ok(KEEP_ALWAYS.indexOf("stand0") >= 0);
   assert.ok(KEEP_ALWAYS.indexOf("pickaxe") >= 0);
   assert.ok(KEEP_ALWAYS.indexOf("rod") >= 0);
-  assert.deepStrictEqual(EXCHANGE_ITEMS.slice().sort(), ["anniversarygift", "gem0"]);
+  for (const name of ["anniversarygift", "gem0", "gift0", "armorbox", "weaponbox", "jewellerybox"]) {
+    assert.ok(EXCHANGE_ITEMS.indexOf(name) >= 0, name);
+  }
+});
+
+test("adversary: idle merchant exchanges stacked armor boxes one at a time", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "armorbox", q: 4 };
+  c.esize = c.items.filter((x) => !x).length;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+
+  for (let i = 0; i < 200; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "xyn:exchange armorbox")) break;
+  }
+
+  assert.ok(api.log.game.some((g) => g.m === "xyn:exchange armorbox"));
+  const boxes = c.items.find((x) => x && x.name === "armorbox");
+  assert.ok(boxes && boxes.q === 3, "one box consumed from stack");
+});
+
+test("adversary: full bag lists surplus before exchanging a stacked box", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = { name: "cake", q: 1 };
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "armorbox", q: 4 };
+  c.items[4] = { name: "dagger", level: 0 };
+  c.esize = 0;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c._bank = { gold: 0, items0: new Array(42).fill({ name: "cake", q: 1 }) };
+
+  for (let i = 0; i < 300; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "xyn:exchange armorbox")) break;
+  }
+
+  const msgs = api.log.game.map((g) => g.m);
+  assert.ok(msgs.some((m) => m === "xyn:no_space armorbox"), "full stacked exchange is deferred");
+  assert.ok(msgs.some((m) => /^stall:list dagger@0/.test(m)), "stall frees the output slot");
+  assert.ok(msgs.some((m) => m === "xyn:exchange armorbox"), "exchange succeeds after space is freed");
 });
 
 test("adversary: Jazwyn keeps Tracktrix — does not toss to merchant", async () => {

@@ -14,6 +14,8 @@ const {
   BEACON_MS,
   EXCHANGE_ITEMS,
   VENDOR_NPC,
+  VENDOR_NPC_LEVEL0,
+  STALL_SELL,
   GEAR_TARGETS,
   PONTY_WANT,
   PONTY_MULT,
@@ -58,7 +60,7 @@ const {
 /**
  * Merchant logistics under Jazwyn command.
  * Idle on farm world; hops only for meet_home / to reach fighters.
- * When idle: vendor junk → Xyn exchange → Ponty → craft tools → upgrade/combine/park/gift.
+ * When idle: vendor junk → Xyn exchange → stall surplus → Ponty → craft/upgrade/combine/gift.
  */
 function bootMerchant(api, opts) {
   opts = opts || {};
@@ -104,6 +106,8 @@ function bootMerchant(api, opts) {
   const upgradeSkipLogAt = {};
   let bankHintPrimed = false;
   const metrics = { t0: 0, gold0: 0, emitCount: 0 };
+  let stallBagDigest = null;
+  let stallBagStableAt = api._now();
 
   function logUpgradeSkip(name, level, chance) {
     // Once per name@level forever — 60s re-logs still flooded burn-in while stall locked park.
@@ -620,7 +624,7 @@ function bootMerchant(api, opts) {
       if (/^hpot|^mpot/.test(it.name)) continue;
       if (it.name === "stand0") continue;
       if (EXCHANGE_ITEMS.indexOf(it.name) >= 0) continue;
-      if (isVendorNpcName(it.name)) continue;
+      if (isVendorNpcItem(it)) continue;
       if (isGearTargetName(it.name)) continue;
       // Listed / reserved for merchant stand — never park.
       if (it.price != null) continue;
@@ -659,7 +663,7 @@ function bootMerchant(api, opts) {
       for (let i = 0; i < bag.length; i++) {
         const it = bag[i];
         if (!it) continue;
-        out.push({ name: it.name, level: it.level || 0, pack, i, q: it.q });
+        out.push({ name: it.name, level: it.level || 0, pack, i, q: it.q, l: it.l, p: it.p });
       }
     }
     return out;
@@ -1285,7 +1289,7 @@ function bootMerchant(api, opts) {
   function countSellJunk(items) {
     let n = 0;
     for (const it of items || []) {
-      if (it && isVendorNpcName(it.name)) n++;
+      if (isVendorNpcItem(it)) n++;
     }
     return n;
   }
@@ -1313,15 +1317,138 @@ function bootMerchant(api, opts) {
     return true;
   }
 
-  function isVendorNpcName(name) {
-    return VENDOR_NPC.indexOf(name) >= 0;
+  function isVendorNpcItem(it) {
+    return (
+      !!it &&
+      (VENDOR_NPC.indexOf(it.name) >= 0 ||
+        (VENDOR_NPC_LEVEL0.indexOf(it.name) >= 0 && !(it.level > 0)))
+    );
   }
 
-  function isTradeReclaimName(name) {
-    if (!name) return false;
-    if (isVendorNpcName(name)) return true;
-    if (isGearTargetName(name)) return true;
+  function isTradeReclaimItem(it) {
+    if (!it) return false;
+    if (isVendorNpcItem(it)) return true;
+    if (isGearTargetName(it.name) && !stallRule(it.name)) return true;
     return false;
+  }
+
+  function stallRule(name) {
+    return (STALL_SELL || []).find((x) => x.name === name) || null;
+  }
+
+  function stallCopies(rule) {
+    const copies = [];
+    for (let i = 0; i < api.character.items.length; i++) {
+      const it = api.character.items[i];
+      if (it && it.name === rule.name) {
+        copies.push({ rule, i, level: it.level || 0, sellable: !it.l && !it.p });
+      }
+    }
+    for (const bank of listBankItems()) {
+      if (bank.name === rule.name) {
+        copies.push({ rule, bank, level: bank.level || 0, sellable: !bank.l && !bank.p });
+      }
+    }
+    const now = api._now();
+    for (const who of FIGHTERS) {
+      const ad = gearAds[who];
+      if (!gearAdFresh(ad, now)) continue;
+      for (const it of ad.bag || []) {
+        if (it && it.name === rule.name) copies.push({ level: it.level || 0, sellable: false });
+      }
+      for (const slot of Object.keys(ad.slots || {})) {
+        const it = ad.slots[slot];
+        if (it && it.name === rule.name) copies.push({ level: it.level || 0, sellable: false });
+      }
+    }
+    copies.sort((a, b) => b.level - a.level || Number(a.sellable) - Number(b.sellable));
+    return copies.slice(rule.keep || 0).filter((x) => x.sellable);
+  }
+
+  function stallReserveReady(rule) {
+    if (!(rule.keep > 0)) return true;
+    const owners = [];
+    for (const who of FIGHTERS) {
+      const targets = GEAR_TARGETS[who] || {};
+      if (Object.keys(targets).some((slot) => targets[slot] === rule.name)) owners.push(who);
+    }
+    const required = owners.length ? owners : FIGHTERS;
+    return required.every((who) => gearAdFresh(gearAds[who], api._now()));
+  }
+
+  function stallPrice(it, rule) {
+    const base = ((api.G.items && api.G.items[it.name]) || {}).g || 100;
+    const upgraded = base * 1.2 * Math.pow(2, it.level || 0);
+    return Math.max(rule.floor || 0, Math.ceil(upgraded / 100) * 100);
+  }
+
+  function stallCandidate(preferBag) {
+    for (const rule of STALL_SELL || []) {
+      if (!stallReserveReady(rule)) continue;
+      let choices = stallCopies(rule);
+      if (preferBag && choices.some((x) => x.i != null)) choices = choices.filter((x) => x.i != null);
+      choices.sort((a, b) => a.level - b.level || (a.i == null ? 1 : -1));
+      if (choices.length) return choices[0];
+    }
+    return null;
+  }
+
+  function stallBagStable() {
+    const digest = JSON.stringify(
+      (api.character.items || []).map((it) => (it ? [it.name, it.level || 0, it.q || 1, it.l || null, it.p || null] : null))
+    );
+    if (digest !== stallBagDigest) {
+      stallBagDigest = digest;
+      stallBagStableAt = api._now();
+      return false;
+    }
+    return api._now() - stallBagStableAt >= 3000;
+  }
+
+  /** List one reserve-safe surplus item per idle pass. */
+  async function tryStallOne() {
+    if (!stallBagStable()) return false;
+    let cand = stallCandidate((api.character.esize || 0) < 1);
+    if (!cand) return false;
+    if (!(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
+    if (!api.character.stand) {
+      api.open_stand();
+      if (typeof api.sleep === "function") await api.sleep(150);
+    }
+    let tradeSlot = 0;
+    for (let s = 1; s <= 16; s++) {
+      if (!api.character.slots["trade" + s]) {
+        tradeSlot = s;
+        break;
+      }
+    }
+    if (!tradeSlot) return false;
+    if (cand.i == null) {
+      closeStandIfOpen();
+      if ((api.character.esize || 0) < 1 || !(await ensureAtBank())) return false;
+      const r = await api.bank_retrieve(cand.bank.pack, cand.bank.i);
+      if (r && r.failed) {
+        api.game_log("stall:retrieve_fail " + cand.rule.name);
+        return false;
+      }
+      await leaveBankToPlaza();
+      cand = stallCandidate(false);
+      if (!cand || cand.i == null) return false;
+      if (!(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
+      api.open_stand();
+      if (typeof api.sleep === "function") await api.sleep(150);
+      }
+    if (api.character.slots["trade" + tradeSlot]) return false;
+    const it = api.character.items[cand.i];
+    if (!it || it.name !== cand.rule.name) return false;
+    const price = stallPrice(it, cand.rule);
+    const r = await api.trade(cand.i, tradeSlot, price, it.q == null ? 1 : it.q);
+    if (r && r.failed) {
+      api.game_log("stall:list_fail " + it.name + " " + (r.reason || ""));
+      return false;
+    }
+    api.game_log("stall:list " + it.name + "@" + (it.level || 0) + " price=" + price);
+    return true;
   }
 
   /** Pull listed stall junk / goal gear into bag (stand must be open for trade unequip). */
@@ -1330,7 +1457,7 @@ function bootMerchant(api, opts) {
     const junkSlots = [];
     for (let s = 1; s <= 16; s++) {
       const it = slots["trade" + s];
-      if (it && isTradeReclaimName(it.name)) junkSlots.push(s);
+      if (isTradeReclaimItem(it)) junkSlots.push(s);
     }
     if (!junkSlots.length) return 0;
     if (!api.character.stand) {
@@ -1367,17 +1494,17 @@ function bootMerchant(api, opts) {
     await reclaimTradeJunk();
 
     function findBagJunk() {
-      return api.character.items.findIndex((x) => x && isVendorNpcName(x.name));
+      return api.character.items.findIndex((x) => isVendorNpcItem(x));
     }
 
     let i = findBagJunk();
     if (i < 0) {
       const hint = api.character.bank || api.character._bank;
-      let any = listBankItems().some((e) => isVendorNpcName(e.name));
+      let any = listBankItems().some((e) => isVendorNpcItem(e));
       if (!any && hint) {
         for (const p of Object.keys(hint)) {
           if (p === "gold" || !Array.isArray(hint[p])) continue;
-          if (hint[p].some((x) => x && isVendorNpcName(x.name))) {
+          if (hint[p].some((x) => isVendorNpcItem(x))) {
             any = true;
             break;
           }
@@ -1391,10 +1518,11 @@ function bootMerchant(api, opts) {
       }
       if (!(await ensureAtBank())) return false;
       const hit = listBankItems()
-        .filter((e) => isVendorNpcName(e.name))
+        .filter((e) => isVendorNpcItem(e))
         .sort((a, b) => {
-          const ia = VENDOR_NPC.indexOf(a.name);
-          const ib = VENDOR_NPC.indexOf(b.name);
+          const order = VENDOR_NPC.concat(VENDOR_NPC_LEVEL0);
+          const ia = order.indexOf(a.name);
+          const ib = order.indexOf(b.name);
           return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
         })[0];
       if (!hit) {
@@ -1524,6 +1652,12 @@ function bootMerchant(api, opts) {
     if (i < 0) return false;
 
     const nm = api.character.items[i].name;
+    const needed = ((api.G.items && api.G.items[nm]) || {}).e || 1;
+    const held = api.character.items[i].q == null ? 1 : api.character.items[i].q;
+    if (held > needed && (api.character.esize || 0) < 1) {
+      api.game_log("xyn:no_space " + nm);
+      return false;
+    }
     if (!(await goNpc({ to: "exchange" }, { map: "main", x: -25, y: -478 }, "xyn:path_fail"))) {
       return false;
     }
@@ -2063,11 +2197,16 @@ function bootMerchant(api, opts) {
     } catch (e) {
       api.game_log("vendor:err " + ((e && e.message) || e));
     }
-    // Xyn exchange — one gem0 / anniversarygift per idle pass.
+    // Xyn exchange — one approved gem/gift/box per idle pass.
     try {
       if (await tryExchangeOne()) return;
     } catch (e) {
       api.game_log("xyn:err " + ((e && e.message) || e));
+    }
+    try {
+      if (await tryStallOne()) return;
+    } catch (e) {
+      api.game_log("stall:err " + ((e && e.message) || e));
     }
     // Ponty — fill earring/cape/sshield quotas under fair cap.
     try {

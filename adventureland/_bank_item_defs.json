@@ -7,6 +7,14 @@
     "g": 100,
     "e": 1
   },
+  "armorbox": {
+    "type": "box",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 120000,
+    "e": 1
+  },
   "ascale": {
     "type": "material",
     "compound": false,
@@ -14,45 +22,129 @@
     "sell": false,
     "g": 500
   },
-  "carrotsword": {
+  "beewings": {
+    "type": "material",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 25
+  },
+  "bwing": {
+    "type": "material",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 120
+  },
+  "cake": {
+    "type": "elixir",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 100
+  },
+  "candycanesword": {
     "type": "weapon",
     "compound": false,
     "upgrade": true,
     "sell": false,
-    "g": 92000,
+    "g": 72000,
+    "grades": [
+      0,
+      8,
+      10,
+      12
+    ],
+    "wtype": "short_sword"
+  },
+  "cclaw": {
+    "type": "weapon",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 9600,
+    "grades": [
+      5,
+      8,
+      10,
+      12
+    ],
+    "wtype": "fist"
+  },
+  "coat": {
+    "type": "chest",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 6000,
+    "grades": [
+      7,
+      9,
+      10,
+      12
+    ]
+  },
+  "confetti": {
+    "type": "throw",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 20
+  },
+  "crabclaw": {
+    "type": "material",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 120
+  },
+  "cscale": {
+    "type": "material",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 200
+  },
+  "dagger": {
+    "type": "weapon",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 167000,
     "grades": [
       0,
       7,
       10,
       12
     ],
+    "wtype": "dagger"
+  },
+  "eears": {
+    "type": "helmet",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 32000,
+    "grades": [
+      6,
+      9,
+      10,
+      12
+    ]
+  },
+  "fireblade": {
+    "type": "weapon",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 96000,
+    "grades": [
+      0,
+      8,
+      10,
+      12
+    ],
     "wtype": "short_sword"
-  },
-  "dexamulet": {
-    "type": "amulet",
-    "compound": true,
-    "upgrade": false,
-    "sell": false,
-    "g": 30000,
-    "grades": [
-      3,
-      5,
-      6,
-      7
-    ]
-  },
-  "dexearring": {
-    "type": "earring",
-    "compound": true,
-    "upgrade": false,
-    "sell": false,
-    "g": 38000,
-    "grades": [
-      2,
-      5,
-      6,
-      7
-    ]
   },
   "gem0": {
     "type": "gem",
@@ -61,6 +153,66 @@
     "sell": false,
     "g": 240000,
     "e": 1
+  },
+  "gift0": {
+    "type": "gem",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 2400,
+    "e": 1
+  },
+  "gloves": {
+    "type": "gloves",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 3400,
+    "grades": [
+      7,
+      9,
+      10,
+      12
+    ]
+  },
+  "gloves1": {
+    "type": "gloves",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 34000,
+    "grades": [
+      0,
+      7,
+      10,
+      12
+    ]
+  },
+  "helmet": {
+    "type": "helmet",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 3200,
+    "grades": [
+      7,
+      9,
+      10,
+      12
+    ]
+  },
+  "helmet1": {
+    "type": "helmet",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 32000,
+    "grades": [
+      0,
+      7,
+      10,
+      12
+    ]
   },
   "hpamulet": {
     "type": "amulet",
@@ -102,6 +254,21 @@
     "sell": false,
     "g": 100
   },
+  "leather": {
+    "type": "quest",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 3000,
+    "e": 40
+  },
+  "monstertoken": {
+    "type": "token",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 12000
+  },
   "mpot0": {
     "type": "pot",
     "compound": false,
@@ -116,17 +283,56 @@
     "sell": false,
     "g": 100
   },
-  "rednose": {
-    "type": "helmet",
-    "compound": true,
-    "upgrade": false,
+  "pants": {
+    "type": "pants",
+    "compound": false,
+    "upgrade": true,
     "sell": false,
-    "g": 32000,
+    "g": 7800,
     "grades": [
-      2,
+      7,
+      9,
+      10,
+      12
+    ]
+  },
+  "pants1": {
+    "type": "pants",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 78000,
+    "grades": [
+      0,
+      7,
+      10,
+      12
+    ]
+  },
+  "partyhat": {
+    "type": "helmet",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 12000,
+    "grades": [
+      7,
+      9,
+      10,
+      12
+    ]
+  },
+  "poker": {
+    "type": "gloves",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 16000,
+    "grades": [
       4,
-      6,
-      7
+      8,
+      10,
+      12
     ]
   },
   "reefglass": {
@@ -156,6 +362,13 @@
     "sell": false,
     "g": 1000
   },
+  "scroll1": {
+    "type": "uscroll",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 40000
+  },
   "seashell": {
     "type": "quest",
     "compound": false,
@@ -177,32 +390,59 @@
       12
     ]
   },
-  "skullamulet": {
-    "type": "amulet",
-    "compound": true,
-    "upgrade": false,
+  "shoes1": {
+    "type": "shoes",
+    "compound": false,
+    "upgrade": true,
     "sell": false,
-    "g": 30000,
+    "g": 120000,
     "grades": [
-      2,
-      4,
-      6,
-      7
+      0,
+      7,
+      10,
+      12
     ]
   },
-  "staff": {
+  "slice_honey": {
+    "type": "material",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 10
+  },
+  "slimestaff": {
     "type": "weapon",
     "compound": false,
     "upgrade": true,
     "sell": false,
-    "g": 12400,
+    "g": 16400,
     "grades": [
-      7,
-      9,
+      5,
+      8,
       10,
       12
     ],
     "wtype": "staff"
+  },
+  "snakeoil": {
+    "type": "pot",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 200
+  },
+  "sshield": {
+    "type": "shield",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 24000,
+    "grades": [
+      4,
+      8,
+      10,
+      12
+    ]
   },
   "stand0": {
     "type": "stand",
@@ -211,17 +451,79 @@
     "sell": false,
     "g": 40000
   },
-  "strearring": {
-    "type": "earring",
+  "stinger": {
+    "type": "weapon",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 16000,
+    "grades": [
+      5,
+      8,
+      10,
+      12
+    ],
+    "wtype": "dagger"
+  },
+  "stormfeather": {
+    "type": "material",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 1800
+  },
+  "stramulet": {
+    "type": "amulet",
     "compound": true,
     "upgrade": false,
     "sell": false,
-    "g": 38000,
+    "g": 30000,
     "grades": [
-      2,
+      3,
       5,
       6,
       7
+    ]
+  },
+  "t2bow": {
+    "type": "weapon",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 78000,
+    "grades": [
+      0,
+      7,
+      10,
+      12
+    ],
+    "wtype": "bow"
+  },
+  "tracker": {
+    "type": "tracker",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 12
+  },
+  "vitscroll": {
+    "type": "pscroll",
+    "compound": false,
+    "upgrade": false,
+    "sell": false,
+    "g": 8000
+  },
+  "wattire": {
+    "type": "chest",
+    "compound": false,
+    "upgrade": true,
+    "sell": false,
+    "g": 12000,
+    "grades": [
+      7,
+      9,
+      10,
+      12
     ]
   },
   "wbook0": {
@@ -237,12 +539,12 @@
       7
     ]
   },
-  "wcap": {
-    "type": "helmet",
+  "wgloves": {
+    "type": "gloves",
     "compound": false,
     "upgrade": true,
     "sell": false,
-    "g": 6400,
+    "g": 6800,
     "grades": [
       7,
       9,
@@ -250,15 +552,15 @@
       12
     ]
   },
-  "wshoes": {
-    "type": "shoes",
+  "xmashat": {
+    "type": "helmet",
     "compound": false,
     "upgrade": true,
     "sell": false,
-    "g": 24200,
+    "g": 13200,
     "grades": [
-      7,
-      9,
+      4,
+      8,
       10,
       12
     ]

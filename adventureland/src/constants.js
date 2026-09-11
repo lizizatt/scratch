@@ -56,7 +56,18 @@ const HUNTER_ITEMS = HUNTER_PLAN.map((x) => x.name);
 /** Never toss/sell — Tracktrix stays permanent; approved Hunter pieces survive swaps. */
 const KEEP_ALWAYS = ["stand0", "tracker", "pickaxe", "rod"].concat(HUNTER_ITEMS);
 /** Merchant idle: exchange these with Xyn (NPC `exchange`). */
-const EXCHANGE_ITEMS = ["gem0", "anniversarygift"];
+const EXCHANGE_ITEMS = [
+  "gem0",
+  "gift0",
+  "anniversarygift",
+  "armorbox",
+  "weaponbox",
+  "jewellerybox",
+  "apologybox",
+  "bugbountybox",
+  "mysterybox",
+  "xbox",
+];
 /**
  * Instant NPC vendor (`sell`) — holiday junk + materials that never move on stall.
  * Do NOT vendor goal earrings (strearring / vitearring / intearring) or capes.
@@ -71,6 +82,32 @@ const VENDOR_NPC = [
   "leatherboots",
   "beewings",
   "gslime",
+];
+/** Upgradeable junk that is safe to NPC-vendor only at +0. */
+const VENDOR_NPC_LEVEL0 = [
+  "wattire",
+  "wgloves",
+  "partyhat",
+];
+/**
+ * Player-market liquidation. `keep` counts all equipped, bagged, banked, and
+ * already-listed copies; only merchant-owned surplus may enter the stall.
+ */
+const STALL_SELL = [
+  { name: "fireblade", keep: 1, floor: 115200 },
+  { name: "sshield", keep: 2, floor: 200000 },
+  { name: "dagger", keep: 0 },
+  { name: "candycanesword", keep: 0 },
+  { name: "t2bow", keep: 0 },
+  { name: "gloves1", keep: 0 },
+  { name: "helmet1", keep: 1 },
+  { name: "pants1", keep: 1 },
+  { name: "cclaw", keep: 0 },
+  { name: "eears", keep: 0 },
+  { name: "poker", keep: 0 },
+  { name: "slimestaff", keep: 0 },
+  { name: "stinger", keep: 0 },
+  { name: "xmashat", keep: 0 },
 ];
 /** Compound priority for bank clean / merchant combine. */
 const COMBINE_PRIORITY = [
@@ -185,6 +222,8 @@ module.exports = {
   KEEP_ALWAYS,
   EXCHANGE_ITEMS,
   VENDOR_NPC,
+  VENDOR_NPC_LEVEL0,
+  STALL_SELL,
   COMBINE_PRIORITY,
   GEAR_TYPES,
   VENDOR_GEAR,

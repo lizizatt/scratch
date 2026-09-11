@@ -1,61 +1,172 @@
 {
   "Jazwyn": {
-    "connected": true,
-    "map": "main",
-    "x": 526.5064147310188,
-    "y": 1880.3711443263837,
-    "gold": 212707,
-    "slots": null,
+    "connected": false,
+    "map": "cave",
+    "x": -80.93851023900484,
+    "y": -498.48740814004896,
+    "gold": 221682,
     "items": [
       {
         "name": "hpot1",
         "level": 0,
-        "q": 445
+        "q": 271
       },
       {
         "name": "mpot1",
         "level": 0,
-        "q": 824
+        "q": 179
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "wgloves",
+        "level": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "gem0",
+        "level": 0,
+        "q": 1
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "beewings",
+        "level": 0,
+        "q": 16
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
       }
     ]
   },
   "Sarene": {
-    "connected": true,
-    "map": "main",
-    "x": 528,
-    "y": 1848,
-    "gold": 151761,
-    "slots": null,
+    "connected": false,
+    "map": "cave",
+    "x": -4.386336991058606,
+    "y": -513.0646231171174,
+    "gold": 238297,
     "items": [
       {
         "name": "mpot1",
         "level": 0,
-        "q": 449
+        "q": 71
       },
       {
         "name": "hpot1",
         "level": 0,
-        "q": 500
+        "q": 4724
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "bwing",
+        "level": 0,
+        "q": 1
+      },
+      {
+        "name": "anniversarygift",
+        "level": 0,
+        "q": 1
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
       }
     ]
   },
   "Zarook": {
-    "connected": true,
-    "map": "main",
-    "x": 498.2554188076306,
-    "y": 1755.9983271981698,
-    "gold": 251761,
-    "slots": null,
+    "connected": false,
+    "map": "cave",
+    "x": -35.45759040922163,
+    "y": -474.6969822878368,
+    "gold": 181143,
     "items": [
       {
         "name": "hpot1",
         "level": 0,
-        "q": 800
+        "q": 9850
+      },
+      {
+        "name": "hpot1",
+        "level": 0,
+        "q": 8998
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
       },
       {
         "name": "mpot1",
         "level": 0,
-        "q": 170
+        "q": 20
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "slice_honey",
+        "level": 0,
+        "q": 1
       }
     ]
   },
@@ -64,8 +175,7 @@
     "map": "bank",
     "x": 0,
     "y": -37,
-    "gold": 5946250,
-    "slots": null,
+    "gold": 25493402,
     "items": [
       {
         "name": "hpot0",
@@ -82,27 +192,183 @@
         "level": 0
       },
       {
-        "name": "wshoes",
+        "name": "scroll0",
+        "level": 0,
+        "q": 35
+      },
+      {
+        "name": "hpot1",
+        "level": 0,
+        "q": 400
+      },
+      {
+        "name": "monstertoken",
+        "level": 0,
+        "q": 40
+      },
+      {
+        "name": "wbook0",
+        "level": 2,
+        "p": null
+      },
+      {
+        "name": "mpot1",
+        "level": 0,
+        "q": 400
+      },
+      {
+        "name": "leather",
+        "level": 0,
+        "q": 2
+      },
+      {
+        "name": "scroll1",
+        "level": 0,
+        "q": 40
+      },
+      {
+        "name": "armorbox",
+        "level": 0,
+        "q": 4
+      },
+      {
+        "name": "gift0",
+        "level": 0,
+        "q": 1
+      },
+      {
+        "name": "snakeoil",
+        "level": 0,
+        "q": 1
+      },
+      {
+        "name": "cscale",
+        "level": 0,
+        "q": 3
+      },
+      {
+        "name": "tracker",
         "level": 0
       },
       {
-        "name": "scroll0",
+        "name": "cake",
         "level": 0,
-        "q": 52
+        "q": 10
+      },
+      {
+        "name": "fireblade",
+        "level": 0
+      },
+      {
+        "name": "sshield",
+        "level": 2
+      },
+      {
+        "name": "wbook0",
+        "level": 2,
+        "p": null
+      },
+      {
+        "name": "ascale",
+        "level": 0,
+        "q": 18
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "slice_honey",
+        "level": 0,
+        "q": 24
+      },
+      {
+        "name": "seashell",
+        "level": 0,
+        "q": 78
+      },
+      {
+        "name": "t2bow",
+        "level": 0
+      },
+      {
+        "name": "confetti",
+        "level": 0,
+        "q": 6
+      },
+      {
+        "name": "reefglass",
+        "level": 0,
+        "q": 47
       },
       {
         "name": "ringsj",
         "level": 0
       },
       {
-        "name": "ascale",
+        "name": "crabclaw",
         "level": 0,
-        "q": 1
+        "q": 11
+      },
+      {
+        "name": "vitscroll",
+        "level": 0,
+        "q": 5
       },
       {
         "name": "anniversarygift",
         "level": 0,
-        "q": 1
+        "q": 8
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "stormfeather",
+        "level": 0,
+        "q": 21
+      },
+      {
+        "name": "bwing",
+        "level": 0,
+        "q": 52
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
       }
     ]
   }

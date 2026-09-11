@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-09T01:09:27.526Z",
+  "at": "2026-09-11T15:50:06.426Z",
   "bank": {
     "gold": 1000,
     "stale": false,
@@ -11,11 +11,24 @@
       {
         "name": "anniversarygift",
         "level": 0,
-        "copies": 1,
-        "qty": 1,
+        "copies": 2,
+        "qty": 9,
         "compound": false,
         "upgrade": false,
         "type": "gem",
+        "locations": [
+          "bag:Sarene",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "armorbox",
+        "level": 0,
+        "copies": 1,
+        "qty": 4,
+        "compound": false,
+        "upgrade": false,
+        "type": "box",
         "locations": [
           "bag:Puppygirl"
         ]
@@ -24,7 +37,7 @@
         "name": "ascale",
         "level": 0,
         "copies": 2,
-        "qty": 2,
+        "qty": 45,
         "compound": false,
         "upgrade": false,
         "type": "material",
@@ -34,7 +47,44 @@
         ]
       },
       {
-        "name": "carrotsword",
+        "name": "beewings",
+        "level": 0,
+        "copies": 1,
+        "qty": 16,
+        "compound": false,
+        "upgrade": false,
+        "type": "material",
+        "locations": [
+          "bag:Jazwyn"
+        ]
+      },
+      {
+        "name": "bwing",
+        "level": 0,
+        "copies": 2,
+        "qty": 53,
+        "compound": false,
+        "upgrade": false,
+        "type": "material",
+        "locations": [
+          "bag:Sarene",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "cake",
+        "level": 0,
+        "copies": 1,
+        "qty": 10,
+        "compound": false,
+        "upgrade": false,
+        "type": "elixir",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "candycanesword",
         "level": 0,
         "copies": 1,
         "qty": 1,
@@ -42,104 +92,260 @@
         "upgrade": true,
         "type": "weapon",
         "locations": [
-          "bank/items0[34]"
+          "bank/items0[35]"
         ]
       },
       {
-        "name": "dexamulet",
+        "name": "cclaw",
         "level": 0,
         "copies": 1,
         "qty": 1,
-        "compound": true,
-        "upgrade": false,
-        "type": "amulet",
+        "compound": false,
+        "upgrade": true,
+        "type": "weapon",
         "locations": [
-          "bank/items0[17]"
+          "bank/items0[33]"
         ]
       },
       {
-        "name": "dexearring",
+        "name": "coat",
+        "level": 2,
+        "copies": 2,
+        "qty": 2,
+        "compound": false,
+        "upgrade": true,
+        "type": "chest",
+        "locations": [
+          "bank/items0[26]",
+          "bank/items1[0]"
+        ]
+      },
+      {
+        "name": "confetti",
+        "level": 0,
+        "copies": 1,
+        "qty": 6,
+        "compound": false,
+        "upgrade": false,
+        "type": "throw",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "crabclaw",
+        "level": 0,
+        "copies": 1,
+        "qty": 11,
+        "compound": false,
+        "upgrade": false,
+        "type": "material",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "cscale",
+        "level": 0,
+        "copies": 1,
+        "qty": 3,
+        "compound": false,
+        "upgrade": false,
+        "type": "material",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "dagger",
         "level": 0,
         "copies": 1,
         "qty": 1,
-        "compound": true,
-        "upgrade": false,
-        "type": "earring",
+        "compound": false,
+        "upgrade": true,
+        "type": "weapon",
         "locations": [
-          "bank/items0[21]"
+          "bank/items0[5]"
+        ]
+      },
+      {
+        "name": "eears",
+        "level": 0,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": true,
+        "type": "helmet",
+        "locations": [
+          "bank/items0[8]"
+        ]
+      },
+      {
+        "name": "fireblade",
+        "level": 0,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": true,
+        "type": "weapon",
+        "locations": [
+          "bag:Puppygirl"
         ]
       },
       {
         "name": "gem0",
         "level": 0,
         "copies": 1,
-        "qty": 8,
+        "qty": 1,
         "compound": false,
         "upgrade": false,
         "type": "gem",
         "locations": [
-          "bank/items0[26]"
+          "bag:Jazwyn"
         ]
       },
       {
-        "name": "hpamulet",
-        "level": 0,
-        "copies": 2,
-        "qty": 2,
-        "compound": true,
-        "upgrade": false,
-        "type": "amulet",
-        "locations": [
-          "bank/items0[11]",
-          "bank/items1[9]"
-        ]
-      },
-      {
-        "name": "hpamulet",
-        "level": 1,
-        "copies": 1,
-        "qty": 1,
-        "compound": true,
-        "upgrade": false,
-        "type": "amulet",
-        "locations": [
-          "bank/items0[3]"
-        ]
-      },
-      {
-        "name": "hpbelt",
+        "name": "gift0",
         "level": 0,
         "copies": 1,
         "qty": 1,
-        "compound": true,
+        "compound": false,
         "upgrade": false,
-        "type": "belt",
+        "type": "gem",
         "locations": [
-          "bank/items0[10]"
+          "bag:Puppygirl"
         ]
       },
       {
-        "name": "hpbelt",
-        "level": 1,
+        "name": "gloves",
+        "level": 3,
         "copies": 1,
         "qty": 1,
-        "compound": true,
-        "upgrade": false,
-        "type": "belt",
+        "compound": false,
+        "upgrade": true,
+        "type": "gloves",
         "locations": [
           "bank/items0[6]"
         ]
       },
       {
-        "name": "hpbelt",
+        "name": "gloves1",
+        "level": 0,
+        "copies": 2,
+        "qty": 2,
+        "compound": false,
+        "upgrade": true,
+        "type": "gloves",
+        "locations": [
+          "bank/items1[13]",
+          "bank/items1[26]"
+        ]
+      },
+      {
+        "name": "helmet",
         "level": 2,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": true,
+        "type": "helmet",
+        "locations": [
+          "bank/items0[32]"
+        ]
+      },
+      {
+        "name": "helmet1",
+        "level": 0,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": true,
+        "type": "helmet",
+        "locations": [
+          "bank/items0[24]"
+        ]
+      },
+      {
+        "name": "hpamulet",
+        "level": 0,
+        "copies": 12,
+        "qty": 12,
+        "compound": true,
+        "upgrade": false,
+        "type": "amulet",
+        "locations": [
+          "bank/items0[17]",
+          "bank/items1[30]",
+          "bank/items1[40]",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Sarene",
+          "bag:Zarook",
+          "bag:Zarook",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "hpamulet",
+        "level": 1,
+        "copies": 1,
+        "qty": 1,
+        "compound": true,
+        "upgrade": false,
+        "type": "amulet",
+        "locations": [
+          "bank/items1[11]"
+        ]
+      },
+      {
+        "name": "hpamulet",
+        "level": 2,
+        "copies": 1,
+        "qty": 1,
+        "compound": true,
+        "upgrade": false,
+        "type": "amulet",
+        "locations": [
+          "bank/items0[36]"
+        ]
+      },
+      {
+        "name": "hpbelt",
+        "level": 0,
+        "copies": 13,
+        "qty": 13,
+        "compound": true,
+        "upgrade": false,
+        "type": "belt",
+        "locations": [
+          "bank/items1[41]",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Sarene",
+          "bag:Zarook",
+          "bag:Puppygirl",
+          "bag:Puppygirl",
+          "bag:Puppygirl",
+          "bag:Puppygirl",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "hpbelt",
+        "level": 3,
         "copies": 1,
         "qty": 1,
         "compound": true,
         "upgrade": false,
         "type": "belt",
         "locations": [
-          "bank/items0[4]"
+          "bank/items0[1]"
         ]
       },
       {
@@ -157,15 +363,41 @@
       {
         "name": "hpot1",
         "level": 0,
-        "copies": 3,
-        "qty": 1745,
+        "copies": 5,
+        "qty": 24243,
         "compound": false,
         "upgrade": false,
         "type": "pot",
         "locations": [
           "bag:Jazwyn",
           "bag:Sarene",
-          "bag:Zarook"
+          "bag:Zarook",
+          "bag:Zarook",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "leather",
+        "level": 0,
+        "copies": 1,
+        "qty": 2,
+        "compound": false,
+        "upgrade": false,
+        "type": "quest",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "monstertoken",
+        "level": 0,
+        "copies": 1,
+        "qty": 40,
+        "compound": false,
+        "upgrade": false,
+        "type": "token",
+        "locations": [
+          "bag:Puppygirl"
         ]
       },
       {
@@ -183,53 +415,117 @@
       {
         "name": "mpot1",
         "level": 0,
-        "copies": 3,
-        "qty": 1443,
+        "copies": 4,
+        "qty": 670,
         "compound": false,
         "upgrade": false,
         "type": "pot",
         "locations": [
           "bag:Jazwyn",
           "bag:Sarene",
-          "bag:Zarook"
+          "bag:Zarook",
+          "bag:Puppygirl"
         ]
       },
       {
-        "name": "rednose",
+        "name": "pants",
+        "level": 2,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": true,
+        "type": "pants",
+        "locations": [
+          "bank/items0[9]"
+        ]
+      },
+      {
+        "name": "pants",
+        "level": 5,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": true,
+        "type": "pants",
+        "locations": [
+          "bank/items1[25]"
+        ]
+      },
+      {
+        "name": "pants1",
         "level": 0,
-        "copies": 2,
-        "qty": 2,
-        "compound": true,
-        "upgrade": false,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": true,
+        "type": "pants",
+        "locations": [
+          "bank/items1[21]"
+        ]
+      },
+      {
+        "name": "partyhat",
+        "level": 0,
+        "copies": 9,
+        "qty": 9,
+        "compound": false,
+        "upgrade": true,
         "type": "helmet",
         "locations": [
-          "bank/items0[1]",
-          "bank/items0[14]"
+          "bank/items0[2]",
+          "bank/items0[16]",
+          "bank/items0[34]",
+          "bank/items1[2]",
+          "bank/items1[8]",
+          "bank/items1[12]",
+          "bank/items1[17]",
+          "bank/items1[23]",
+          "bank/items1[29]"
+        ]
+      },
+      {
+        "name": "poker",
+        "level": 0,
+        "copies": 4,
+        "qty": 4,
+        "compound": false,
+        "upgrade": true,
+        "type": "gloves",
+        "locations": [
+          "bank/items0[30]",
+          "bank/items1[7]",
+          "bank/items1[20]",
+          "bank/items1[22]"
         ]
       },
       {
         "name": "reefglass",
         "level": 0,
-        "copies": 1,
-        "qty": 2,
+        "copies": 2,
+        "qty": 68,
         "compound": false,
         "upgrade": false,
         "type": "material",
         "locations": [
-          "bank/items0[29]"
+          "bank/items0[29]",
+          "bag:Puppygirl"
         ]
       },
       {
         "name": "ringsj",
         "level": 0,
-        "copies": 3,
-        "qty": 3,
+        "copies": 7,
+        "qty": 7,
         "compound": true,
         "upgrade": false,
         "type": "ring",
         "locations": [
-          "bank/items0[9]",
-          "bank/items0[16]",
+          "bank/items0[3]",
+          "bank/items1[38]",
+          "bag:Jazwyn",
+          "bag:Jazwyn",
+          "bag:Puppygirl",
+          "bag:Puppygirl",
           "bag:Puppygirl"
         ]
       },
@@ -242,26 +538,39 @@
         "upgrade": false,
         "type": "ring",
         "locations": [
-          "bank/items0[2]"
+          "bank/items0[22]"
         ]
       },
       {
         "name": "ringsj",
         "level": 2,
-        "copies": 1,
-        "qty": 1,
+        "copies": 2,
+        "qty": 2,
         "compound": true,
         "upgrade": false,
         "type": "ring",
         "locations": [
-          "bank/items0[0]"
+          "bank/items0[18]",
+          "bank/items0[20]"
         ]
       },
       {
         "name": "scroll0",
         "level": 0,
         "copies": 1,
-        "qty": 52,
+        "qty": 35,
+        "compound": false,
+        "upgrade": false,
+        "type": "uscroll",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "scroll1",
+        "level": 0,
+        "copies": 1,
+        "qty": 40,
         "compound": false,
         "upgrade": false,
         "type": "uscroll",
@@ -272,61 +581,94 @@
       {
         "name": "seashell",
         "level": 0,
-        "copies": 1,
-        "qty": 2,
+        "copies": 2,
+        "qty": 115,
         "compound": false,
         "upgrade": false,
         "type": "quest",
         "locations": [
-          "bank/items0[27]"
+          "bank/items0[27]",
+          "bag:Puppygirl"
         ]
       },
       {
         "name": "shoes",
-        "level": 3,
+        "level": 2,
         "copies": 1,
         "qty": 1,
         "compound": false,
         "upgrade": true,
         "type": "shoes",
         "locations": [
-          "bank/items0[20]"
+          "bank/items0[40]"
         ]
       },
       {
-        "name": "shoes",
-        "level": 4,
-        "copies": 1,
-        "qty": 1,
-        "compound": false,
-        "upgrade": true,
-        "type": "shoes",
-        "locations": [
-          "bank/items0[19]"
-        ]
-      },
-      {
-        "name": "skullamulet",
+        "name": "shoes1",
         "level": 0,
         "copies": 1,
         "qty": 1,
-        "compound": true,
-        "upgrade": false,
-        "type": "amulet",
+        "compound": false,
+        "upgrade": true,
+        "type": "shoes",
         "locations": [
-          "bank/items0[31]"
+          "bank/items0[25]"
         ]
       },
       {
-        "name": "staff",
-        "level": 3,
-        "copies": 1,
-        "qty": 1,
+        "name": "slice_honey",
+        "level": 0,
+        "copies": 2,
+        "qty": 25,
+        "compound": false,
+        "upgrade": false,
+        "type": "material",
+        "locations": [
+          "bag:Zarook",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "slimestaff",
+        "level": 0,
+        "copies": 7,
+        "qty": 7,
         "compound": false,
         "upgrade": true,
         "type": "weapon",
         "locations": [
-          "bank/items0[12]"
+          "bank/items1[1]",
+          "bank/items1[3]",
+          "bank/items1[4]",
+          "bank/items1[6]",
+          "bank/items1[10]",
+          "bank/items1[14]",
+          "bank/items1[15]"
+        ]
+      },
+      {
+        "name": "snakeoil",
+        "level": 0,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": false,
+        "type": "pot",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "sshield",
+        "level": 2,
+        "copies": 2,
+        "qty": 2,
+        "compound": false,
+        "upgrade": true,
+        "type": "shield",
+        "locations": [
+          "bank/items0[4]",
+          "bag:Puppygirl"
         ]
       },
       {
@@ -342,66 +684,180 @@
         ]
       },
       {
-        "name": "strearring",
+        "name": "stinger",
+        "level": 0,
+        "copies": 9,
+        "qty": 9,
+        "compound": false,
+        "upgrade": true,
+        "type": "weapon",
+        "locations": [
+          "bank/items0[10]",
+          "bank/items0[11]",
+          "bank/items0[12]",
+          "bank/items0[15]",
+          "bank/items0[37]",
+          "bank/items0[41]",
+          "bank/items1[5]",
+          "bank/items1[19]",
+          "bank/items1[28]"
+        ]
+      },
+      {
+        "name": "stormfeather",
+        "level": 0,
+        "copies": 2,
+        "qty": 27,
+        "compound": false,
+        "upgrade": false,
+        "type": "material",
+        "locations": [
+          "bank/items0[23]",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "stramulet",
         "level": 0,
         "copies": 1,
         "qty": 1,
         "compound": true,
         "upgrade": false,
-        "type": "earring",
+        "type": "amulet",
         "locations": [
-          "bank/items0[5]"
+          "bank/items0[21]"
         ]
       },
       {
-        "name": "wbook0",
-        "level": 0,
-        "copies": 1,
-        "qty": 1,
-        "compound": true,
-        "upgrade": false,
-        "type": "source",
-        "locations": [
-          "bank/items0[24]"
-        ]
-      },
-      {
-        "name": "wbook0",
+        "name": "stramulet",
         "level": 1,
+        "copies": 1,
+        "qty": 1,
+        "compound": true,
+        "upgrade": false,
+        "type": "amulet",
+        "locations": [
+          "bank/items0[31]"
+        ]
+      },
+      {
+        "name": "t2bow",
+        "level": 0,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": true,
+        "type": "weapon",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "tracker",
+        "level": 0,
+        "copies": 1,
+        "qty": 1,
+        "compound": false,
+        "upgrade": false,
+        "type": "tracker",
+        "locations": [
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "vitscroll",
+        "level": 0,
+        "copies": 2,
+        "qty": 7,
+        "compound": false,
+        "upgrade": false,
+        "type": "pscroll",
+        "locations": [
+          "bank/items0[39]",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "wattire",
+        "level": 0,
+        "copies": 10,
+        "qty": 10,
+        "compound": false,
+        "upgrade": true,
+        "type": "chest",
+        "locations": [
+          "bank/items0[14]",
+          "bank/items0[19]",
+          "bank/items0[38]",
+          "bank/items1[9]",
+          "bank/items1[16]",
+          "bank/items1[27]",
+          "bank/items1[32]",
+          "bank/items1[33]",
+          "bank/items1[34]",
+          "bag:Jazwyn"
+        ]
+      },
+      {
+        "name": "wbook0",
+        "level": 0,
+        "copies": 5,
+        "qty": 5,
+        "compound": true,
+        "upgrade": false,
+        "type": "source",
+        "locations": [
+          "bag:Jazwyn",
+          "bag:Sarene",
+          "bag:Puppygirl",
+          "bag:Puppygirl",
+          "bag:Puppygirl"
+        ]
+      },
+      {
+        "name": "wbook0",
+        "level": 2,
         "copies": 2,
         "qty": 2,
         "compound": true,
         "upgrade": false,
         "type": "source",
         "locations": [
-          "bank/items0[7]",
-          "bank/items0[8]"
+          "bag:Puppygirl",
+          "bag:Puppygirl"
         ]
       },
       {
-        "name": "wcap",
+        "name": "wgloves",
         "level": 0,
-        "copies": 2,
-        "qty": 2,
+        "copies": 10,
+        "qty": 10,
+        "compound": false,
+        "upgrade": true,
+        "type": "gloves",
+        "locations": [
+          "bank/items0[0]",
+          "bank/items0[7]",
+          "bank/items0[28]",
+          "bank/items1[18]",
+          "bank/items1[31]",
+          "bank/items1[35]",
+          "bank/items1[36]",
+          "bank/items1[37]",
+          "bank/items1[39]",
+          "bag:Jazwyn"
+        ]
+      },
+      {
+        "name": "xmashat",
+        "level": 4,
+        "copies": 1,
+        "qty": 1,
         "compound": false,
         "upgrade": true,
         "type": "helmet",
         "locations": [
-          "bank/items0[22]",
-          "bank/items0[23]"
-        ]
-      },
-      {
-        "name": "wshoes",
-        "level": 0,
-        "copies": 2,
-        "qty": 2,
-        "compound": false,
-        "upgrade": true,
-        "type": "shoes",
-        "locations": [
-          "bank/items0[18]",
-          "bag:Puppygirl"
+          "bank/items1[24]"
         ]
       }
     ],
@@ -410,6 +866,12 @@
         "name": "anniversarygift",
         "level": 0,
         "reason": "consumable_or_material",
+        "copies": 2
+      },
+      {
+        "name": "armorbox",
+        "level": 0,
+        "reason": "unknown_keep",
         "copies": 1
       },
       {
@@ -419,9 +881,69 @@
         "copies": 2
       },
       {
-        "name": "carrotsword",
+        "name": "bwing",
         "level": 0,
-        "reason": "locked_or_shiny",
+        "reason": "type_material",
+        "copies": 2
+      },
+      {
+        "name": "cake",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "candycanesword",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "cclaw",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "coat",
+        "level": 2,
+        "reason": "best_vendor_piece",
+        "copies": 1
+      },
+      {
+        "name": "confetti",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "crabclaw",
+        "level": 0,
+        "reason": "type_material",
+        "copies": 1
+      },
+      {
+        "name": "cscale",
+        "level": 0,
+        "reason": "consumable_or_material",
+        "copies": 1
+      },
+      {
+        "name": "dagger",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "eears",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "fireblade",
+        "level": 0,
+        "reason": "hold_target_max_1",
         "copies": 1
       },
       {
@@ -431,32 +953,62 @@
         "copies": 1
       },
       {
-        "name": "hpamulet",
+        "name": "gift0",
         "level": 0,
-        "reason": "hold_target_max_3",
+        "reason": "type_gem",
+        "copies": 1
+      },
+      {
+        "name": "gloves",
+        "level": 3,
+        "reason": "best_vendor_piece",
+        "copies": 1
+      },
+      {
+        "name": "gloves1",
+        "level": 0,
+        "reason": "unknown_keep",
         "copies": 2
       },
       {
+        "name": "helmet",
+        "level": 2,
+        "reason": "best_vendor_piece",
+        "copies": 1
+      },
+      {
+        "name": "helmet1",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "hpamulet",
+        "level": 0,
+        "reason": "combine_feed",
+        "copies": 12
+      },
+      {
         "name": "hpamulet",
         "level": 1,
         "reason": "hold_target_max_3",
         "copies": 1
       },
       {
+        "name": "hpamulet",
+        "level": 2,
+        "reason": "hold_target_max_3",
+        "copies": 1
+      },
+      {
         "name": "hpbelt",
         "level": 0,
-        "reason": "hold_target_max_3",
-        "copies": 1
+        "reason": "combine_feed",
+        "copies": 13
       },
       {
         "name": "hpbelt",
-        "level": 1,
-        "reason": "hold_target_max_3",
-        "copies": 1
-      },
-      {
-        "name": "hpbelt",
-        "level": 2,
+        "level": 3,
         "reason": "hold_target_max_3",
         "copies": 1
       },
@@ -470,7 +1022,19 @@
         "name": "hpot1",
         "level": 0,
         "reason": "consumable_or_material",
-        "copies": 3
+        "copies": 5
+      },
+      {
+        "name": "leather",
+        "level": 0,
+        "reason": "type_quest",
+        "copies": 1
+      },
+      {
+        "name": "monstertoken",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
       },
       {
         "name": "mpot0",
@@ -482,19 +1046,37 @@
         "name": "mpot1",
         "level": 0,
         "reason": "consumable_or_material",
-        "copies": 3
+        "copies": 4
+      },
+      {
+        "name": "pants",
+        "level": 5,
+        "reason": "best_vendor_piece",
+        "copies": 1
+      },
+      {
+        "name": "pants1",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "poker",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 4
       },
       {
         "name": "reefglass",
         "level": 0,
         "reason": "consumable_or_material",
-        "copies": 1
+        "copies": 2
       },
       {
         "name": "ringsj",
         "level": 0,
         "reason": "combine_feed",
-        "copies": 3
+        "copies": 7
       },
       {
         "name": "ringsj",
@@ -506,7 +1088,7 @@
         "name": "ringsj",
         "level": 2,
         "reason": "hold_target_max_6",
-        "copies": 1
+        "copies": 2
       },
       {
         "name": "scroll0",
@@ -515,28 +1097,52 @@
         "copies": 1
       },
       {
-        "name": "seashell",
+        "name": "scroll1",
         "level": 0,
         "reason": "consumable_or_material",
         "copies": 1
       },
       {
+        "name": "seashell",
+        "level": 0,
+        "reason": "consumable_or_material",
+        "copies": 2
+      },
+      {
         "name": "shoes",
-        "level": 4,
+        "level": 2,
         "reason": "best_vendor_piece",
         "copies": 1
       },
       {
-        "name": "skullamulet",
+        "name": "shoes1",
         "level": 0,
         "reason": "unknown_keep",
         "copies": 1
       },
       {
-        "name": "staff",
-        "level": 3,
-        "reason": "hold_target_max_2",
+        "name": "slice_honey",
+        "level": 0,
+        "reason": "type_material",
+        "copies": 2
+      },
+      {
+        "name": "slimestaff",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 7
+      },
+      {
+        "name": "snakeoil",
+        "level": 0,
+        "reason": "unknown_keep",
         "copies": 1
+      },
+      {
+        "name": "sshield",
+        "level": 2,
+        "reason": "hold_target_max_1",
+        "copies": 2
       },
       {
         "name": "stand0",
@@ -545,83 +1151,146 @@
         "copies": 1
       },
       {
-        "name": "wbook0",
+        "name": "stinger",
         "level": 0,
-        "reason": "hold_target_max_1",
+        "reason": "unknown_keep",
+        "copies": 9
+      },
+      {
+        "name": "stormfeather",
+        "level": 0,
+        "reason": "type_material",
+        "copies": 2
+      },
+      {
+        "name": "stramulet",
+        "level": 0,
+        "reason": "unknown_keep",
         "copies": 1
       },
       {
-        "name": "wbook0",
+        "name": "stramulet",
         "level": 1,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "t2bow",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 1
+      },
+      {
+        "name": "tracker",
+        "level": 0,
+        "reason": "consumable_or_material",
+        "copies": 1
+      },
+      {
+        "name": "vitscroll",
+        "level": 0,
+        "reason": "unknown_keep",
+        "copies": 2
+      },
+      {
+        "name": "wbook0",
+        "level": 0,
+        "reason": "combine_feed",
+        "copies": 5
+      },
+      {
+        "name": "wbook0",
+        "level": 2,
         "reason": "hold_target_max_1",
         "copies": 2
+      },
+      {
+        "name": "xmashat",
+        "level": 4,
+        "reason": "unknown_keep",
+        "copies": 1
       }
     ],
     "sell": [
       {
-        "name": "dexamulet",
+        "name": "beewings",
         "level": 0,
-        "reason": "legacy_sell",
+        "reason": "vendor_npc_junk",
         "copies": 1,
         "locations": [
-          "bank/items0[17]"
+          "bag:Jazwyn"
         ]
       },
       {
-        "name": "dexearring",
-        "level": 0,
-        "reason": "legacy_sell",
+        "name": "coat",
+        "level": 2,
+        "reason": "vendor_extra_copies",
         "copies": 1,
         "locations": [
-          "bank/items0[21]"
+          "bank/items0[26]",
+          "bank/items1[0]"
         ]
       },
       {
-        "name": "rednose",
-        "level": 0,
-        "reason": "legacy_sell",
-        "copies": 2,
-        "locations": [
-          "bank/items0[1]",
-          "bank/items0[14]"
-        ]
-      },
-      {
-        "name": "shoes",
-        "level": 3,
-        "reason": "vendor_dupe_below_4",
+        "name": "pants",
+        "level": 2,
+        "reason": "vendor_dupe_below_5",
         "copies": 1,
         "locations": [
-          "bank/items0[20]"
+          "bank/items0[9]"
         ]
       },
       {
-        "name": "strearring",
+        "name": "partyhat",
         "level": 0,
-        "reason": "legacy_sell",
-        "copies": 1,
+        "reason": "vendor_npc_level0",
+        "copies": 9,
         "locations": [
-          "bank/items0[5]"
+          "bank/items0[2]",
+          "bank/items0[16]",
+          "bank/items0[34]",
+          "bank/items1[2]",
+          "bank/items1[8]",
+          "bank/items1[12]",
+          "bank/items1[17]",
+          "bank/items1[23]",
+          "bank/items1[29]"
         ]
       },
       {
-        "name": "wcap",
+        "name": "wattire",
         "level": 0,
-        "reason": "legacy_sell",
-        "copies": 2,
+        "reason": "vendor_npc_level0",
+        "copies": 10,
         "locations": [
-          "bank/items0[22]",
-          "bank/items0[23]"
+          "bank/items0[14]",
+          "bank/items0[19]",
+          "bank/items0[38]",
+          "bank/items1[9]",
+          "bank/items1[16]",
+          "bank/items1[27]",
+          "bank/items1[32]",
+          "bank/items1[33]",
+          "bank/items1[34]",
+          "bag:Jazwyn"
         ]
       },
       {
-        "name": "wshoes",
+        "name": "wgloves",
         "level": 0,
-        "reason": "legacy_sell",
-        "copies": 2,
+        "reason": "vendor_npc_level0",
+        "copies": 10,
         "locations": [
-          "bank/items0[18]",
-          "bag:Puppygirl"
+          "bank/items0[0]",
+          "bank/items0[7]",
+          "bank/items0[28]",
+          "bank/items1[18]",
+          "bank/items1[31]",
+          "bank/items1[35]",
+          "bank/items1[36]",
+          "bank/items1[37]",
+          "bank/items1[39]",
+          "bag:Jazwyn"
         ]
       }
     ],
@@ -629,8 +1298,29 @@
       {
         "name": "ringsj",
         "level": 0,
-        "copies": 3,
-        "priority": 0,
+        "copies": 7,
+        "priority": 1,
+        "cscroll": "cscroll0"
+      },
+      {
+        "name": "hpbelt",
+        "level": 0,
+        "copies": 13,
+        "priority": 2,
+        "cscroll": "cscroll0"
+      },
+      {
+        "name": "hpamulet",
+        "level": 0,
+        "copies": 12,
+        "priority": 3,
+        "cscroll": "cscroll0"
+      },
+      {
+        "name": "wbook0",
+        "level": 0,
+        "copies": 5,
+        "priority": 4,
         "cscroll": "cscroll0"
       }
     ],
@@ -639,6 +1329,21 @@
         "name": "cscroll0",
         "qty": 1,
         "reason": "compound ringsj@0"
+      },
+      {
+        "name": "cscroll0",
+        "qty": 1,
+        "reason": "compound hpbelt@0"
+      },
+      {
+        "name": "cscroll0",
+        "qty": 1,
+        "reason": "compound hpamulet@0"
+      },
+      {
+        "name": "cscroll0",
+        "qty": 1,
+        "reason": "compound wbook0@0"
       },
       {
         "name": "armorring",
@@ -651,84 +1356,99 @@
         "qty": 1,
         "reason": "missing_hold_target_lv9",
         "via": "ponty_or_drop"
-      },
-      {
-        "name": "fireblade",
-        "qty": 1,
-        "reason": "missing_hold_target_lv1",
-        "via": "ponty_or_drop"
-      },
-      {
-        "name": "sshield",
-        "qty": 1,
-        "reason": "missing_hold_target_lv1",
-        "via": "ponty_or_drop"
       }
     ],
     "notes": [
-      "review unknown: skullamulet@0"
+      "review unknown: armorbox@0",
+      "review unknown: cake@0",
+      "review unknown: candycanesword@0",
+      "review unknown: cclaw@0",
+      "review unknown: confetti@0",
+      "review unknown: dagger@0",
+      "review unknown: eears@0",
+      "review unknown: gloves1@0",
+      "review unknown: helmet1@0",
+      "review unknown: monstertoken@0",
+      "review unknown: pants1@0",
+      "review unknown: poker@0",
+      "review unknown: shoes1@0",
+      "review unknown: slimestaff@0",
+      "review unknown: snakeoil@0",
+      "review unknown: stinger@0",
+      "review unknown: stramulet@0",
+      "review unknown: stramulet@1",
+      "review unknown: t2bow@0",
+      "review unknown: vitscroll@0",
+      "review unknown: xmashat@4"
     ],
     "proposed": {
       "SELL_WHITELIST": [
-        "dexamulet",
-        "dexearring",
-        "rednose",
-        "strearring",
-        "wcap",
-        "wshoes"
+        "beewings"
       ],
       "SELL_ROWS": [
         {
-          "name": "dexamulet",
+          "name": "beewings",
           "level": 0,
           "copies": 1,
-          "reason": "legacy_sell"
+          "reason": "vendor_npc_junk"
         },
         {
-          "name": "dexearring",
-          "level": 0,
+          "name": "coat",
+          "level": 2,
           "copies": 1,
-          "reason": "legacy_sell"
+          "reason": "vendor_extra_copies"
         },
         {
-          "name": "rednose",
-          "level": 0,
-          "copies": 2,
-          "reason": "legacy_sell"
-        },
-        {
-          "name": "shoes",
-          "level": 3,
+          "name": "pants",
+          "level": 2,
           "copies": 1,
-          "reason": "vendor_dupe_below_4"
+          "reason": "vendor_dupe_below_5"
         },
         {
-          "name": "strearring",
+          "name": "partyhat",
           "level": 0,
-          "copies": 1,
-          "reason": "legacy_sell"
+          "copies": 9,
+          "reason": "vendor_npc_level0"
         },
         {
-          "name": "wcap",
+          "name": "wattire",
           "level": 0,
-          "copies": 2,
-          "reason": "legacy_sell"
+          "copies": 10,
+          "reason": "vendor_npc_level0"
         },
         {
-          "name": "wshoes",
+          "name": "wgloves",
           "level": 0,
-          "copies": 2,
-          "reason": "legacy_sell"
+          "copies": 10,
+          "reason": "vendor_npc_level0"
         }
       ],
       "COMBINE_PRIORITY": [
-        "ringsj"
+        "ringsj",
+        "hpbelt",
+        "hpamulet",
+        "wbook0"
       ],
       "BUY_NOW": [
         {
           "name": "cscroll0",
           "qty": 1,
           "reason": "compound ringsj@0"
+        },
+        {
+          "name": "cscroll0",
+          "qty": 1,
+          "reason": "compound hpbelt@0"
+        },
+        {
+          "name": "cscroll0",
+          "qty": 1,
+          "reason": "compound hpamulet@0"
+        },
+        {
+          "name": "cscroll0",
+          "qty": 1,
+          "reason": "compound wbook0@0"
         }
       ],
       "BUY_WISH": [
@@ -742,18 +1462,6 @@
           "name": "vitring",
           "qty": 1,
           "reason": "missing_hold_target_lv9",
-          "via": "ponty_or_drop"
-        },
-        {
-          "name": "fireblade",
-          "qty": 1,
-          "reason": "missing_hold_target_lv1",
-          "via": "ponty_or_drop"
-        },
-        {
-          "name": "sshield",
-          "qty": 1,
-          "reason": "missing_hold_target_lv1",
           "via": "ponty_or_drop"
         }
       ]

@@ -127,6 +127,96 @@ test("adversary: occupied trade slot arg returns slot_occuppied (sim matches liv
   assert.ok(r && r.failed && r.reason === "slot_occuppied", "expected slot_occuppied, got " + JSON.stringify(r));
 });
 
+test("adversary: stall lists only surplus fiery blades and spiked shields", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Jazwyn", "Puppygirl"] });
+  const j = p.bots.Jazwyn.api.character;
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  j.slots.mainhand = { name: "fireblade", level: 1 };
+  j.slots.offhand = { name: "sshield", level: 5 };
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "fireblade", level: 0 };
+  c.items[4] = { name: "sshield", level: 2 };
+  c.esize = c.items.filter((x) => !x).length;
+  c.map = j.map = "main";
+  c.real_x = c.x = j.real_x = j.x = 40;
+  c.real_y = c.y = j.real_y = j.y = -20;
+  c._bank = { gold: 0, items0: [{ name: "sshield", level: 2 }].concat(new Array(41).fill(null)) };
+
+  for (let i = 0; i < 240; i++) {
+    await p.tickAll();
+    const listed = Object.values(c.slots).filter((x) => x && x.price);
+    if (listed.some((x) => x.name === "fireblade") && listed.some((x) => x.name === "sshield")) break;
+  }
+
+  const listed = Object.values(c.slots).filter((x) => x && x.price);
+  assert.strictEqual(listed.filter((x) => x.name === "fireblade").length, 1, "sell one spare blade");
+  assert.strictEqual(listed.filter((x) => x.name === "sshield").length, 1, "keep two of three shields");
+  assert.ok(listed.find((x) => x.name === "fireblade").price >= 115200);
+  assert.ok(listed.find((x) => x.name === "sshield").price >= 200000);
+  assert.strictEqual(j.slots.mainhand.name, "fireblade");
+  assert.strictEqual(j.slots.offhand.name, "sshield");
+});
+
+test("adversary: stall sells the weakest surplus copy and ignores locked gear", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Jazwyn", "Puppygirl"] });
+  const j = p.bots.Jazwyn.api.character;
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  j.slots.mainhand = { name: "fireblade", level: 1 };
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "fireblade", level: 5 };
+  c.items[4] = { name: "fireblade", level: 4, l: "locked" };
+  c.esize = c.items.filter((x) => !x).length;
+  c.map = j.map = "main";
+  c.real_x = c.x = j.real_x = j.x = 40;
+  c.real_y = c.y = j.real_y = j.y = -20;
+  c._bank = { gold: 0, items0: [{ name: "fireblade", level: 0 }].concat(new Array(41).fill(null)) };
+
+  for (let i = 0; i < 240; i++) {
+    await p.tickAll();
+    if (Object.values(c.slots).some((x) => x && x.name === "fireblade" && x.price)) break;
+  }
+
+  const listed = Object.values(c.slots).find((x) => x && x.name === "fireblade" && x.price);
+  assert.ok(listed, "a surplus blade must be listed");
+  assert.strictEqual(listed.level || 0, 0, "weakest copy listed first");
+  const held = c.items.concat(j.items, Object.values(c.slots), Object.values(j.slots)).filter(Boolean);
+  assert.ok(held.some((x) => x.name === "fireblade" && x.level === 5 && !x.price), "strongest copy retained");
+  assert.ok(held.some((x) => x.name === "fireblade" && x.l && !x.price), "locked copy retained");
+});
+
+test("adversary: full bag lists an eligible bag copy before a weaker bank copy", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = { name: "cake" };
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "dagger", level: 5 };
+  c.esize = 0;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c._bank = { gold: 0, items0: [{ name: "dagger", level: 0 }].concat(new Array(41).fill({ name: "cake" })) };
+
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    if (Object.values(c.slots).some((x) => x && x.name === "dagger" && x.price)) break;
+  }
+
+  const listed = Object.values(c.slots).find((x) => x && x.name === "dagger" && x.price);
+  assert.ok(listed, "full bag must still list from bag");
+  assert.strictEqual(listed.level, 5);
+});
+
 module.exports = { tests };
 
 if (require.main === module) {

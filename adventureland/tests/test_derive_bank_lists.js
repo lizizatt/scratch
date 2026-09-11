@@ -16,6 +16,8 @@ const defs = {
   gem0: { type: "gem", g: 240000 },
   hpot1: { type: "pot" },
   cscroll0: { g: 800 },
+  stramulet: { compound: true, type: "amulet" },
+  wattire: { upgrade: true, type: "chest" },
 };
 
 test("derive: legacy sell + combine ringsj x3", () => {
@@ -40,6 +42,22 @@ test("derive: legacy sell + combine ringsj x3", () => {
   assert.ok(d.keep.some((k) => k.name === "shoes" && k.level === 4));
   assert.ok(d.proposed.BUY_NOW.some((b) => b.name === "cscroll0"));
   assert.ok(d.keep.some((k) => k.name === "gem0"));
+});
+
+test("derive: compound inputs and upgraded wearable junk are retained", () => {
+  const packs = {
+    items0: [
+      { name: "stramulet", level: 0 },
+      { name: "stramulet", level: 1 },
+      { name: "wattire", level: 0 },
+      { name: "wattire", level: 2 },
+    ],
+  };
+  const d = deriveBankLists({ packs, defs, bags: {} });
+  assert.ok(!d.sell.some((s) => s.name === "stramulet"), "partial compound feed retained");
+  assert.ok(d.sell.some((s) => s.name === "wattire" && s.level === 0), "level-zero duplicate sold");
+  assert.ok(!d.sell.some((s) => s.name === "wattire" && s.level === 2), "upgraded wearable retained");
+  assert.ok(d.proposed.SELL_WHITELIST.indexOf("wattire") < 0, "level-gated gear excluded from name whitelist");
 });
 
 test("derive: bag copies count toward combine", () => {

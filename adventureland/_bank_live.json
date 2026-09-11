@@ -2,181 +2,363 @@
   "success": true,
   "source": "last_account_snapshot",
   "observed_at": null,
+  "retrieved_at": "2026-09-11T15:25:11.029Z",
+  "freshness": "unverified",
   "stale": false,
   "mounted_character_id": null,
   "gold": 1000,
   "packs": {
     "items0": [
       {
+        "name": "wgloves",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 3,
+        "grace": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
         "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "sshield",
         "level": 2,
-        "grace": 0
+        "grace": 0.4
       },
       {
-        "name": "rednose",
+        "name": "dagger",
         "level": 0
       },
       {
-        "name": "ringsj",
-        "level": 1,
-        "grace": 0
+        "name": "gloves",
+        "level": 3,
+        "grace": 0.4
       },
       {
-        "name": "hpamulet",
-        "level": 1,
-        "grace": 0
-      },
-      {
-        "name": "hpbelt",
-        "level": 2,
-        "grace": 0
-      },
-      {
-        "name": "strearring",
+        "name": "wgloves",
         "level": 0
       },
       {
-        "name": "hpbelt",
-        "level": 1,
-        "grace": 0
-      },
-      {
-        "name": "wbook0",
-        "level": 1,
-        "grace": 0
-      },
-      {
-        "name": "wbook0",
-        "level": 1,
-        "grace": 0
-      },
-      {
-        "name": "ringsj",
+        "name": "eears",
         "level": 0
       },
       {
-        "name": "hpbelt",
+        "name": "pants",
+        "level": 2
+      },
+      {
+        "name": "stinger",
         "level": 0
       },
       {
-        "name": "hpamulet",
+        "name": "stinger",
         "level": 0
       },
       {
-        "name": "staff",
-        "level": 3
+        "name": "stinger",
+        "level": 0
       },
       {
         "name": "ascale",
-        "q": 1
+        "q": 27
       },
       {
-        "name": "rednose",
+        "name": "wattire",
         "level": 0
       },
-      null,
+      {
+        "name": "stinger",
+        "level": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "stramulet",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "stormfeather",
+        "q": 6
+      },
+      {
+        "name": "helmet1",
+        "level": 0
+      },
+      {
+        "name": "shoes1",
+        "level": 0
+      },
+      {
+        "name": "coat",
+        "level": 2
+      },
+      {
+        "name": "seashell",
+        "q": 37
+      },
+      {
+        "name": "wgloves",
+        "level": 0
+      },
+      {
+        "name": "reefglass",
+        "q": 21
+      },
+      {
+        "name": "poker",
+        "level": 0
+      },
+      {
+        "name": "stramulet",
+        "level": 1,
+        "grace": 0.8
+      },
+      {
+        "name": "helmet",
+        "level": 2
+      },
+      {
+        "name": "cclaw",
+        "level": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
+        "name": "candycanesword",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "stinger",
+        "level": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "vitscroll",
+        "q": 2
+      },
+      {
+        "name": "shoes",
+        "level": 2,
+        "grace": 1
+      },
+      {
+        "name": "stinger",
+        "level": 0
+      }
+    ],
+    "items1": [
+      {
+        "name": "coat",
+        "level": 2,
+        "grace": 0.8
+      },
+      {
+        "name": "slimestaff",
+        "level": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
+        "name": "slimestaff",
+        "level": 0
+      },
+      {
+        "name": "slimestaff",
+        "level": 0
+      },
+      {
+        "name": "stinger",
+        "level": 0
+      },
+      {
+        "name": "slimestaff",
+        "level": 0
+      },
+      {
+        "name": "poker",
+        "level": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "slimestaff",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
+        "name": "gloves1",
+        "level": 0
+      },
+      {
+        "name": "slimestaff",
+        "level": 0
+      },
+      {
+        "name": "slimestaff",
+        "level": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
+        "name": "wgloves",
+        "level": 0
+      },
+      {
+        "name": "stinger",
+        "level": 0
+      },
+      {
+        "name": "poker",
+        "level": 0
+      },
+      {
+        "name": "pants1",
+        "level": 0
+      },
+      {
+        "name": "poker",
+        "level": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
+        "name": "xmashat",
+        "level": 4
+      },
+      {
+        "name": "pants",
+        "level": 5
+      },
+      {
+        "name": "gloves1",
+        "level": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "stinger",
+        "level": 0
+      },
+      {
+        "name": "partyhat",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "wgloves",
+        "level": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "wattire",
+        "level": 0
+      },
+      {
+        "name": "wgloves",
+        "level": 0
+      },
+      {
+        "name": "wgloves",
+        "level": 0
+      },
+      {
+        "name": "wgloves",
+        "level": 0
+      },
       {
         "name": "ringsj",
         "level": 0
       },
       {
-        "name": "dexamulet",
+        "name": "wgloves",
         "level": 0
       },
-      {
-        "name": "wshoes",
-        "level": 0
-      },
-      {
-        "name": "shoes",
-        "level": 4
-      },
-      {
-        "name": "shoes",
-        "level": 3
-      },
-      {
-        "name": "dexearring",
-        "level": 0
-      },
-      {
-        "name": "wcap",
-        "level": 0
-      },
-      {
-        "name": "wcap",
-        "level": 0
-      },
-      {
-        "name": "wbook0",
-        "level": 0
-      },
-      null,
-      {
-        "name": "gem0",
-        "q": 8
-      },
-      {
-        "name": "seashell",
-        "q": 2
-      },
-      null,
-      {
-        "name": "reefglass",
-        "q": 2
-      },
-      null,
-      {
-        "name": "skullamulet",
-        "level": 0,
-        "grace": 0.4
-      },
-      null,
-      null,
-      {
-        "name": "carrotsword",
-        "level": 0,
-        "grace": 0.4,
-        "p": "shiny"
-      },
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    ],
-    "items1": [
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
       {
         "name": "hpamulet",
         "level": 0
       },
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
+      {
+        "name": "hpbelt",
+        "level": 0
+      }
     ]
-  }
+  },
+  "note": "Saved bank items and gold, not live data. stale flags a mounted bank, not data age. Freshness is unverified; observed_at is unknown and retrieved_at is the read time."
 }
