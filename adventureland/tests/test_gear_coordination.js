@@ -85,13 +85,14 @@ test("party planner finds the cross-equipped earring exchange", async () => {
       { name: "intearring", level: 0 },
       { name: "vitearring", level: 0 },
     ],
-    Zarook: [{ name: "strearring", level: 0 }, null],
+    Zarook: [null, null],
   };
   const ads = {};
   for (const who of ["Jazwyn", "Sarene", "Zarook"]) {
     const api = p.bots[who].api;
     api.character.slots.earring1 = setup[who][0];
     api.character.slots.earring2 = setup[who][1];
+    if (who === "Zarook") api.character.items[7] = { name: "strearring", level: 0 };
     ads[who] = makeInventorySnapshot(api, 1, {});
   }
 
@@ -117,12 +118,13 @@ test("Puppygirl coordinates a mutually improving live-shaped earring exchange", 
       { name: "intearring", level: 0 },
       { name: "vitearring", level: 0 },
     ],
-    Zarook: [{ name: "strearring", level: 0 }, null],
+    Zarook: [null, null],
   };
   for (const who of ["Jazwyn", "Sarene", "Zarook"]) {
     const c = p.bots[who].api.character;
     c.slots.earring1 = setup[who][0];
     c.slots.earring2 = setup[who][1];
+    if (who === "Zarook") c.items[7] = { name: "strearring", level: 0 };
     c.esize = c.items.filter((x) => !x).length;
     const api = p.bots[who].api;
     const getPlayer = api.get_player.bind(api);
@@ -165,6 +167,41 @@ test("Puppygirl coordinates a mutually improving live-shaped earring exchange", 
     1,
     "retries must not duplicate the physical transfer"
   );
+});
+
+test("prepared receiver preserves its incoming bag slot", async () => {
+  const p = bootParty({ pack: "bat" });
+  const jaz = p.bots.Jazwyn;
+  const source = p.bots.Zarook.api;
+  source.character.items[7] = { name: "strearring", level: 0 };
+  const incoming = makeInventorySnapshot(source, 1, {}).bag.find((x) => x.where === "bag:7");
+  for (let i = 0; i < jaz.api.character.items.length - 1; i++) {
+    jaz.api.character.items[i] = { name: "hpot1", q: 1 };
+  }
+  jaz.api.character.esize = 1;
+  let lootCalls = 0;
+  jaz.api.loot = () => {
+    lootCalls++;
+    const index = jaz.api.character.items.findIndex((x) => !x);
+    if (index >= 0) {
+      jaz.api.character.items[index] = { name: "slime", q: 1 };
+      jaz.api.character.esize--;
+    }
+  };
+
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", {
+    gear_plan: 1,
+    tx: "reserve-inbound",
+    plan_revision: 1,
+    expires_at: p.world.clock.now() + 120000,
+    outgoing: [],
+    incoming: [{ index: 0, from: "Zarook", to: "Jazwyn", toSlot: "earring1", item: incoming }],
+  });
+  assert.strictEqual(jaz.ctrl.gearTxn.phase, "prepared");
+
+  await jaz.ctrl.tick();
+  assert.strictEqual(lootCalls, 0);
+  assert.strictEqual(jaz.api.character.esize, 1);
 });
 
 test("stale observed item is rejected before preparation", async () => {

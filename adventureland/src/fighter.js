@@ -1427,11 +1427,13 @@ function bootFighter(api, opts) {
       sendGearAd();
     }
     motion.evalPresent(now);
-    if (typeof api.loot === "function") api.loot();
-    await stripWrongClass();
-    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
+    if (!gearTxn) {
+      if (typeof api.loot === "function") api.loot();
+      await stripWrongClass();
+      await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
+    }
     if (now - lastGearAd >= GEAR_AD_MS) sendGearAd();
-    await offloadToMerchant();
+    if (!gearTxn) await offloadToMerchant();
     emitMetrics(now);
     if (isLead() && now >= bootQuietUntil && now - lastHb >= HEARTBEAT_MS) {
       reseedSeqAboveHeard();

@@ -174,6 +174,16 @@ function planGroup(ads, G, group) {
         items.push({ owner: who, sourceSlot: slot, ref: it });
       }
     }
+    for (const it of ad.bag || []) {
+      if (
+        it &&
+        !it.l &&
+        (ad.reservations || []).indexOf(it.fingerprint) < 0 &&
+        candidateSlots(it, G).some((slot) => group.indexOf(slot) >= 0)
+      ) {
+        items.push({ owner: who, sourceSlot: null, ref: it });
+      }
+    }
   }
 
   let states = new Map();
@@ -184,6 +194,7 @@ function planGroup(ads, G, group) {
       for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
         if (mask & (1 << slotIndex)) continue;
         const slot = slots[slotIndex];
+        if (items[itemIndex].sourceSlot == null && items[itemIndex].owner === slot.who) continue;
         const value = assignmentValue(items[itemIndex].ref, slot.who, slot.slot, slot.ctype, G);
         if (!Number.isFinite(value)) continue;
         const nextMask = mask | (1 << slotIndex);
