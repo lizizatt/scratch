@@ -6,7 +6,7 @@ Use the class-specific Monster Hunter armor as the party's next armor
 progression, but buy for **high-value effects and two-/three-piece breakpoints**
 rather than completing one set at a time.
 
-The first planned spend is:
+The first tranche was:
 
 | Character | Pieces | Cost | Immediate reason |
 |---|---|---:|---|
@@ -15,7 +15,21 @@ The first planned spend is:
 | Jazwyn | Warrior gloves | 8 | Clear glove upgrade with 1 crit |
 | **Total** | 7 pieces | **60** | Leaves 4 of the currently estimated 64 tokens |
 
-This approves the Hunter-set direction without claiming that four complete
+**Status:** executed on US IV on 2026-09-11. Puppygirl verified the full
+64-token budget before spending, bought exactly seven pieces for 60 tokens,
+and completed all seven authenticated deliveries without a Hunter delivery
+failure. Live equipment snapshots then confirmed:
+
+- Sarene: `mmhat`, `mmgloves`, and `mmpants`;
+- Zarook: `mphat`, `mpgloves`, and `mppants`;
+- Jazwyn: `mwgloves`.
+
+The post-delivery snapshot showed 9 tokens on Puppygirl. The purchase audit
+recorded an exact 60-token debit; the party remained online and continued
+earning tokens during delivery, so 4 is the purchase-time reserve rather than
+a durable balance.
+
+This executes the Hunter-set direction without claiming that four complete
 sets are the best immediate use of 212 tokens. Full sets remain later targets,
 especially for Jazwyn. Puppygirl's set is useful but follows the combat trio.
 
@@ -28,14 +42,16 @@ BIS.
 The item and token facts in this document were checked against official
 Adventure Land game data version **15650**.
 
-The working balance is **64 Monster Tokens**:
+The pre-purchase working balance was **64 Monster Tokens**:
 
 - 41 observed on Puppygirl;
 - 23 in the most recent bank snapshot.
 
-The bank service marked its snapshot age as unverified. Refresh and recount the
-bank immediately before spending. The plan remains useful if only the 41 bag
-tokens are available:
+The bank service had marked its snapshot age as unverified. The live execution
+therefore refreshed the bank, consolidated the split stacks, and verified all
+64 tokens before the first purchase.
+
+The executed order was:
 
 1. Buy Sarene's three-piece core for 26.
 2. Buy Zarook's gloves and hat for 15.
@@ -205,32 +221,31 @@ would be a temporary downgrade.
 | Jewelry/orb/cape | Prefer unattended survivability; keep gathered `orbg` and practical cape targets |
 | Long-term Hunter goal | Do not complete the set until combat progression and ordinary empty slots are solved |
 
-## Purchase and upgrade gates
+## Implemented purchase controls
 
-Do not automate the purchases yet. The current code safely coordinates
-accessories, but Hunter armor exposes four gaps:
+The first tranche resolved the original automation gaps:
 
-1. Party-wide coordination does not yet allocate armor slots.
-2. `score()` does not model set bonuses, crit, piercing, output, speed, or the
-   equipped item's `stat_type`, so it cannot prove these loadout decisions.
-3. Automatic upgrades are restricted to a `scroll0` allowlist and grade-zero
-   items. Hunter equipment is neither allowlisted nor grade zero at +0.
-4. A bought piece needs an explicit, auditable route from Puppygirl to the
-   correct class before it can be treated as delivered.
+1. A fixed, class-validated manifest assigns every piece and armor slot.
+2. Loadout scoring includes class main stats, set breakpoints, crit, piercing,
+   output, and speed.
+3. Hunter pieces are protected from ordinary disposal and `scroll0` upgrading;
+   no live upgrade was attempted.
+4. Purchases require fresh fighter advertisements and a verified complete
+   budget before the first debit.
+5. Every piece uses the persisted, authenticated gear-delivery flow and an
+   explicit destination slot.
 
-Before spending, add Hunter pieces to a reviewed purchase manifest and make the
-delivery/equip flow understand class, complete-loadout score, set breakpoints,
-and replacement retention. Upgrade each initial piece only through a
-high-grade policy with an explicit gold/scroll budget. Retain displaced gear
-until live tooltips and combat logs prove the replacement.
+Retain displaced gear until longer combat observation proves the replacements.
+Any Hunter upgrade still requires a separate high-grade policy with an
+explicit gold and scroll budget.
 
 ## Spending roadmap
 
 | Phase | Spend | Cumulative | Stop condition |
 |---|---:|---:|---|
-| Sarene three-piece core | 26 | 26 | Hat, gloves, and pants delivered and equipped |
-| Zarook two-piece core | 15 | 41 | Gloves and hat delivered; 2-piece INT bonus active |
-| Zarook pants + Jazwyn gloves | 19 | 60 | Bank tokens confirmed; both effects verified |
+| Sarene three-piece core | 26 | 26 | **Complete:** hat, gloves, and pants equipped |
+| Zarook two-piece core | 15 | 41 | **Complete:** gloves and hat equipped |
+| Zarook pants + Jazwyn gloves | 19 | 60 | **Complete:** both pieces equipped |
 | Jazwyn chest + pants | 23 | 83 | Warrior three-piece breakpoint active |
 | Puppygirl gloves | 8 | 91 | Combat cores stable; economic return is wanted |
 | Sarene chest | 12 | 103 | Fourth-piece piercing improves the current farm |
