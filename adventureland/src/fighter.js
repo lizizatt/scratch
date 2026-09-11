@@ -32,6 +32,9 @@ const { equipPending, isKeep, markGift, classOk, canEquipSlot } = require("./gea
 const {
   inventoryDigest,
   makeInventorySnapshot,
+  compactGearItem,
+  itemFingerprint,
+  resolveObservedItem,
   isMerchantMessage,
 } = require("./gear_coordination");
 const {
@@ -78,6 +81,7 @@ function bootFighter(api, opts) {
   const gearReservations = {};
   let inventoryRevision = 0;
   let lastInventoryDigest = "";
+  let gearTxn = null;
   // equipPending's live "Wrong weapon" rejection memo — persists across ticks
   // so a class-illegal / 2H-conflicted item isn't re-attempted every tick.
   const equipRejectMemo = {};
@@ -133,6 +137,7 @@ function bootFighter(api, opts) {
           mhuntSoftSkipId: mhuntSoftSkipId,
           inventoryRevision,
           gearReservations,
+          gearTxn,
         })
       );
     } catch (e) {}
@@ -159,8 +164,16 @@ function bootFighter(api, opts) {
       if (d.mhuntDeathForId) mhuntDeathForId = d.mhuntDeathForId;
       if (d.mhuntSoftSkipId) mhuntSoftSkipId = d.mhuntSoftSkipId;
       if (d.inventoryRevision != null) inventoryRevision = d.inventoryRevision | 0;
-      if (d.gearReservations && typeof d.gearReservations === "object")
-        Object.assign(gearReservations, d.gearReservations);
+      if (d.gearTxn && typeof d.gearTxn === "object") gearTxn = d.gearTxn;
+      if (gearTxn) {
+        for (const leg of gearTxn.outgoing || []) leg.sending = 0;
+      }
+      if (d.gearReservations && typeof d.gearReservations === "object") {
+        for (const id of Object.keys(d.gearReservations)) {
+          const r = d.gearReservations[id];
+          if (gearTxn && r && r.tx === gearTxn.tx) gearReservations[id] = r;
+        }
+      }
     } catch (e) {}
   }
 
@@ -213,7 +226,7 @@ function bootFighter(api, opts) {
   /** Free ≥1 bag slot by selling junk, then surplus pots if dry on the other type. */
   async function freeBagSlot() {
     if ((api.character.esize || 0) >= 1) return true;
-    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo);
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
     if ((api.character.esize || 0) >= 1) return true;
     async function sellAt(i, it) {
       if (typeof api.sell !== "function") return false;
@@ -225,6 +238,7 @@ function bootFighter(api, opts) {
       const it = api.character.items[i];
       if (!it) continue;
       if (/^hpot|^mpot/.test(it.name)) continue;
+      if (isGearReserved(it)) continue;
       if (isKeep(api, it, api.G || {}, giftTtl)) continue;
       if (await sellAt(i, it)) return true;
     }
@@ -233,6 +247,7 @@ function bootFighter(api, opts) {
       const it = api.character.items[i];
       if (!it || /^hpot|^mpot/.test(it.name)) continue;
       if (KEEP_ALWAYS.indexOf(it.name) >= 0) continue;
+      if (isGearReserved(it)) continue;
       if (await sellAt(i, it)) return true;
     }
     // Pot-only full bag: dry on one type while the other fills every slot
@@ -286,16 +301,224 @@ function bootFighter(api, opts) {
   }
 
   function sendGearAd() {
+    const snap = currentInventorySnapshot();
+    api.send_cm(MERCHANT, Object.assign({ gear_ad: 1, name }, snap));
+    lastGearAd = api._now();
+    api.game_log("gear_ad");
+  }
+
+  function currentInventorySnapshot() {
     const digest = inventoryDigest(api);
     if (digest !== lastInventoryDigest) {
       inventoryRevision += 1;
       lastInventoryDigest = digest;
       persist();
     }
-    const snap = makeInventorySnapshot(api, inventoryRevision, gearReservations);
-    api.send_cm(MERCHANT, Object.assign({ gear_ad: 1, name }, snap));
-    lastGearAd = api._now();
-    api.game_log("gear_ad");
+    return makeInventorySnapshot(api, inventoryRevision, gearReservations);
+  }
+
+  function isGearReserved(it) {
+    const fp = itemFingerprint(it);
+    if (
+      gearTxn &&
+      (gearTxn.incoming || []).some((x) => !x.equipped && x.item && x.item.fingerprint === fp)
+    )
+      return true;
+    return Object.keys(gearReservations).some(
+      (id) => gearReservations[id] && gearReservations[id].fingerprint === fp
+    );
+  }
+
+  async function sendGearTxReport(tx, phase, extra) {
+    await api.send_cm(
+      MERCHANT,
+      Object.assign({ gear_tx_report: 1, tx, who: name, phase, revision: inventoryRevision }, extra || {})
+    );
+  }
+
+  function clearGearTxn(tx) {
+    if (tx && gearTxn && gearTxn.tx !== tx) return;
+    for (const id of Object.keys(gearReservations)) {
+      if (!tx || (gearReservations[id] && gearReservations[id].tx === tx)) delete gearReservations[id];
+    }
+    gearTxn = null;
+    persist();
+  }
+
+  function countBagFingerprint(fingerprint) {
+    let n = 0;
+    for (const it of api.character.items || []) {
+      if (it && itemFingerprint(it) === fingerprint) n++;
+    }
+    return n;
+  }
+
+  async function handleGearPlan(d) {
+    const now = api._now();
+    if (!d.tx || !Array.isArray(d.outgoing) || !Array.isArray(d.incoming)) return;
+    if (d.expires_at && now >= d.expires_at) {
+      await sendGearTxReport(d.tx, "failed", { error: "expired" });
+      return;
+    }
+    if (gearTxn && gearTxn.tx === d.tx) {
+      if (gearTxn.phase === "prepared")
+        await sendGearTxReport(d.tx, "prepared", { outgoing: gearTxn.outgoing });
+      return;
+    }
+    if (gearTxn && gearTxn.tx !== d.tx) {
+      await sendGearTxReport(d.tx, "blocked", { error: "busy" });
+      return;
+    }
+
+    // Refresh the revision for diagnostics, but validate each referenced item
+    // independently so unrelated potion or loot changes do not stale a plan.
+    currentInventorySnapshot();
+    for (const leg of d.outgoing) {
+      if (!leg.item || !resolveObservedItem(api, leg.item)) {
+        await sendGearTxReport(d.tx, "failed", { error: "stale_item" });
+        return;
+      }
+    }
+    const unequipCount = d.outgoing.filter((x) => x.item.where.indexOf("slot:") === 0).length;
+    const need = unequipCount + (d.incoming.length ? 1 : 0);
+    if ((api.character.esize || 0) < need) {
+      await sendGearTxReport(d.tx, "blocked", { error: "no_space", need });
+      return;
+    }
+
+    const txn = {
+      tx: d.tx,
+      planRevision: d.plan_revision,
+      expiresAt: d.expires_at,
+      phase: "preparing",
+      outgoing: JSON.parse(JSON.stringify(d.outgoing)),
+      incoming: JSON.parse(JSON.stringify(d.incoming)),
+    };
+    gearTxn = txn;
+    for (const incoming of txn.incoming) {
+      incoming.beforeCount = countBagFingerprint(incoming.item.fingerprint);
+    }
+    const used = {};
+    for (const leg of txn.outgoing) {
+      const found = resolveObservedItem(api, leg.item);
+      if (!found) {
+        clearGearTxn(d.tx);
+        await sendGearTxReport(d.tx, "failed", { error: "item_moved" });
+        return;
+      }
+      if (found.slot) {
+        const r = await api.unequip(found.slot);
+        if (gearTxn !== txn) return;
+        if (r && r.failed) {
+          clearGearTxn(d.tx);
+          await sendGearTxReport(d.tx, "blocked", { error: "unequip", slot: found.slot });
+          return;
+        }
+      }
+      const fp = leg.item.fingerprint;
+      const index = (api.character.items || []).findIndex(
+        (it, i) => it && !used[i] && itemFingerprint(it) === fp
+      );
+      if (index < 0) {
+        clearGearTxn(d.tx);
+        await sendGearTxReport(d.tx, "failed", { error: "prepared_item_missing" });
+        return;
+      }
+      used[index] = 1;
+      leg.item = Object.assign({}, compactGearItem(api.character.items[index]), {
+        uid: d.tx + ":bag:" + index,
+        where: "bag:" + index,
+        fingerprint: fp,
+        observed_revision: inventoryRevision,
+      });
+      gearReservations[leg.item.uid] = { tx: d.tx, fingerprint: fp };
+    }
+    if (gearTxn !== txn) return;
+    currentInventorySnapshot();
+    txn.phase = "prepared";
+    persist();
+    api.game_log("gear_tx:prepared tx=" + d.tx + " who=" + name);
+    await sendGearTxReport(d.tx, "prepared", { outgoing: gearTxn.outgoing });
+  }
+
+  async function handleGearTransfer(d) {
+    if (!gearTxn || gearTxn.tx !== d.tx || gearTxn.phase !== "prepared") return;
+    const leg = gearTxn.outgoing.find((x) => x.index === d.index);
+    if (!leg) return;
+    if (leg.sending) return;
+    if (leg.sent) {
+      await sendGearTxReport(d.tx, "sent", { index: d.index });
+      return;
+    }
+    const found = resolveObservedItem(api, leg.item);
+    const target = api.get_player(leg.to);
+    if (!found) {
+      await sendGearTxReport(d.tx, "failed", { index: d.index, error: "item_moved" });
+      return;
+    }
+    if (!target || target.rip || merchantDist(target) > SEND_RANGE) {
+      await sendGearTxReport(d.tx, "blocked", { index: d.index, error: "not_in_range" });
+      return;
+    }
+    leg.sending = 1;
+    persist();
+    let r;
+    try {
+      r = await api.send_item(leg.to, found.index, 1);
+    } catch (e) {
+      leg.sending = 0;
+      persist();
+      await sendGearTxReport(d.tx, "blocked", { index: d.index, error: "send_failed" });
+      return;
+    }
+    if (r && r.failed) {
+      leg.sending = 0;
+      persist();
+      await sendGearTxReport(d.tx, "blocked", { index: d.index, error: r.reason || "send_failed" });
+      return;
+    }
+    leg.sending = 0;
+    leg.sent = 1;
+    delete gearReservations[leg.item.uid];
+    currentInventorySnapshot();
+    persist();
+    api.game_log("gear_tx:sent tx=" + d.tx + " to=" + leg.to + " " + leg.item.name);
+    await sendGearTxReport(d.tx, "sent", { index: d.index });
+  }
+
+  async function handleGearCheck(d) {
+    if (!gearTxn || gearTxn.tx !== d.tx) return;
+    const incoming = gearTxn.incoming.find((x) => x.index === d.index);
+    if (!incoming) return;
+    if (incoming.equipped) {
+      await sendGearTxReport(d.tx, "equipped", { index: d.index, slot: incoming.toSlot });
+      return;
+    }
+    const matches = [];
+    const outgoingIndexes = {};
+    for (const leg of gearTxn.outgoing || []) {
+      if (leg.sent || !leg.item || leg.item.where.indexOf("bag:") !== 0) continue;
+      outgoingIndexes[Number(leg.item.where.slice(4))] = 1;
+    }
+    for (let i = 0; i < (api.character.items || []).length; i++) {
+      const it = api.character.items[i];
+      if (it && !outgoingIndexes[i] && itemFingerprint(it) === incoming.item.fingerprint) matches.push(i);
+    }
+    if (matches.length <= (incoming.beforeCount || 0)) return;
+    const index = matches[matches.length - 1];
+    const r = await api.equip(index, incoming.toSlot);
+    const worn = api.character.slots && api.character.slots[incoming.toSlot];
+    if ((r && r.failed) || !worn || itemFingerprint(worn) !== incoming.item.fingerprint) {
+      await sendGearTxReport(d.tx, "failed", { index: d.index, error: "equip_failed" });
+      return;
+    }
+    incoming.equipped = 1;
+    currentInventorySnapshot();
+    persist();
+    api.game_log(
+      "gear_tx:equipped tx=" + d.tx + " slot=" + incoming.toSlot + " " + incoming.item.name
+    );
+    await sendGearTxReport(d.tx, "equipped", { index: d.index, slot: incoming.toSlot });
   }
 
   let lastGoldOffload = 0;
@@ -338,7 +561,7 @@ function bootFighter(api, opts) {
     let n = 0;
     for (let i = 0; i < api.character.items.length && n < 12; i++) {
       const it = api.character.items[i];
-      if (!it || isKeep(api, it, api.G || {}, giftTtl)) continue;
+      if (!it || isGearReserved(it) || isKeep(api, it, api.G || {}, giftTtl)) continue;
       try {
         const r = await api.send_item(MERCHANT, i, it.q == null ? 1 : it.q);
         if (r && r.failed) {
@@ -366,7 +589,7 @@ function bootFighter(api, opts) {
     const slot = d.slot;
     const prev = slot && api.character.slots[slot] ? Object.assign({}, api.character.slots[slot]) : null;
     markGift(giftTtl, id, d.name, api._now());
-    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo);
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (it && it.name === d.name && (it.level || 0) === (d.level || 0)) {
@@ -383,7 +606,7 @@ function bootFighter(api, opts) {
         break;
       }
     }
-    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo);
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
     const worn = slot && api.character.slots[slot];
     const ok =
       worn && worn.name === d.name && (worn.level || 0) === (d.level || 0) ? 1 : 0;
@@ -643,6 +866,27 @@ function bootFighter(api, opts) {
     const d = m.message;
     if (!d || typeof d !== "object") return;
     if (!isMerchantMessage(m)) return;
+    if (d.gear_plan) {
+      await handleGearPlan(d);
+      return;
+    }
+    if (d.gear_transfer) {
+      await handleGearTransfer(d);
+      return;
+    }
+    if (d.gear_check) {
+      await handleGearCheck(d);
+      return;
+    }
+    if (d.gear_finish || d.gear_cancel) {
+      if (gearTxn && gearTxn.tx === d.tx) {
+        const phase = d.gear_finish ? "complete" : "cancelled";
+        clearGearTxn(d.tx);
+        sendGearAd();
+        await sendGearTxReport(d.tx, phase);
+      }
+      return;
+    }
     // Merchant console → CM (Puppygirl hunt/world/hold/hunt_quest)
     if (d.hunt) applyCmd({ type: "cmd", cmd: "hunt", args: ["" + d.hunt] }, isLead());
     if (d.grind) applyCmd({ type: "cmd", cmd: "grind", args: [] }, isLead());
@@ -1176,10 +1420,16 @@ function bootFighter(api, opts) {
       return;
     }
     await maybeUsePots(api);
+    if (gearTxn && gearTxn.expiresAt && now >= gearTxn.expiresAt + 5000) {
+      const expiredTx = gearTxn.tx;
+      clearGearTxn(expiredTx);
+      api.game_log("gear_tx:expired tx=" + expiredTx);
+      sendGearAd();
+    }
     motion.evalPresent(now);
     if (typeof api.loot === "function") api.loot();
     await stripWrongClass();
-    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo);
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
     if (now - lastGearAd >= GEAR_AD_MS) sendGearAd();
     await offloadToMerchant();
     emitMetrics(now);
@@ -1254,6 +1504,9 @@ function bootFighter(api, opts) {
     },
     get dlvPending() {
       return dlvPending;
+    },
+    get gearTxn() {
+      return gearTxn;
     },
     _setDlv(p) {
       // Test helper: set pending only — do not fake status (hearCm {status} bumps lastStatusAt)

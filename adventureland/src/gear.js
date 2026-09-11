@@ -309,12 +309,13 @@ function isKeep(api, it, G, giftTtl) {
  */
 const EQUIP_REJECT_COOLDOWN_MS = 60000;
 
-async function equipPending(api, G, giftTtl, rejectMemo) {
+async function equipPending(api, G, giftTtl, rejectMemo, isReserved) {
   let n = 0;
   const now = api._now ? api._now() : Date.now();
   for (let i = 0; i < api.character.items.length; i++) {
     const it = api.character.items[i];
     if (!it) continue;
+    if (isReserved && isReserved(it, i)) continue;
     const best = pickBestSlot(api, it, G);
     if (!best || typeof api.equip !== "function") continue;
     const rejectKey = it.name + "@" + (it.level || 0) + "->" + best.slot;

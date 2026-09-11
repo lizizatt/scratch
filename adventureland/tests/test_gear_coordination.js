@@ -2,6 +2,7 @@
 
 const assert = require("assert");
 const { bootParty } = require("../src/boot_party");
+const { bootFighter } = require("../src/fighter");
 const {
   inventoryDigest,
   makeInventorySnapshot,
@@ -102,6 +103,272 @@ test("party planner finds the cross-equipped earring exchange", async () => {
   assert.ok(
     plan.legs.some((x) => x.from === "Jazwyn" && x.item.name === "intearring"),
     "Jazwyn should release an intelligence earring as part of the improving assignment"
+  );
+});
+
+test("Puppygirl coordinates a mutually improving live-shaped earring exchange", async () => {
+  const p = bootParty({ pack: "bat", pots: 200, gold: 500000 });
+  const setup = {
+    Jazwyn: [
+      { name: "intearring", level: 2 },
+      { name: "intearring", level: 2 },
+    ],
+    Sarene: [
+      { name: "intearring", level: 0 },
+      { name: "vitearring", level: 0 },
+    ],
+    Zarook: [{ name: "strearring", level: 0 }, null],
+  };
+  for (const who of ["Jazwyn", "Sarene", "Zarook"]) {
+    const c = p.bots[who].api.character;
+    c.slots.earring1 = setup[who][0];
+    c.slots.earring2 = setup[who][1];
+    c.esize = c.items.filter((x) => !x).length;
+    const api = p.bots[who].api;
+    const getPlayer = api.get_player.bind(api);
+    api.get_player = (target) => {
+      const player = getPlayer(target);
+      if (!player) return player;
+      const liveShape = Object.assign({}, player);
+      delete liveShape.esize;
+      return liveShape;
+    };
+  }
+  const merchantCm = p.bots.Puppygirl.api.send_cm.bind(p.bots.Puppygirl.api);
+  let churned = false;
+  p.bots.Puppygirl.api.send_cm = async (to, message) => {
+    if (!churned && message && message.gear_plan) {
+      churned = true;
+      const pot = p.bots[to].api.character.items.find((x) => x && x.name === "hpot1");
+      if (pot && pot.q > 1) pot.q -= 1;
+    }
+    return merchantCm(to, message);
+  };
+  p.world.advance(20000);
+  for (let i = 0; i < 160; i++) {
+    await p.tickAll();
+    const logs = p.bots.Puppygirl.api.log.game.map((x) => x.m);
+    if (logs.some((x) => x.indexOf("gear_tx:done") === 0)) break;
+  }
+
+  const jaz = p.bots.Jazwyn.api.character;
+  assert.ok(
+    [jaz.slots.earring1, jaz.slots.earring2].some((x) => x && x.name === "strearring"),
+    "Jazwyn should receive Zarook's strength earring"
+  );
+  const logs = p.bots.Puppygirl.api.log.game.map((x) => x.m);
+  assert.ok(logs.some((x) => x.indexOf("gear_tx:plan") === 0));
+  assert.ok(logs.some((x) => x.indexOf("gear_tx:done") === 0));
+  assert.ok(churned, "test must mutate unrelated inventory between advertisement and prepare");
+  assert.strictEqual(
+    p.bots.Zarook.api.log.sent.filter((x) => x.name === "Jazwyn" && x.item === "strearring").length,
+    1,
+    "retries must not duplicate the physical transfer"
+  );
+});
+
+test("stale observed item is rejected before preparation", async () => {
+  const p = bootParty({ pack: "bat" });
+  const j = p.bots.Jazwyn.api.character;
+  j.slots.earring1 = { name: "intearring", level: 2 };
+  p.world.advance(20000);
+  await p.tickAll();
+  const ref = p.bots.Puppygirl.ctrl.gearAds.Jazwyn.slots.earring1;
+  j.slots.earring1 = { name: "strearring", level: 0 };
+
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", {
+    gear_plan: 1,
+    v: 2,
+    tx: "stale-plan",
+    plan_revision: 1,
+    expires_at: p.world.clock.now() + 10000,
+    outgoing: [{ index: 0, from: "Jazwyn", to: "Zarook", item: ref, toSlot: "earring1" }],
+    incoming: [],
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.strictEqual(p.bots.Jazwyn.ctrl.gearTxn, null);
+  assert.ok(
+    p.bots.Jazwyn.api.log.cm.some(
+      (x) => x.message && x.message.gear_tx_report && x.message.tx === "stale-plan" && x.message.error === "stale_item"
+    )
+  );
+});
+
+test("coordinator does not start a swap without participant capacity", async () => {
+  const p = bootParty({ pack: "bat" });
+  p.bots.Jazwyn.api.character.slots.earring1 = { name: "intearring", level: 2 };
+  p.bots.Zarook.api.character.slots.earring1 = { name: "strearring", level: 0 };
+  for (const who of ["Jazwyn", "Sarene", "Zarook"]) {
+    const c = p.bots[who].api.character;
+    for (let i = 0; i < c.items.length; i++) c.items[i] = { name: "hpot1", q: 1 };
+    c.esize = 0;
+  }
+  p.world.advance(20000);
+  for (let i = 0; i < 20; i++) await p.tickAll();
+  assert.ok(!p.bots.Puppygirl.ctrl.store.gearTx);
+});
+
+test("prepared reservations survive a fighter controller reload", async () => {
+  const p = bootParty({ pack: "bat" });
+  const api = p.bots.Jazwyn.api;
+  api.character.slots.earring1 = { name: "intearring", level: 2 };
+  p.world.advance(20000);
+  await p.tickAll();
+  const ref = p.bots.Puppygirl.ctrl.gearAds.Jazwyn.slots.earring1;
+
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", {
+    gear_plan: 1,
+    v: 2,
+    tx: "reload-plan",
+    plan_revision: 1,
+    expires_at: p.world.clock.now() + 10000,
+    outgoing: [{ index: 0, from: "Jazwyn", to: "Zarook", item: ref, toSlot: "earring1" }],
+    incoming: [],
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.ok(p.bots.Jazwyn.ctrl.gearTxn && p.bots.Jazwyn.ctrl.gearTxn.phase === "prepared");
+
+  const restored = bootFighter(api, { now: () => p.world.clock.now(), farm: "bat" });
+  assert.ok(restored.gearTxn && restored.gearTxn.tx === "reload-plan");
+  assert.strictEqual(restored.gearTxn.phase, "prepared");
+});
+
+test("duplicate plans during delayed preparation do not unequip twice", async () => {
+  const p = bootParty({ pack: "bat" });
+  const api = p.bots.Jazwyn.api;
+  api.character.slots.earring1 = { name: "intearring", level: 2 };
+  p.world.advance(20000);
+  await p.tickAll();
+  const ref = p.bots.Puppygirl.ctrl.gearAds.Jazwyn.slots.earring1;
+  const originalUnequip = api.unequip.bind(api);
+  let release;
+  let calls = 0;
+  api.unequip = (slot) => {
+    calls++;
+    return new Promise((resolve) => {
+      release = () => originalUnequip(slot).then(resolve);
+    });
+  };
+  const plan = {
+    gear_plan: 1,
+    v: 2,
+    tx: "delayed-plan",
+    plan_revision: 1,
+    expires_at: p.world.clock.now() + 10000,
+    outgoing: [{ index: 0, from: "Jazwyn", to: "Zarook", item: ref, toSlot: "earring1" }],
+    incoming: [],
+  };
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", plan);
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", plan);
+  assert.strictEqual(calls, 1);
+  release();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(p.bots.Jazwyn.ctrl.gearTxn && p.bots.Jazwyn.ctrl.gearTxn.phase === "prepared");
+});
+
+test("cancel during delayed preparation cannot resurrect a reservation", async () => {
+  const p = bootParty({ pack: "bat" });
+  const api = p.bots.Jazwyn.api;
+  api.character.slots.earring1 = { name: "intearring", level: 2 };
+  p.world.advance(20000);
+  await p.tickAll();
+  const ref = p.bots.Puppygirl.ctrl.gearAds.Jazwyn.slots.earring1;
+  const originalUnequip = api.unequip.bind(api);
+  let release;
+  api.unequip = (slot) =>
+    new Promise((resolve) => {
+      release = () => originalUnequip(slot).then(resolve);
+    });
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", {
+    gear_plan: 1,
+    v: 2,
+    tx: "cancel-race",
+    plan_revision: 1,
+    expires_at: p.world.clock.now() + 10000,
+    outgoing: [{ index: 0, from: "Jazwyn", to: "Zarook", item: ref, toSlot: "earring1" }],
+    incoming: [],
+  });
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", { gear_cancel: 1, v: 2, tx: "cancel-race" });
+  release();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.strictEqual(p.bots.Jazwyn.ctrl.gearTxn, null);
+  await p.bots.Jazwyn.ctrl.tick();
+  assert.ok(
+    [api.character.slots.earring1, api.character.slots.earring2].some(
+      (x) => x && x.name === "intearring" && (x.level || 0) === 2
+    )
+  );
+});
+
+test("duplicate transfer commands cannot overlap send_item", async () => {
+  const p = bootParty({ pack: "bat" });
+  const zApi = p.bots.Zarook.api;
+  zApi.character.slots.earring1 = { name: "strearring", level: 0 };
+  p.world.advance(20000);
+  await p.tickAll();
+  const ref = p.bots.Puppygirl.ctrl.gearAds.Zarook.slots.earring1;
+  await p.bots.Puppygirl.api.send_cm("Zarook", {
+    gear_plan: 1,
+    v: 2,
+    tx: "send-race",
+    plan_revision: 1,
+    expires_at: p.world.clock.now() + 10000,
+    outgoing: [{ index: 0, from: "Zarook", to: "Jazwyn", item: ref, toSlot: "earring1" }],
+    incoming: [],
+  });
+  await Promise.resolve();
+  const originalSend = zApi.send_item.bind(zApi);
+  let release;
+  let calls = 0;
+  zApi.send_item = (to, index, q) => {
+    calls++;
+    return new Promise((resolve) => {
+      release = () => originalSend(to, index, q).then(resolve);
+    });
+  };
+  const command = { gear_transfer: 1, v: 2, tx: "send-race", index: 0 };
+  await p.bots.Puppygirl.api.send_cm("Zarook", command);
+  await p.bots.Puppygirl.api.send_cm("Zarook", command);
+  assert.strictEqual(calls, 1);
+  release();
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.strictEqual(
+    zApi.log.sent.filter((x) => x.name === "Jazwyn" && x.item === "strearring").length,
+    1
+  );
+});
+
+test("expired prepared transaction releases and re-equips reserved gear", async () => {
+  const p = bootParty({ pack: "bat" });
+  const api = p.bots.Jazwyn.api;
+  api.character.slots.earring1 = { name: "intearring", level: 2 };
+  p.world.advance(20000);
+  await p.tickAll();
+  const ref = p.bots.Puppygirl.ctrl.gearAds.Jazwyn.slots.earring1;
+  await p.bots.Puppygirl.api.send_cm("Jazwyn", {
+    gear_plan: 1,
+    v: 2,
+    tx: "lost-finish",
+    plan_revision: 1,
+    expires_at: p.world.clock.now() + 1000,
+    outgoing: [{ index: 0, from: "Jazwyn", to: "Zarook", item: ref, toSlot: "earring1" }],
+    incoming: [],
+  });
+  await Promise.resolve();
+  assert.ok(p.bots.Jazwyn.ctrl.gearTxn);
+  p.world.advance(7000);
+  await p.bots.Jazwyn.ctrl.tick();
+  assert.strictEqual(p.bots.Jazwyn.ctrl.gearTxn, null);
+  assert.ok(
+    [api.character.slots.earring1, api.character.slots.earring2].some(
+      (x) => x && x.name === "intearring" && (x.level || 0) === 2
+    )
   );
 });
 

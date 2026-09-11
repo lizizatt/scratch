@@ -49,7 +49,15 @@ function compactGearItem(it) {
 }
 
 function itemFingerprint(it) {
-  return JSON.stringify(compactGearItem(it));
+  if (!it) return "null";
+  const stable = {
+    name: it.name,
+    level: it.level || 0,
+    p: it.p == null ? null : it.p,
+    stat_type: it.stat_type == null ? null : it.stat_type,
+    l: it.l ? 1 : 0,
+  };
+  return JSON.stringify(stable);
 }
 
 function shortHash(s) {
@@ -66,6 +74,7 @@ function observedItem(it, where, revision) {
     uid: revision + ":" + where + ":" + shortHash(fingerprint),
     where,
     fingerprint,
+    observed_revision: revision,
   });
 }
 
@@ -110,7 +119,9 @@ function makeInventorySnapshot(api, revision, reservations) {
     ctype: api.character.ctype,
     slots,
     bag,
-    reservations: Object.keys(reservations || {}),
+    reservations: Object.keys(reservations || {})
+      .map((id) => reservations[id] && reservations[id].fingerprint)
+      .filter(Boolean),
   };
 }
 
@@ -159,7 +170,7 @@ function planGroup(ads, G, group) {
     for (const slot of group) {
       slots.push({ who, slot, ctype: ad.ctype });
       const it = ad.slots[slot];
-      if (it && !it.l && (ad.reservations || []).indexOf(it.uid) < 0) {
+      if (it && !it.l && (ad.reservations || []).indexOf(it.fingerprint) < 0) {
         items.push({ owner: who, sourceSlot: slot, ref: it });
       }
     }
