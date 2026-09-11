@@ -1422,7 +1422,11 @@ function bootMerchant(api, opts) {
     const reserveStable = stallBagStable();
     let cand = stallCandidate((api.character.esize || 0) < 1, reserveStable);
     if (!cand) return false;
-    if (!(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
+    // A full bag is the capacity emergency the listing is meant to resolve.
+    // If the item is already in hand on main, list in place rather than letting
+    // a transient plaza path failure deadlock every other cleanup operation.
+    const listInPlace = cand.i != null && (api.character.esize || 0) < 1 && api.character.map === "main";
+    if (!listInPlace && !(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
     if (!api.character.stand) {
       api.open_stand();
       if (typeof api.sleep === "function") await api.sleep(150);
