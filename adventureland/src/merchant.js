@@ -762,12 +762,14 @@ function bootMerchant(api, opts) {
    * all-or-nothing before the first exchange, then restart-safe by ownership:
    * already-owned target pieces are never purchased again.
    */
-  async function startHunterPlan() {
-    if (busy) return { failed: true, reason: "busy" };
-    if (store.active || store.q.length || store.gearTx) {
-      return { failed: true, reason: "logistics_busy" };
+  async function startHunterPlan(fromTick) {
+    if (!fromTick && (busy || store.active || store.q.length || store.gearTx)) {
+      if (!store.hunterRequested) api.game_log("hunter:requested");
+      store.hunterRequested = 1;
+      saveQ(store);
+      return { success: true, requested: true };
     }
-    busy = true;
+    if (!fromTick) busy = true;
     hunterPreparing = true;
     try {
       const now = api._now ? api._now() : Date.now();
@@ -878,7 +880,7 @@ function bootMerchant(api, opts) {
       return { success: true, queued, spent: cost, tokens: bagQuantity("monstertoken") };
     } finally {
       hunterPreparing = false;
-      busy = false;
+      if (!fromTick) busy = false;
     }
   }
 
@@ -2472,6 +2474,25 @@ function bootMerchant(api, opts) {
         return;
       }
       await maybeUsePots(api);
+      if (
+        store.hunterRequested &&
+        !store.active &&
+        !store.q.length &&
+        !store.gearTx &&
+        api._now() >= (store.hunterRetryAt || 0)
+      ) {
+        const result = await startHunterPlan(true);
+        if (
+          result.success ||
+          ["tokens", "catalog", "wrong_owner", "no_space"].indexOf(result.reason) >= 0
+        ) {
+          store.hunterRequested = null;
+        } else {
+          store.hunterRetryAt = api._now() + 5000;
+        }
+        saveQ(store);
+        return;
+      }
       const gearActive = await tickPeerGearTx(api._now());
       if (gearActive && !store.active && !store.q.length) return;
       // Snapshot vault before any stall/park so live-blind main can see sell junk.

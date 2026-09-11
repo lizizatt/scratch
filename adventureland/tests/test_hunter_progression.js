@@ -49,6 +49,25 @@ test("Hunter plan verifies all 60 tokens before buying and queues exact class de
     assert.strictEqual(p.bots.Puppygirl.api.log.exchanged.length, 7);
     assert.strictEqual(p.bots.Puppygirl.ctrl.store.q.length, 7);
   });
+
+  test("Hunter operator request waits for existing logistics instead of being lost", async () => {
+    const p = bootParty({ pack: "bat" });
+    seedBagTokens(p, 60);
+    await advertise(p);
+    p.bots.Puppygirl.ctrl.enqueue({
+      id: "existing",
+      kind: "meet_home",
+      who: "party",
+    });
+
+    const requested = await p.bots.Puppygirl.ctrl.startHunterPlan();
+    assert.deepStrictEqual(requested, { success: true, requested: true });
+    assert.strictEqual(p.bots.Puppygirl.ctrl.store.hunterRequested, 1);
+    p.bots.Puppygirl.ctrl.store.q = [];
+    await p.bots.Puppygirl.ctrl.tick();
+    assert.strictEqual(p.bots.Puppygirl.ctrl.store.hunterRequested, null);
+    assert.strictEqual(p.bots.Puppygirl.ctrl.store.q.length, 7);
+  });
   seedBagTokens(p, 41);
   await advertise(p);
 
