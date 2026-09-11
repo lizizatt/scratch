@@ -175,6 +175,65 @@ test("live runtime: v2_start_fighter clears prior interval on reload", () => {
   assert.strictEqual(r.activeCount, 1);
 });
 
+test("live runtime: busy fighter tick still respawns after dying during movement", async () => {
+  const root = path.join(__dirname, "..");
+  let intervalFn = null;
+  let respawnCalls = 0;
+  const character = { name: "Sarene", rip: false };
+  const sandbox = {
+    console,
+    Date,
+    Math,
+    JSON,
+    Promise,
+    globalThis: {},
+    character,
+    game_log() {},
+    createAlApi() {
+      return { character };
+    },
+    bootFighter() {
+      return {
+        tick() {
+          return new Promise(() => {});
+        },
+        respawnIfDead() {
+          respawnCalls++;
+          character.rip = false;
+          return Promise.resolve(true);
+        },
+        isLead() {
+          return false;
+        },
+      };
+    },
+    FIGHTERS: ["Jazwyn", "Sarene", "Zarook"],
+    loot() {},
+    get_party() {
+      return {};
+    },
+    send_party_invite() {},
+    setInterval(fn) {
+      intervalFn = fn;
+      return 1;
+    },
+    clearInterval() {},
+  };
+  vm.createContext(sandbox);
+  const src = fs.readFileSync(path.join(root, "src", "live_fighter_runtime.js"), "utf8");
+  vm.runInContext(src, sandbox);
+
+  sandbox.v2_start_fighter();
+  intervalFn();
+  character.rip = true;
+  intervalFn();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.strictEqual(respawnCalls, 1);
+  assert.strictEqual(character.rip, false);
+});
+
 test("dist: v2_fighter includes single-flight tick guard", () => {
   const root = path.join(__dirname, "..");
   const { buildAll } = require("../tools/compress_code");

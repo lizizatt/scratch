@@ -33,8 +33,23 @@ function v2_start_fighter(opts) {
   } catch (e) {}
 
   let tickBusy = false;
+  let emergencyRespawn = null;
   const iv = setInterval(function () {
-    if (tickBusy) return;
+    if (tickBusy) {
+      try {
+        if (character.rip && !emergencyRespawn && ctrl.respawnIfDead) {
+          emergencyRespawn = Promise.resolve(ctrl.respawnIfDead())
+            .catch(function (e) {
+              const msg = e && e.message ? e.message : e && e.reason ? e.reason : e;
+              game_log("respawn:" + (typeof msg === "string" ? msg : JSON.stringify(msg)));
+            })
+            .finally(function () {
+              emergencyRespawn = null;
+            });
+        }
+      } catch (e) {}
+      return;
+    }
     tickBusy = true;
     try {
       try {

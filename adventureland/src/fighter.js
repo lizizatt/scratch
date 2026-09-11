@@ -82,6 +82,7 @@ function bootFighter(api, opts) {
   let inventoryRevision = 0;
   let lastInventoryDigest = "";
   let gearTxn = null;
+  let respawnBusy = false;
   // equipPending's live "Wrong weapon" rejection memo — persists across ticks
   // so a class-illegal / 2H-conflicted item isn't re-attempted every tick.
   const equipRejectMemo = {};
@@ -1073,6 +1074,7 @@ function bootFighter(api, opts) {
       mhuntDeathForId = h.id;
       mhuntDeaths = 0;
     }
+
     mhuntDeaths += 1;
     api.game_log("mhunt:death id=" + h.id + " n=" + mhuntDeaths + "/" + MHUNT_DEATH_LIMIT);
     if (mhuntDeaths >= MHUNT_DEATH_LIMIT) {
@@ -1082,6 +1084,23 @@ function bootFighter(api, opts) {
       state.setIntent({ kind: "farm", mtype: defaultFarm, hold: 0 }, present);
       api.game_log("mhunt:soft_abandon id=" + h.id + " farm=" + defaultFarm);
       api.set_message("HQ skip " + h.id);
+    }
+  }
+
+  async function respawnIfDead() {
+    if (!api.character.rip || respawnBusy) return false;
+    respawnBusy = true;
+    api.game_log("rip:respawn");
+    noteHuntQuestDeath();
+    try {
+      if (typeof api.respawn === "function") await api.respawn();
+      persist();
+      return true;
+    } catch (e) {
+      api.game_log("rip:respawn_fail " + ((e && e.message) || e));
+      return false;
+    } finally {
+      respawnBusy = false;
     }
   }
 
@@ -1410,13 +1429,8 @@ function bootFighter(api, opts) {
       }
     }
     if (api.character.rip) {
-      api.game_log("rip:respawn");
-      noteHuntQuestDeath();
-      try {
-        if (typeof api.respawn === "function") await api.respawn();
-      } catch (e) {}
+      await respawnIfDead();
       await api.sleep(1000);
-      persist();
       return;
     }
     await maybeUsePots(api);
@@ -1492,6 +1506,7 @@ function bootFighter(api, opts) {
     hopPrep,
     persist,
     freeBagSlot,
+    respawnIfDead,
     applyCmd: (c) => applyCmd(c, true),
     setHuntQuest(v) {
       huntQuest = !!v;
