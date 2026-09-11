@@ -41,6 +41,7 @@ const SLOTS = [
       "src/potions.js",
       "src/packs.js",
       "src/gear.js",
+      "src/gear_coordination.js",
       "src/monsterhunt.js",
       "src/chat_queue.js",
       "src/party_state.js",

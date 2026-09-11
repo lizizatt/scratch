@@ -46,6 +46,7 @@ const {
   meetTransitBlockerFilter,
 } = require("./merchant_meet");
 const { packCenter } = require("./packs");
+const { cmSender, isFighterName } = require("./gear_coordination");
 
 /**
  * Merchant logistics under Jazwyn command.
@@ -304,13 +305,24 @@ function bootMerchant(api, opts) {
   async function hearCm(m) {
     const d = m.message;
     if (!d || typeof d !== "object") return;
+    const sender = cmSender(m);
+    if (!isFighterName(sender)) return;
     if (d.gear_ad && d.name) {
+      if (d.name !== sender) return;
+      const prev = gearAds[d.name];
+      if (
+        d.revision != null &&
+        prev &&
+        prev.revision != null &&
+        Number(d.revision) < Number(prev.revision)
+      )
+        return;
       d._t = api._now ? api._now() : Date.now();
       gearAds[d.name] = d;
       return;
     }
     if (d.gear_got) {
-      api.game_log("gear_got from=" + (m.name || "?") + " ok=" + (d.ok ? 1 : 0));
+      api.game_log("gear_got from=" + sender + " ok=" + (d.ok ? 1 : 0));
       return;
     }
     if (d.dlv_loot_done) {
@@ -318,6 +330,7 @@ function bootMerchant(api, opts) {
       return;
     }
     if (d.job === "cancel_all") {
+      if (d.who && d.who !== sender) return;
       store.q = store.q.filter((j) => j.who !== d.who && j.id !== d.id);
       if (store.active && (store.active.who === d.who || store.active.id === d.id)) store.active = null;
       saveQ(store);
@@ -325,6 +338,7 @@ function bootMerchant(api, opts) {
       return;
     }
     if (d.job === "dlv_pots" || d.job === "dlv_gear") {
+      if (d.who !== sender) return;
       const farm = meetFarmAt(d.farm, d.map, d.x, d.y);
       if (farm && d.farm && farm !== d.farm) {
         api.game_log("dlv:retarget " + d.farm + "->" + farm);
@@ -349,7 +363,7 @@ function bootMerchant(api, opts) {
     if (d.dlv_loc && d.id) {
       const jobs = (store.active ? [store.active] : []).concat(store.q);
       const job = jobs.find((j) => j.id === d.id);
-      if (!job || (m.name || m.from) !== job.who) return;
+      if (!job || sender !== job.who) return;
       const oldFarm = job.farm;
       const oldMap = job.map;
       const oldX = job.x;

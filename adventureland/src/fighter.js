@@ -28,7 +28,12 @@ const { createPartyState, countPots, potBucket } = require("./party_state");
 const { createMotion } = require("./motion");
 const { maybeUsePots } = require("./potions");
 const { packCenter } = require("./packs");
-const { equipPending, isKeep, wornSnapshot, markGift, classOk, canEquipSlot } = require("./gear");
+const { equipPending, isKeep, markGift, classOk, canEquipSlot } = require("./gear");
+const {
+  inventoryDigest,
+  makeInventorySnapshot,
+  isMerchantMessage,
+} = require("./gear_coordination");
 const {
   DAISY,
   getHunt,
@@ -70,6 +75,9 @@ function bootFighter(api, opts) {
   /** Intent snapshot taken when entering rare — restored on rare_kill/gone/timeout. */
   let preRareSnap = null;
   const giftTtl = {};
+  const gearReservations = {};
+  let inventoryRevision = 0;
+  let lastInventoryDigest = "";
   // equipPending's live "Wrong weapon" rejection memo — persists across ticks
   // so a class-illegal / 2H-conflicted item isn't re-attempted every tick.
   const equipRejectMemo = {};
@@ -123,6 +131,8 @@ function bootFighter(api, opts) {
           mhuntDeaths: mhuntDeaths,
           mhuntDeathForId: mhuntDeathForId,
           mhuntSoftSkipId: mhuntSoftSkipId,
+          inventoryRevision,
+          gearReservations,
         })
       );
     } catch (e) {}
@@ -148,6 +158,9 @@ function bootFighter(api, opts) {
       if (d.mhuntDeaths != null) mhuntDeaths = d.mhuntDeaths | 0;
       if (d.mhuntDeathForId) mhuntDeathForId = d.mhuntDeathForId;
       if (d.mhuntSoftSkipId) mhuntSoftSkipId = d.mhuntSoftSkipId;
+      if (d.inventoryRevision != null) inventoryRevision = d.inventoryRevision | 0;
+      if (d.gearReservations && typeof d.gearReservations === "object")
+        Object.assign(gearReservations, d.gearReservations);
     } catch (e) {}
   }
 
@@ -273,14 +286,14 @@ function bootFighter(api, opts) {
   }
 
   function sendGearAd() {
-    const snap = wornSnapshot(api);
-    api.send_cm(MERCHANT, {
-      gear_ad: 1,
-      name,
-      esize: snap.esize,
-      ctype: snap.ctype,
-      slots: snap.slots,
-    });
+    const digest = inventoryDigest(api);
+    if (digest !== lastInventoryDigest) {
+      inventoryRevision += 1;
+      lastInventoryDigest = digest;
+      persist();
+    }
+    const snap = makeInventorySnapshot(api, inventoryRevision, gearReservations);
+    api.send_cm(MERCHANT, Object.assign({ gear_ad: 1, name }, snap));
     lastGearAd = api._now();
     api.game_log("gear_ad");
   }
@@ -629,6 +642,7 @@ function bootFighter(api, opts) {
   async function hearCm(m) {
     const d = m.message;
     if (!d || typeof d !== "object") return;
+    if (!isMerchantMessage(m)) return;
     // Merchant console → CM (Puppygirl hunt/world/hold/hunt_quest)
     if (d.hunt) applyCmd({ type: "cmd", cmd: "hunt", args: ["" + d.hunt] }, isLead());
     if (d.grind) applyCmd({ type: "cmd", cmd: "grind", args: [] }, isLead());
