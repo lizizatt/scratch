@@ -1396,7 +1396,7 @@ function bootMerchant(api, opts) {
       if (rule.keep > 0 && !reserveStable) continue;
       if (!stallReserveReady(rule)) continue;
       let choices = stallCopies(rule);
-      if (preferBag && choices.some((x) => x.i != null)) choices = choices.filter((x) => x.i != null);
+      if (preferBag) choices = choices.filter((x) => x.i != null);
       choices.sort((a, b) => a.level - b.level || (a.i == null ? 1 : -1));
       if (choices.length) return choices[0];
     }

@@ -65,12 +65,13 @@ test("adversary: full bag lists surplus before exchanging a stacked box", async 
   c.items[1] = { name: "hpot1", q: 200 };
   c.items[2] = { name: "mpot1", q: 200 };
   c.items[3] = { name: "armorbox", q: 4 };
-  c.items[4] = { name: "dagger", level: 0 };
+  c.items[4] = { name: "t2bow", level: 0 };
   c.esize = 0;
   c.map = "main";
   c.real_x = c.x = 40;
   c.real_y = c.y = 800;
   c._bank = { gold: 0, items0: new Array(42).fill({ name: "cake", q: 1 }) };
+  c._bank.items0[0] = { name: "dagger", level: 0 };
   api._injectSmartFail("fail");
 
   for (let i = 0; i < 300; i++) {
@@ -80,10 +81,10 @@ test("adversary: full bag lists surplus before exchanging a stacked box", async 
 
   const msgs = api.log.game.map((g) => g.m);
   assert.ok(msgs.some((m) => m === "xyn:no_space armorbox"), "full stacked exchange is deferred");
-  assert.ok(msgs.some((m) => /^stall:list dagger@0/.test(m)), "stall frees the output slot");
+  assert.ok(msgs.some((m) => /^stall:list t2bow@0/.test(m)), "bag item wins over earlier bank candidate");
   assert.ok(!msgs.some((m) => m === "stall:path_fail"), "full-bag listing does not depend on plaza pathing");
   assert.ok(
-    api.log.game.find((g) => /^stall:list dagger@0/.test(g.m)).t < 3000,
+    api.log.game.find((g) => /^stall:list t2bow@0/.test(g.m)).t < 3000,
     "zero-reserve surplus must not wait on the reserve stability gate"
   );
   assert.ok(msgs.some((m) => m === "xyn:exchange armorbox"), "exchange succeeds after space is freed");
