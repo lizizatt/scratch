@@ -609,6 +609,14 @@ function bootMerchant(api, opts) {
       if (bagParkables(keep, { skipUpgrades: false }).length >= before) break;
     }
     if ((api.character.esize || 0) < need) {
+      try {
+        await tryVendorNpc();
+        if ((api.character.esize || 0) < need) await tryStallOne();
+      } catch (e) {
+        api.game_log("dlv:space_err " + ((e && e.message) || e));
+      }
+    }
+    if ((api.character.esize || 0) < need) {
       api.game_log("dlv:need_space esize=" + (api.character.esize || 0));
       return false;
     }

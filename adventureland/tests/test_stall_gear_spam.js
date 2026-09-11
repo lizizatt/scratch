@@ -217,6 +217,41 @@ test("adversary: full bag lists an eligible bag copy before a weaker bank copy",
   assert.strictEqual(listed.level, 5);
 });
 
+test("adversary: active delivery liquidates junk to create take-back capacity", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 400, gold: 500000, members: ["Sarene", "Puppygirl"] });
+  const ctrl = p.bots.Puppygirl.ctrl;
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = { name: "cake" };
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 400 };
+  c.items[2] = { name: "mpot1", q: 400 };
+  c.items[3] = { name: "wattire", level: 0 };
+  c.items[4] = null;
+  c.items[5] = null;
+  c.esize = 2;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c._bank = { gold: 0, items0: new Array(42).fill({ name: "cake" }) };
+  ctrl.store.active = {
+    id: "space_recovery",
+    kind: "dlv_pots",
+    who: "Sarene",
+    bought: 1,
+    t0: p.world.clock.now(),
+    items: [{ name: "hpot1", q: 200 }, { name: "mpot1", q: 200 }],
+  };
+
+  for (let i = 0; i < 100; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => /^vendor:sell wattire/.test(g.m))) break;
+  }
+
+  assert.ok(api.log.game.some((g) => /^vendor:sell wattire/.test(g.m)), "active delivery frees a slot");
+  assert.ok(c.esize >= 3, "take-back capacity restored");
+});
+
 module.exports = { tests };
 
 if (require.main === module) {
