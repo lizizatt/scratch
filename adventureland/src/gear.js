@@ -55,6 +55,9 @@ const SCORE_WEIGHTS = {
     dreturn: 12,
     str: 10,
     armor: 6,
+    crit: 4,
+    apiercing: 0.1,
+    speed: 1,
     attack: 3,
     resistance: 2,
     vit: 1,
@@ -65,6 +68,10 @@ const SCORE_WEIGHTS = {
   },
   mage: {
     int: 12,
+    crit: 4,
+    rpiercing: 0.1,
+    speed: 1,
+    output: 2,
     attack: 3,
     resistance: 3,
     armor: 1,
@@ -79,6 +86,10 @@ const SCORE_WEIGHTS = {
   priest: {
     int: 12,
     vit: 3,
+    crit: 2,
+    rpiercing: 0.05,
+    speed: 1,
+    output: 1,
     attack: 2,
     resistance: 3,
     armor: 1,
@@ -140,7 +151,11 @@ function score(it, G, ctype) {
     "attack",
     "resistance",
     "hp",
-    "stat",
+    "crit",
+    "apiercing",
+    "rpiercing",
+    "speed",
+    "output",
   ];
   let total = 0;
   for (const k of keys) {
@@ -148,10 +163,45 @@ function score(it, G, ctype) {
     if (!wt) continue;
     total += scaledStat(g, it, k) * wt;
   }
+  const generic = scaledStat(g, it, "stat");
+  const statType =
+    it.stat_type ||
+    (G && G.classes && G.classes[c] && G.classes[c].main_stat) ||
+    "stat";
+  total += generic * (statType && w[statType] != null ? w[statType] : w.stat || 0);
   // Tiny level bias so same-name +1 wins ties when defs lack upgrade growth.
   total += lv * 0.5;
   // Avoid zero for unknown misc that still occupies a slot.
   if (!(total > 0) && !g.sell) total = 0.1 + lv * 0.05;
+  return total;
+}
+
+function setBonusScore(slots, G, ctype) {
+  const counts = {};
+  for (const slot of Object.keys(slots || {})) {
+    const it = slots[slot];
+    const set = it && itemDef(G, it.name).set;
+    if (set) counts[set] = (counts[set] || 0) + 1;
+  }
+  const w = SCORE_WEIGHTS[ctype] || SCORE_WEIGHTS.warrior;
+  let total = 0;
+  for (const set of Object.keys(counts)) {
+    const def = G && G.sets && G.sets[set];
+    if (!def) continue;
+    for (let n = 1; n <= counts[set]; n++) {
+      const bonus = def[n] || def["" + n];
+      if (!bonus) continue;
+      for (const key of Object.keys(bonus)) {
+        if (w[key]) total += Number(bonus[key] || 0) * w[key];
+      }
+    }
+  }
+  return total;
+}
+
+function loadoutScore(slots, G, ctype) {
+  let total = setBonusScore(slots, G, ctype);
+  for (const slot of Object.keys(slots || {})) total += score(slots[slot], G, ctype);
   return total;
 }
 
@@ -179,6 +229,7 @@ function classOk(it, ctype, G) {
   const g = itemDef(G, it.name);
   const c = ctype || "warrior";
   const t = g.type;
+  if (Array.isArray(g.class) && g.class.indexOf(c) < 0) return false;
   if (t === "tool") return false;
   if (t === "shield") return c === "warrior";
   if (t === "source") return c === "mage" || c === "priest";
@@ -271,13 +322,17 @@ function pickBestSlot(api, it, G) {
   const ctype = api.character.ctype;
   if (!classOk(it, ctype, G)) return null;
   const slots = candidateSlots(it, G);
-  const sc = score(it, G, ctype);
+  const worn = (api.character && api.character.slots) || {};
+  const before = loadoutScore(worn, G, ctype);
   let best = null;
   for (const s of slots) {
     if (!canEquipSlot(api, it, s, G)) continue;
-    const worn = api.character.slots[s];
-    const sw = score(worn, G, ctype);
-    if (sc > sw && (!best || sw < best.sw)) best = { slot: s, sw };
+    const next = Object.assign({}, worn, { [s]: it });
+    const gain = loadoutScore(next, G, ctype) - before;
+    const sw = score(worn[s], G, ctype);
+    if (gain > 0.001 && (!best || gain > best.gain || (gain === best.gain && sw < best.sw))) {
+      best = { slot: s, sw, gain };
+    }
   }
   return best;
 }
@@ -388,9 +443,10 @@ function planGifts(bankItems, ads, G) {
     if (!ad || !ad.slots) continue;
     if (ad.esize != null && ad.esize < 1) continue;
     const ctype = ad.ctype || "warrior";
+    const plannedSlots = Object.assign({}, ad.slots);
     for (const slot of Object.keys(ad.slots)) {
-      const worn = ad.slots[slot];
-      const wc = worn ? score(worn, G, ctype) : 0;
+      const worn = plannedSlots[slot];
+      const before = loadoutScore(plannedSlots, G, ctype);
       const prefer = targetNameFor(who, slot);
       let best = null;
       for (let j = 0; j < (bankItems || []).length; j++) {
@@ -399,8 +455,9 @@ function planGifts(bankItems, ads, G) {
         const it = { name: e.name, level: e.level || 0 };
         if (!classOk(it, ctype, G)) continue;
         if (candidateSlots(it, G).indexOf(slot) < 0) continue;
-        const sc = score(it, G, ctype);
-        if (!(sc > wc)) continue;
+        const next = Object.assign({}, plannedSlots, { [slot]: it });
+        const sc = loadoutScore(next, G, ctype) - before;
+        if (!(sc > 0.001)) continue;
         // Prefer named target over higher-score wrong accessory (e.g. vitearring on mage).
         const preferHit = prefer && it.name === prefer ? 1 : 0;
         const bestPref = best && prefer && best.it.name === prefer ? 1 : 0;
@@ -423,6 +480,7 @@ function planGifts(bankItems, ads, G) {
       if (best) {
         used[best.idx] = 1;
         out.push(best);
+        plannedSlots[slot] = best.it;
       }
     }
   }
@@ -510,6 +568,8 @@ function planVendorBuy(ads, owned, G) {
 
 module.exports = {
   score,
+  setBonusScore,
+  loadoutScore,
   SCORE_WEIGHTS,
   scaledStat,
   candidateSlots,

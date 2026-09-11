@@ -19,6 +19,7 @@ const {
   PONTY_MULT,
   CRAFT_TARGETS,
   GEAR_AD_MS,
+  HUNTER_PLAN,
 } = require("./constants");
 const { maybeUsePots } = require("./potions");
 const {
@@ -31,6 +32,7 @@ const {
   upgradeChance,
   planVendorBuy,
   eligibleUpgrade,
+  candidateSlots,
 } = require("./gear");
 const { planCompounds, cscrollFor } = require("./bank_clean_plan");
 const {
@@ -60,6 +62,7 @@ const {
  */
 function bootMerchant(api, opts) {
   opts = opts || {};
+  if (!api._now) api._now = () => (opts.now ? opts.now() : Date.now());
   const name = api.character.name;
   const QK = "dlv_q_" + name;
 
@@ -83,6 +86,7 @@ function bootMerchant(api, opts) {
     saveQ(store);
   }
   let busy = false;
+  let hunterPreparing = false;
   const gearAds = {};
   let gearAdSeq = 0;
   let giftBusy = false;
@@ -161,6 +165,7 @@ function bootMerchant(api, opts) {
   }
 
   function enqueue(job) {
+    if (hunterPreparing && !job.hunter) return false;
     if (store.q.length >= 8) {
       api.game_log("dlv:queue_full");
       return false;
@@ -669,6 +674,212 @@ function bootMerchant(api, opts) {
       out.push({ name: it.name, level: it.level || 0, pack: "bag", i, q: it.q });
     }
     return out.concat(listBankItems());
+  }
+
+  function bagQuantity(itemName) {
+    let n = 0;
+    for (const it of api.character.items || []) {
+      if (it && it.name === itemName) n += it.q == null ? 1 : it.q;
+    }
+    return n;
+  }
+
+  function bankQuantity(itemName) {
+    return listBankItems()
+      .filter((x) => x.name === itemName)
+      .reduce((n, x) => n + (x.q == null ? 1 : x.q), 0);
+  }
+
+  function adHasItem(ad, itemName) {
+    if (!ad) return false;
+    for (const slot of Object.keys(ad.slots || {})) {
+      if (ad.slots[slot] && ad.slots[slot].name === itemName) return true;
+    }
+    return (ad.bag || []).some((x) => x && x.name === itemName);
+  }
+
+  function merchantOwned(itemName) {
+    const bag = (api.character.items || []).find((x) => x && x.name === itemName);
+    if (bag) return { name: itemName, level: bag.level || 0 };
+    const bank = listBankItems().find((x) => x.name === itemName);
+    return bank ? { name: itemName, level: bank.level || 0 } : null;
+  }
+
+  function validateHunterPlan() {
+    const tokens = api.G && api.G.tokens && api.G.tokens.monstertoken;
+    for (const step of HUNTER_PLAN || []) {
+      const def = api.G && api.G.items && api.G.items[step.name];
+      const ctype = gearAds[step.who] && gearAds[step.who].ctype;
+      if (
+        !def ||
+        !tokens ||
+        Number(tokens[step.name]) !== step.cost ||
+        !Array.isArray(def.class) ||
+        def.class.indexOf(ctype) < 0 ||
+        candidateSlots({ name: step.name }, api.G).indexOf(step.slot) < 0
+      ) {
+        return { failed: true, reason: "catalog", item: step.name };
+      }
+    }
+    return { success: true };
+  }
+
+  async function prepareTokenStack(need) {
+    let bankTokens = listBankItems().filter((x) => x.name === "monstertoken");
+    let anchor = bankTokens.sort((a, b) => (b.q || 1) - (a.q || 1))[0];
+    if (!anchor) {
+      const first = (api.character.items || []).findIndex(
+        (x) => x && x.name === "monstertoken"
+      );
+      if (first < 0) return false;
+      const r = await storeBagItemToBank(first);
+      if (r && r.failed) return false;
+      snapBank();
+      bankTokens = listBankItems().filter((x) => x.name === "monstertoken");
+      anchor = bankTokens[0];
+    }
+    for (let i = 0; i < (api.character.items || []).length; i++) {
+      const it = api.character.items[i];
+      if (!it || it.name !== "monstertoken") continue;
+      const r = await api.bank_store(i, anchor.pack);
+      if (r && r.failed) return false;
+      snapBank();
+    }
+    bankTokens = listBankItems()
+      .filter((x) => x.name === "monstertoken")
+      .sort((a, b) => (b.q || 1) - (a.q || 1));
+    const stack = bankTokens.find((x) => (x.q == null ? 1 : x.q) >= need);
+    if (!stack || (api.character.esize || 0) < 1) return false;
+    const r = await api.bank_retrieve(stack.pack, stack.i);
+    if (r && r.failed) return false;
+    return (api.character.items || []).some(
+      (x) => x && x.name === "monstertoken" && (x.q == null ? 1 : x.q) >= need
+    );
+  }
+
+  /**
+   * Explicit operator action for the reviewed 60-token tranche. It is
+   * all-or-nothing before the first exchange, then restart-safe by ownership:
+   * already-owned target pieces are never purchased again.
+   */
+  async function startHunterPlan() {
+    if (busy) return { failed: true, reason: "busy" };
+    if (store.active || store.q.length || store.gearTx) {
+      return { failed: true, reason: "logistics_busy" };
+    }
+    busy = true;
+    hunterPreparing = true;
+    try {
+      const now = api._now ? api._now() : Date.now();
+      for (const who of FIGHTERS) {
+        if (!gearAdFresh(gearAds[who], now)) {
+          api.game_log("hunter:blocked stale_ad " + who);
+          return { failed: true, reason: "stale_ad", who };
+        }
+      }
+      const valid = validateHunterPlan();
+      if (valid.failed) {
+        api.game_log("hunter:blocked catalog " + valid.item);
+        return valid;
+      }
+      for (const step of HUNTER_PLAN) {
+        for (const who of FIGHTERS) {
+          if (who !== step.who && adHasItem(gearAds[who], step.name)) {
+            api.game_log("hunter:blocked wrong_owner " + step.name + " " + who);
+            return { failed: true, reason: "wrong_owner", item: step.name, who };
+          }
+        }
+      }
+
+      closeStandIfOpen();
+      if (!(await ensureAtBank())) return { failed: true, reason: "bank" };
+      snapBank();
+      const missing = HUNTER_PLAN.filter(
+        (step) => !adHasItem(gearAds[step.who], step.name) && !merchantOwned(step.name)
+      );
+      const cost = missing.reduce((n, step) => n + step.cost, 0);
+      const tokens = bagQuantity("monstertoken") + bankQuantity("monstertoken");
+      api.game_log("hunter:verify tokens=" + tokens + " cost=" + cost + " missing=" + missing.length);
+      if (tokens < cost) {
+        await leaveBankToPlaza();
+        return { failed: true, reason: "tokens", have: tokens, need: cost };
+      }
+      if (cost > 0 && !(await prepareTokenStack(cost))) {
+        await leaveBankToPlaza();
+        return { failed: true, reason: "token_pull" };
+      }
+      if ((api.character.esize || 0) < missing.length) {
+        api.game_log("hunter:blocked no_space need=" + missing.length);
+        await leaveBankToPlaza();
+        return { failed: true, reason: "no_space", need: missing.length };
+      }
+      await leaveBankToPlaza();
+      if (missing.length) {
+        if (!(await goNpc({ to: "monsterhunter" }, { map: "main", x: 126, y: -413 }, "hunter:path_fail"))) {
+          return { failed: true, reason: "path" };
+        }
+      }
+      for (const step of missing) {
+        const beforeItem = bagQuantity(step.name);
+        const beforeTokens = bagQuantity("monstertoken");
+        let r = await api.exchange_buy("monstertoken", step.name);
+        const waitUntil = (api._now ? api._now() : Date.now()) + 5000;
+        while (
+          (bagQuantity(step.name) <= beforeItem ||
+            bagQuantity("monstertoken") !== beforeTokens - step.cost) &&
+          (api._now ? api._now() : Date.now()) < waitUntil
+        ) {
+          if (typeof api.sleep !== "function") break;
+          await api.sleep(250);
+        }
+        if (r && r.failed && bagQuantity(step.name) <= beforeItem) {
+          api.game_log("hunter:buy_fail " + step.name + " " + (r.reason || ""));
+          return { failed: true, reason: "buy", item: step.name };
+        }
+        if (
+          bagQuantity(step.name) <= beforeItem ||
+          bagQuantity("monstertoken") !== beforeTokens - step.cost
+        ) {
+          api.game_log("hunter:buy_unverified " + step.name);
+          return { failed: true, reason: "buy_unverified", item: step.name };
+        }
+        api.game_log("hunter:buy " + step.name + " cost=" + step.cost);
+      }
+
+      let queued = 0;
+      for (const step of HUNTER_PLAN) {
+        if (adHasItem(gearAds[step.who], step.name)) continue;
+        const owned = merchantOwned(step.name);
+        if (!owned) {
+          api.game_log("hunter:blocked missing " + step.name);
+          return { failed: true, reason: "missing", item: step.name };
+        }
+        const ad = gearAds[step.who];
+        const ok = enqueue({
+          id: "hunter_" + step.name,
+          kind: "dlv_gear",
+          who: step.who,
+          gear: { name: step.name, level: owned.level, slot: step.slot },
+          farm: meetFarmAt(ad.farm, ad.map, ad.x, ad.y) || "bat",
+          map: ad.map,
+          x: ad.x,
+          y: ad.y,
+          serverRegion: ad.server_region,
+          serverIdentifier: ad.server_identifier,
+          items: [],
+          hunter: 1,
+        });
+        if (ok) queued++;
+        else api.game_log("hunter:queue_fail " + step.name);
+      }
+      saveQ(store);
+      api.set_message("Hunter queued");
+      api.game_log("hunter:queued n=" + queued + " spent=" + cost);
+      return { success: true, queued, spent: cost, tokens: bagQuantity("monstertoken") };
+    } finally {
+      hunterPreparing = false;
+      busy = false;
+    }
   }
 
   async function ensureAtBank() {
@@ -1959,6 +2170,18 @@ function bootMerchant(api, opts) {
     }
 
     closeStandIfOpen();
+    if (job.gear) {
+      const hasGear = (api.character.items || []).some(
+        (it) =>
+          it &&
+          it.name === job.gear.name &&
+          (it.level || 0) === (job.gear.level || 0)
+      );
+      if (!hasGear && (await ensureGearInBag(job.gear)) < 0) {
+        await abortDelivery(job, "gear_missing");
+        return;
+      }
+    }
     if (job.kind === "meet_home") {
       const reg = api.parent.server_region;
       const id = api.parent.server_identifier;
@@ -2406,6 +2629,7 @@ function bootMerchant(api, opts) {
     hold,
     resume,
     world,
+    startHunterPlan,
     fighterLead,
     avoidFailPolicy,
     get store() {

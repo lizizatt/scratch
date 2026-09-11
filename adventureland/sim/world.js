@@ -102,6 +102,29 @@ function baseG() {
       pickaxe: { g: 2000, type: "tool", wtype: "pickaxe" },
       rod: { g: 2000, type: "tool", wtype: "rod" },
       monstertoken: { g: 12000, type: "token", npc: "monsterhunter" },
+      mmhat: { class: ["mage"], set: "mmage", type: "helmet", stat: 2, armor: 19, resistance: 22, rpiercing: 40, grades: [0, 7] },
+      mmgloves: { class: ["mage"], set: "mmage", type: "gloves", stat: 2, armor: 22, resistance: 11, grades: [0, 7] },
+      mmpants: { class: ["mage"], set: "mmage", type: "pants", stat: 2, armor: 28, resistance: 17, grades: [0, 7] },
+      mpgloves: { class: ["priest"], set: "mpriest", type: "gloves", stat: 2, armor: 22, resistance: 11, output: 5, grades: [0, 7] },
+      mphat: { class: ["priest"], set: "mpriest", type: "helmet", stat: 2, armor: 19, resistance: 22, grades: [0, 7] },
+      mppants: { class: ["priest"], set: "mpriest", type: "pants", stat: 2, armor: 28, resistance: 17, grades: [0, 7] },
+      mwgloves: { class: ["warrior"], set: "mwarrior", type: "gloves", stat: 2, armor: 23, resistance: 12, crit: 1, grades: [0, 5] },
+    },
+    tokens: {
+      monstertoken: {
+        mmhat: 7,
+        mmgloves: 8,
+        mmpants: 11,
+        mpgloves: 8,
+        mphat: 7,
+        mppants: 11,
+        mwgloves: 8,
+      },
+    },
+    sets: {
+      mmage: { 2: { int: 2 }, 3: { speed: 2, int: 3 } },
+      mpriest: { 2: { int: 3 }, 3: { speed: 2, int: 3 } },
+      mwarrior: { 2: { str: 2 }, 3: { speed: 1, str: 3 } },
     },
     craft: {
       orbg: {
@@ -114,16 +137,19 @@ function baseG() {
     },
     classes: {
       warrior: {
+        main_stat: "str",
         mainhand: { spear: {}, short_sword: {}, sword: {}, fist: {}, mace: {} },
         offhand: { shield: {}, short_sword: {}, sword: {}, misc_offhand: {}, fist: {}, mace: {} },
         doublehand: { rapier: {}, bow: {}, axe: {}, scythe: {}, basher: {}, great_sword: {} },
       },
       mage: {
+        main_stat: "int",
         mainhand: { staff: {}, wblade: {}, wand: {} },
         offhand: { source: {}, misc_offhand: {} },
         doublehand: {},
       },
       priest: {
+        main_stat: "int",
         mainhand: { pmace: {}, staff: {} },
         offhand: { shield: {}, source: {}, misc_offhand: {} },
         doublehand: { wand: {} },

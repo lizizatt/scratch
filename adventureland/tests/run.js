@@ -23,6 +23,7 @@ const suites = [
   require("./test_equip_class"),
   require("./test_gear_score"),
   require("./test_gear_coordination"),
+  require("./test_hunter_progression"),
   require("./test_monsterhunt"),
   require("./test_live_runtime_interval"),
   require("./test_live_warrior_combat"),

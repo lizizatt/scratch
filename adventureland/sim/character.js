@@ -726,6 +726,32 @@ function createCharacter(world, over) {
       return { success: true, name: nm };
     },
 
+    async exchange_buy(token, name) {
+      const npc = NPC.monsterhunt;
+      if (c.map !== npc.map || dist(c, npc) > DAISY_RANGE) {
+        return { failed: true, reason: "distance" };
+      }
+      const cost = world.G.tokens && world.G.tokens[token] && world.G.tokens[token][name];
+      if (!(cost > 0) || !world.G.items[name]) return { failed: true, reason: "invalid" };
+      const ti = c.items.findIndex((x) => x && x.name === token);
+      if (ti < 0 || (c.items[ti].q == null ? 1 : c.items[ti].q) < cost) {
+        return { failed: true, reason: "quantity" };
+      }
+      const out = c.items.findIndex((x) => !x);
+      if (out < 0) return { failed: true, reason: "no_space" };
+      c.items[ti].q -= cost;
+      if (c.items[ti].q <= 0) {
+        c.items[ti] = null;
+        c.esize = (c.esize || 0) + 1;
+      }
+      const slot = c.items.findIndex((x) => !x);
+      c.items[slot] = { name, level: 0 };
+      c.esize = Math.max(0, (c.esize || 1) - 1);
+      log.exchanged.push({ token, name, cost });
+      api.game_log("exchange_buy " + token + " " + name);
+      return { success: true, name };
+    },
+
     async get_secondhands() {
       const npc = NPC.secondhands;
       if (c.map !== npc.map || dist(c, npc) > 40) {

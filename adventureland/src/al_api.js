@@ -50,6 +50,7 @@ function createAlApi() {
     upgrade: typeof upgrade === "function" ? upgrade : async function () {},
     compound: typeof compound === "function" ? compound : async function () {},
     exchange: typeof exchange === "function" ? exchange : async function () {},
+    exchange_buy: typeof exchange_buy === "function" ? exchange_buy : async function () {},
     get_secondhands: typeof get_secondhands === "function" ? get_secondhands : async function () {
       return { success: true, items: [] };
     },
@@ -207,7 +208,8 @@ function createAlApi() {
         // Picking *which* pack has room is the caller's job (merchant.storeBagItemToBank
         // already does that pack-scan) -- this is a thin passthrough, not a second copy
         // of that selection logic.
-        if (pack) return await g.bank_store(i, pack, pack_num == null ? -1 : pack_num);
+        if (pack && pack_num == null) return await g.bank_store(i, pack);
+        if (pack) return await g.bank_store(i, pack, pack_num);
         return await g.bank_store(i);
       } catch (e) {
         return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
@@ -257,6 +259,14 @@ function createAlApi() {
       try {
         if (typeof exchange !== "function") return { failed: true, reason: "no_exchange" };
         return await exchange(item_num);
+      } catch (e) {
+        return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
+      }
+    },
+    async exchange_buy(token, name) {
+      try {
+        if (typeof g.exchange_buy !== "function") return { failed: true, reason: "no_exchange_buy" };
+        return await g.exchange_buy(token, name);
       } catch (e) {
         return { failed: true, reason: (e && e.reason) || (e && e.message) || e };
       }

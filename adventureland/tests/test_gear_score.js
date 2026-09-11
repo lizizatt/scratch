@@ -7,6 +7,8 @@ const assert = require("assert");
 const { bootParty } = require("../src/boot_party");
 const {
   score,
+  setBonusScore,
+  loadoutScore,
   scaledStat,
   SCORE_WEIGHTS,
   classOk,
@@ -187,6 +189,34 @@ test("unit: mage and priest score prefer int", () => {
   assert.ok(book > 0 && classOk({ name: "wbook0" }, "mage", G));
   assert.ok(!classOk({ name: "blade" }, "mage", G));
   void blade;
+});
+
+test("unit: assigned generic stats and Hunter set bonuses affect loadout score", () => {
+  const G = Gish({
+    mmhat: { class: ["mage"], set: "mmage", type: "helmet", stat: 2, armor: 19, resistance: 22 },
+    mmgloves: { class: ["mage"], set: "mmage", type: "gloves", stat: 2, armor: 22, resistance: 11 },
+    mmpants: { class: ["mage"], set: "mmage", type: "pants", stat: 2, armor: 28, resistance: 17 },
+  });
+  G.sets = { mmage: { 2: { int: 2 }, 3: { speed: 2, int: 3 } } };
+  assert.ok(
+    score({ name: "mmhat", level: 0, stat_type: "int" }, G, "mage") >
+      score({ name: "mmhat", level: 0 }, G, "mage"),
+    "INT-scrolled generic stat must use the mage INT weight"
+  );
+  const two = {
+    helmet: { name: "mmhat", level: 0, stat_type: "int" },
+    gloves: { name: "mmgloves", level: 0, stat_type: "int" },
+  };
+  const three = Object.assign({}, two, {
+    pants: { name: "mmpants", level: 0, stat_type: "int" },
+  });
+  assert.strictEqual(setBonusScore(two, G, "mage"), 2 * SCORE_WEIGHTS.mage.int);
+  assert.strictEqual(
+    setBonusScore(three, G, "mage"),
+    5 * SCORE_WEIGHTS.mage.int + 2 * SCORE_WEIGHTS.mage.speed
+  );
+  assert.ok(loadoutScore(three, G, "mage") > loadoutScore(two, G, "mage"));
+  assert.ok(!classOk({ name: "mmhat" }, "warrior", G), "class-locked armor must be rejected");
 });
 
 test("unit: same item +level scores higher", () => {

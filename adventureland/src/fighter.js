@@ -303,7 +303,7 @@ function bootFighter(api, opts) {
 
   function sendGearAd() {
     const snap = currentInventorySnapshot();
-    api.send_cm(MERCHANT, Object.assign({ gear_ad: 1, name }, snap));
+    api.send_cm(MERCHANT, Object.assign({ gear_ad: 1, name, farm: state.S.intent.mtype }, snap));
     lastGearAd = api._now();
     api.game_log("gear_ad");
   }

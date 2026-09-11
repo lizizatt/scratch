@@ -42,8 +42,19 @@ const SEND_RANGE = 320;
 const ASSEMBLE_TIMEOUT_MS = 60000;
 const RARE_GONE_MS = 20000;
 const RARE_WHITELIST = ["phoenix", "goldenbat"];
-/** Never toss/sell — Tracktrix (`tracker`) stays on Jazwyn permanently; craft tools stay parked. */
-const KEEP_ALWAYS = ["stand0", "tracker", "pickaxe", "rod"];
+/** Approved first Monster Token tranche; order also defines purchase/log order. */
+const HUNTER_PLAN = [
+  { who: "Sarene", name: "mmhat", slot: "helmet", cost: 7 },
+  { who: "Sarene", name: "mmgloves", slot: "gloves", cost: 8 },
+  { who: "Sarene", name: "mmpants", slot: "pants", cost: 11 },
+  { who: "Zarook", name: "mpgloves", slot: "gloves", cost: 8 },
+  { who: "Zarook", name: "mphat", slot: "helmet", cost: 7 },
+  { who: "Zarook", name: "mppants", slot: "pants", cost: 11 },
+  { who: "Jazwyn", name: "mwgloves", slot: "gloves", cost: 8 },
+];
+const HUNTER_ITEMS = HUNTER_PLAN.map((x) => x.name);
+/** Never toss/sell — Tracktrix stays permanent; approved Hunter pieces survive swaps. */
+const KEEP_ALWAYS = ["stand0", "tracker", "pickaxe", "rod"].concat(HUNTER_ITEMS);
 /** Merchant idle: exchange these with Xyn (NPC `exchange`). */
 const EXCHANGE_ITEMS = ["gem0", "anniversarygift"];
 /**
@@ -169,6 +180,8 @@ module.exports = {
   ASSEMBLE_TIMEOUT_MS,
   RARE_GONE_MS,
   RARE_WHITELIST,
+  HUNTER_PLAN,
+  HUNTER_ITEMS,
   KEEP_ALWAYS,
   EXCHANGE_ITEMS,
   VENDOR_NPC,

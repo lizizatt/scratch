@@ -38,6 +38,9 @@ function v2_start_merchant() {
   world = function (spec) {
     return ctrl.world(spec);
   };
+  hunter_progression = function () {
+    return ctrl.startHunterPlan();
+  };
 
   // Mainframe hot-reload can re-run slot code in the same worker.
   // Prevent multiple interval tickers from piling up.
