@@ -204,6 +204,74 @@ test("prepared receiver preserves its incoming bag slot", async () => {
   assert.strictEqual(jaz.api.character.esize, 1);
 });
 
+test("range cancellation recovers after fresh equal-revision advertisements", async () => {
+  const p = bootParty({ pack: "bat" });
+  for (const who of ["Jazwyn", "Sarene", "Zarook"]) {
+    const c = p.bots[who].api.character;
+    for (const slot of ["cape", "belt", "amulet", "earring1", "earring2", "ring1", "ring2", "orb"]) {
+      c.slots[slot] = null;
+    }
+    c.items = c.items.map((it) => (it && /^hpot|^mpot/.test(it.name) ? it : null));
+    c.real_x = 0;
+    c.real_y = 0;
+    c.esize = c.items.filter((x) => !x).length;
+  }
+  p.bots.Zarook.api.character.items[7] = { name: "strearring", level: 0 };
+  p.bots.Zarook.api.character.esize = p.bots.Zarook.api.character.items.filter((x) => !x).length;
+
+  p.world.advance(20000);
+  for (const who of ["Jazwyn", "Sarene", "Zarook"]) {
+    const api = p.bots[who].api;
+    await api.send_cm(
+      "Puppygirl",
+      Object.assign({ gear_ad: 1, name: who }, makeInventorySnapshot(api, 1, {}))
+    );
+  }
+  await p.bots.Puppygirl.ctrl.tick();
+  const first = p.bots.Puppygirl.ctrl.store.gearTx;
+  assert.ok(first && first.legs.length === 1);
+  const baseline = {
+    Jazwyn: p.bots.Puppygirl.ctrl.gearAds.Jazwyn.revision,
+    Zarook: p.bots.Puppygirl.ctrl.gearAds.Zarook.revision,
+  };
+
+  p.bots.Zarook.api.character.real_x += 1000;
+  for (let i = 0; i < 100 && p.bots.Puppygirl.ctrl.store.gearTx; i++) {
+    p.world.advance(250);
+    await p.bots.Puppygirl.ctrl.tick();
+  }
+  assert.strictEqual(p.bots.Puppygirl.ctrl.store.gearTx, null);
+  assert.strictEqual(p.bots.Puppygirl.ctrl.gearAds.Jazwyn.revision, baseline.Jazwyn);
+  assert.strictEqual(p.bots.Puppygirl.ctrl.gearAds.Zarook.revision, baseline.Zarook);
+
+  p.bots.Zarook.api.character.real_x = p.bots.Jazwyn.api.character.real_x;
+  p.bots.Zarook.api.character.real_y = p.bots.Jazwyn.api.character.real_y;
+  for (const who of ["Jazwyn", "Zarook"]) {
+    const api = p.bots[who].api;
+    await api.send_cm(
+      "Puppygirl",
+      Object.assign(
+        { gear_ad: 1, name: who },
+        makeInventorySnapshot(api, baseline[who], {})
+      )
+    );
+  }
+  for (let i = 0; i < 180; i++) {
+    p.world.advance(250);
+    await p.bots.Puppygirl.ctrl.tick();
+    if (
+      p.bots.Jazwyn.api.character.slots.earring1 &&
+      p.bots.Jazwyn.api.character.slots.earring1.name === "strearring"
+    )
+      break;
+  }
+
+  const logs = p.bots.Puppygirl.api.log.game.map((x) => x.m);
+  assert.ok(p.bots.Puppygirl.ctrl.store.gearPlanRevision >= 2);
+  assert.ok(logs.some((x) => x.indexOf("gear_tx:cancel") === 0 && x.indexOf("not_in_range") >= 0));
+  assert.strictEqual(p.bots.Jazwyn.api.character.slots.earring1.name, "strearring");
+});
+
 test("stale observed item is rejected before preparation", async () => {
   const p = bootParty({ pack: "bat" });
   const j = p.bots.Jazwyn.api.character;

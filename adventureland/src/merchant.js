@@ -77,8 +77,14 @@ function bootMerchant(api, opts) {
   }
 
   let store = loadQ();
+  if (store.gearAwaitRevisions || store.gearAwaitAds) {
+    delete store.gearAwaitRevisions;
+    delete store.gearAwaitAds;
+    saveQ(store);
+  }
   let busy = false;
   const gearAds = {};
+  let gearAdSeq = 0;
   let giftBusy = false;
   let lastParkFailAt = null;
   const PARK_FAIL_BACKOFF_MS = 15000;
@@ -365,6 +371,7 @@ function bootMerchant(api, opts) {
       )
         return;
       d._t = api._now ? api._now() : Date.now();
+      d._seq = ++gearAdSeq;
       gearAds[d.name] = d;
       return;
     }
@@ -897,6 +904,10 @@ function bootMerchant(api, opts) {
   async function cancelPeerGearTx(reason) {
     const tx = store.gearTx;
     if (!tx) return;
+    store.gearAwaitAds = {};
+    for (const who of tx.participants) {
+      store.gearAwaitAds[who] = gearAds[who] ? gearAds[who]._seq : 0;
+    }
     for (const who of tx.participants) {
       await api.send_cm(who, { gear_cancel: 1, v: 2, tx: tx.id, reason });
     }
@@ -909,10 +920,6 @@ function bootMerchant(api, opts) {
       until: (api._now ? api._now() : Date.now()) + Math.min(300000, 5000 * Math.pow(2, count - 1)),
       reason,
     };
-    store.gearAwaitRevisions = {};
-    for (const who of tx.participants) {
-      store.gearAwaitRevisions[who] = tx.baselineRevisions[who];
-    }
     store.gearTx = null;
     store.gearPlanAfter = (api._now ? api._now() : Date.now()) + 5000;
     saveQ(store);
@@ -925,14 +932,14 @@ function bootMerchant(api, opts) {
       const ad = gearAds[who];
       if (!gearAdFresh(ad, now)) return false;
       if (
-        store.gearAwaitRevisions &&
-        store.gearAwaitRevisions[who] != null &&
-        Number(ad.revision) <= Number(store.gearAwaitRevisions[who])
+        store.gearAwaitAds &&
+        store.gearAwaitAds[who] != null &&
+        Number(ad._seq) <= Number(store.gearAwaitAds[who])
       )
         return false;
       ads[who] = ad;
     }
-    store.gearAwaitRevisions = null;
+    store.gearAwaitAds = null;
     const plan = planPeerGearTransfers(ads, api.G || {});
     if (!plan || !peerPlanInRange(plan)) return false;
     const planKey = peerGearPlanKey(plan.legs);
@@ -970,15 +977,15 @@ function bootMerchant(api, opts) {
   async function finishPeerGearTx() {
     const tx = store.gearTx;
     if (!tx) return;
+    store.gearAwaitAds = {};
+    for (const who of tx.participants) {
+      store.gearAwaitAds[who] = gearAds[who] ? gearAds[who]._seq : 0;
+    }
     for (const who of tx.participants) {
       await api.send_cm(who, { gear_finish: 1, v: 2, tx: tx.id });
     }
     api.game_log("gear_tx:done tx=" + tx.id);
     if (store.gearPlanFailures) delete store.gearPlanFailures[tx.planKey];
-    store.gearAwaitRevisions = {};
-    for (const who of tx.participants) {
-      store.gearAwaitRevisions[who] = tx.baselineRevisions[who];
-    }
     store.gearPlanAfter = (api._now ? api._now() : Date.now()) + 3000;
     store.gearTx = null;
     saveQ(store);
