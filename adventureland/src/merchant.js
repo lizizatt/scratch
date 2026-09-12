@@ -102,10 +102,12 @@ function bootMerchant(api, opts) {
   let giftBusy = false;
   let lastParkFailAt = null;
   const PARK_FAIL_BACKOFF_MS = 15000;
-  // Poll Ponty at most once per second so idle ticks cannot flood the server
-  // with get_secondhands requests or redundant path searches.
+  // A failed attempt may retry after one second, but a completed inventory
+  // sweep is authoritative for three minutes.
   let lastPontyAttemptAt = null;
+  let lastPontySweepAt = null;
   const PONTY_RETRY_MS = 1000;
+  const PONTY_SWEEP_MS = 180000;
   // Single vault-exit point — matches live Cue banker's plaza doorway. Was
   // hand-copied as a bare literal in 3 places (retreatPlaza / leaveBankToPlaza
   // / gear-pull delivery step); one constant + leaveBankToPlaza() now owns it.
@@ -1948,6 +1950,7 @@ function bootMerchant(api, opts) {
     const spend = spendableGold();
     if (!(spend > 0)) return false;
     const now = api._now ? api._now() : Date.now();
+    if (lastPontySweepAt != null && now - lastPontySweepAt < PONTY_SWEEP_MS) return false;
     if (lastPontyAttemptAt != null && now - lastPontyAttemptAt < PONTY_RETRY_MS) return false;
     lastPontyAttemptAt = now;
     if ((api.character.esize || 0) < 1) {
@@ -1964,6 +1967,7 @@ function bootMerchant(api, opts) {
       api.game_log("ponty:list_fail");
       return false;
     }
+    lastPontySweepAt = api._now ? api._now() : Date.now();
     const items = (listed && listed.items) || [];
     api.game_log("ponty:list " + items.length);
     let best = null;
@@ -2564,6 +2568,9 @@ function bootMerchant(api, opts) {
       return;
     }
     if (await tryPlanGearGift()) return;
+    if (!api.character.stand && (await goNpc(PLAZA, null, "stall:idle_path_fail"))) {
+      await openStandAndSync();
+    }
   }
 
   async function abortDelivery(job, reason) {

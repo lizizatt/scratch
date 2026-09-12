@@ -148,7 +148,7 @@ test("adversary: ponty buys cape under fair cap when needed", async () => {
   assert.ok(m.items.some((x) => x && x.name === "cape"), "cape in bag");
 });
 
-test("adversary: merchant polls Ponty no faster than once per second", async () => {
+test("adversary: merchant waits three minutes between completed Ponty sweeps", async () => {
   const p = bootParty({
     pack: "armadillo",
     pots: 100,
@@ -182,10 +182,12 @@ test("adversary: merchant polls Ponty no faster than once per second", async () 
 
   for (let i = 0; i < 200; i++) await p.tickAll();
 
-  assert.ok(polls.length >= 2, "must keep polling Ponty, polls=" + polls.length);
-  for (let i = 1; i < polls.length; i++) {
-    assert.ok(polls[i] - polls[i - 1] >= 1000, "Ponty polls too close: " + polls.join(","));
-  }
+  assert.strictEqual(polls.length, 1, "completed sweep must suppress repeated polls");
+  assert.strictEqual(m.stand, true, "idle merchant should hold the stall open");
+  p.world.advance(180000);
+  for (let i = 0; i < 20 && polls.length < 2; i++) await p.tickAll();
+  assert.strictEqual(polls.length, 2, "must poll again after the cooldown");
+  assert.ok(polls[1] - polls[0] >= 180000, "Ponty polls too close: " + polls.join(","));
 });
 
 module.exports = { tests };
