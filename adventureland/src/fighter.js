@@ -921,7 +921,7 @@ function bootFighter(api, opts) {
     }
     if (d.status && (m.name || m.from) === MERCHANT) {
       if (d.id && /^pickup_/.test(d.id)) {
-        pickupHoldUntil = Math.max(pickupHoldUntil, api._now() + 120000);
+        pickupHoldUntil = Math.max(pickupHoldUntil, api._now() + PENDING_MS);
       }
       if (dlvPending && (!d.id || d.id === dlvPending.id)) {
         lastStatusAt = api._now();
