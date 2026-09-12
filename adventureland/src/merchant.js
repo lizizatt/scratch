@@ -158,14 +158,16 @@ function bootMerchant(api, opts) {
     );
   }
 
-  async function primeBankHint() {
+  async function primeBankHint(force) {
     if (api.character._bank || api.character.bank) {
       bankHintPrimed = true;
       return true;
     }
     if (bankHintPrimed) return false;
     // Never walk bank / closeStand just to hint — that tears down a bag-only stall.
-    if (api.character.stand) return false;
+    // A saturated persisted stand is the exception: without a vault snapshot,
+    // higher-value bank stock can never replace its weakest listings.
+    if (api.character.stand && !force) return false;
     api.game_log("bank:prime");
     if (!(await ensureAtBank())) {
       api.game_log("bank:prime_fail");
@@ -2465,7 +2467,10 @@ function bootMerchant(api, opts) {
 
   async function idleEcon() {
     // Live has no _bank until we visit once — without this, vendor/gift are blind on main.
-    await primeBankHint();
+    const fullPersistedStand =
+      api.character.stand &&
+      Array.from({ length: 16 }, (_, i) => api.character.slots["trade" + (i + 1)]).every(Boolean);
+    await primeBankHint(fullPersistedStand);
     // Keep the merchant's own emergency supply full before spending idle time
     // on optional economy work.
     await restockSelfPots();
