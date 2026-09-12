@@ -1260,16 +1260,7 @@ function bootFighter(api, opts) {
     const pots = refreshPots();
     if (now < pickupHoldUntil) {
       state.setSelf({ task: "pickup" });
-      if (pots === "dry") {
-        persist();
-        return;
-      }
-      burnPotsNow(now);
-      if (opts.pre_combat && opts.pre_combat()) {
-        persist();
-        return;
-      }
-      runCombat(state.S.intent.mtype || "bat");
+      if (pots !== "dry") burnPotsNow(now);
       persist();
       return;
     }
@@ -1486,6 +1477,12 @@ function bootFighter(api, opts) {
     }
     chat.tick(now);
 
+    if (now < pickupHoldUntil) {
+      await tickFarm(now);
+      chat.tick(now);
+      persist();
+      return;
+    }
     if (await tickRare(now)) {
       persist();
       return;
