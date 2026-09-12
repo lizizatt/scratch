@@ -129,6 +129,10 @@ const STALL_SELL = [
   { name: "helmet1", keep: 1 },
   { name: "pants1", keep: 1 },
   { name: "xmashat", keep: 0 },
+  { name: "firestaff", keep: 0, maxLevel: 1 },
+  { name: "firebow", keep: 0, maxLevel: 1 },
+  { name: "shoes1", keep: 0, maxLevel: 1 },
+  { name: "stramulet", keep: 0, maxLevel: 1 },
 ];
 /** Compound priority for bank clean / merchant combine. */
 const COMBINE_PRIORITY = [

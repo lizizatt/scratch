@@ -1587,8 +1587,7 @@ function bootMerchant(api, opts) {
       const weakest = weakestListedStall();
       const candidatePrice = stallPrice({ name: cand.rule.name, level: cand.level }, cand.rule);
       if (
-        cand.i == null ||
-        (api.character.esize || 0) < 1 ||
+        (api.character.esize || 0) < (cand.i == null ? 2 : 1) ||
         !weakest ||
         candidatePrice <= weakest.price
       ) {

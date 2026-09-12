@@ -246,6 +246,40 @@ test("adversary: saturated stall rotates its cheapest listing for higher-value s
   assert.strictEqual(listed.filter((x) => x.name === "helmet1").length, 15, "replaces one low-value listing");
 });
 
+test("adversary: saturated stall pulls a higher-value bank replacement", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.esize = c.items.filter((x) => !x).length;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c.stand = true;
+  for (let i = 1; i <= 16; i++) {
+    c.slots["trade" + i] = { name: "helmet1", level: 0, price: 38400 };
+  }
+  c._bank = {
+    gold: 0,
+    items0: [{ name: "dagger", level: 5 }].concat(new Array(41).fill(null)),
+  };
+
+  for (let i = 0; i < 240; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => /^stall:rotate helmet1@0 -> dagger@5/.test(g.m))) break;
+  }
+
+  const listed = Object.values(c.slots).filter((x) => x && x.price);
+  assert.ok(
+    listed.some((x) => x.name === "dagger" && x.level === 5),
+    "retrieves and lists higher-value bank gear"
+  );
+  assert.strictEqual(listed.filter((x) => x.name === "helmet1").length, 15);
+});
+
 test("adversary: active delivery liquidates junk to create take-back capacity", async () => {
   const p = bootParty({ pack: "armadillo", pots: 400, gold: 500000, members: ["Sarene", "Puppygirl"] });
   const ctrl = p.bots.Puppygirl.ctrl;
