@@ -187,6 +187,45 @@ function bootMerchant(api, opts) {
     return true;
   }
 
+  function enqueueSaturationPickup() {
+    const now = api._now ? api._now() : Date.now();
+    for (const who of FIGHTERS) {
+      const ad = gearAds[who];
+      if (!ad || (ad.esize || 0) > 0 || now - (ad._t || 0) > GEAR_AD_MS * 2) continue;
+      const groups = {};
+      for (const it of ad.bag || []) {
+        if (!it || COMBINE_PRIORITY.indexOf(it.name) < 0) continue;
+        const key = it.name + "@" + (it.level || 0);
+        groups[key] = (groups[key] || 0) + 1;
+      }
+      if (!Object.keys(groups).some((key) => groups[key] > 3)) continue;
+      const id = "pickup_" + who + "_" + (ad.revision || 0);
+      if (
+        (store.active && store.active.id === id) ||
+        store.q.some((job) => job.id === id)
+      )
+        continue;
+      if (
+        enqueue({
+          id,
+          kind: "dlv_gear",
+          who,
+          items: [],
+          farm: ad.farm,
+          map: ad.map,
+          x: ad.x,
+          y: ad.y,
+          serverRegion: ad.server_region || api.parent.server_region,
+          serverIdentifier: ad.server_identifier || api.parent.server_identifier,
+          locAt: now,
+        })
+      ) {
+        api.game_log("dlv:pickup " + who);
+      }
+      return;
+    }
+  }
+
   function closeStandIfOpen() {
     // api.close_stand() already falls back to parent.close_merchant internally
     // (both live al_api.js and sim character.js define it unconditionally).
@@ -2738,6 +2777,7 @@ function bootMerchant(api, opts) {
         }
       }
       // Stall only from idleEcon when truly idle — opening here caused flash open→close on dequeue.
+      if (!store.active && !store.q.length) enqueueSaturationPickup();
       if (!store.active && store.q.length) {
         store.active = store.q.shift();
         saveQ(store);

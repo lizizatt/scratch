@@ -22,6 +22,7 @@ const {
   FORM_R_OUT,
   FIGHTER_ENGAGE_R,
   KEEP_ALWAYS,
+  COMBINE_PRIORITY,
 } = require("./constants");
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
@@ -559,10 +560,18 @@ function bootFighter(api, opts) {
     if (!m || m.rip) return 0;
     if (api.character.bank) return 0;
     if (!(merchantDist(m) <= (SEND_RANGE || 320))) return 0;
+    const saturated = (api.character.esize || 0) < 1;
     let n = 0;
     for (let i = 0; i < api.character.items.length && n < 12; i++) {
       const it = api.character.items[i];
-      if (!it || isGearReserved(it) || isKeep(api, it, api.G || {}, giftTtl)) continue;
+      if (!it || isGearReserved(it)) continue;
+      const compoundOverflow =
+        saturated &&
+        COMBINE_PRIORITY.indexOf(it.name) >= 0 &&
+        api.character.items.filter(
+          (x) => x && x.name === it.name && (x.level || 0) === (it.level || 0)
+        ).length > 3;
+      if (isKeep(api, it, api.G || {}, giftTtl) && !compoundOverflow) continue;
       try {
         const r = await api.send_item(MERCHANT, i, it.q == null ? 1 : it.q);
         if (r && r.failed) {
