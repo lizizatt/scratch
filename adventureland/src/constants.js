@@ -37,6 +37,8 @@ const POTION_LOW = 80;
 const POTION_DRY = 0;
 /** Keep this many merchant bag slots open while withdrawing economy batches. */
 const ECON_BAG_RESERVE = 4;
+/** Last-resort full-bag slot recovery before sacrificing compound inputs. */
+const EMERGENCY_SLOT_ITEMS = ["confetti", "cake"];
 /** Emergency heal thresholds (live use_hp/use_mp trigger points; also used in sim). */
 const HEAL_HP_PCT = 0.55;
 const HEAL_MP_PCT = 0.5;
@@ -214,6 +216,7 @@ module.exports = {
   POTION_LOW,
   POTION_DRY,
   ECON_BAG_RESERVE,
+  EMERGENCY_SLOT_ITEMS,
   HEAL_HP_PCT,
   HEAL_MP_PCT,
   SEND_RANGE,

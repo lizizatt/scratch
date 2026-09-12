@@ -7,6 +7,7 @@ const {
   JOB_MS,
   POTION_TARGET,
   ECON_BAG_RESERVE,
+  EMERGENCY_SLOT_ITEMS,
   GOLD_FLOAT_FIGHTER,
   GOLD_FLOAT_MERCHANT,
   COMBINE_PRIORITY,
@@ -2189,7 +2190,12 @@ function bootMerchant(api, opts) {
     // target cannot be retrieved and otherwise blocks every local compound.
     if ((api.character.esize || 0) < 1) {
       const local = planCompounds([api.character.items || []], api.G, COMBINE_PRIORITY);
-      if (local.length) cand = local;
+      const ready = local.find((x) => {
+        const scroll = cscrollFor(x.name, x.level, api.G);
+        return api.character.items.some((it) => it && it.name === scroll);
+      });
+      if (ready) cand = [ready];
+      else if (local.length) cand = local;
     }
     const target = cand[0];
     closeStandIfOpen();
@@ -2239,6 +2245,17 @@ function bootMerchant(api, opts) {
           const sold = await api.sell(i);
           freed = !(sold && sold.failed);
           break;
+        }
+        if (!freed) {
+          const i = api.character.items.findIndex(
+            (it) => it && EMERGENCY_SLOT_ITEMS.indexOf(it.name) >= 0
+          );
+          if (i >= 0 && (await goNpc({ map: "main", x: 56, y: -122 }, null))) {
+            const it = api.character.items[i];
+            const sold = await api.sell(i, it.q == null ? 1 : it.q);
+            freed = !(sold && sold.failed) && (api.character.esize || 0) >= 1;
+            if (freed) api.game_log("bank:material_sacrifice " + it.name);
+          }
         }
         if (!freed) {
           const groups = {};

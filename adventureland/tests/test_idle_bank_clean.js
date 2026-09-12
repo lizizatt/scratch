@@ -5,6 +5,7 @@
  */
 const assert = require("assert");
 const { bootParty } = require("../src/boot_party");
+const { cscrollFor } = require("../src/bank_clean_plan");
 
 const tests = [];
 function test(name, fn) {
@@ -88,11 +89,15 @@ test("adversary: full merchant sacrifices one excess input to unlock local compo
   const mApi = p.bots.Puppygirl.api;
   const m = mApi.character;
   m.gold = 500000;
-  for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "cake", q: 1 };
+  for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
   for (let i = 0; i < 3; i++) m.items[i] = { name: "hpbelt", level: 0 };
   for (let i = 3; i < 7; i++) m.items[i] = { name: "wbook0", level: 0 };
   m.esize = 0;
-  m._bank = { gold: 0, items0: new Array(42).fill({ name: "cake", q: 1 }) };
+  m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
   m.map = "main";
   m.real_x = m.x = 40;
   m.real_y = m.y = -20;
@@ -108,6 +113,70 @@ test("adversary: full merchant sacrifices one excess input to unlock local compo
   assert.ok(msgs.some((x) => x === "bank:compound hpbelt@0"), "local triple compounds after buying a scroll");
   assert.strictEqual(countNameLevel([m.items], "wbook0", 0), 3, "preserves a complete wbook triple");
   assert.ok((m.esize || 0) >= 2, "compound creates durable recovery capacity");
+});
+
+test("adversary: full merchant prefers a local triple with its scroll already in bag", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const m = api.character;
+  let readyLevel = 0;
+  while (readyLevel < 5 && cscrollFor("hpbelt", readyLevel, api.G) !== "cscroll1") {
+    readyLevel++;
+  }
+  assert.ok(readyLevel < 5, "fixture must expose a cscroll1 hpbelt level");
+  for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
+  m.items[0] = { name: "hpbelt", level: 0 };
+  m.items[1] = { name: "hpbelt", level: 0 };
+  m.items[2] = { name: "hpbelt", level: 0 };
+  m.items[3] = { name: "hpbelt", level: readyLevel };
+  m.items[4] = { name: "hpbelt", level: readyLevel };
+  m.items[5] = { name: "hpbelt", level: readyLevel };
+  m.items[6] = { name: "cscroll1", q: 4 };
+  m.esize = 0;
+  m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+
+  for (let i = 0; i < 300; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "bank:compound hpbelt@" + readyLevel)) break;
+  }
+
+  const msgs = api.log.game.map((g) => g.m);
+  assert.ok(
+    msgs.some((g) => g === "bank:compound hpbelt@" + readyLevel),
+    "logs=" + msgs.filter((g) => /^bank:/.test(g)).join(" | ")
+  );
+  assert.ok(!api.log.game.some((g) => g.m === "bank:compound_sacrifice hpbelt@0"));
+  assert.ok((m.esize || 0) >= 2);
+});
+
+test("adversary: full merchant sells cosmetic clutter before breaking an exact triple", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const m = api.character;
+  for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
+  m.items[0] = { name: "hpbelt", level: 0 };
+  m.items[1] = { name: "hpbelt", level: 0 };
+  m.items[2] = { name: "hpbelt", level: 0 };
+  m.items[3] = { name: "confetti", q: 8 };
+  m.esize = 0;
+  m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
+
+  for (let i = 0; i < 300; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "bank:compound hpbelt@0")) break;
+  }
+
+  const msgs = api.log.game.map((g) => g.m);
+  assert.ok(
+    msgs.some((g) => g === "bank:material_sacrifice confetti"),
+    "logs=" + msgs.filter((g) => /^bank:/.test(g)).join(" | ")
+  );
+  assert.ok(msgs.some((g) => g === "bank:compound hpbelt@0"));
+  assert.ok(!api.log.game.some((g) => /^bank:compound_sacrifice/.test(g.m)));
 });
 
 test("adversary: bank compound work is withdrawn and scrolled as one bounded batch", async () => {
