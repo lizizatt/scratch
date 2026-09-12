@@ -1584,6 +1584,9 @@ function bootMerchant(api, opts) {
       }
       const r = await Promise.resolve(api.unequip("trade" + weakest.slot));
       if (r && r.failed) return false;
+      for (let n = 0; n < 10 && api.character.slots["trade" + weakest.slot]; n++) {
+        if (typeof api.sleep === "function") await api.sleep(100);
+      }
       if (api.character.slots["trade" + weakest.slot]) return false;
       tradeSlot = weakest.slot;
       replaced = weakest.it;
