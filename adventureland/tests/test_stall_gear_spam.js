@@ -217,7 +217,7 @@ test("adversary: full bag lists an eligible bag copy before a weaker bank copy",
   assert.strictEqual(listed.level, 5);
 });
 
-test("adversary: saturated stall rotates its cheapest listing for a +1 intelligence book", async () => {
+test("adversary: saturated stall rotates its cheapest listing for higher-value stock", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
   const c = api.character;
@@ -225,8 +225,7 @@ test("adversary: saturated stall rotates its cheapest listing for a +1 intellige
   c.items[0] = { name: "stand0" };
   c.items[1] = { name: "hpot1", q: 200 };
   c.items[2] = { name: "mpot1", q: 200 };
-  c.items[3] = { name: "wbook0", level: 1 };
-  c.items[4] = { name: "wbook0", level: 2 };
+  c.items[3] = { name: "dagger", level: 1 };
   c.esize = c.items.filter((x) => !x).length;
   c.map = "main";
   c.real_x = c.x = 40;
@@ -239,12 +238,11 @@ test("adversary: saturated stall rotates its cheapest listing for a +1 intellige
 
   for (let i = 0; i < 160; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => /^stall:rotate helmet1@0 -> wbook0@1/.test(g.m))) break;
+    if (api.log.game.some((g) => /^stall:rotate helmet1@0 -> dagger@1/.test(g.m))) break;
   }
 
   const listed = Object.values(c.slots).filter((x) => x && x.price);
-  assert.ok(listed.some((x) => x.name === "wbook0" && x.level === 1), "lists +1 intelligence book");
-  assert.ok(!listed.some((x) => x.name === "wbook0" && x.level === 2), "preserves +2 intelligence book");
+  assert.ok(listed.some((x) => x.name === "dagger" && x.level === 1), "lists higher-value dagger");
   assert.strictEqual(listed.filter((x) => x.name === "helmet1").length, 15, "replaces one low-value listing");
 });
 

@@ -103,6 +103,7 @@ const VENDOR_NPC_LOW_LEVEL = [
   "ringsj",
   "hpamulet",
   "hpbelt",
+  "wbook0",
 ];
 const VENDOR_NPC_MAX_LEVEL = 1;
 /** Low-value unneeded drops: reclaim immediately instead of occupying stall/vault slots. */
@@ -128,7 +129,6 @@ const STALL_SELL = [
   { name: "helmet1", keep: 1 },
   { name: "pants1", keep: 1 },
   { name: "xmashat", keep: 0 },
-  { name: "wbook0", keep: 0, maxLevel: 1 },
 ];
 /** Compound priority for bank clean / merchant combine. */
 const COMBINE_PRIORITY = [

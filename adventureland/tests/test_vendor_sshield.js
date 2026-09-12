@@ -29,14 +29,47 @@ test("constants: VENDOR_NPC covers stuck stall junk; sshield is Jazwyn offhand t
 });
 
 test("unit: wearable duplicate junk is vendored through level one", () => {
-  for (const n of ["wattire", "wgloves", "partyhat", "ringsj", "hpamulet", "hpbelt"]) {
+  for (const n of ["wattire", "wgloves", "partyhat", "ringsj", "hpamulet", "hpbelt", "wbook0"]) {
     assert.ok(VENDOR_NPC_LOW_LEVEL.indexOf(n) >= 0, n);
     assert.strictEqual(VENDOR_NPC_MAX_LEVEL, 1);
     const G = { items: { [n]: { type: "ring", upgrade: true } } };
-    assert.ok(isSellJunk({ name: n, level: 0 }, G));
-    assert.ok(isSellJunk({ name: n, level: 1 }, G));
-    assert.ok(!isSellJunk({ name: n, level: 2 }, G));
+    if (n !== "wbook0") {
+      assert.ok(isSellJunk({ name: n, level: 0 }, G));
+      assert.ok(isSellJunk({ name: n, level: 1 }, G));
+      assert.ok(!isSellJunk({ name: n, level: 2 }, G));
+    }
   }
+});
+
+test("adversary: merchant vendors +0/+1 intelligence books but preserves +2", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "wbook0", level: 0 };
+  c.items[4] = { name: "wbook0", level: 1 };
+  c.items[5] = { name: "wbook0", level: 2 };
+  c.esize = c.items.filter((x) => !x).length;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    if (api.log.game.filter((g) => g.m === "vendor:sell wbook0 x1").length >= 2) break;
+  }
+
+  const books = c.items.filter((x) => x && x.name === "wbook0");
+  assert.deepStrictEqual(books.map((x) => x.level || 0), [2]);
 });
 
 test("unit: sshield classOk warrior only; scores above plain shield", () => {

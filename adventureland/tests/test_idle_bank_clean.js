@@ -90,8 +90,7 @@ test("adversary: full merchant sacrifices one excess input to unlock local compo
   const m = mApi.character;
   m.gold = 500000;
   for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
-  for (let i = 0; i < 3; i++) m.items[i] = { name: "strearring", level: 0 };
-  for (let i = 3; i < 7; i++) m.items[i] = { name: "wbook0", level: 0 };
+  for (let i = 0; i < 7; i++) m.items[i] = { name: "strearring", level: 0 };
   m.esize = 0;
   m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
   m.map = "main";
@@ -109,9 +108,9 @@ test("adversary: full merchant sacrifices one excess input to unlock local compo
   }
 
   const msgs = mApi.log.game.map((g) => g.m);
-  assert.ok(msgs.some((x) => x === "bank:compound_sacrifice wbook0@0"), "sells a remainder, not a triple");
+  assert.ok(msgs.some((x) => x === "bank:compound_sacrifice strearring@0"), "sells a remainder, not a triple");
   assert.ok(msgs.some((x) => x === "bank:compound strearring@0"), "local triple compounds after buying a scroll");
-  assert.strictEqual(countNameLevel([m.items], "wbook0", 0), 3, "preserves a complete wbook triple");
+  assert.strictEqual(countNameLevel([m.items], "strearring", 0), 3, "preserves a complete earring triple");
   assert.ok((m.esize || 0) >= 2, "compound creates durable recovery capacity");
 });
 
