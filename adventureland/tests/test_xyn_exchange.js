@@ -56,7 +56,27 @@ test("adversary: idle merchant exchanges stacked armor boxes one at a time", asy
   assert.ok(boxes && boxes.q === 3, "one box consumed from stack");
 });
 
-test("adversary: full bag lists surplus before exchanging a stacked box", async () => {
+test("adversary: stacked exchanges stop before consuming the logistics reserve", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = { name: "tracker" };
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "anniversarygift", q: 25 };
+  for (let i = 4; i < 12; i++) c.items[i] = null;
+  c.esize = 8;
+  c._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
+
+  for (let i = 0; i < 80; i++) await p.tickAll();
+
+  assert.ok(!api.log.game.some((g) => g.m === "xyn:exchange anniversarygift"));
+  assert.ok(api.log.game.some((g) => g.m === "xyn:capacity_hold anniversarygift"));
+  assert.strictEqual(c.esize, 8, "exchange does not expand the bag through its reserve");
+});
+
+test("adversary: full bag lists surplus but defers stacked exchange while vault is full", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
   const c = api.character;
@@ -76,18 +96,13 @@ test("adversary: full bag lists surplus before exchanging a stacked box", async 
 
   for (let i = 0; i < 300; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => g.m === "xyn:exchange armorbox")) break;
+    if (api.log.game.some((g) => g.m === "xyn:capacity_hold armorbox")) break;
   }
 
   const msgs = api.log.game.map((g) => g.m);
-  assert.ok(msgs.some((m) => m === "xyn:no_space armorbox"), "full stacked exchange is deferred");
+  assert.ok(msgs.some((m) => m === "xyn:capacity_hold armorbox"), "full stacked exchange is deferred");
   assert.ok(msgs.some((m) => /^stall:list t2bow@0/.test(m)), "bag item wins over earlier bank candidate");
-  assert.ok(!msgs.some((m) => m === "stall:path_fail"), "full-bag listing does not depend on plaza pathing");
-  assert.ok(
-    api.log.game.find((g) => /^stall:list t2bow@0/.test(g.m)).t < 3000,
-    "zero-reserve surplus must not wait on the reserve stability gate"
-  );
-  assert.ok(msgs.some((m) => m === "xyn:exchange armorbox"), "exchange succeeds after space is freed");
+  assert.ok(!msgs.some((m) => m === "xyn:exchange armorbox"), "one bag slot is not enough reserve");
 });
 
 test("adversary: Jazwyn keeps Tracktrix — does not toss to merchant", async () => {

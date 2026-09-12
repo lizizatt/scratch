@@ -37,6 +37,12 @@ const POTION_LOW = 80;
 const POTION_DRY = 0;
 /** Keep this many merchant bag slots open while withdrawing economy batches. */
 const ECON_BAG_RESERVE = 4;
+/** Keep enough vault capacity for several fighter pickups before expanding boxes/gifts. */
+const ECON_BANK_RESERVE = 12;
+/** Stacked Xyn exchanges expand one inventory slot into many; stop before logistics is crowded. */
+const XYN_BAG_RESERVE = 8;
+/** Obsolete now that every character uses the stronger hpot1/mpot1 tier. */
+const OBSOLETE_POTIONS = ["hpot0", "mpot0"];
 /** Last-resort full-bag slot recovery before sacrificing compound inputs. */
 const EMERGENCY_SLOT_ITEMS = ["confetti", "cake"];
 /** Safe fixed rendezvous for saturation pickups. */
@@ -218,6 +224,9 @@ module.exports = {
   POTION_LOW,
   POTION_DRY,
   ECON_BAG_RESERVE,
+  ECON_BANK_RESERVE,
+  XYN_BAG_RESERVE,
+  OBSOLETE_POTIONS,
   EMERGENCY_SLOT_ITEMS,
   PICKUP_MEET,
   HEAL_HP_PCT,

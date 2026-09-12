@@ -235,14 +235,15 @@ test("adversary: bank upgrade work is withdrawn and scrolled as one bounded batc
   assert.ok((m.esize || 0) >= 4, "batch withdrawal preserves logistics reserve");
 });
 
-test("adversary: merchant visits saturated fighter and retrieves only compound overflow", async () => {
+test("adversary: saturation pickup centralizes every unequipped compound input", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000 });
   const fighter = p.bots.Jazwyn.api.character;
   for (let i = 0; i < fighter.items.length; i++) {
-    fighter.items[i] = { name: "wbook0", level: 0 };
+    fighter.items[i] = { name: "tracker" };
   }
   fighter.items[0] = { name: "hpot1", q: 200 };
   fighter.items[1] = { name: "mpot1", q: 200 };
+  for (let i = 2; i < 8; i++) fighter.items[i] = { name: "wbook0", level: 0 };
   fighter.esize = 0;
 
   for (let i = 0; i < 500; i++) {
@@ -252,19 +253,42 @@ test("adversary: merchant visits saturated fighter and retrieves only compound o
 
   const remaining = fighter.items.filter((x) => x && x.name === "wbook0").length;
   assert.ok((fighter.esize || 0) > 0, "fighter gains room after saturation pickup");
-  assert.ok(remaining >= 3, "fighter preserves a complete compound triple");
+  assert.strictEqual(remaining, 0, "fighter does not retain a permanent compound backlog");
   assert.ok(
     p.bots.Puppygirl.api.log.game.some((g) => g.m === "dlv:pickup Jazwyn"),
     "merchant explicitly schedules the saturation pickup"
   );
   assert.ok(
     p.bots.Jazwyn.api.log.game.some((g) => /^toss wbook0@0/.test(g.m)),
-    "fighter transfers retained compound overflow only during saturation recovery"
+    "fighter transfers compound inputs only during saturation recovery"
   );
   assert.ok(
     !p.bots.Puppygirl.api.log.game.some((g) => g.m === "dlv:reroute"),
     "fighter holds its pickup location instead of forcing a moving-target chase"
   );
+});
+
+test("adversary: blocked full-bag compounding is rate limited", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const m = api.character;
+  for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
+  m.items[0] = { name: "hpbelt", level: 0 };
+  m.items[1] = { name: "hpbelt", level: 0 };
+  m.items[2] = { name: "hpbelt", level: 0 };
+  m.esize = 0;
+  m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
+
+  for (let i = 0; i < 100; i++) await p.tickAll();
+
+  const blocked = api.log.game.filter((g) => g.m === "bank:combine_no_space");
+  assert.ok(blocked.length >= 1);
+  for (let i = 1; i < blocked.length; i++) {
+    assert.ok(
+      blocked[i].t - blocked[i - 1].t >= 5000,
+      "blocked state should not flood logs or CPU"
+    );
+  }
 });
 
 test("adversary: targeted pot cancellation does not cancel a coordinator pickup", async () => {

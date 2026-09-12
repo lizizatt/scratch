@@ -567,13 +567,10 @@ function bootFighter(api, opts) {
     for (let i = 0; i < api.character.items.length && n < 12; i++) {
       const it = api.character.items[i];
       if (!it || isGearReserved(it)) continue;
-      const compoundOverflow =
+      const compoundOffload =
         saturated &&
-        COMBINE_PRIORITY.indexOf(it.name) >= 0 &&
-        api.character.items.filter(
-          (x) => x && x.name === it.name && (x.level || 0) === (it.level || 0)
-        ).length > 3;
-      if (isKeep(api, it, api.G || {}, giftTtl) && !compoundOverflow) continue;
+        COMBINE_PRIORITY.indexOf(it.name) >= 0;
+      if (isKeep(api, it, api.G || {}, giftTtl) && !compoundOffload) continue;
       try {
         const r = await api.send_item(MERCHANT, i, it.q == null ? 1 : it.q);
         if (r && r.failed) {

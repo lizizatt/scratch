@@ -7,6 +7,9 @@ const {
   JOB_MS,
   POTION_TARGET,
   ECON_BAG_RESERVE,
+  ECON_BANK_RESERVE,
+  XYN_BAG_RESERVE,
+  OBSOLETE_POTIONS,
   EMERGENCY_SLOT_ITEMS,
   PICKUP_MEET,
   GOLD_FLOAT_FIGHTER,
@@ -113,6 +116,8 @@ function bootMerchant(api, opts) {
   let stallBagStableAt = api._now();
   let lastXynNoSpaceAt = null;
   let lastNeedSpaceAt = null;
+  let lastCombineNoSpaceAt = null;
+  const COMBINE_NO_SPACE_BACKOFF_MS = 5000;
 
   function logUpgradeSkip(name, level, chance) {
     // Once per name@level forever — 60s re-logs still flooded burn-in while stall locked park.
@@ -130,6 +135,25 @@ function bootMerchant(api, opts) {
     } catch (e) {
       api.character._bank = api.character.bank;
     }
+  }
+
+  function bankFreeSlots() {
+    const bank = api.character.bank || api.character._bank;
+    if (!bank) return null;
+    let free = 0;
+    for (const p of Object.keys(bank)) {
+      if (p === "gold" || !Array.isArray(bank[p])) continue;
+      for (const it of bank[p]) if (!it) free++;
+    }
+    return free;
+  }
+
+  function capacityConstrained() {
+    const bankFree = bankFreeSlots();
+    return (
+      (api.character.esize || 0) < ECON_BAG_RESERVE ||
+      (bankFree != null && bankFree < ECON_BANK_RESERVE)
+    );
   }
 
   async function primeBankHint() {
@@ -1385,7 +1409,8 @@ function bootMerchant(api, opts) {
   function isVendorNpcItem(it) {
     return (
       !!it &&
-      (VENDOR_NPC.indexOf(it.name) >= 0 ||
+      (OBSOLETE_POTIONS.indexOf(it.name) >= 0 ||
+        VENDOR_NPC.indexOf(it.name) >= 0 ||
         (VENDOR_NPC_LEVEL0.indexOf(it.name) >= 0 && !(it.level > 0)))
     );
   }
@@ -1592,7 +1617,7 @@ function bootMerchant(api, opts) {
       const hit = listBankItems()
         .filter((e) => isVendorNpcItem(e))
         .sort((a, b) => {
-          const order = VENDOR_NPC.concat(VENDOR_NPC_LEVEL0);
+          const order = OBSOLETE_POTIONS.concat(VENDOR_NPC, VENDOR_NPC_LEVEL0);
           const ia = order.indexOf(a.name);
           const ib = order.indexOf(b.name);
           return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
@@ -1712,6 +1737,12 @@ function bootMerchant(api, opts) {
         await leaveBankToPlaza();
         return false;
       }
+      const bankNeed = ((api.G.items && api.G.items[hit.name]) || {}).e || 1;
+      const bankHeld = hit.q == null ? 1 : hit.q;
+      if (bankHeld > bankNeed && (api.character.esize || 0) <= XYN_BAG_RESERVE) {
+        await leaveBankToPlaza();
+        return false;
+      }
       const rr = await api.bank_retrieve(hit.pack, hit.i);
       if (rr && rr.failed) {
         api.game_log("xyn:retrieve_fail");
@@ -1726,10 +1757,15 @@ function bootMerchant(api, opts) {
     const nm = api.character.items[i].name;
     const needed = ((api.G.items && api.G.items[nm]) || {}).e || 1;
     const held = api.character.items[i].q == null ? 1 : api.character.items[i].q;
-    if (held > needed && (api.character.esize || 0) < 1) {
+    const bankFree = bankFreeSlots();
+    if (
+      held > needed &&
+      ((api.character.esize || 0) <= XYN_BAG_RESERVE ||
+        (bankFree != null && bankFree < ECON_BANK_RESERVE))
+    ) {
       const now = api._now();
       if (lastXynNoSpaceAt == null || now - lastXynNoSpaceAt >= 15000) {
-        api.game_log("xyn:no_space " + nm);
+        api.game_log("xyn:capacity_hold " + nm);
         lastXynNoSpaceAt = now;
       }
       return false;
@@ -2178,6 +2214,13 @@ function bootMerchant(api, opts) {
   /** One compound from bag/bank triples (idle bank clean). */
   async function tryCombineOne() {
     if (typeof api.compound !== "function") return false;
+    const now = api._now ? api._now() : Date.now();
+    if (
+      lastCombineNoSpaceAt != null &&
+      now - lastCombineNoSpaceAt < COMBINE_NO_SPACE_BACKOFF_MS
+    ) {
+      return false;
+    }
     const bags = [api.character.items || []];
     const bankHint = api.character.bank || api.character._bank;
     if (bankHint) {
@@ -2283,6 +2326,7 @@ function bootMerchant(api, opts) {
           }
         }
         if (!freed || (api.character.esize || 0) < 1) {
+          lastCombineNoSpaceAt = api._now ? api._now() : Date.now();
           api.game_log("bank:combine_no_space");
           return false;
         }
@@ -2324,6 +2368,7 @@ function bootMerchant(api, opts) {
         return false;
       }
       api.game_log("bank:compound " + target.name + "@" + target.level);
+      lastCombineNoSpaceAt = null;
       return true;
     } catch (e) {
       api.game_log("bank:compound_fail " + target.name);
@@ -2342,6 +2387,29 @@ function bootMerchant(api, opts) {
       if (await tryVendorNpc()) return;
     } catch (e) {
       api.game_log("vendor:err " + ((e && e.message) || e));
+    }
+    // Compression and liquidation outrank slot-expanding exchanges whenever
+    // either the bag or vault has fallen below its logistics reserve.
+    if (capacityConstrained()) {
+      try {
+        if (await tryCombineOne()) return;
+      } catch (e) {
+        api.game_log("bank:combine_err " + ((e && e.message) || e));
+      }
+      try {
+        if (await tryStallOne()) return;
+      } catch (e) {
+        api.game_log("stall:err " + ((e && e.message) || e));
+      }
+      try {
+        if (await tryExchangeOne()) return;
+      } catch (e) {
+        api.game_log("xyn:err " + ((e && e.message) || e));
+      }
+      if (bagParkables(null, { skipUpgrades: false }).length) {
+        await parkToBank(null, { skipUpgrades: false });
+      }
+      return;
     }
     // Xyn exchange — one approved gem/gift/box per idle pass.
     try {
