@@ -1549,6 +1549,21 @@ function bootMerchant(api, opts) {
     return api._now() - stallBagStableAt >= 3000;
   }
 
+  async function openStandAndSync() {
+    if (!api.character.stand) api.open_stand();
+    // Live restores persisted trade slots asynchronously after opening.
+    for (let n = 0; n < 10; n++) {
+      if (
+        Object.keys(api.character.slots || {}).some(
+          (slot) => /^trade\d+$/.test(slot) && api.character.slots[slot]
+        )
+      ) {
+        break;
+      }
+      if (typeof api.sleep === "function") await api.sleep(100);
+    }
+  }
+
   /** List one reserve-safe surplus item per idle pass. */
   async function tryStallOne() {
     const reserveStable = stallBagStable();
@@ -1559,10 +1574,7 @@ function bootMerchant(api, opts) {
     // a transient plaza path failure deadlock every other cleanup operation.
     const listInPlace = cand.i != null && (api.character.esize || 0) < 1 && api.character.map === "main";
     if (!listInPlace && !(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
-    if (!api.character.stand) {
-      api.open_stand();
-      if (typeof api.sleep === "function") await api.sleep(150);
-    }
+    await openStandAndSync();
     let tradeSlot = 0;
     for (let s = 1; s <= 16; s++) {
       if (!api.character.slots["trade" + s]) {
@@ -1603,9 +1615,8 @@ function bootMerchant(api, opts) {
       cand = stallCandidate(false, true);
       if (!cand || cand.i == null) return false;
       if (!(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
-      api.open_stand();
-      if (typeof api.sleep === "function") await api.sleep(150);
-      }
+      await openStandAndSync();
+    }
     if (api.character.slots["trade" + tradeSlot]) return false;
     const it = api.character.items[cand.i];
     if (!it || it.name !== cand.rule.name) return false;
