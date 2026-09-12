@@ -76,6 +76,40 @@ test("adversary: stacked exchanges stop before consuming the logistics reserve",
   assert.strictEqual(c.esize, 8, "exchange does not expand the bag through its reserve");
 });
 
+test("adversary: full bag and full stand sacrifice a safe stack instead of looping on Xyn", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = { name: "tracker" };
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "anniversarygift", q: 25 };
+  c.items[4] = { name: "cake", q: 1 };
+  c.esize = 0;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
+  c.stand = true;
+  for (let i = 1; i <= 16; i++) {
+    c.slots["trade" + i] = { name: "helmet1", level: 0, price: 38400 };
+  }
+
+  for (let i = 0; i < 160; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "bank:material_sacrifice cake")) break;
+  }
+
+  const msgs = api.log.game.map((g) => g.m);
+  assert.ok(
+    msgs.some((g) => g === "bank:material_sacrifice cake"),
+    "full stand must not trap cleanup behind repeated Xyn holds"
+  );
+  assert.ok(c.esize >= 1, "emergency sale opens a working inventory slot");
+  assert.ok(!c.stand, "recovery closes the saturated stand before moving");
+});
+
 test("adversary: full bag lists surplus but defers stacked exchange while vault is full", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
