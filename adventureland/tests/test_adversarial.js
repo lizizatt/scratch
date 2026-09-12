@@ -413,6 +413,44 @@ test("bag-full: dry fighter sells junk then requests pots", async () => {
   assert.ok(p.bots.Jazwyn.api.log.game.some((g) => /bag:sell/.test(g.m)), "should sell junk");
   assert.ok(p.bots.Jazwyn.ctrl.dlvPending || p.bots.Jazwyn.api.log.game.some((g) => /dlv:req/.test(g.m)));
   assert.ok((p.bots.Jazwyn.api.character.esize || 0) >= 1);
+  assert.ok(Math.hypot(
+    p.bots.Jazwyn.api.character.real_x - 56,
+    p.bots.Jazwyn.api.character.real_y - (-122)
+  ) < 50, "fighter visits the town vendor before selling");
+});
+
+test("bag-full: fighter vendors +0 joy rings and HP accessories but preserves upgrades", async () => {
+  const items = new Array(42).fill(null);
+  for (let i = 0; i < 42; i++) items[i] = { name: "tracker" };
+  items[0] = { name: "ringsj", level: 0 };
+  items[1] = { name: "hpamulet", level: 0 };
+  items[2] = { name: "hpbelt", level: 0 };
+  items[3] = { name: "ringsj", level: 1 };
+  items[4] = { name: "hpamulet", level: 1 };
+  items[5] = { name: "hpbelt", level: 1 };
+  items[6] = { name: "hpot1", q: 200 };
+  items[7] = { name: "mpot1", q: 200 };
+  const p = bootParty({ pots: 200, gold: 50000, esize: 0, items });
+  const fighter = p.bots.Jazwyn;
+
+  await fighter.ctrl.tick();
+
+  const owns = (name, level) =>
+    fighter.api.character.items.some(
+      (it) => it && it.name === name && (it.level || 0) === level
+    ) ||
+    Object.keys(fighter.api.character.slots || {}).some((slot) => {
+      const it = fighter.api.character.slots[slot];
+      return it && it.name === name && (it.level || 0) === level;
+    });
+  for (const name of ["ringsj", "hpamulet", "hpbelt"]) {
+    assert.ok(!fighter.api.character.items.some(
+      (it) => it && it.name === name && (it.level || 0) === 0
+    ), name + "@0 should not remain in the bag");
+    assert.ok(owns(name, 1), name + "@1 should be preserved");
+  }
+  assert.ok((fighter.api.character.esize || 0) >= 3);
+  assert.ok(fighter.api.log.game.some((g) => g.m === "bag:sell ringsj"));
 });
 
 test("bag-full: pot-only bag sells surplus hp pots when mp dry", async () => {

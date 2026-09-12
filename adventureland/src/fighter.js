@@ -21,7 +21,6 @@ const {
   METRICS_MS,
   FORM_R_OUT,
   FIGHTER_ENGAGE_R,
-  KEEP_ALWAYS,
   COMBINE_PRIORITY,
   PICKUP_MEET,
 } = require("./constants");
@@ -30,7 +29,14 @@ const { createPartyState, countPots, potBucket } = require("./party_state");
 const { createMotion } = require("./motion");
 const { maybeUsePots } = require("./potions");
 const { packCenter } = require("./packs");
-const { equipPending, isKeep, markGift, classOk, canEquipSlot } = require("./gear");
+const {
+  equipPending,
+  isKeep,
+  isSellJunk,
+  markGift,
+  classOk,
+  canEquipSlot,
+} = require("./gear");
 const {
   inventoryDigest,
   makeInventorySnapshot,
@@ -227,37 +233,53 @@ function bootFighter(api, opts) {
     return b;
   }
 
-  /** Free ≥1 bag slot by selling junk, then surplus pots if dry on the other type. */
+  function hasSellableJunk() {
+    return api.character.items.some(
+      (it) =>
+        it &&
+        !isGearReserved(it) &&
+        isSellJunk(it, api.G || {})
+    );
+  }
+
+  /** Visit town and clear approved junk, then one surplus potion stack if necessary. */
   async function freeBagSlot() {
     if ((api.character.esize || 0) >= 1) return true;
-    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
-    if ((api.character.esize || 0) >= 1) return true;
+    async function reachVendor() {
+      const r = await motion.goTo({ map: "main", x: 56, y: -122 });
+      if (r && r.failed) {
+        api.game_log("bag:vendor_path_fail");
+        return false;
+      }
+      return true;
+    }
     async function sellAt(i, it) {
       if (typeof api.sell !== "function") return false;
-      await api.sell(i, it.q == null ? 1 : it.q);
+      const r = await api.sell(i, it.q == null ? 1 : it.q);
+      if (r && r.failed) return false;
       api.game_log("bag:sell " + it.name);
-      return (api.character.esize || 0) >= 1;
+      return true;
     }
-    for (let i = 0; i < api.character.items.length; i++) {
-      const it = api.character.items[i];
-      if (!it) continue;
-      if (/^hpot|^mpot/.test(it.name)) continue;
-      if (isGearReserved(it)) continue;
-      if (isKeep(api, it, api.G || {}, giftTtl)) continue;
-      if (await sellAt(i, it)) return true;
+    if (hasSellableJunk()) {
+      if (!(await reachVendor())) return false;
+      for (let n = 0; n < api.character.items.length; n++) {
+        const i = api.character.items.findIndex(
+          (it) => it && !isGearReserved(it) && isSellJunk(it, api.G || {})
+        );
+        if (i < 0 || !(await sellAt(i, api.character.items[i]))) break;
+      }
+      if ((api.character.esize || 0) >= 1) {
+        sendGearAd();
+        return true;
+      }
     }
-    // Still full of "keep" gear duplicates — sell any non-pot (never Tracktrix/stand)
-    for (let i = 0; i < api.character.items.length; i++) {
-      const it = api.character.items[i];
-      if (!it || /^hpot|^mpot/.test(it.name)) continue;
-      if (KEEP_ALWAYS.indexOf(it.name) >= 0) continue;
-      if (isGearReserved(it)) continue;
-      if (await sellAt(i, it)) return true;
-    }
+    await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
+    if ((api.character.esize || 0) >= 1) return true;
     // Pot-only full bag: dry on one type while the other fills every slot
     const c = countPots(api.character.items);
     if (c.hp === 0 || c.mp === 0) {
       const prefer = c.hp > c.mp ? /^hpot/ : /^mpot/;
+      if (!(await reachVendor())) return false;
       for (let i = 0; i < api.character.items.length; i++) {
         const it = api.character.items[i];
         if (!it || !prefer.test(it.name)) continue;
@@ -1473,6 +1495,12 @@ function bootFighter(api, opts) {
     if (!gearTxn) {
       if (typeof api.loot === "function") api.loot();
       await stripWrongClass();
+      if ((api.character.esize || 0) < 1 && hasSellableJunk()) {
+        state.setSelf({ task: "vendor" });
+        await freeBagSlot();
+        persist();
+        return;
+      }
       await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
     }
     if (now - lastGearAd >= GEAR_AD_MS) sendGearAd();
