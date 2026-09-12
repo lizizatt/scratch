@@ -81,6 +81,7 @@ function bootFighter(api, opts) {
   const giftTtl = {};
   const gearReservations = {};
   let inventoryRevision = 0;
+  let pickupHoldUntil = 0;
   let lastInventoryDigest = "";
   let gearTxn = null;
   let respawnBusy = false;
@@ -919,6 +920,9 @@ function bootFighter(api, opts) {
       persist();
     }
     if (d.status && (m.name || m.from) === MERCHANT) {
+      if (d.id && /^pickup_/.test(d.id)) {
+        pickupHoldUntil = Math.max(pickupHoldUntil, api._now() + 120000);
+      }
       if (dlvPending && (!d.id || d.id === dlvPending.id)) {
         lastStatusAt = api._now();
         dlvPending.phase = d.phase;
@@ -944,6 +948,7 @@ function bootFighter(api, opts) {
       refreshPots();
       persist();
     }
+    if (d.dlv_done && d.id && /^pickup_/.test(d.id)) pickupHoldUntil = 0;
     if (d.dlv_loot_q) {
       const n = await offloadToMerchant();
       api.game_log("dlv:toss n=" + n);
@@ -1289,6 +1294,17 @@ function bootFighter(api, opts) {
 
     // Burn after restock checks so dry-wait does not waste pots
     if (pots !== "dry") burnPotsNow(now);
+
+    if (now < pickupHoldUntil) {
+      state.setSelf({ task: "pickup" });
+      if (opts.pre_combat && opts.pre_combat()) {
+        persist();
+        return;
+      }
+      runCombat(state.S.intent.mtype || "bat");
+      persist();
+      return;
+    }
 
     if (!isLead()) {
       state.setSelf({ task: "follow" });

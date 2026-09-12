@@ -192,6 +192,10 @@ test("adversary: merchant visits saturated fighter and retrieves only compound o
     p.bots.Jazwyn.api.log.game.some((g) => /^toss wbook0@0/.test(g.m)),
     "fighter transfers retained compound overflow only during saturation recovery"
   );
+  assert.ok(
+    !p.bots.Puppygirl.api.log.game.some((g) => g.m === "dlv:reroute"),
+    "fighter holds its pickup location instead of forcing a moving-target chase"
+  );
 });
 
 test("adversary: targeted pot cancellation does not cancel a coordinator pickup", async () => {
