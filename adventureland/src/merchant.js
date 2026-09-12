@@ -109,6 +109,7 @@ function bootMerchant(api, opts) {
   let stallBagDigest = null;
   let stallBagStableAt = api._now();
   let lastXynNoSpaceAt = null;
+  let lastNeedSpaceAt = null;
 
   function logUpgradeSkip(name, level, chance) {
     // Once per name@level forever — 60s re-logs still flooded burn-in while stall locked park.
@@ -611,6 +612,7 @@ function bootMerchant(api, opts) {
     }
     if ((api.character.esize || 0) < need) {
       try {
+        await tryCombineOne();
         await tryVendorNpc();
         if ((api.character.esize || 0) < need) await tryStallOne();
       } catch (e) {
@@ -618,7 +620,11 @@ function bootMerchant(api, opts) {
       }
     }
     if ((api.character.esize || 0) < need) {
-      api.game_log("dlv:need_space esize=" + (api.character.esize || 0));
+      const now = api._now();
+      if (lastNeedSpaceAt == null || now - lastNeedSpaceAt >= 5000) {
+        lastNeedSpaceAt = now;
+        api.game_log("dlv:need_space esize=" + (api.character.esize || 0));
+      }
       return false;
     }
     return true;
@@ -2114,8 +2120,14 @@ function bootMerchant(api, opts) {
         if (p !== "gold" && Array.isArray(bankHint[p])) bags.push(bankHint[p]);
       }
     }
-    const cand = planCompounds(bags, api.G, COMBINE_PRIORITY);
+    let cand = planCompounds(bags, api.G, COMBINE_PRIORITY);
     if (!cand.length) return false;
+    // When completely full, prefer a triple already in the bag. A bank-first
+    // target cannot be retrieved and otherwise blocks every local compound.
+    if ((api.character.esize || 0) < 1) {
+      const local = planCompounds([api.character.items || []], api.G, COMBINE_PRIORITY);
+      if (local.length) cand = local;
+    }
     const target = cand[0];
     closeStandIfOpen();
 
@@ -2158,9 +2170,34 @@ function bootMerchant(api, opts) {
         let freed = false;
         for (let i = 0; i < api.character.items.length; i++) {
           if (!isSellJunk(api.character.items[i], api.G)) continue;
-          await api.sell(i);
-          freed = true;
+          if (!(await goNpc({ map: "main", x: 56, y: -122 }, null))) break;
+          const sold = await api.sell(i);
+          freed = !(sold && sold.failed);
           break;
+        }
+        if (!freed) {
+          const groups = {};
+          for (let i = 0; i < api.character.items.length; i++) {
+            const it = api.character.items[i];
+            if (!it || COMBINE_PRIORITY.indexOf(it.name) < 0) continue;
+            const key = it.name + "@" + (it.level || 0);
+            if (!groups[key]) groups[key] = { indexes: [], priority: COMBINE_PRIORITY.indexOf(it.name) };
+            groups[key].indexes.push(i);
+          }
+          const excess = Object.keys(groups)
+            .map((key) => groups[key])
+            .filter((g) => g.indexes.length >= 4)
+            .sort((a, b) => {
+              const ar = a.indexes.length % 3 ? 0 : 1;
+              const br = b.indexes.length % 3 ? 0 : 1;
+              return ar - br || b.priority - a.priority;
+            })[0];
+          if (excess && (await goNpc({ map: "main", x: 56, y: -122 }, null))) {
+            const it = api.character.items[excess.indexes[0]];
+            const sold = await api.sell(excess.indexes[0], 1);
+            freed = !(sold && sold.failed) && (api.character.esize || 0) >= 1;
+            if (freed) api.game_log("bank:compound_sacrifice " + it.name + "@" + (it.level || 0));
+          }
         }
         if (!freed || (api.character.esize || 0) < 1) {
           api.game_log("bank:combine_no_space");

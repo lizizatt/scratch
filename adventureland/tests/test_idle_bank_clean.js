@@ -78,6 +78,38 @@ test("adversary: idle merchant compounds bank ringsj triple", async () => {
   assert.ok(countNameLevel(bags, "ringsj", 0) <= 0, "no leftover @0 triple");
 });
 
+test("adversary: full merchant sacrifices one excess input to unlock local compounding", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const m = mApi.character;
+  m.gold = 500000;
+  for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "cake", q: 1 };
+  for (let i = 0; i < 3; i++) m.items[i] = { name: "hpbelt", level: 0 };
+  for (let i = 3; i < 7; i++) m.items[i] = { name: "wbook0", level: 0 };
+  m.esize = 0;
+  m._bank = { gold: 0, items0: new Array(42).fill({ name: "cake", q: 1 }) };
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+
+  for (let i = 0; i < 250; i++) {
+    await p.tickAll();
+    if (mApi.log.game.some((g) => g.m === "bank:compound hpbelt@0")) break;
+  }
+
+  const msgs = mApi.log.game.map((g) => g.m);
+  assert.ok(msgs.some((x) => x === "bank:compound_sacrifice wbook0@0"), "sells a remainder, not a triple");
+  assert.ok(msgs.some((x) => x === "bank:compound hpbelt@0"), "local triple compounds after buying a scroll");
+  assert.strictEqual(countNameLevel([m.items], "wbook0", 0), 3, "preserves a complete wbook triple");
+  assert.ok((m.esize || 0) >= 2, "compound creates durable recovery capacity");
+});
+
 test("adversary: idle merchant NPC-vendors bank whitelist junk", async () => {
   const p = bootParty({
     pack: "armadillo",
