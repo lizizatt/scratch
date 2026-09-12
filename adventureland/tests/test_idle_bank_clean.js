@@ -408,6 +408,32 @@ test("adversary: idle merchant NPC-vendors bank whitelist junk", async () => {
     const compound = api.log.game.find((g) => g.m === "bank:compound hpbelt@0");
     assert.ok(!compound || soldAt < compound.t, "junk liquidation must outrank compounding");
   });
+
+  test("adversary: bank junk drains before a saturated-fighter pickup is scheduled", async () => {
+    const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000 });
+    const merchant = p.bots.Puppygirl.api;
+    const fighter = p.bots.Jazwyn.api.character;
+    for (let i = 0; i < fighter.items.length; i++) fighter.items[i] = { name: "tracker" };
+    for (let i = 0; i < 6; i++) fighter.items[i] = { name: "hpbelt", level: 0 };
+    fighter.items[6] = { name: "hpot1", q: 200 };
+    fighter.items[7] = { name: "mpot1", q: 200 };
+    fighter.esize = 0;
+    merchant.character._bank = {
+      gold: 0,
+      items0: [{ name: "stinger", level: 0 }, null, null],
+    };
+
+    for (let i = 0; i < 600; i++) {
+      await p.tickAll();
+      if (merchant.log.game.some((g) => g.m === "dlv:pickup Jazwyn")) break;
+    }
+
+    const vendor = merchant.log.game.find((g) => g.m === "vendor:sell stinger x1");
+    const pickup = merchant.log.game.find((g) => g.m === "dlv:pickup Jazwyn");
+    assert.ok(vendor, "bank junk must be liquidated");
+    assert.ok(pickup, "pickup resumes after junk liquidation");
+    assert.ok(vendor.t < pickup.t, "junk liquidation must precede saturation pickup");
+  });
   const mApi = p.bots.Puppygirl.api;
   const m = mApi.character;
   m.gold = 500000;

@@ -2864,6 +2864,12 @@ function bootMerchant(api, opts) {
           countSellJunk(api.character.items) +
             countSellJunkBank(api.character.bank || api.character._bank) >
           0;
+        if (!store.q.length && junkSoon) {
+          if (await tryVendorNpc()) return;
+          // A full bag cannot retrieve bank junk. Compact one local triple only
+          // to bootstrap a slot, then the next tick returns to vendoring first.
+          if ((api.character.esize || 0) < 1 && (await tryCombineOne())) return;
+        }
         if (junkSoon && bagParkables(null, { onlyBelowGate: true }).length) {
           await parkToBank(null, { onlyBelowGate: true });
         }
