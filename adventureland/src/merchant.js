@@ -205,12 +205,19 @@ function bootMerchant(api, opts) {
         store.q.some((job) => job.id === id)
       )
         continue;
+      const potTotals = { hpot1: 0, mpot1: 0 };
+      for (const it of ad.bag || []) {
+        if (it && potTotals[it.name] != null) potTotals[it.name] += it.q == null ? 1 : it.q;
+      }
+      const items = Object.keys(potTotals)
+        .filter((name) => potTotals[name] < POTION_TARGET)
+        .map((name) => ({ name, q: POTION_TARGET - potTotals[name] }));
       if (
         enqueue({
           id,
-          kind: "dlv_gear",
+          kind: items.length ? "dlv_pots" : "dlv_gear",
           who,
-          items: [],
+          items,
           farm: ad.farm,
           map: ad.map,
           x: ad.x,

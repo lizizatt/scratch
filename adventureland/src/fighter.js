@@ -1258,6 +1258,21 @@ function bootFighter(api, opts) {
     }
 
     const pots = refreshPots();
+    if (now < pickupHoldUntil) {
+      state.setSelf({ task: "pickup" });
+      if (pots === "dry") {
+        persist();
+        return;
+      }
+      burnPotsNow(now);
+      if (opts.pre_combat && opts.pre_combat()) {
+        persist();
+        return;
+      }
+      runCombat(state.S.intent.mtype || "bat");
+      persist();
+      return;
+    }
     if (pots === "dry") {
       if ((api.character.esize || 0) < 1) {
         await freeBagSlot();
@@ -1294,17 +1309,6 @@ function bootFighter(api, opts) {
 
     // Burn after restock checks so dry-wait does not waste pots
     if (pots !== "dry") burnPotsNow(now);
-
-    if (now < pickupHoldUntil) {
-      state.setSelf({ task: "pickup" });
-      if (opts.pre_combat && opts.pre_combat()) {
-        persist();
-        return;
-      }
-      runCombat(state.S.intent.mtype || "bat");
-      persist();
-      return;
-    }
 
     if (!isLead()) {
       state.setSelf({ task: "follow" });
