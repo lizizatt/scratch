@@ -436,8 +436,9 @@ function bootMerchant(api, opts) {
     }
     if (d.job === "cancel_all") {
       if (d.who && d.who !== sender) return;
-      store.q = store.q.filter((j) => j.who !== d.who && j.id !== d.id);
-      if (store.active && (store.active.who === d.who || store.active.id === d.id)) store.active = null;
+      const matches = (job) => (d.id ? job.id === d.id : job.who === d.who);
+      store.q = store.q.filter((job) => !matches(job));
+      if (store.active && matches(store.active)) store.active = null;
       saveQ(store);
       api.game_log("dlv:cancel");
       return;

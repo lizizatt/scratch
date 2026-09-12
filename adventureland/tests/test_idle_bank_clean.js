@@ -194,6 +194,31 @@ test("adversary: merchant visits saturated fighter and retrieves only compound o
   );
 });
 
+test("adversary: targeted pot cancellation does not cancel a coordinator pickup", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000 });
+  const ctrl = p.bots.Puppygirl.ctrl;
+  ctrl.store.active = {
+    id: "pickup_Zarook_7",
+    kind: "dlv_gear",
+    who: "Zarook",
+    items: [],
+    t0: p.world.clock.now(),
+  };
+
+  await p.bots.Zarook.api.send_cm("Puppygirl", {
+    job: "cancel_all",
+    id: "pot_timeout_Zarook",
+    who: "Zarook",
+  });
+  assert.ok(ctrl.store.active && ctrl.store.active.id === "pickup_Zarook_7");
+
+  await p.bots.Zarook.api.send_cm("Puppygirl", {
+    job: "cancel_all",
+    who: "Zarook",
+  });
+  assert.strictEqual(ctrl.store.active, null, "untargeted hop cancellation still clears fighter jobs");
+});
+
 test("adversary: idle merchant NPC-vendors bank whitelist junk", async () => {
   const p = bootParty({
     pack: "armadillo",
