@@ -6,6 +6,7 @@ const {
   HOME,
   JOB_MS,
   POTION_TARGET,
+  ECON_BAG_RESERVE,
   GOLD_FLOAT_FIGHTER,
   GOLD_FLOAT_MERCHANT,
   COMBINE_PRIORITY,
@@ -2028,8 +2029,18 @@ function bootMerchant(api, opts) {
       });
       if (!bankHit) return false;
       if ((api.character.esize || 0) < 1) await parkToBank();
-      const bagI = await ensureGearInBag({ name: bankHit.name, level: bankHit.level || 0 });
-      if (bagI < 0) return false;
+      if (!(await ensureAtBank())) return false;
+      while ((api.character.esize || 0) > ECON_BAG_RESERVE) {
+        const hit = listBankItems().find((e) => {
+          if (e.name !== bankHit.name) return false;
+          const it = { name: e.name, level: e.level || 0 };
+          return eligibleUpgrade(it, api.G) && upgradeChance(it) >= MIN_UPGRADE_CHANCE;
+        });
+        if (!hit) break;
+        const pulled = await api.bank_retrieve(hit.pack, hit.i);
+        if (pulled && pulled.failed) break;
+      }
+      await leaveBankToPlaza();
       i = pickUpgradeIndex(api.character.items, api.G);
       if (i < 0) return false;
     }
@@ -2058,7 +2069,12 @@ function bootMerchant(api, opts) {
         api.game_log("gear:upgrade_path_fail");
         return false;
       }
-      const br = await api.buy(scn, 1);
+      const batchSize = api.character.items.filter((x) => {
+        if (!x || scrollFor(x, api.G) !== scn) return false;
+        return eligibleUpgrade(x, api.G) && upgradeChance(x) >= MIN_UPGRADE_CHANCE;
+      }).length;
+      const scrollQty = Math.max(1, Math.min(batchSize, Math.floor(spendableGold() / price)));
+      const br = await api.buy(scn, scrollQty);
       if (br && br.failed) {
         api.game_log("gear:scroll_buy_fail");
         return false;
@@ -2143,12 +2159,14 @@ function bootMerchant(api, opts) {
     let three = bagThree();
     if (!three) {
       if (!(await ensureAtBank())) return false;
-      while (!bagThree() && (api.character.esize || 0) > 0) {
+      while ((api.character.esize || 0) > 0) {
         const hit = listBankItems().find(
           (e) => e.name === target.name && (e.level || 0) === target.level
         );
         if (!hit) break;
-        await api.bank_retrieve(hit.pack, hit.i);
+        if (bagThree() && (api.character.esize || 0) <= ECON_BAG_RESERVE) break;
+        const pulled = await api.bank_retrieve(hit.pack, hit.i);
+        if (pulled && pulled.failed) break;
       }
       three = bagThree();
       await leaveBankToPlaza();
@@ -2210,7 +2228,13 @@ function bootMerchant(api, opts) {
         api.game_log("bank:combine_path_fail");
         return false;
       }
-      const br = await api.buy(scn, 1);
+      const batchSize = Math.floor(
+        api.character.items.filter(
+          (x) => x && x.name === target.name && (x.level || 0) === target.level
+        ).length / 3
+      );
+      const scrollQty = Math.max(1, Math.min(batchSize, Math.floor(spendableGold() / price)));
+      const br = await api.buy(scn, scrollQty);
       if (br && br.failed) {
         api.game_log("bank:cscroll_buy_fail");
         return false;

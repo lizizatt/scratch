@@ -35,6 +35,8 @@ const GOLD_FLOAT_FIGHTER = 100000; // keep ~100k on fighters for town buys / flo
 const POTION_TARGET = 200;
 const POTION_LOW = 80;
 const POTION_DRY = 0;
+/** Keep this many merchant bag slots open while withdrawing economy batches. */
+const ECON_BAG_RESERVE = 4;
 /** Emergency heal thresholds (live use_hp/use_mp trigger points; also used in sim). */
 const HEAL_HP_PCT = 0.55;
 const HEAL_MP_PCT = 0.5;
@@ -211,6 +213,7 @@ module.exports = {
   POTION_TARGET,
   POTION_LOW,
   POTION_DRY,
+  ECON_BAG_RESERVE,
   HEAL_HP_PCT,
   HEAL_MP_PCT,
   SEND_RANGE,

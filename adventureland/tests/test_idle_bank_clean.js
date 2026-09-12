@@ -110,6 +110,62 @@ test("adversary: full merchant sacrifices one excess input to unlock local compo
   assert.ok((m.esize || 0) >= 2, "compound creates durable recovery capacity");
 });
 
+test("adversary: bank compound work is withdrawn and scrolled as one bounded batch", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const m = api.character;
+  for (let i = 0; i < m.items.length; i++) {
+    if (m.items[i] && ["stand0", "hpot1", "mpot1"].indexOf(m.items[i].name) >= 0) continue;
+    if (m.items[i]) {
+      m.items[i] = null;
+      m.esize++;
+    }
+  }
+  m._bank = { gold: 0, items0: new Array(42).fill(null) };
+  for (let i = 0; i < 9; i++) m._bank.items0[i] = { name: "ringsj", level: 0 };
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+
+  for (let i = 0; i < 200; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "bank:compound ringsj@0")) break;
+  }
+
+  assert.strictEqual(api.log.retrieved.filter((x) => x.name === "ringsj").length, 9);
+  const scroll = m.items.find((x) => x && x.name === "cscroll0");
+  assert.ok(scroll && scroll.q === 2, "buys all three batch scrolls before the first compound");
+  assert.ok((m.esize || 0) >= 4, "batch withdrawal preserves logistics reserve");
+});
+
+test("adversary: bank upgrade work is withdrawn and scrolled as one bounded batch", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const m = api.character;
+  for (let i = 0; i < m.items.length; i++) {
+    if (m.items[i] && ["stand0", "hpot1", "mpot1"].indexOf(m.items[i].name) >= 0) continue;
+    if (m.items[i]) {
+      m.items[i] = null;
+      m.esize++;
+    }
+  }
+  m._bank = { gold: 0, items0: new Array(42).fill(null) };
+  for (let i = 0; i < 3; i++) m._bank.items0[i] = { name: "gloves", level: 0 };
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+
+  for (let i = 0; i < 200; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => /^gear:upgrade gloves@0/.test(g.m))) break;
+  }
+
+  assert.strictEqual(api.log.retrieved.filter((x) => x.name === "gloves").length, 3);
+  const scroll = m.items.find((x) => x && x.name === "scroll0");
+  assert.ok(scroll && scroll.q >= 2, "buys the upgrade batch scrolls together");
+  assert.ok((m.esize || 0) >= 4, "batch withdrawal preserves logistics reserve");
+});
+
 test("adversary: idle merchant NPC-vendors bank whitelist junk", async () => {
   const p = bootParty({
     pack: "armadillo",
