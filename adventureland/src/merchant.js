@@ -203,7 +203,8 @@ function bootMerchant(api, opts) {
 
   function enqueue(job) {
     if (hunterPreparing && !job.hunter) return false;
-    if (store.q.length >= 8) {
+    const queueLimit = job.hunter ? Math.max(8, HUNTER_PLAN.length) : 8;
+    if (store.q.length >= queueLimit) {
       api.game_log("dlv:queue_full");
       return false;
     }
@@ -855,7 +856,7 @@ function bootMerchant(api, opts) {
   }
 
   /**
-   * Explicit operator action for the reviewed 60-token tranche. It is
+   * Explicit operator action for the approved Hunter manifest. It is
    * all-or-nothing before the first exchange, then restart-safe by ownership:
    * already-owned target pieces are never purchased again.
    */
@@ -2631,7 +2632,7 @@ function bootMerchant(api, opts) {
   async function deliverActive() {
     const job = store.active;
     if (!job) return;
-    if ((api._now ? api._now() : Date.now()) - job.t0 > JOB_MS) {
+    if ((api._now ? api._now() : Date.now()) - (job.activeAt || job.t0) > JOB_MS) {
       api.game_log("dlv:job_ttl");
       store.active = null;
       saveQ(store);
@@ -2996,6 +2997,7 @@ function bootMerchant(api, opts) {
       if (!store.active && !store.q.length) enqueueSaturationPickup();
       if (!store.active && store.q.length) {
         store.active = store.q.shift();
+        store.active.activeAt = api._now();
         saveQ(store);
         api.game_log("dlv:active " + store.active.kind + " -> " + store.active.who);
       }

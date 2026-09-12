@@ -29,9 +29,10 @@ recorded an exact 60-token debit; the party remained online and continued
 earning tokens during delivery, so 4 is the purchase-time reserve rather than
 a durable balance.
 
-This executes the Hunter-set direction without claiming that four complete
-sets are the best immediate use of 212 tokens. Full sets remain later targets,
-especially for Jazwyn. Puppygirl's set is useful but follows the combat trio.
+The configured acquisition manifest now includes all five Warrior, Mage, and
+Priest pieces. It reuses the seven pieces above, so completing the three combat
+sets costs 99 additional tokens rather than repurchasing the first tranche.
+Puppygirl's set remains outside this manifest.
 
 This is a **current-progression BIS plan** for the party's present levels,
 inventory, and operating model. It is not a claim about theoretical endgame
@@ -225,7 +226,7 @@ would be a temporary downgrade.
 
 The first tranche resolved the original automation gaps:
 
-1. A fixed, class-validated manifest assigns every piece and armor slot.
+1. A fixed, class-validated manifest assigns all 15 combat-set pieces and armor slots.
 2. Loadout scoring includes class main stats, set breakpoints, crit, piercing,
    output, and speed.
 3. Hunter pieces are protected from ordinary disposal and `scroll0` upgrading;
@@ -292,6 +293,10 @@ their opportunity cost worthwhile.
    Mace.
    **Correction:** live version-15650 `G.tokens.monstertoken` is authoritative
    for that 12-token Paladin-only reward.
+8. **Full-set expansion:** a 15-delivery batch exceeded the ordinary queue's
+   eight-job cap and late jobs aged out while waiting.
+   **Correction:** Hunter jobs may fill the complete manifest, and delivery TTL
+   starts when each queued job becomes active.
 
 ## Sources
 

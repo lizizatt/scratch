@@ -54,7 +54,7 @@ const SEND_RANGE = 320;
 const ASSEMBLE_TIMEOUT_MS = 60000;
 const RARE_GONE_MS = 20000;
 const RARE_WHITELIST = ["phoenix", "goldenbat"];
-/** Approved first Monster Token tranche; order also defines purchase/log order. */
+/** Approved full Monster Hunter sets; order also defines purchase/log order. */
 const HUNTER_PLAN = [
   { who: "Sarene", name: "mmhat", slot: "helmet", cost: 7 },
   { who: "Sarene", name: "mmgloves", slot: "gloves", cost: 8 },
@@ -63,6 +63,14 @@ const HUNTER_PLAN = [
   { who: "Zarook", name: "mphat", slot: "helmet", cost: 7 },
   { who: "Zarook", name: "mppants", slot: "pants", cost: 11 },
   { who: "Jazwyn", name: "mwgloves", slot: "gloves", cost: 8 },
+  { who: "Jazwyn", name: "mwarmor", slot: "chest", cost: 12 },
+  { who: "Jazwyn", name: "mwpants", slot: "pants", cost: 11 },
+  { who: "Sarene", name: "mmarmor", slot: "chest", cost: 12 },
+  { who: "Jazwyn", name: "mwhelmet", slot: "helmet", cost: 7 },
+  { who: "Jazwyn", name: "mwboots", slot: "shoes", cost: 15 },
+  { who: "Zarook", name: "mparmor", slot: "chest", cost: 12 },
+  { who: "Zarook", name: "mpshoes", slot: "shoes", cost: 15 },
+  { who: "Sarene", name: "mmshoes", slot: "shoes", cost: 15 },
 ];
 const HUNTER_ITEMS = HUNTER_PLAN.map((x) => x.name);
 /** Never toss/sell — Tracktrix stays permanent; approved Hunter pieces survive swaps. */
@@ -168,6 +176,11 @@ const GEAR_TARGETS = {
     orb: "orbg",
     offhand: "sshield",
     mainhand: "fireblade",
+    helmet: "mwhelmet",
+    chest: "mwarmor",
+    pants: "mwpants",
+    shoes: "mwboots",
+    gloves: "mwgloves",
     earring1: "strearring",
     earring2: "strearring",
     cape: "cape",
@@ -175,6 +188,11 @@ const GEAR_TARGETS = {
   Zarook: {
     orb: "orbg",
     offhand: "wbook0",
+    helmet: "mphat",
+    chest: "mparmor",
+    pants: "mppants",
+    shoes: "mpshoes",
+    gloves: "mpgloves",
     earring1: "vitearring",
     earring2: "vitearring",
     cape: "cape",
@@ -182,6 +200,11 @@ const GEAR_TARGETS = {
   Sarene: {
     orb: "orbg",
     offhand: "wbook0",
+    helmet: "mmhat",
+    chest: "mmarmor",
+    pants: "mmpants",
+    shoes: "mmshoes",
+    gloves: "mmgloves",
     earring1: "intearring",
     earring2: "intearring",
     cape: "cape",
