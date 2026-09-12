@@ -37,7 +37,7 @@ test("planSellBag picks whitelist only", () => {
     { name: "ringsj", level: 0 },
     null,
   ];
-  assert.deepStrictEqual(planSellBag(items), [0, 2]);
+  assert.deepStrictEqual(planSellBag(items), [0, 2, 3]);
 });
 
 test("planSellBank skips gold and keep items", () => {

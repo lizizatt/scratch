@@ -23,10 +23,12 @@ test("constants: VENDOR_NPC covers stuck stall junk; sshield is Jazwyn offhand t
 });
 
 test("unit: wearable duplicate junk is vendored only at level zero", () => {
-  for (const n of ["wattire", "wgloves", "partyhat"]) assert.ok(VENDOR_NPC_LEVEL0.indexOf(n) >= 0, n);
-  const G = { items: { wattire: { type: "chest", upgrade: true } } };
-  assert.ok(isSellJunk({ name: "wattire", level: 0 }, G));
-  assert.ok(!isSellJunk({ name: "wattire", level: 1 }, G));
+  for (const n of ["wattire", "wgloves", "partyhat", "ringsj", "hpamulet", "hpbelt"]) {
+    assert.ok(VENDOR_NPC_LEVEL0.indexOf(n) >= 0, n);
+    const G = { items: { [n]: { type: "ring", upgrade: true } } };
+    assert.ok(isSellJunk({ name: n, level: 0 }, G));
+    assert.ok(!isSellJunk({ name: n, level: 1 }, G));
+  }
 });
 
 test("unit: sshield classOk warrior only; scores above plain shield", () => {

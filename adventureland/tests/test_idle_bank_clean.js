@@ -23,7 +23,7 @@ function countNameLevel(bags, name, level) {
   return n;
 }
 
-test("adversary: idle merchant compounds bank ringsj triple", async () => {
+test("adversary: idle merchant compounds bank strearring triple", async () => {
   const p = bootParty({
     pack: "armadillo",
     pots: 200,
@@ -44,9 +44,9 @@ test("adversary: idle merchant compounds bank ringsj triple", async () => {
   m._bank = {
     gold: 0,
     items0: [
-      { name: "ringsj", level: 0 },
-      { name: "ringsj", level: 0 },
-      { name: "ringsj", level: 0 },
+      { name: "strearring", level: 0 },
+      { name: "strearring", level: 0 },
+      { name: "strearring", level: 0 },
       { name: "frogt" },
       null,
       null,
@@ -60,7 +60,7 @@ test("adversary: idle merchant compounds bank ringsj triple", async () => {
   let compounded = false;
   for (let i = 0; i < 200; i++) {
     await p.tickAll();
-    if (mApi.log.game.some((g) => /^bank:compound ringsj@0/.test(g.m))) {
+    if (mApi.log.game.some((g) => /^bank:compound strearring@0/.test(g.m))) {
       compounded = true;
       break;
     }
@@ -75,8 +75,8 @@ test("adversary: idle merchant compounds bank ringsj triple", async () => {
   if (m._bank) {
     for (const k of Object.keys(m._bank)) if (k !== "gold" && Array.isArray(m._bank[k])) bags.push(m._bank[k]);
   }
-  assert.ok(countNameLevel(bags, "ringsj", 1) >= 1, "should have ringsj@1 after compound");
-  assert.ok(countNameLevel(bags, "ringsj", 0) <= 0, "no leftover @0 triple");
+  assert.ok(countNameLevel(bags, "strearring", 1) >= 1, "should have strearring@1 after compound");
+  assert.ok(countNameLevel(bags, "strearring", 0) <= 0, "no leftover @0 triple");
 });
 
 test("adversary: full merchant sacrifices one excess input to unlock local compounding", async () => {
@@ -90,7 +90,7 @@ test("adversary: full merchant sacrifices one excess input to unlock local compo
   const m = mApi.character;
   m.gold = 500000;
   for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
-  for (let i = 0; i < 3; i++) m.items[i] = { name: "hpbelt", level: 0 };
+  for (let i = 0; i < 3; i++) m.items[i] = { name: "strearring", level: 0 };
   for (let i = 3; i < 7; i++) m.items[i] = { name: "wbook0", level: 0 };
   m.esize = 0;
   m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
@@ -105,12 +105,12 @@ test("adversary: full merchant sacrifices one excess input to unlock local compo
 
   for (let i = 0; i < 250; i++) {
     await p.tickAll();
-    if (mApi.log.game.some((g) => g.m === "bank:compound hpbelt@0")) break;
+    if (mApi.log.game.some((g) => g.m === "bank:compound strearring@0")) break;
   }
 
   const msgs = mApi.log.game.map((g) => g.m);
   assert.ok(msgs.some((x) => x === "bank:compound_sacrifice wbook0@0"), "sells a remainder, not a triple");
-  assert.ok(msgs.some((x) => x === "bank:compound hpbelt@0"), "local triple compounds after buying a scroll");
+  assert.ok(msgs.some((x) => x === "bank:compound strearring@0"), "local triple compounds after buying a scroll");
   assert.strictEqual(countNameLevel([m.items], "wbook0", 0), 3, "preserves a complete wbook triple");
   assert.ok((m.esize || 0) >= 2, "compound creates durable recovery capacity");
 });
@@ -120,17 +120,17 @@ test("adversary: full merchant prefers a local triple with its scroll already in
   const api = p.bots.Puppygirl.api;
   const m = api.character;
   let readyLevel = 0;
-  while (readyLevel < 5 && cscrollFor("hpbelt", readyLevel, api.G) !== "cscroll1") {
+  while (readyLevel < 5 && cscrollFor("strearring", readyLevel, api.G) !== "cscroll1") {
     readyLevel++;
   }
-  assert.ok(readyLevel < 5, "fixture must expose a cscroll1 hpbelt level");
+  assert.ok(readyLevel < 5, "fixture must expose a cscroll1 strearring level");
   for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
-  m.items[0] = { name: "hpbelt", level: 0 };
-  m.items[1] = { name: "hpbelt", level: 0 };
-  m.items[2] = { name: "hpbelt", level: 0 };
-  m.items[3] = { name: "hpbelt", level: readyLevel };
-  m.items[4] = { name: "hpbelt", level: readyLevel };
-  m.items[5] = { name: "hpbelt", level: readyLevel };
+  m.items[0] = { name: "strearring", level: 0 };
+  m.items[1] = { name: "strearring", level: 0 };
+  m.items[2] = { name: "strearring", level: 0 };
+  m.items[3] = { name: "strearring", level: readyLevel };
+  m.items[4] = { name: "strearring", level: readyLevel };
+  m.items[5] = { name: "strearring", level: readyLevel };
   m.items[6] = { name: "cscroll1", q: 4 };
   m.esize = 0;
   m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
@@ -141,15 +141,15 @@ test("adversary: full merchant prefers a local triple with its scroll already in
 
   for (let i = 0; i < 300; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => g.m === "bank:compound hpbelt@" + readyLevel)) break;
+    if (api.log.game.some((g) => g.m === "bank:compound strearring@" + readyLevel)) break;
   }
 
   const msgs = api.log.game.map((g) => g.m);
   assert.ok(
-    msgs.some((g) => g === "bank:compound hpbelt@" + readyLevel),
+    msgs.some((g) => g === "bank:compound strearring@" + readyLevel),
     "logs=" + msgs.filter((g) => /^bank:/.test(g)).join(" | ")
   );
-  assert.ok(!api.log.game.some((g) => g.m === "bank:compound_sacrifice hpbelt@0"));
+  assert.ok(!api.log.game.some((g) => g.m === "bank:compound_sacrifice strearring@0"));
   assert.ok((m.esize || 0) >= 2);
 });
 
@@ -158,9 +158,9 @@ test("adversary: constrained merchant compacts a local triple before an inaccess
   const api = p.bots.Puppygirl.api;
   const m = api.character;
   for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
-  m.items[0] = { name: "hpbelt", level: 0 };
-  m.items[1] = { name: "hpbelt", level: 0 };
-  m.items[2] = { name: "hpbelt", level: 0 };
+  m.items[0] = { name: "strearring", level: 0 };
+  m.items[1] = { name: "strearring", level: 0 };
+  m.items[2] = { name: "strearring", level: 0 };
   m.items[3] = { name: "cscroll0", q: 1 };
   m.items[4] = { name: "hpot1", q: 200 };
   m.items[5] = { name: "mpot1", q: 200 };
@@ -177,11 +177,11 @@ test("adversary: constrained merchant compacts a local triple before an inaccess
 
   for (let i = 0; i < 120; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => g.m === "bank:compound hpbelt@0")) break;
+    if (api.log.game.some((g) => g.m === "bank:compound strearring@0")) break;
   }
 
   const msgs = api.log.game.map((g) => g.m);
-  assert.ok(msgs.some((g) => g === "bank:compound hpbelt@0"));
+  assert.ok(msgs.some((g) => g === "bank:compound strearring@0"));
   assert.ok(!msgs.some((g) => g === "bank:combine_pull_fail orbg@0"));
   assert.ok((m.esize || 0) >= 4, "local compaction restores the logistics reserve");
 });
@@ -191,16 +191,16 @@ test("adversary: full merchant sells cosmetic clutter before breaking an exact t
   const api = p.bots.Puppygirl.api;
   const m = api.character;
   for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
-  m.items[0] = { name: "hpbelt", level: 0 };
-  m.items[1] = { name: "hpbelt", level: 0 };
-  m.items[2] = { name: "hpbelt", level: 0 };
+  m.items[0] = { name: "strearring", level: 0 };
+  m.items[1] = { name: "strearring", level: 0 };
+  m.items[2] = { name: "strearring", level: 0 };
   m.items[3] = { name: "confetti", q: 8 };
   m.esize = 0;
   m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
 
   for (let i = 0; i < 300; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => g.m === "bank:compound hpbelt@0")) break;
+    if (api.log.game.some((g) => g.m === "bank:compound strearring@0")) break;
   }
 
   const msgs = api.log.game.map((g) => g.m);
@@ -208,7 +208,7 @@ test("adversary: full merchant sells cosmetic clutter before breaking an exact t
     msgs.some((g) => g === "bank:material_sacrifice confetti"),
     "logs=" + msgs.filter((g) => /^bank:/.test(g)).join(" | ")
   );
-  assert.ok(msgs.some((g) => g === "bank:compound hpbelt@0"));
+  assert.ok(msgs.some((g) => g === "bank:compound strearring@0"));
   assert.ok(!api.log.game.some((g) => /^bank:compound_sacrifice/.test(g.m)));
 });
 
@@ -224,17 +224,17 @@ test("adversary: bank compound work is withdrawn and scrolled as one bounded bat
     }
   }
   m._bank = { gold: 0, items0: new Array(42).fill(null) };
-  for (let i = 0; i < 9; i++) m._bank.items0[i] = { name: "ringsj", level: 0 };
+  for (let i = 0; i < 9; i++) m._bank.items0[i] = { name: "strearring", level: 0 };
   m.map = "main";
   m.real_x = m.x = 40;
   m.real_y = m.y = -20;
 
   for (let i = 0; i < 200; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => g.m === "bank:compound ringsj@0")) break;
+    if (api.log.game.some((g) => g.m === "bank:compound strearring@0")) break;
   }
 
-  assert.strictEqual(api.log.retrieved.filter((x) => x.name === "ringsj").length, 9);
+  assert.strictEqual(api.log.retrieved.filter((x) => x.name === "strearring").length, 9);
   const scroll = m.items.find((x) => x && x.name === "cscroll0");
   assert.ok(scroll && scroll.q === 2, "buys all three batch scrolls before the first compound");
   assert.ok((m.esize || 0) >= 4, "batch withdrawal preserves logistics reserve");
@@ -306,9 +306,9 @@ test("adversary: blocked full-bag compounding is rate limited", async () => {
   const api = p.bots.Puppygirl.api;
   const m = api.character;
   for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
-  m.items[0] = { name: "hpbelt", level: 0 };
-  m.items[1] = { name: "hpbelt", level: 0 };
-  m.items[2] = { name: "hpbelt", level: 0 };
+  m.items[0] = { name: "strearring", level: 0 };
+  m.items[1] = { name: "strearring", level: 0 };
+  m.items[2] = { name: "strearring", level: 0 };
   m.esize = 0;
   m._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
 
@@ -414,9 +414,10 @@ test("adversary: idle merchant NPC-vendors bank whitelist junk", async () => {
     const merchant = p.bots.Puppygirl.api;
     const fighter = p.bots.Jazwyn.api.character;
     for (let i = 0; i < fighter.items.length; i++) fighter.items[i] = { name: "tracker" };
-    for (let i = 0; i < 6; i++) fighter.items[i] = { name: "hpbelt", level: 0 };
+    for (let i = 0; i < 6; i++) fighter.items[i] = { name: "wbook0", level: 0 };
     fighter.items[6] = { name: "hpot1", q: 200 };
     fighter.items[7] = { name: "mpot1", q: 200 };
+    fighter.slots.offhand = { name: "wbook0", level: 5 };
     fighter.esize = 0;
     merchant.character._bank = {
       gold: 0,

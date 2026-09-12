@@ -100,6 +100,9 @@ const VENDOR_NPC_LEVEL0 = [
   "wattire",
   "wgloves",
   "partyhat",
+  "ringsj",
+  "hpamulet",
+  "hpbelt",
 ];
 /** Low-value unneeded drops: reclaim immediately instead of occupying stall/vault slots. */
 const EMERGENCY_VENDOR_NPC = [
