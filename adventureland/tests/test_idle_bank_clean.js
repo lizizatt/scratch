@@ -153,6 +153,39 @@ test("adversary: full merchant prefers a local triple with its scroll already in
   assert.ok((m.esize || 0) >= 2);
 });
 
+test("adversary: constrained merchant compacts a local triple before an inaccessible bank triple", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const m = api.character;
+  for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
+  m.items[0] = { name: "hpbelt", level: 0 };
+  m.items[1] = { name: "hpbelt", level: 0 };
+  m.items[2] = { name: "hpbelt", level: 0 };
+  m.items[3] = { name: "cscroll0", q: 1 };
+  m.items[4] = { name: "hpot1", q: 200 };
+  m.items[5] = { name: "mpot1", q: 200 };
+  m.items[40] = null;
+  m.items[41] = null;
+  m.esize = 2;
+  m._bank = {
+    gold: 0,
+    items0: new Array(42).fill({ name: "tracker" }),
+  };
+  m._bank.items0[0] = { name: "orbg", level: 0 };
+  m._bank.items0[1] = { name: "orbg", level: 0 };
+  m._bank.items0[2] = { name: "orbg", level: 0 };
+
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "bank:compound hpbelt@0")) break;
+  }
+
+  const msgs = api.log.game.map((g) => g.m);
+  assert.ok(msgs.some((g) => g === "bank:compound hpbelt@0"));
+  assert.ok(!msgs.some((g) => g === "bank:combine_pull_fail orbg@0"));
+  assert.ok((m.esize || 0) >= 4, "local compaction restores the logistics reserve");
+});
+
 test("adversary: full merchant sells cosmetic clutter before breaking an exact triple", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
@@ -347,6 +380,33 @@ test("adversary: idle merchant NPC-vendors bank whitelist junk", async () => {
     pots: 200,
     gold: 500000,
     members: ["Puppygirl"],
+  });
+
+  test("adversary: low-value stall drops are NPC-vendored before compounding", async () => {
+    const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+    const api = p.bots.Puppygirl.api;
+    const m = api.character;
+    m._bank = {
+      gold: 0,
+      items0: [
+        { name: "stinger", level: 0 },
+        { name: "hpbelt", level: 0 },
+        { name: "hpbelt", level: 0 },
+        { name: "hpbelt", level: 0 },
+        null,
+      ],
+    };
+
+    for (let i = 0; i < 180; i++) {
+      await p.tickAll();
+      if (api.log.game.some((g) => g.m === "vendor:sell stinger x1")) break;
+    }
+
+    const msgs = api.log.game.map((g) => g.m);
+    assert.ok(msgs.some((g) => g === "vendor:sell stinger x1"));
+    const soldAt = api.log.game.find((g) => g.m === "vendor:sell stinger x1").t;
+    const compound = api.log.game.find((g) => g.m === "bank:compound hpbelt@0");
+    assert.ok(!compound || soldAt < compound.t, "junk liquidation must outrank compounding");
   });
   const mApi = p.bots.Puppygirl.api;
   const m = mApi.character;

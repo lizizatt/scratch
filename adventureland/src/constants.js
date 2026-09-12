@@ -101,6 +101,15 @@ const VENDOR_NPC_LEVEL0 = [
   "wgloves",
   "partyhat",
 ];
+/** Low-value unneeded drops: reclaim immediately instead of occupying stall/vault slots. */
+const EMERGENCY_VENDOR_NPC = [
+  "cclaw",
+  "stinger",
+  "poker",
+  "slimestaff",
+  "eears",
+  "mushroomstaff",
+];
 /**
  * Player-market liquidation. `keep` counts all equipped, bagged, banked, and
  * already-listed copies; only merchant-owned surplus may enter the stall.
@@ -114,11 +123,6 @@ const STALL_SELL = [
   { name: "gloves1", keep: 0 },
   { name: "helmet1", keep: 1 },
   { name: "pants1", keep: 1 },
-  { name: "cclaw", keep: 0 },
-  { name: "eears", keep: 0 },
-  { name: "poker", keep: 0 },
-  { name: "slimestaff", keep: 0 },
-  { name: "stinger", keep: 0 },
   { name: "xmashat", keep: 0 },
 ];
 /** Compound priority for bank clean / merchant combine. */
@@ -241,6 +245,7 @@ module.exports = {
   EXCHANGE_ITEMS,
   VENDOR_NPC,
   VENDOR_NPC_LEVEL0,
+  EMERGENCY_VENDOR_NPC,
   STALL_SELL,
   COMBINE_PRIORITY,
   GEAR_TYPES,

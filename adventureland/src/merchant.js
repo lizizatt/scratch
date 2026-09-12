@@ -21,6 +21,7 @@ const {
   EXCHANGE_ITEMS,
   VENDOR_NPC,
   VENDOR_NPC_LEVEL0,
+  EMERGENCY_VENDOR_NPC,
   STALL_SELL,
   GEAR_TARGETS,
   PONTY_WANT,
@@ -1410,6 +1411,7 @@ function bootMerchant(api, opts) {
     return (
       !!it &&
       (OBSOLETE_POTIONS.indexOf(it.name) >= 0 ||
+        EMERGENCY_VENDOR_NPC.indexOf(it.name) >= 0 ||
         VENDOR_NPC.indexOf(it.name) >= 0 ||
         (VENDOR_NPC_LEVEL0.indexOf(it.name) >= 0 && !(it.level > 0)))
     );
@@ -1617,7 +1619,11 @@ function bootMerchant(api, opts) {
       const hit = listBankItems()
         .filter((e) => isVendorNpcItem(e))
         .sort((a, b) => {
-          const order = OBSOLETE_POTIONS.concat(VENDOR_NPC, VENDOR_NPC_LEVEL0);
+          const order = OBSOLETE_POTIONS.concat(
+            EMERGENCY_VENDOR_NPC,
+            VENDOR_NPC,
+            VENDOR_NPC_LEVEL0
+          );
           const ia = order.indexOf(a.name);
           const ib = order.indexOf(b.name);
           return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
@@ -2230,9 +2236,10 @@ function bootMerchant(api, opts) {
     }
     let cand = planCompounds(bags, api.G, COMBINE_PRIORITY);
     if (!cand.length) return false;
-    // When completely full, prefer a triple already in the bag. A bank-first
-    // target cannot be retrieved and otherwise blocks every local compound.
-    if ((api.character.esize || 0) < 1) {
+    // Under the logistics reserve, prefer an executable local triple. A
+    // bank-first target needs three retrieval slots and can otherwise block
+    // local compaction even when the bag already contains a complete triple.
+    if ((api.character.esize || 0) < ECON_BAG_RESERVE) {
       const local = planCompounds([api.character.items || []], api.G, COMBINE_PRIORITY);
       const ready = local.find((x) => {
         const scroll = cscrollFor(x.name, x.level, api.G);
