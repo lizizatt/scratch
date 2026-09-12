@@ -1508,13 +1508,32 @@ function bootMerchant(api, opts) {
     return Math.max(rule.floor || 0, Math.ceil(upgraded / 100) * 100);
   }
 
+  function stallGiftReserveKeys() {
+    const ads = {};
+    for (const who of FIGHTERS) {
+      const ad = gearAds[who];
+      if (ad && ad.slots) ads[who] = Object.assign({}, ad, { esize: Math.max(1, ad.esize || 0) });
+    }
+    const keys = new Set();
+    for (const gift of planGifts(listGiftables(), ads, api.G)) {
+      const e = gift.e;
+      if (e && e.pack != null && e.i != null) keys.add(e.pack + ":" + e.i);
+    }
+    return keys;
+  }
+
   function stallCandidate(preferBag, reserveStable) {
     const candidates = [];
+    const giftReserve = stallGiftReserveKeys();
     for (const rule of STALL_SELL || []) {
       if (rule.keep > 0 && !reserveStable) continue;
       if (!stallReserveReady(rule)) continue;
       let choices = stallCopies(rule);
       if (preferBag) choices = choices.filter((x) => x.i != null);
+      choices = choices.filter((x) => {
+        const key = x.i != null ? "bag:" + x.i : x.bank && x.bank.pack + ":" + x.bank.i;
+        return !giftReserve.has(key);
+      });
       candidates.push(...choices);
     }
     candidates.sort((a, b) => {

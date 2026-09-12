@@ -161,7 +161,46 @@ test("adversary: stall lists only surplus fiery blades and spiked shields", asyn
   assert.strictEqual(j.slots.offhand.name, "sshield");
 });
 
-test("adversary: stall sells the weakest surplus copy and ignores locked gear", async () => {
+test("adversary: stall lists upgraded base armor without touching fighter equipment", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Jazwyn", "Puppygirl"] });
+  const j = p.bots.Jazwyn.api.character;
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  const armor = [
+    ["pants", "pants", 6, 2],
+    ["gloves", "gloves", 6, 3],
+    ["helmet", "helmet", 6, 4],
+    ["shoes", "shoes", 6, 5],
+    ["coat", "chest", 7, 6],
+  ];
+  for (const [name, slot, level] of armor) j.slots[slot] = { name, level };
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  armor.forEach(([name, , , sellLevel], i) => {
+    c.items[i + 3] = { name, level: sellLevel };
+  });
+  c.esize = c.items.filter((x) => !x).length;
+  c.map = j.map = "main";
+  c.real_x = c.x = j.real_x = j.x = 40;
+  c.real_y = c.y = j.real_y = j.y = -20;
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+
+  for (let i = 0; i < 480; i++) {
+    await p.tickAll();
+    const listed = Object.values(c.slots).filter((x) => x && x.price);
+    if (armor.every(([name]) => listed.some((x) => x.name === name))) break;
+  }
+
+  const listed = Object.values(c.slots).filter((x) => x && x.price);
+  for (const [name, slot, level, sellLevel] of armor) {
+    assert.ok(listed.some((x) => x.name === name && x.level === sellLevel), name + " listed");
+    assert.deepStrictEqual(j.slots[slot], { name, level }, name + " remains equipped");
+  }
+});
+
+test("adversary: stall delivers the strongest upgrade before listing displaced gear", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Jazwyn", "Puppygirl"] });
   const j = p.bots.Jazwyn.api.character;
   const api = p.bots.Puppygirl.api;
@@ -186,7 +225,8 @@ test("adversary: stall sells the weakest surplus copy and ignores locked gear", 
 
   const listed = Object.values(c.slots).find((x) => x && x.name === "fireblade" && x.price);
   assert.ok(listed, "a surplus blade must be listed");
-  assert.strictEqual(listed.level || 0, 0, "weakest copy listed first");
+  assert.strictEqual(listed.level || 0, 1, "displaced fighter copy is listed");
+  assert.strictEqual(j.slots.mainhand.level, 5, "strongest copy reaches the fighter first");
   const held = c.items.concat(j.items, Object.values(c.slots), Object.values(j.slots)).filter(Boolean);
   assert.ok(held.some((x) => x.name === "fireblade" && x.level === 5 && !x.price), "strongest copy retained");
   assert.ok(held.some((x) => x.name === "fireblade" && x.l && !x.price), "locked copy retained");
