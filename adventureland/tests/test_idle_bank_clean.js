@@ -434,6 +434,31 @@ test("adversary: idle merchant NPC-vendors bank whitelist junk", async () => {
     assert.ok(pickup, "pickup resumes after junk liquidation");
     assert.ok(vendor.t < pickup.t, "junk liquidation must precede saturation pickup");
   });
+
+  test("adversary: trapped bank junk sacrifices one cheap material to bootstrap retrieval", async () => {
+    const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+    const api = p.bots.Puppygirl.api;
+    const m = api.character;
+    for (let i = 0; i < m.items.length; i++) m.items[i] = { name: "tracker" };
+    m.items[0] = { name: "hpot1", q: 200 };
+    m.items[1] = { name: "mpot1", q: 200 };
+    m.items[2] = { name: "bwing", q: 50 };
+    m.esize = 0;
+    m._bank = {
+      gold: 0,
+      items0: new Array(42).fill({ name: "tracker" }),
+    };
+    m._bank.items0[0] = { name: "stinger", level: 0 };
+
+    for (let i = 0; i < 240; i++) {
+      await p.tickAll();
+      if (api.log.game.some((g) => g.m === "vendor:sell stinger x1")) break;
+    }
+
+    const msgs = api.log.game.map((g) => g.m);
+    assert.ok(msgs.some((g) => g === "bank:material_sacrifice bwing"));
+    assert.ok(msgs.some((g) => g === "vendor:sell stinger x1"));
+  });
   const mApi = p.bots.Puppygirl.api;
   const m = mApi.character;
   m.gold = 500000;

@@ -118,7 +118,7 @@ function bootMerchant(api, opts) {
   let lastXynNoSpaceAt = null;
   let lastNeedSpaceAt = null;
   let lastCombineNoSpaceAt = null;
-  const COMBINE_NO_SPACE_BACKOFF_MS = 5000;
+  const COMBINE_NO_SPACE_BACKOFF_MS = 15000;
 
   function logUpgradeSkip(name, level, chance) {
     // Once per name@level forever — 60s re-logs still flooded burn-in while stall locked park.
@@ -1417,6 +1417,18 @@ function bootMerchant(api, opts) {
     );
   }
 
+  async function freeEmergencySlot() {
+    const i = api.character.items.findIndex(
+      (it) => it && EMERGENCY_SLOT_ITEMS.indexOf(it.name) >= 0
+    );
+    if (i < 0 || !(await goNpc({ map: "main", x: 56, y: -122 }, null))) return false;
+    const it = api.character.items[i];
+    const sold = await api.sell(i, it.q == null ? 1 : it.q);
+    const freed = !(sold && sold.failed) && (api.character.esize || 0) >= 1;
+    if (freed) api.game_log("bank:material_sacrifice " + it.name);
+    return freed;
+  }
+
   function isTradeReclaimItem(it) {
     if (!it) return false;
     if (isVendorNpcItem(it)) return true;
@@ -2298,15 +2310,7 @@ function bootMerchant(api, opts) {
           break;
         }
         if (!freed) {
-          const i = api.character.items.findIndex(
-            (it) => it && EMERGENCY_SLOT_ITEMS.indexOf(it.name) >= 0
-          );
-          if (i >= 0 && (await goNpc({ map: "main", x: 56, y: -122 }, null))) {
-            const it = api.character.items[i];
-            const sold = await api.sell(i, it.q == null ? 1 : it.q);
-            freed = !(sold && sold.failed) && (api.character.esize || 0) >= 1;
-            if (freed) api.game_log("bank:material_sacrifice " + it.name);
-          }
+          freed = await freeEmergencySlot();
         }
         if (!freed) {
           const groups = {};
@@ -2866,6 +2870,7 @@ function bootMerchant(api, opts) {
           0;
         if (!store.q.length && junkSoon) {
           if (await tryVendorNpc()) return;
+          if ((api.character.esize || 0) < 1 && (await freeEmergencySlot())) return;
           // A full bag cannot retrieve bank junk. Compact one local triple only
           // to bootstrap a slot, then the next tick returns to vendoring first.
           if ((api.character.esize || 0) < 1 && (await tryCombineOne())) return;

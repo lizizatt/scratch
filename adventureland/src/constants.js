@@ -44,7 +44,7 @@ const XYN_BAG_RESERVE = 8;
 /** Obsolete now that every character uses the stronger hpot1/mpot1 tier. */
 const OBSOLETE_POTIONS = ["hpot0", "mpot0"];
 /** Last-resort full-bag slot recovery before sacrificing compound inputs. */
-const EMERGENCY_SLOT_ITEMS = ["confetti", "cake"];
+const EMERGENCY_SLOT_ITEMS = ["confetti", "cake", "bwing"];
 /** Safe fixed rendezvous for saturation pickups. */
 const PICKUP_MEET = { map: "main", x: 40, y: -20 };
 /** Emergency heal thresholds (live use_hp/use_mp trigger points; also used in sim). */
