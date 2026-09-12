@@ -95,8 +95,8 @@ const VENDOR_NPC = [
   "beewings",
   "gslime",
 ];
-/** Upgradeable junk that is safe to NPC-vendor only at +0. */
-const VENDOR_NPC_LEVEL0 = [
+/** Upgradeable junk that is safe to NPC-vendor through +1. */
+const VENDOR_NPC_LOW_LEVEL = [
   "wattire",
   "wgloves",
   "partyhat",
@@ -104,6 +104,7 @@ const VENDOR_NPC_LEVEL0 = [
   "hpamulet",
   "hpbelt",
 ];
+const VENDOR_NPC_MAX_LEVEL = 1;
 /** Low-value unneeded drops: reclaim immediately instead of occupying stall/vault slots. */
 const EMERGENCY_VENDOR_NPC = [
   "cclaw",
@@ -127,6 +128,7 @@ const STALL_SELL = [
   { name: "helmet1", keep: 1 },
   { name: "pants1", keep: 1 },
   { name: "xmashat", keep: 0 },
+  { name: "wbook0", keep: 0, maxLevel: 1 },
 ];
 /** Compound priority for bank clean / merchant combine. */
 const COMBINE_PRIORITY = [
@@ -247,7 +249,8 @@ module.exports = {
   KEEP_ALWAYS,
   EXCHANGE_ITEMS,
   VENDOR_NPC,
-  VENDOR_NPC_LEVEL0,
+  VENDOR_NPC_LOW_LEVEL,
+  VENDOR_NPC_MAX_LEVEL,
   EMERGENCY_VENDOR_NPC,
   STALL_SELL,
   COMBINE_PRIORITY,

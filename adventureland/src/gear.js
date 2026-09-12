@@ -2,7 +2,8 @@
 
 const {
   VENDOR_NPC,
-  VENDOR_NPC_LEVEL0,
+  VENDOR_NPC_LOW_LEVEL,
+  VENDOR_NPC_MAX_LEVEL,
   KEEP_ALWAYS,
   GEAR_TYPES,
   GEAR_TARGETS,
@@ -304,7 +305,12 @@ function isSellJunk(it, G) {
   if (it.name === "stand0" || it.name === "scroll0") return false;
   if (isGearTargetName(it.name)) return false;
   if (VENDOR_NPC.indexOf(it.name) >= 0) return true;
-  if (VENDOR_NPC_LEVEL0.indexOf(it.name) >= 0 && !(it.level > 0)) return true;
+  if (
+    VENDOR_NPC_LOW_LEVEL.indexOf(it.name) >= 0 &&
+    (it.level || 0) <= VENDOR_NPC_MAX_LEVEL
+  ) {
+    return true;
+  }
   const g = itemDef(G, it.name);
   return !!g.sell;
 }

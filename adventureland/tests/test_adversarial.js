@@ -419,7 +419,7 @@ test("bag-full: dry fighter sells junk then requests pots", async () => {
   ) < 50, "fighter visits the town vendor before selling");
 });
 
-test("bag-full: fighter vendors +0 joy rings and HP accessories but preserves upgrades", async () => {
+test("bag-full: fighter vendors through +1 joy rings and HP accessories but preserves +2", async () => {
   const items = new Array(42).fill(null);
   for (let i = 0; i < 42; i++) items[i] = { name: "tracker" };
   items[0] = { name: "ringsj", level: 0 };
@@ -428,8 +428,11 @@ test("bag-full: fighter vendors +0 joy rings and HP accessories but preserves up
   items[3] = { name: "ringsj", level: 1 };
   items[4] = { name: "hpamulet", level: 1 };
   items[5] = { name: "hpbelt", level: 1 };
-  items[6] = { name: "hpot1", q: 200 };
-  items[7] = { name: "mpot1", q: 200 };
+  items[6] = { name: "ringsj", level: 2 };
+  items[7] = { name: "hpamulet", level: 2 };
+  items[8] = { name: "hpbelt", level: 2 };
+  items[9] = { name: "hpot1", q: 200 };
+  items[10] = { name: "mpot1", q: 200 };
   const p = bootParty({ pots: 200, gold: 50000, esize: 0, items });
   const fighter = p.bots.Jazwyn;
 
@@ -447,9 +450,10 @@ test("bag-full: fighter vendors +0 joy rings and HP accessories but preserves up
     assert.ok(!fighter.api.character.items.some(
       (it) => it && it.name === name && (it.level || 0) === 0
     ), name + "@0 should not remain in the bag");
-    assert.ok(owns(name, 1), name + "@1 should be preserved");
+    assert.ok(!owns(name, 1), name + "@1 should be sold");
+    assert.ok(owns(name, 2), name + "@2 should be preserved");
   }
-  assert.ok((fighter.api.character.esize || 0) >= 3);
+  assert.ok((fighter.api.character.esize || 0) >= 6);
   assert.ok(fighter.api.log.game.some((g) => g.m === "bag:sell ringsj"));
 });
 

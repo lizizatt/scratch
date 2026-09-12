@@ -5,7 +5,11 @@
  * Rules blend legacy HOLD/SELL with V2 vendor-gear progression.
  */
 
-const { VENDOR_NPC, VENDOR_NPC_LEVEL0 } = require("./constants");
+const {
+  VENDOR_NPC,
+  VENDOR_NPC_LOW_LEVEL,
+  VENDOR_NPC_MAX_LEVEL,
+} = require("./constants");
 
 /** Keep at least this many of each (name → min level to count as hold). */
 const HOLD_TARGETS = [
@@ -218,8 +222,8 @@ function deriveBankLists(dump) {
       sell.push({ name, level: lv, reason: "vendor_npc_junk", copies: row.copies, locations: row.locations });
       continue;
     }
-    if (VENDOR_NPC_LEVEL0.indexOf(name) >= 0 && lv === 0) {
-      sell.push({ name, level: lv, reason: "vendor_npc_level0", copies: row.copies, locations: row.locations });
+    if (VENDOR_NPC_LOW_LEVEL.indexOf(name) >= 0 && lv <= VENDOR_NPC_MAX_LEVEL) {
+      sell.push({ name, level: lv, reason: "vendor_npc_low_level", copies: row.copies, locations: row.locations });
       continue;
     }
 
@@ -270,7 +274,7 @@ function deriveBankLists(dump) {
   const sellNames = [
     ...new Set(
       sell
-        .filter((s) => VENDOR_GEAR.indexOf(s.name) < 0 && VENDOR_NPC_LEVEL0.indexOf(s.name) < 0)
+        .filter((s) => VENDOR_GEAR.indexOf(s.name) < 0 && VENDOR_NPC_LOW_LEVEL.indexOf(s.name) < 0)
         .map((s) => s.name)
     ),
   ];

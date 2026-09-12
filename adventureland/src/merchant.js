@@ -20,7 +20,8 @@ const {
   BEACON_MS,
   EXCHANGE_ITEMS,
   VENDOR_NPC,
-  VENDOR_NPC_LEVEL0,
+  VENDOR_NPC_LOW_LEVEL,
+  VENDOR_NPC_MAX_LEVEL,
   EMERGENCY_VENDOR_NPC,
   STALL_SELL,
   GEAR_TARGETS,
@@ -1413,7 +1414,8 @@ function bootMerchant(api, opts) {
       (OBSOLETE_POTIONS.indexOf(it.name) >= 0 ||
         EMERGENCY_VENDOR_NPC.indexOf(it.name) >= 0 ||
         VENDOR_NPC.indexOf(it.name) >= 0 ||
-        (VENDOR_NPC_LEVEL0.indexOf(it.name) >= 0 && !(it.level > 0)))
+        (VENDOR_NPC_LOW_LEVEL.indexOf(it.name) >= 0 &&
+          (it.level || 0) <= VENDOR_NPC_MAX_LEVEL))
     );
   }
 
@@ -1445,12 +1447,30 @@ function bootMerchant(api, opts) {
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (it && it.name === rule.name) {
-        copies.push({ rule, i, level: it.level || 0, sellable: !it.l && !it.p });
+        const level = it.level || 0;
+        copies.push({
+          rule,
+          i,
+          level,
+          sellable:
+            !it.l &&
+            !it.p &&
+            (rule.maxLevel == null || level <= rule.maxLevel),
+        });
       }
     }
     for (const bank of listBankItems()) {
       if (bank.name === rule.name) {
-        copies.push({ rule, bank, level: bank.level || 0, sellable: !bank.l && !bank.p });
+        const level = bank.level || 0;
+        copies.push({
+          rule,
+          bank,
+          level,
+          sellable:
+            !bank.l &&
+            !bank.p &&
+            (rule.maxLevel == null || level <= rule.maxLevel),
+        });
       }
     }
     const now = api._now();
@@ -1487,15 +1507,32 @@ function bootMerchant(api, opts) {
   }
 
   function stallCandidate(preferBag, reserveStable) {
+    const candidates = [];
     for (const rule of STALL_SELL || []) {
       if (rule.keep > 0 && !reserveStable) continue;
       if (!stallReserveReady(rule)) continue;
       let choices = stallCopies(rule);
       if (preferBag) choices = choices.filter((x) => x.i != null);
-      choices.sort((a, b) => a.level - b.level || (a.i == null ? 1 : -1));
-      if (choices.length) return choices[0];
+      candidates.push(...choices);
     }
-    return null;
+    candidates.sort((a, b) => {
+      const ap = stallPrice({ name: a.rule.name, level: a.level }, a.rule);
+      const bp = stallPrice({ name: b.rule.name, level: b.level }, b.rule);
+      return bp - ap || b.level - a.level || (a.i == null ? 1 : -1);
+    });
+    return candidates[0] || null;
+  }
+
+  function weakestListedStall() {
+    const listed = [];
+    for (let s = 1; s <= 16; s++) {
+      const it = api.character.slots["trade" + s];
+      const rule = it && stallRule(it.name);
+      if (!rule) continue;
+      listed.push({ slot: s, it, rule, price: stallPrice(it, rule) });
+    }
+    listed.sort((a, b) => a.price - b.price || (a.it.level || 0) - (b.it.level || 0));
+    return listed[0] || null;
   }
 
   function stallBagStable() {
@@ -1533,7 +1570,24 @@ function bootMerchant(api, opts) {
         break;
       }
     }
-    if (!tradeSlot) return false;
+    let replaced = null;
+    if (!tradeSlot) {
+      const weakest = weakestListedStall();
+      const candidatePrice = stallPrice({ name: cand.rule.name, level: cand.level }, cand.rule);
+      if (
+        cand.i == null ||
+        (api.character.esize || 0) < 1 ||
+        !weakest ||
+        candidatePrice <= weakest.price
+      ) {
+        return false;
+      }
+      const r = await Promise.resolve(api.unequip("trade" + weakest.slot));
+      if (r && r.failed) return false;
+      if (api.character.slots["trade" + weakest.slot]) return false;
+      tradeSlot = weakest.slot;
+      replaced = weakest.it;
+    }
     if (cand.i == null) {
       closeStandIfOpen();
       if ((api.character.esize || 0) < 1 || !(await ensureAtBank())) return false;
@@ -1557,6 +1611,18 @@ function bootMerchant(api, opts) {
     if (r && r.failed) {
       api.game_log("stall:list_fail " + it.name + " " + (r.reason || ""));
       return false;
+    }
+    if (replaced) {
+      api.game_log(
+        "stall:rotate " +
+          replaced.name +
+          "@" +
+          (replaced.level || 0) +
+          " -> " +
+          it.name +
+          "@" +
+          (it.level || 0)
+      );
     }
     api.game_log("stall:list " + it.name + "@" + (it.level || 0) + " price=" + price);
     return true;
@@ -1634,7 +1700,7 @@ function bootMerchant(api, opts) {
           const order = OBSOLETE_POTIONS.concat(
             EMERGENCY_VENDOR_NPC,
             VENDOR_NPC,
-            VENDOR_NPC_LEVEL0
+            VENDOR_NPC_LOW_LEVEL
           );
           const ia = order.indexOf(a.name);
           const ib = order.indexOf(b.name);
