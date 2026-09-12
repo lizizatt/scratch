@@ -30,8 +30,8 @@ test("live: bare bank_store(i) invalid — pack store still parks (Mainframe)", 
   for (let i = 0; i < bag.length; i++) bag[i] = null;
   bag[0] = { name: "hpot1", q: 50 };
   bag[1] = { name: "stand0" };
-  bag[2] = { name: "gloves", level: 7 };
-  bag[3] = { name: "helmet", level: 7 };
+  bag[2] = { name: "basher", level: 7 };
+  bag[3] = { name: "blade", level: 7 };
   api.character.esize = bag.filter((x) => !x).length;
 
   // Bare call must fail under inject
@@ -41,16 +41,16 @@ test("live: bare bank_store(i) invalid — pack store still parks (Mainframe)", 
 
   for (let n = 0; n < 40; n++) await p.tickAll();
 
-  assert.ok(!api.character.items.some((it) => it && it.name === "gloves"), "gloves removed from bag");
-  assert.ok(!api.character.items.some((it) => it && it.name === "helmet"), "helmet removed from bag");
+  assert.ok(!api.character.items.some((it) => it && it.name === "basher"), "basher removed from bag");
+  assert.ok(!api.character.items.some((it) => it && it.name === "blade"), "blade removed from bag");
   const bankItems = Object.values(api.character._bank)
     .filter(Array.isArray)
     .flat()
     .filter(Boolean);
-  assert.ok(bankItems.some((it) => it.name === "gloves"), "gloves parked via pack store");
-  assert.ok(bankItems.some((it) => it.name === "helmet"), "helmet parked via pack store");
+  assert.ok(bankItems.some((it) => it.name === "basher"), "basher parked via pack store");
+  assert.ok(bankItems.some((it) => it.name === "blade"), "blade parked via pack store");
   const msgs = api.log.game.map((g) => g.m);
-  assert.ok(msgs.some((m) => /^bank:store gloves/.test(m)));
+  assert.ok(msgs.some((m) => /^bank:store basher/.test(m)));
   assert.ok(!msgs.some((m) => m === "bank:full"), "must not mislabel free vault as full");
 });
 
@@ -112,13 +112,13 @@ test("live: solo merchant does not spam upgrade_skip on bank low-chance gear", a
   );
 });
 
-test("live: bag below-gate piece skip is rate-limited then parked", async () => {
+test("live: reserved below-gate target skip is rate-limited and retained", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
   api.character.gold = 500000;
   const bag = api.character.items;
   const slot = bag.findIndex((x) => !x);
-  bag[slot] = { name: "gloves", level: 4 };
+  bag[slot] = { name: "sshield", level: 3 };
   api.character.esize = Math.max(0, (api.character.esize || 1) - 1);
 
   for (let n = 0; n < 60; n++) await p.tickAll();
@@ -126,12 +126,10 @@ test("live: bag below-gate piece skip is rate-limited then parked", async () => 
   const skips = api.log.game.filter((g) => /^gear:upgrade_skip/.test(g.m));
   assert.ok(skips.length >= 1, "expected at least one upgrade_skip");
   assert.ok(skips.length <= 1, "skip log once-only, got " + skips.length);
-  const banked =
-    (api.character.bank || api.character._bank) &&
-    (api.character.bank || api.character._bank).items0.some(
-      (x) => x && x.name === "gloves" && (x.level || 0) === 4
-    );
-  assert.ok(banked || !api.character.items[slot], "below-gate gloves should leave bag (park)");
+  assert.ok(
+    api.character.items.some((x) => x && x.name === "sshield" && (x.level || 0) === 3),
+    "protected shield remains held"
+  );
 });
 
 module.exports = { tests };

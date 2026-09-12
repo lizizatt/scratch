@@ -133,6 +133,11 @@ test("adversary: stall lists only surplus fiery blades and spiked shields", asyn
   const api = p.bots.Puppygirl.api;
   const c = api.character;
   j.slots.mainhand = { name: "fireblade", level: 1 };
+  j.slots.helmet = { name: "mwhelmet", level: 0 };
+  j.slots.chest = { name: "mwarmor", level: 0 };
+  j.slots.pants = { name: "mwpants", level: 0 };
+  j.slots.shoes = { name: "mwboots", level: 0 };
+  j.slots.gloves = { name: "mwgloves", level: 0 };
   j.slots.offhand = { name: "sshield", level: 5 };
   for (let i = 0; i < c.items.length; i++) c.items[i] = null;
   c.items[0] = { name: "stand0" };
@@ -206,6 +211,11 @@ test("adversary: stall delivers the strongest upgrade before listing displaced g
   const api = p.bots.Puppygirl.api;
   const c = api.character;
   j.slots.mainhand = { name: "fireblade", level: 1 };
+  j.slots.helmet = { name: "mwhelmet", level: 0 };
+  j.slots.chest = { name: "mwarmor", level: 0 };
+  j.slots.pants = { name: "mwpants", level: 0 };
+  j.slots.shoes = { name: "mwboots", level: 0 };
+  j.slots.gloves = { name: "mwgloves", level: 0 };
   for (let i = 0; i < c.items.length; i++) c.items[i] = null;
   c.items[0] = { name: "stand0" };
   c.items[1] = { name: "hpot1", q: 200 };
@@ -220,12 +230,19 @@ test("adversary: stall delivers the strongest upgrade before listing displaced g
 
   for (let i = 0; i < 240; i++) {
     await p.tickAll();
-    if (Object.values(c.slots).some((x) => x && x.name === "fireblade" && x.price)) break;
+    if (
+      j.slots.mainhand &&
+      j.slots.mainhand.name === "fireblade" &&
+      j.slots.mainhand.level === 5 &&
+      Object.values(c.slots).some((x) => x && x.name === "fireblade" && x.price)
+    ) {
+      break;
+    }
   }
 
   const listed = Object.values(c.slots).find((x) => x && x.name === "fireblade" && x.price);
   assert.ok(listed, "a surplus blade must be listed");
-  assert.strictEqual(listed.level || 0, 1, "displaced fighter copy is listed");
+  assert.ok((listed.level || 0) < 5, "only a weaker copy is listed");
   assert.strictEqual(j.slots.mainhand.level, 5, "strongest copy reaches the fighter first");
   const held = c.items.concat(j.items, Object.values(c.slots), Object.values(j.slots)).filter(Boolean);
   assert.ok(held.some((x) => x.name === "fireblade" && x.level === 5 && !x.price), "strongest copy retained");

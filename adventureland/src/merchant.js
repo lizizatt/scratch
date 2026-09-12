@@ -2490,6 +2490,8 @@ function bootMerchant(api, opts) {
   }
 
   async function idleEcon() {
+    const fighterNearby = FIGHTERS.some((who) => playerDist(api.get_player(who)) <= SEND_RANGE);
+    if (api.character.stand && fighterNearby) closeStandIfOpen();
     // Live has no _bank until we visit once — without this, vendor/gift are blind on main.
     const fullPersistedStand =
       api.character.stand &&
@@ -2568,7 +2570,11 @@ function bootMerchant(api, opts) {
       return;
     }
     if (await tryPlanGearGift()) return;
-    if (!api.character.stand && (await goNpc(PLAZA, null, "stall:idle_path_fail"))) {
+    if (
+      !fighterNearby &&
+      !api.character.stand &&
+      (await goNpc(PLAZA, null, "stall:idle_path_fail"))
+    ) {
       await openStandAndSync();
     }
   }

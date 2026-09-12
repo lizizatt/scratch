@@ -251,17 +251,17 @@ test("adversary: bank upgrade work is withdrawn and scrolled as one bounded batc
     }
   }
   m._bank = { gold: 0, items0: new Array(42).fill(null) };
-  for (let i = 0; i < 3; i++) m._bank.items0[i] = { name: "gloves", level: 0 };
+  for (let i = 0; i < 3; i++) m._bank.items0[i] = { name: "sshield", level: 0 };
   m.map = "main";
   m.real_x = m.x = 40;
   m.real_y = m.y = -20;
 
   for (let i = 0; i < 200; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => /^gear:upgrade gloves@0/.test(g.m))) break;
+    if (api.log.game.some((g) => /^gear:upgrade sshield@0/.test(g.m))) break;
   }
 
-  assert.strictEqual(api.log.retrieved.filter((x) => x.name === "gloves").length, 3);
+  assert.strictEqual(api.log.retrieved.filter((x) => x.name === "sshield").length, 3);
   const scroll = m.items.find((x) => x && x.name === "scroll0");
   assert.ok(scroll && scroll.q >= 2, "buys the upgrade batch scrolls together");
   assert.ok((m.esize || 0) >= 4, "batch withdrawal preserves logistics reserve");

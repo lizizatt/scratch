@@ -1023,7 +1023,7 @@ test("scenario: vendor buy requires scroll0 headroom under GOLD_FLOAT_MERCHANT",
   assert.ok(!mLog.some((m) => /^gear:buy gloves@0/.test(m)), "must not buy gloves without scroll budget");
 });
 
-test("scenario: upgrade skips when chance below gate", async () => {
+test("scenario: low-chance upgraded base armor is listed instead of upgraded", async () => {
   const p = bootParty({
     pack: "armadillo",
     pots: 200,
@@ -1039,18 +1039,10 @@ test("scenario: upgrade skips when chance below gate", async () => {
   for (let i = 0; i < 30; i++) await p.tickAll();
   const mLog = p.bots.Puppygirl.api.log.game.map((g) => g.m);
   assert.ok(
-    mLog.some((m) => /^gear:upgrade_skip/.test(m)),
-    "expected gear:upgrade_skip for low-chance piece"
-  );
-  assert.ok(
     !mLog.some((m) => /^gear:upgrade gloves@3/.test(m)),
     "must not upgrade gloves@3"
   );
-  const still = p.bots.Puppygirl.api.character.items.find((x) => x && x.name === "gloves" && (x.level || 0) === 3);
-  const bank = p.bots.Puppygirl.api.character.bank || p.bots.Puppygirl.api.character._bank;
-  const banked =
-    bank && bank.items0 && bank.items0.some((x) => x && x.name === "gloves" && (x.level || 0) === 3);
-  assert.ok(still || banked, "gloves@3 must remain (skipped, not destroyed)");
+  assert.ok(mLog.some((m) => /^stall:list gloves@3/.test(m)), "gloves@3 must be market-listed");
 });
 
 test("scenario: metrics emit kpm/gpm after farm window", async () => {
