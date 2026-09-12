@@ -1551,17 +1551,9 @@ function bootMerchant(api, opts) {
 
   async function openStandAndSync() {
     if (!api.character.stand) api.open_stand();
-    // Live restores persisted trade slots asynchronously after opening.
-    for (let n = 0; n < 10; n++) {
-      if (
-        Object.keys(api.character.slots || {}).some(
-          (slot) => /^trade\d+$/.test(slot) && api.character.slots[slot]
-        )
-      ) {
-        break;
-      }
-      if (typeof api.sleep === "function") await api.sleep(100);
-    }
+    // Live restores persisted trade slots incrementally. Seeing the first slot
+    // does not mean the remaining slots are ready for occupancy checks.
+    if (typeof api.sleep === "function") await api.sleep(3000);
   }
 
   /** List one reserve-safe surplus item per idle pass. */
