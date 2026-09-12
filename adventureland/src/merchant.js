@@ -1586,11 +1586,16 @@ function bootMerchant(api, opts) {
         return false;
       }
       const r = await Promise.resolve(api.unequip("trade" + weakest.slot));
-      if (r && r.failed) return false;
-      for (let n = 0; n < 10 && api.character.slots["trade" + weakest.slot]; n++) {
-        if (typeof api.sleep === "function") await api.sleep(100);
+      if (r && r.failed) {
+        api.game_log("stall:rotate_unequip_fail " + (r.reason || ""));
+        return false;
       }
-      if (api.character.slots["trade" + weakest.slot]) return false;
+      // The local slot clears before Adventure Land persists the delisting.
+      if (typeof api.sleep === "function") await api.sleep(2000);
+      if (api.character.slots["trade" + weakest.slot]) {
+        api.game_log("stall:rotate_slot_stuck trade" + weakest.slot);
+        return false;
+      }
       tradeSlot = weakest.slot;
       replaced = weakest.it;
     }
