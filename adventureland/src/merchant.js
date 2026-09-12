@@ -1643,6 +1643,16 @@ function bootMerchant(api, opts) {
     const price = stallPrice(it, cand.rule);
     const r = await api.trade(cand.i, tradeSlot, price, it.q == null ? 1 : it.q);
     if (r && r.failed) {
+      if (r.reason === "cant_equip") {
+        // A reopened stand can expose a locally empty trade slot before its
+        // persisted listing arrives. Force a fresh restore so we do not keep
+        // retrieving and retrying stock against that occupied server slot.
+        closeStandIfOpen();
+        if (typeof api.sleep === "function") await api.sleep(1000);
+        await openStandAndSync();
+        api.game_log("stall:slot_resync trade" + tradeSlot);
+        return false;
+      }
       api.game_log("stall:list_fail " + it.name + " " + (r.reason || ""));
       return false;
     }

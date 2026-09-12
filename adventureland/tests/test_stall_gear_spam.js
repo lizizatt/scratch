@@ -337,6 +337,46 @@ test("adversary: saturated stall pulls a higher-value bank replacement", async (
   assert.strictEqual(listed.filter((x) => x.name === "helmet1").length, 15);
 });
 
+test("adversary: stale local trade slot is resynced instead of retried forever", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "candycanesword", level: 0 };
+  c.esize = c.items.filter((x) => !x).length;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c.stand = true;
+  for (let i = 1; i <= 15; i++) {
+    c.slots["trade" + i] = { name: "pants", level: 5, price: 299600 };
+  }
+  c.slots.trade16 = null;
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+
+  let attempts = 0;
+  api.trade = async () => {
+    attempts++;
+    c.slots.trade16 = { name: "pants", level: 5, price: 299600 };
+    return { failed: true, reason: "cant_equip" };
+  };
+
+  for (let i = 0; i < 160; i++) await p.tickAll();
+
+  assert.strictEqual(attempts, 1, "server-occupied slot must not be retried");
+  assert.ok(
+    api.log.game.some((g) => g.m === "stall:slot_resync trade16"),
+    "slot race is diagnosed and resynced"
+  );
+  assert.ok(
+    !api.log.game.some((g) => /^stall:list_fail candycanesword/.test(g.m)),
+    "known slot restore race is not reported as an item failure"
+  );
+});
+
 test("adversary: active delivery liquidates junk to create take-back capacity", async () => {
   const p = bootParty({ pack: "armadillo", pots: 400, gold: 500000, members: ["Sarene", "Puppygirl"] });
   const ctrl = p.bots.Puppygirl.ctrl;
