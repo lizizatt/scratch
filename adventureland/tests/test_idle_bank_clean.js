@@ -292,7 +292,7 @@ test("adversary: targeted pot cancellation does not cancel a coordinator pickup"
   assert.strictEqual(ctrl.store.active, null, "untargeted hop cancellation still clears fighter jobs");
 });
 
-test("adversary: pickup hold preempts hunt routing until delivery completes", async () => {
+test("adversary: pickup hold preempts hunt routing and waits in town", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000 });
   const fighter = p.bots.Jazwyn;
   fighter.api.character.s.monsterhunt = { id: "goo", c: 3 };
@@ -307,11 +307,10 @@ test("adversary: pickup hold preempts hunt routing until delivery completes", as
     phase: "enroute",
     meet: 1,
   });
-  const before = { x: fighter.api.character.real_x, y: fighter.api.character.real_y };
   await fighter.ctrl.tick();
 
-  assert.strictEqual(fighter.api.character.real_x, before.x);
-  assert.strictEqual(fighter.api.character.real_y, before.y);
+  assert.strictEqual(fighter.api.character.map, "main");
+  assert.ok(Math.hypot(fighter.api.character.real_x - 40, fighter.api.character.real_y + 20) <= 80);
   assert.ok(
     !fighter.api.log.game.some((g) => g.m === "mhunt:farm id=goo c=3"),
     "hunt routing must not run ahead of the pickup hold"

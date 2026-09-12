@@ -23,6 +23,7 @@ const {
   FIGHTER_ENGAGE_R,
   KEEP_ALWAYS,
   COMBINE_PRIORITY,
+  PICKUP_MEET,
 } = require("./constants");
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
@@ -929,13 +930,14 @@ function bootFighter(api, opts) {
       }
       if (d.meet && d.id) {
         lastBeacon = api._now();
+        const pickup = /^pickup_/.test(d.id);
         await api.send_cm(MERCHANT, {
           dlv_loc: 1,
           id: d.id || (dlvPending && dlvPending.id),
-          farm: state.S.intent.mtype,
-          map: api.character.map,
-          x: api.character.real_x,
-          y: api.character.real_y,
+          farm: pickup ? null : state.S.intent.mtype,
+          map: pickup ? PICKUP_MEET.map : api.character.map,
+          x: pickup ? PICKUP_MEET.x : api.character.real_x,
+          y: pickup ? PICKUP_MEET.y : api.character.real_y,
           serverRegion: api.parent.server_region,
           serverIdentifier: api.parent.server_identifier,
         });
@@ -1261,6 +1263,15 @@ function bootFighter(api, opts) {
     if (now < pickupHoldUntil) {
       state.setSelf({ task: "pickup" });
       if (pots !== "dry") burnPotsNow(now);
+      if (
+        api.character.map !== PICKUP_MEET.map ||
+        Math.hypot(
+          (api.character.real_x || 0) - PICKUP_MEET.x,
+          (api.character.real_y || 0) - PICKUP_MEET.y
+        ) > 80
+      ) {
+        await motion.goTo(PICKUP_MEET);
+      }
       persist();
       return;
     }

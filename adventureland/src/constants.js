@@ -39,6 +39,8 @@ const POTION_DRY = 0;
 const ECON_BAG_RESERVE = 4;
 /** Last-resort full-bag slot recovery before sacrificing compound inputs. */
 const EMERGENCY_SLOT_ITEMS = ["confetti", "cake"];
+/** Safe fixed rendezvous for saturation pickups. */
+const PICKUP_MEET = { map: "main", x: 40, y: -20 };
 /** Emergency heal thresholds (live use_hp/use_mp trigger points; also used in sim). */
 const HEAL_HP_PCT = 0.55;
 const HEAL_MP_PCT = 0.5;
@@ -217,6 +219,7 @@ module.exports = {
   POTION_DRY,
   ECON_BAG_RESERVE,
   EMERGENCY_SLOT_ITEMS,
+  PICKUP_MEET,
   HEAL_HP_PCT,
   HEAL_MP_PCT,
   SEND_RANGE,
