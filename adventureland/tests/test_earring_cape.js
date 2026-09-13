@@ -190,4 +190,57 @@ test("adversary: merchant waits three minutes between completed Ponty sweeps", a
   assert.ok(polls[1] - polls[0] >= 180000, "Ponty polls too close: " + polls.join(","));
 });
 
+test("adversary: idle stall keeps 32 pixels clear of other stalls", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 100,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const m = mApi.character;
+  const rivalApi = p.world.spawn({
+    name: "RivalMerchant",
+    ctype: "merchant",
+    map: "main",
+    real_x: 40,
+    real_y: -20,
+    x: 40,
+    y: -20,
+    stand: true,
+  });
+  const rival = rivalApi.character;
+  m._bank = { gold: 0, items0: new Array(42).fill(null) };
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+  p.world.ponty = [];
+
+  for (let i = 0; i < 200 && !m.stand; i++) await p.tickAll();
+
+  assert.strictEqual(m.stand, true, "merchant should open after finding clear ground");
+  assert.ok(
+    Math.hypot(m.real_x - rival.real_x, m.real_y - rival.real_y) >= 32,
+    "merchant opened too close to an existing stall"
+  );
+
+  rival.real_x = rival.x = m.real_x + 8;
+  rival.real_y = rival.y = m.real_y;
+  for (let i = 0; i < 200; i++) {
+    await p.tickAll();
+    if (m.stand && Math.hypot(m.real_x - rival.real_x, m.real_y - rival.real_y) >= 32) break;
+  }
+
+  assert.strictEqual(m.stand, true, "merchant should reopen after a rival crowds her");
+  assert.ok(
+    Math.hypot(m.real_x - rival.real_x, m.real_y - rival.real_y) >= 32,
+    "merchant did not relocate after another stall moved nearby"
+  );
+  assert.ok(
+    mApi.log.game.some((g) => g.m === "stall:space_relocate"),
+    "crowding relocation should be visible in logs"
+  );
+});
+
 module.exports = { tests };

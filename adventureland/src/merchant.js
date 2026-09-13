@@ -112,6 +112,9 @@ function bootMerchant(api, opts) {
   // hand-copied as a bare literal in 3 places (retreatPlaza / leaveBankToPlaza
   // / gear-pull delivery step); one constant + leaveBankToPlaza() now owns it.
   const PLAZA = { map: "main", x: 40, y: -20 };
+  const STALL_CLEARANCE = 32;
+  const STALL_SPOT_STEP = 40;
+  const STALL_SPOT_RADIUS = 4;
   /** Once-only gear:upgrade_skip logs per name@level (burn-in 60s spam). */
   const upgradeSkipLogAt = {};
   let bankHintPrimed = false;
@@ -1573,11 +1576,72 @@ function bootMerchant(api, opts) {
     return api._now() - stallBagStableAt >= 3000;
   }
 
+  function visibleStalls() {
+    const entities = api.parent && api.parent.entities;
+    const values = Array.isArray(entities) ? entities : Object.values(entities || {});
+    return values.filter(
+      (e) =>
+        e &&
+        e !== api.character &&
+        e.name !== api.character.name &&
+        (!e.map || e.map === api.character.map) &&
+        e.stand &&
+        !e.rip
+    );
+  }
+
+  function stallSpotClear(x, y) {
+    return visibleStalls().every((e) => {
+      const ex = e.real_x != null ? e.real_x : e.x;
+      const ey = e.real_y != null ? e.real_y : e.y;
+      return ex == null || ey == null || Math.hypot(x - ex, y - ey) >= STALL_CLEARANCE;
+    });
+  }
+
+  function stallSpots() {
+    const out = [];
+    for (let ring = 0; ring <= STALL_SPOT_RADIUS; ring++) {
+      for (let dx = -ring; dx <= ring; dx++) {
+        for (let dy = -ring; dy <= ring; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+          out.push({
+            map: PLAZA.map,
+            x: PLAZA.x + dx * STALL_SPOT_STEP,
+            y: PLAZA.y + dy * STALL_SPOT_STEP,
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  async function ensureStallClearance() {
+    const cx = api.character.real_x != null ? api.character.real_x : api.character.x;
+    const cy = api.character.real_y != null ? api.character.real_y : api.character.y;
+    if (api.character.map === PLAZA.map && stallSpotClear(cx, cy)) return true;
+    closeStandIfOpen();
+    for (const spot of stallSpots()) {
+      if (!stallSpotClear(spot.x, spot.y)) continue;
+      if (typeof api.can_move_to === "function" && !api.can_move_to(spot.x, spot.y)) continue;
+      const r = await api.smart_move(spot);
+      if (r && r.failed) continue;
+      const x = api.character.real_x != null ? api.character.real_x : api.character.x;
+      const y = api.character.real_y != null ? api.character.real_y : api.character.y;
+      if (!stallSpotClear(x, y)) continue;
+      api.game_log("stall:space " + Math.round(x) + "," + Math.round(y));
+      return true;
+    }
+    api.game_log("stall:space_blocked");
+    return false;
+  }
+
   async function openStandAndSync() {
+    if (!(await ensureStallClearance())) return false;
     if (!api.character.stand) api.open_stand();
     // Live restores persisted trade slots incrementally. Seeing the first slot
     // does not mean the remaining slots are ready for occupancy checks.
     if (typeof api.sleep === "function") await api.sleep(3000);
+    return true;
   }
 
   /** List one reserve-safe surplus item per idle pass. */
@@ -1590,7 +1654,7 @@ function bootMerchant(api, opts) {
     // a transient plaza path failure deadlock every other cleanup operation.
     const listInPlace = cand.i != null && (api.character.esize || 0) < 1 && api.character.map === "main";
     if (!listInPlace && !(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
-    await openStandAndSync();
+    if (!(await openStandAndSync())) return false;
     let tradeSlot = 0;
     for (let s = 1; s <= 16; s++) {
       if (!api.character.slots["trade" + s]) {
@@ -1635,7 +1699,7 @@ function bootMerchant(api, opts) {
       cand = stallCandidate(false, true);
       if (!cand || cand.i == null) return false;
       if (!(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
-      await openStandAndSync();
+      if (!(await openStandAndSync())) return false;
     }
     if (api.character.slots["trade" + tradeSlot]) return false;
     const it = api.character.items[cand.i];
@@ -1649,7 +1713,7 @@ function bootMerchant(api, opts) {
         // retrieving and retrying stock against that occupied server slot.
         closeStandIfOpen();
         if (typeof api.sleep === "function") await api.sleep(1000);
-        await openStandAndSync();
+        if (!(await openStandAndSync())) return false;
         api.game_log("stall:slot_resync trade" + tradeSlot);
         return false;
       }
@@ -1681,12 +1745,7 @@ function bootMerchant(api, opts) {
       if (isTradeReclaimItem(it)) junkSlots.push(s);
     }
     if (!junkSlots.length) return 0;
-    if (!api.character.stand) {
-      // api.open_stand() already falls back to parent.open_merchant internally
-      // (both live al_api.js and sim character.js define it unconditionally).
-      if (typeof api.open_stand === "function") api.open_stand();
-      if (typeof api.sleep === "function") await api.sleep(150);
-    }
+    if (!api.character.stand && !(await openStandAndSync())) return 0;
     let n = 0;
     for (const s of junkSlots) {
       if ((api.character.esize || 0) < 1) break;
@@ -2502,6 +2561,12 @@ function bootMerchant(api, opts) {
   async function idleEcon() {
     const fighterNearby = FIGHTERS.some((who) => playerDist(api.get_player(who)) <= SEND_RANGE);
     if (api.character.stand && fighterNearby) closeStandIfOpen();
+    const px = api.character.real_x != null ? api.character.real_x : api.character.x;
+    const py = api.character.real_y != null ? api.character.real_y : api.character.y;
+    if (api.character.stand && !stallSpotClear(px, py)) {
+      closeStandIfOpen();
+      api.game_log("stall:space_relocate");
+    }
     // Live has no _bank until we visit once — without this, vendor/gift are blind on main.
     const fullPersistedStand =
       api.character.stand &&
@@ -2583,9 +2648,10 @@ function bootMerchant(api, opts) {
     if (
       !fighterNearby &&
       !api.character.stand &&
-      (await goNpc(PLAZA, null, "stall:idle_path_fail"))
+      (await goNpc(PLAZA, null, "stall:idle_path_fail")) &&
+      (await openStandAndSync())
     ) {
-      await openStandAndSync();
+      return;
     }
   }
 
