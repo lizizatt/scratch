@@ -52,6 +52,7 @@ test("adversary: stale reboot farm retargets from current fighter coordinates", 
     gold: 500000,
     members: ["Zarook", "Puppygirl"],
   });
+
   const ctrl = p.bots.Puppygirl.ctrl;
   ctrl.enqueue({
     id: "p_stale_reboot",
@@ -89,6 +90,76 @@ test("adversary: stale reboot farm retargets from current fighter coordinates", 
     p.bots.Puppygirl.api.log.game.some((g) => g.m === "dlv:reroute"),
     "route interruption is visible in merchant logs"
   );
+});
+
+test("adversary: confirmed bat delivery keeps the observed bat spawn", () => {
+  const alternate = packCenter("bat", "cave", 1110, 60);
+  assert.deepStrictEqual(alternate, { map: "cave", x: 1110, y: 60 });
+  assert.deepStrictEqual(safeMeet("bat", "cave", 1110, 60), {
+    map: "cave",
+    x: 890,
+    y: 140,
+  });
+  assert.deepStrictEqual(
+    meetResolveDelivery(
+      { get_player: () => null },
+      {
+        who: "Zarook",
+        farm: "bat",
+        farmConfirmed: true,
+        map: "cave",
+        x: 1110,
+        y: 60,
+      },
+      SEND_RANGE
+    ),
+    { map: "cave", x: 890, y: 140 }
+  );
+});
+
+test("adversary: an unlisted bat spawn derives a local standoff", () => {
+  const observed = { map: "cave", x: -900, y: 900 };
+  const meet = safeMeet("bat", observed.map, observed.x, observed.y);
+  assert.strictEqual(meet.map, observed.map);
+  assert.ok(Math.hypot(meet.x - observed.x, meet.y - observed.y) <= SEND_RANGE);
+  assert.ok(Math.hypot(meet.x, meet.y) < Math.hypot(observed.x, observed.y));
+  assert.ok(
+    Math.hypot(meet.x - packCenter("bat").x, meet.y - packCenter("bat").y) > SEND_RANGE,
+    "must not fall back to the unrelated default bat spawn"
+  );
+});
+
+test("scenario: Puppygirl routes to the fighter's alternate bat spawn", async () => {
+  const p = bootParty({
+    pack: "bat",
+    pots: 0,
+    gold: 500000,
+    members: ["Zarook", "Puppygirl"],
+  });
+  const fighter = p.bots.Zarook.api;
+  fighter.character.map = "cave";
+  fighter.character.x = fighter.character.real_x = 1110;
+  fighter.character.y = fighter.character.real_y = 60;
+  p.world.refreshPartyCoords("US/III");
+  await fighter.send_cm("Puppygirl", {
+    job: "dlv_pots",
+    id: "p_alt_bat",
+    who: "Zarook",
+    items: [{ name: "hpot1", q: 10 }],
+    farm: "bat",
+    map: "cave",
+    x: 1110,
+    y: 60,
+  });
+
+  for (let i = 0; i < 20; i++) {
+    await p.bots.Puppygirl.ctrl.tick();
+    p.world.advance(500);
+  }
+
+  const logs = p.bots.Puppygirl.api.log.game.map((entry) => entry.m);
+  assert.ok(logs.some((line) => line === "dlv:meet cave 890,140"), logs.join(" | "));
+  assert.ok(!logs.some((line) => line === "dlv:spawn bat"), "must not delegate ambiguous bat routing");
 });
 
 test("adversary: bee fallback avoids the unreachable north grove", async () => {
@@ -321,7 +392,7 @@ test("adversary: preflight retargets a fresh stale request before first field ro
   assert.ok(msgs.some((x) => x === "dlv:done id=p_preflight"));
 });
 
-test("adversary: confirmed cross-map farm uses named spawn route", async () => {
+test("adversary: confirmed cross-map farm uses the observed spawn route", async () => {
   const p = bootParty({
     pack: "bat",
     pots: 50,
@@ -366,9 +437,9 @@ test("adversary: confirmed cross-map farm uses named spawn route", async () => {
 
   const msgs = mApi.log.game.map((g) => g.m);
   assert.ok(msgs.some((x) => x === "dlv:retarget snake->bat"));
-  assert.ok(msgs.some((x) => x === "dlv:spawn bat"));
-  assert.ok(mApi.log.moved.some((d) => d && d.to === "bat"), "must use Adventure Land's named spawn route");
-  assert.ok(msgs.some((x) => x === "dlv:done id=p_named_bat"));
+  assert.ok(msgs.some((x) => x === "dlv:meet cave -294,-241"));
+  assert.ok(!mApi.log.moved.some((d) => d && d.to === "bat"), "named bat routing is ambiguous");
+  assert.ok(msgs.some((x) => x === "dlv:done id=p_named_bat"), msgs.filter((x) => /^dlv:/.test(x)).join(" | "));
 });
 
 test("adversary: accepted same-farm reroute cannot fall through to empty_send", async () => {
@@ -412,10 +483,11 @@ test("adversary: accepted same-farm reroute cannot fall through to empty_send", 
   const realMove = mApi.smart_move.bind(mApi);
   mApi.smart_move = async (dest) => {
     const r = await realMove(dest);
-    if (!moved && dest && dest.to === "bat") {
+    if (!moved && dest && dest.map === "cave") {
       moved = true;
-      z.real_x = z.x = 350;
-      z.real_y = z.y = -200;
+      z.real_x = z.x = 1110;
+      z.real_y = z.y = 60;
+      p.world.refreshPartyCoords("US/III");
     }
     return r;
   };

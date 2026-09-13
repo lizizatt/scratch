@@ -17,7 +17,7 @@ function meetFarmAt(farm, map, x, y) {
   let found = null;
   let best = Infinity;
   for (const mtype of Object.keys(FARM_XY)) {
-    const p = FARM_XY[mtype];
+    const p = packCenter(mtype, map, x, y);
     if (!p || p.map !== map) continue;
     const d = Math.hypot(x - p.x, y - p.y);
     if (d < best) {
@@ -50,7 +50,11 @@ function meetApproachPoint(t, farm, sendRange) {
   if (!farm || !nearPack(farm, fmap, fx, fy)) {
     return { map: fmap, x: fx, y: fy };
   }
-  const safe = safeMeet(farm) || { map: fmap, x: fx, y: fy - (PACK_DANGER_R + 80) };
+  const safe = safeMeet(farm, fmap, fx, fy) || {
+    map: fmap,
+    x: fx,
+    y: fy - (PACK_DANGER_R + 80),
+  };
   let dx = safe.x - fx;
   let dy = safe.y - fy;
   const len = Math.hypot(dx, dy) || 1;
@@ -75,12 +79,12 @@ function meetResolveDelivery(api, job, sendRange) {
   }
   if (job.map != null && job.x != null && job.y != null) {
     if (job.farmConfirmed && farm) {
-      const safe = safeMeet(farm);
+      const safe = safeMeet(farm, job.map, job.x, job.y);
       if (safe) return safe;
     }
     const observedFarm = meetFarmAt(null, job.map, job.x, job.y);
     if (observedFarm) {
-      const safe = safeMeet(observedFarm);
+      const safe = safeMeet(observedFarm, job.map, job.x, job.y);
       if (safe) return safe;
     }
     if (!farm || !nearPack(farm, job.map, job.x, job.y)) {
@@ -88,7 +92,7 @@ function meetResolveDelivery(api, job, sendRange) {
     }
   }
   if (farm) {
-    const safe = safeMeet(farm);
+    const safe = safeMeet(farm, job.map, job.x, job.y);
     if (safe) return safe;
   }
   const c = farm && packCenter(farm);

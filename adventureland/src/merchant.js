@@ -3096,16 +3096,8 @@ function bootMerchant(api, opts) {
 
     const routeFarm = job.farm;
     if (meet) {
-      const namedRoute =
-        job.farmConfirmed &&
-        packCenter(job.farm) &&
-        !api.get_player(job.who) &&
-        (api.character.map !== meet.map || api.character.map !== "main")
-          ? { to: job.farm }
-          : null;
-      if (namedRoute) api.game_log("dlv:spawn " + job.farm);
-      else api.game_log("dlv:meet " + meet.map + " " + Math.round(meet.x) + "," + Math.round(meet.y));
-      const r = await fieldMove(namedRoute || meet, { farm: job.farm });
+      api.game_log("dlv:meet " + meet.map + " " + Math.round(meet.x) + "," + Math.round(meet.y));
+      const r = await fieldMove(meet, { farm: job.farm });
       if (r && r.failed) {
         api.game_log("dlv:path_fail");
         await api.send_cm(job.who, { nack: "path", id: job.id });

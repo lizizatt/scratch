@@ -184,9 +184,11 @@ stateDiagram-v2
 1. The stand is closed before movement or item transfer.
 2. The destination comes from a fresh, authenticated fighter beacon. A moving
    party can reroute the job; old pack coordinates are not authoritative.
-3. Named farm routes are used only for confirmed cross-map farm movement.
-4. Puppygirl approaches a safe point within the 320-pixel transfer radius
-   rather than walking into the monster pack.
+3. Delivery travel uses the beacon's concrete map/coordinates, never an
+   ambiguous named-monster route. Multi-spawn farms such as bats retain the
+   observed spawn through cross-map movement and rerouting.
+4. Puppygirl approaches a spawn-specific safe point within the 320-pixel
+   transfer radius rather than walking into the monster pack.
 5. At least three bag slots are available before an ordinary handoff. Upgrade
    pickups reserve `max(3, pickup count + 1)`.
 6. A fighter below the gold floor may be topped up before item transfer.
