@@ -256,4 +256,41 @@ test("adversary: idle stall keeps 32 pixels clear of other stalls", async () => 
   );
 });
 
+test("adversary: idle stall keeps 32 pixels clear of Ponty and every map NPC", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 100,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const m = mApi.character;
+  const npcs = [
+    { id: "secondhands", position: [40, -20] },
+    { id: "favors", position: [0, -60] },
+    { id: "pvp", positions: [[0, -20], [80, -60]] },
+  ];
+  mApi.G.maps.main.npcs = npcs;
+  mApi.G.maps.main.seasonal_npcs = [{ id: "event_npc", position: [80, -20] }];
+  m._bank = { gold: 0, items0: new Array(42).fill(null) };
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+  p.world.ponty = [];
+
+  for (let i = 0; i < 200 && !m.stand; i++) await p.tickAll();
+
+  assert.strictEqual(m.stand, true, "merchant should find a location clear of map NPCs");
+  const positions = npcs
+    .flatMap((npc) => (npc.position ? [npc.position] : npc.positions || []))
+    .concat([[80, -20]]);
+  for (const position of positions) {
+    assert.ok(
+      Math.hypot(m.real_x - position[0], m.real_y - position[1]) >= 32,
+      "merchant opened too close to NPC at " + position.join(",")
+    );
+  }
+});
+
 module.exports = { tests };

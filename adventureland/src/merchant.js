@@ -1590,12 +1590,32 @@ function bootMerchant(api, opts) {
     );
   }
 
+  function mapNpcPositions() {
+    const map = api.G && api.G.maps && api.G.maps[api.character.map];
+    const out = [];
+    const add = (position) => {
+      if (Array.isArray(position) && position[0] != null && position[1] != null) {
+        out.push({ x: position[0], y: position[1] });
+      }
+    };
+    for (const npc of ((map && map.npcs) || []).concat((map && map.seasonal_npcs) || [])) {
+      if (!npc) continue;
+      add(npc.position);
+      for (const position of npc.positions || []) add(position);
+    }
+    return out;
+  }
+
   function stallSpotClear(x, y) {
-    return visibleStalls().every((e) => {
+    const stallsClear = visibleStalls().every((e) => {
       const ex = e.real_x != null ? e.real_x : e.x;
       const ey = e.real_y != null ? e.real_y : e.y;
       return ex == null || ey == null || Math.hypot(x - ex, y - ey) >= STALL_CLEARANCE;
     });
+    return (
+      stallsClear &&
+      mapNpcPositions().every((npc) => Math.hypot(x - npc.x, y - npc.y) >= STALL_CLEARANCE)
+    );
   }
 
   function stallSpots() {
