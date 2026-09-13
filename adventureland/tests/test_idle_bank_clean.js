@@ -281,6 +281,7 @@ test("adversary: bank upgrade work is withdrawn and scrolled as one bounded batc
       stopped[name] = 0;
       return stopped;
     }, {});
+  p.bots.Puppygirl.ctrl.store.progressionUpgradeStop = { sshield: 0 };
   for (let i = 0; i < m.items.length; i++) {
     if (m.items[i] && ["stand0", "hpot1", "mpot1"].indexOf(m.items[i].name) >= 0) continue;
     if (m.items[i]) {

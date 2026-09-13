@@ -629,10 +629,18 @@ function isHunterUpgrade(it) {
   );
 }
 
+function canUpgradeItem(it, G) {
+  if (!it || it.l) return false;
+  return !!itemDef(G, it.name).upgrade && itemGrade(it, G) <= 2;
+}
+
+function upgradeScrollFor(it, G) {
+  if (!canUpgradeItem(it, G)) return null;
+  return "scroll" + itemGrade(it, G);
+}
+
 function eligibleUpgrade(it, G) {
-  if (!it) return false;
-  const g = itemDef(G, it.name);
-  if (!g.upgrade || it.l) return false;
+  if (!canUpgradeItem(it, G)) return false;
   if (isHunterUpgrade(it)) return itemGrade(it, G) <= 2;
   if (isRiskUpgrade(it)) return itemGrade(it, G) <= 2;
   if (DENY_UPGRADE.indexOf(it.name) >= 0) return false;
@@ -724,6 +732,8 @@ module.exports = {
   riskUpgradeTarget,
   isRiskUpgrade,
   isHunterUpgrade,
+  canUpgradeItem,
+  upgradeScrollFor,
   eligibleUpgrade,
   scrollFor,
   upgradeReady,

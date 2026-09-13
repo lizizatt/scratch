@@ -359,7 +359,7 @@ function bootFighter(api, opts) {
   }
 
   function isGearReserved(it) {
-    return hunterOffloadMatch(it, hunterOffloadItems) || isPeerGearReserved(it);
+    return upgradeOffloadMatch(it, hunterOffloadItems) || isPeerGearReserved(it);
   }
 
   async function sendGearTxReport(tx, phase, extra) {
@@ -586,17 +586,20 @@ function bootFighter(api, opts) {
     }
   }
 
-  function hunterOffloadMatch(it, hunterItems) {
+  function upgradeOffloadMatch(it, upgradeItems) {
     return !!(
       it &&
-      isHunterUpgrade(it) &&
-      (hunterItems || []).some(
+      (upgradeItems || []).some(
         (want) => want && want.name === it.name && (want.level || 0) === (it.level || 0)
       )
     );
   }
 
-  async function offloadHunterUpgrades(hunterItems) {
+  function hunterOffloadMatch(it, hunterItems) {
+    return isHunterUpgrade(it) && upgradeOffloadMatch(it, hunterItems);
+  }
+
+  async function offloadUpgradeItems(upgradeItems, allowEquipped) {
     const merchant = api.get_player(MERCHANT);
     if (!merchant || merchant.rip || merchantDist(merchant) > (SEND_RANGE || 320)) return 0;
     let sent = 0;
@@ -604,7 +607,7 @@ function bootFighter(api, opts) {
     async function sendHunter(name, level) {
       const i = api.character.items.findIndex(
         (it) =>
-          hunterOffloadMatch(it, [{ name, level }]) &&
+          upgradeOffloadMatch(it, [{ name, level }]) &&
           !it.l &&
           !isPeerGearReserved(it)
       );
@@ -619,22 +622,24 @@ function bootFighter(api, opts) {
       return true;
     }
 
-    for (const slot of Object.keys(api.character.slots || {})) {
-      const it = api.character.slots[slot];
-      if (!hunterOffloadMatch(it, hunterItems) || it.l || isPeerGearReserved(it)) continue;
-      if ((api.character.esize || 0) < 1) {
-        api.game_log("hunter:unequip_space");
-        break;
+    if (allowEquipped) {
+      for (const slot of Object.keys(api.character.slots || {})) {
+        const it = api.character.slots[slot];
+        if (!upgradeOffloadMatch(it, upgradeItems) || it.l || isPeerGearReserved(it)) continue;
+        if ((api.character.esize || 0) < 1) {
+          api.game_log("hunter:unequip_space");
+          break;
+        }
+        const r = await api.unequip(slot);
+        if (r && r.failed) {
+          api.game_log("hunter:unequip_fail " + it.name + " " + (r.reason || ""));
+          continue;
+        }
+        api.game_log("hunter:unequip " + it.name + "@" + (it.level || 0));
+        await sendHunter(it.name, it.level || 0);
       }
-      const r = await api.unequip(slot);
-      if (r && r.failed) {
-        api.game_log("hunter:unequip_fail " + it.name + " " + (r.reason || ""));
-        continue;
-      }
-      api.game_log("hunter:unequip " + it.name + "@" + (it.level || 0));
-      await sendHunter(it.name, it.level || 0);
     }
-    for (const want of hunterItems || []) {
+    for (const want of upgradeItems || []) {
       if (!want) continue;
       while (await sendHunter(want.name, want.level || 0)) {
         if (sent >= 12) return sent;
@@ -685,6 +690,28 @@ function bootFighter(api, opts) {
     return tossLoot(opts);
   }
 
+  async function returnProgressionSpare(prev) {
+    if (!prev || prev.l || isPeerGearReserved(prev)) return false;
+    const merchant = api.get_player(MERCHANT);
+    if (!merchant || merchant.rip || merchantDist(merchant) > (SEND_RANGE || 320)) return false;
+    const i = api.character.items.findIndex(
+      (it) =>
+        it &&
+        it.name === prev.name &&
+        (it.level || 0) === (prev.level || 0) &&
+        !it.l &&
+        !isPeerGearReserved(it)
+    );
+    if (i < 0) return false;
+    const r = await api.send_item(MERCHANT, i, 1);
+    if (r && r.failed) {
+      api.game_log("gear:progress_return_fail " + prev.name + " " + (r.reason || ""));
+      return false;
+    }
+    api.game_log("gear:progress_return " + prev.name + "@" + (prev.level || 0));
+    return true;
+  }
+
   async function handleGearOffer(d) {
     if (!d || !d.name) return;
     const id = d.id || d.name;
@@ -719,6 +746,7 @@ function bootFighter(api, opts) {
     ) {
       api.game_log("gear:replaced " + prev.name + "@" + (prev.level || 0));
     }
+    if (d.progression && prev && ok) await returnProgressionSpare(prev);
     // Return replaced / non-keep pieces (+ excess gold) while merchant is still in range (P5)
     const tossed = await offloadToMerchant();
     if (tossed) api.game_log("gear:toss_after n=" + tossed);
@@ -1041,12 +1069,14 @@ function bootFighter(api, opts) {
     }
     if (d.dlv_done && d.id && /^pickup_/.test(d.id)) pickupHoldUntil = 0;
     if (d.dlv_loot_q) {
-      hunterOffloadBusy = !!d.hunter_upgrade;
-      hunterOffloadItems = d.hunter_upgrade ? d.hunter_items || [] : [];
+      const upgradeRequest = !!(d.hunter_upgrade || d.progression_upgrade);
+      const upgradeItems = d.upgrade_items || d.hunter_items || [];
+      hunterOffloadBusy = upgradeRequest;
+      hunterOffloadItems = upgradeRequest ? upgradeItems : [];
       let n = 0;
       try {
-        n = d.hunter_upgrade
-          ? await offloadHunterUpgrades(d.hunter_items || [])
+        n = upgradeRequest
+          ? await offloadUpgradeItems(upgradeItems, !!d.hunter_upgrade)
           : await offloadToMerchant();
       } finally {
         hunterOffloadBusy = false;

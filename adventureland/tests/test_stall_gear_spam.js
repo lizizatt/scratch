@@ -288,18 +288,137 @@ test("adversary: risk failures collapse surplus while a useful fighter upgrade i
     "surplus fiery stock is deliberately risked; logs=" +
       api.log.game.map((g) => g.m).filter((m) => /^gear:/.test(m)).join(" | ")
   );
-  assert.ok(destroyed.some((m) => /sshield@2/.test(m)), "only one surplus shield is deliberately risked");
+  assert.ok(
+    api.log.game.some((g) => /^gear:(risk|progress)_destroyed sshield@2/.test(g.m)),
+    "a spare shield is deliberately risked while the equipped shield stays protected"
+  );
   assert.ok(!destroyed.some((m) => /fireblade/.test(m)), "a newly useful fighter upgrade is not destroyed");
   assert.ok(
     c.items.some((x) => x && x.name === "fireblade" && (x.level || 0) === 2),
     "the newly useful fighter upgrade remains reserved"
   );
-  assert.ok(
-    c.items.concat(...Object.values(c._bank).filter(Array.isArray)).some((x) => x && x.name === "sshield"),
-    "the second reserved shield remains"
-  );
   assert.strictEqual(j.slots.mainhand.name, "fireblade");
   assert.strictEqual(j.slots.offhand.name, "sshield");
+  assert.strictEqual(j.slots.offhand.level, 5, "the equipped shield is never exposed to the risk");
+});
+
+test("adversary: a worn duplicate becomes a rolling upgrade challenger", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 500000,
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  const api = p.bots.Puppygirl.api;
+  const merchant = api.character;
+  const fighter = p.bots.Jazwyn.api.character;
+  fighter.map = "main";
+  fighter.real_x = fighter.x = 40;
+  fighter.real_y = fighter.y = -20;
+  p.bots.Jazwyn.ctrl.state.setIntent({ hold: 1 });
+  fighter.slots.helmet = { name: "helmet1", level: 5 };
+  fighter.slots.chest = { name: "coat1", level: 5 };
+  fighter.slots.pants = { name: "pants1", level: 5 };
+  fighter.slots.shoes = { name: "shoes1", level: 5 };
+  fighter.slots.gloves = { name: "mwgloves", level: 1 };
+  fighter.items[5] = { name: "mwgloves", level: 1 };
+  fighter.esize = fighter.items.filter((x) => !x).length;
+  for (let i = 0; i < merchant.items.length; i++) merchant.items[i] = null;
+  merchant.items[0] = { name: "stand0" };
+  merchant.items[1] = { name: "hpot1", q: 200 };
+  merchant.items[2] = { name: "mpot1", q: 200 };
+  merchant.esize = merchant.items.filter((x) => !x).length;
+  merchant._bank = { gold: 0, items0: new Array(42).fill(null) };
+  p.bots.Puppygirl.ctrl.store.hunterUpgradeStop = { mwgloves: 1 };
+
+  let attempts = 0;
+  api.upgrade = async (itemI, scrollI, offering, preview) => {
+    const item = merchant.items[itemI];
+    if (preview) return { chance: 0.05, level: item.level || 0 };
+    attempts++;
+    const scroll = merchant.items[scrollI];
+    if (scroll && (scroll.q || 1) > 1) scroll.q--;
+    else if (scroll) {
+      merchant.items[scrollI] = null;
+      merchant.esize++;
+    }
+    if (attempts === 1) {
+      item.level = (item.level || 0) + 1;
+      return { success: true, level: item.level, chance: 0.05 };
+    }
+    merchant.items[itemI] = null;
+    merchant.esize++;
+    return { failed: true, reason: "destroyed", chance: 0.05 };
+  };
+
+  for (let i = 0; i < 6000; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "gear:progress_destroyed mwgloves@1")) break;
+  }
+
+  const logs = api.log.game.map((g) => g.m);
+  const fighterLogs = p.bots.Jazwyn.api.log.game.map((g) => g.m);
+  assert.ok(logs.some((m) => /^gear:progress_pickup Jazwyn n=1$/.test(m)));
+  assert.ok(logs.some((m) => m === "gear:progress mwgloves@1->2"));
+  assert.ok(
+    fighterLogs.some((m) => m === "gear:progress_return mwgloves@1") ||
+      logs.filter((m) => /^gear:progress_pickup Jazwyn n=1$/.test(m)).length >= 2,
+    "the displaced copy must return directly or through the retry pickup; " +
+      fighterLogs.filter((m) => /progress|gear:|dlv:/.test(m)).join(" | ")
+  );
+  assert.ok(
+    logs.some((m) => m === "gear:progress_destroyed mwgloves@1"),
+    logs.filter((m) => /progress|gear_got|hunter_ready|dlv:send_gear/.test(m)).join(" | ")
+  );
+  assert.strictEqual(attempts, 2, "one low-chance attempt per challenger");
+  assert.strictEqual(fighter.slots.gloves.name, "mwgloves");
+  assert.strictEqual(fighter.slots.gloves.level, 2);
+  assert.strictEqual(
+    merchant.items
+      .concat(...Object.values(merchant._bank).filter(Array.isArray))
+      .filter((it) => it && it.name === "mwgloves").length,
+    0,
+    "the failed displaced challenger is removed while the equipped winner survives"
+  );
+});
+
+test("adversary: rolling progression remembers the game cap without retrying", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 500000,
+    members: ["Jazwyn", "Puppygirl"],
+  });
+  const api = p.bots.Puppygirl.api;
+  const merchant = api.character;
+  const fighter = p.bots.Jazwyn.api.character;
+  fighter.slots.cape = { name: "cape", level: 5 };
+  for (let i = 0; i < merchant.items.length; i++) merchant.items[i] = null;
+  merchant.items[0] = { name: "stand0" };
+  merchant.items[1] = { name: "hpot1", q: 200 };
+  merchant.items[2] = { name: "mpot1", q: 200 };
+  merchant.items[3] = { name: "cape", level: 5 };
+  merchant.esize = merchant.items.filter((x) => !x).length;
+  merchant._bank = { gold: 0, items0: new Array(42).fill(null) };
+  let previews = 0;
+  let attempts = 0;
+  api.upgrade = async (itemI, scrollI, offering, preview) => {
+    const item = merchant.items[itemI];
+    if (preview) {
+      if (item && item.name === "cape") previews++;
+      return { chance: 0, level: (item && item.level) || 0 };
+    }
+    if (item && item.name === "cape") attempts++;
+    return { failed: true, reason: "max_level" };
+  };
+
+  for (let i = 0; i < 500; i++) await p.tickAll();
+
+  assert.strictEqual(p.bots.Puppygirl.ctrl.store.progressionUpgradeStop.cape, 5);
+  assert.strictEqual(previews, 1);
+  assert.strictEqual(attempts, 0);
+  assert.ok(api.log.game.some((g) => g.m === "gear:progress_cap cape@5"));
+  assert.strictEqual(fighter.slots.cape.level, 5);
 });
 
 test("adversary: stall lists upgraded base armor without touching fighter equipment", async () => {
@@ -327,6 +446,9 @@ test("adversary: stall lists upgraded base armor without touching fighter equipm
   c.real_x = c.x = j.real_x = j.x = 40;
   c.real_y = c.y = j.real_y = j.y = -20;
   c._bank = { gold: 0, items0: new Array(42).fill(null) };
+  p.bots.Puppygirl.ctrl.store.progressionUpgradeStop = Object.fromEntries(
+    armor.map(([name, , , sellLevel]) => [name, sellLevel])
+  );
 
   for (let i = 0; i < 480; i++) {
     await p.tickAll();

@@ -1380,7 +1380,8 @@ test("scenario: path fail injection during farm — no Transfer/Port storm", asy
   assert.ok(
     p.bots.Jazwyn.ctrl.state.S.members.Jazwyn.task === "farm" ||
       p.bots.Jazwyn.ctrl.state.S.members.Jazwyn.task === "moving" ||
-      p.bots.Jazwyn.ctrl.state.S.members.Jazwyn.task === "follow",
+      p.bots.Jazwyn.ctrl.state.S.members.Jazwyn.task === "follow" ||
+      p.bots.Jazwyn.ctrl.state.S.members.Jazwyn.task === "pickup",
     "should resume farm after injected fails, task=" + p.bots.Jazwyn.ctrl.state.S.members.Jazwyn.task
   );
 });

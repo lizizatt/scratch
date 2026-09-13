@@ -885,6 +885,24 @@ have returned the displaced item and excess gold. Sources:
 `hearCm`; `src/fighter.js`: `handleGearOffer`; `src/gear.js`: `markGift`,
 `equipPending`.
 
+### 6.9 Rolling duplicate progression
+
+Fresh inventory advertisements also expose safe upgrade challengers. If a
+fighter carries, or Puppygirl owns, an unlocked upgradeable item whose
+name matches currently equipped gear and whose level does not exceed the
+weakest wearer, Puppygirl protects one highest-level copy from sale and
+upgrades it regardless of preview chance. The equipped copy is never moved or
+risked.
+
+A successful challenger is excluded from further upgrades and delivered
+through `gear_offer` with `progression:true`. Once equipped, the displaced copy
+is returned directly when possible; otherwise its next inventory advertisement
+queues a `pickup_progress_*` rendezvous. That copy then becomes the challenger
+against the new equipped level. Destruction ends that branch and reduces stock.
+A zero-chance preview or server `max_level` response persists
+`progressionUpgradeStop[name]=level`, preventing retry loops at the game cap.
+Locked items and peer-transaction reservations are excluded throughout.
+
 ## 7. Leadership, hold/world, and persistence
 
 ### 7.1 Leadership invariants

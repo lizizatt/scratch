@@ -43,6 +43,8 @@ const {
   upgradeChance,
   isRiskUpgrade,
   isHunterUpgrade,
+  canUpgradeItem,
+  upgradeScrollFor,
   upgradeReady,
   planVendorBuy,
   eligibleUpgrade,
@@ -300,6 +302,43 @@ function bootMerchant(api, opts) {
     return false;
   }
 
+  function enqueueProgressionUpgradePickup() {
+    const now = api._now();
+    for (const who of FIGHTERS) {
+      const items = progressionAdItems(who);
+      if (!items.length) continue;
+      const ad = gearAds[who];
+      const id = "pickup_progress_" + who + "_" + (ad.revision || 0);
+      if (
+        (store.active && store.active.id === id) ||
+        store.q.some((job) => job.id === id)
+      ) {
+        continue;
+      }
+      if (
+        enqueue({
+          id,
+          kind: "progression_upgrade",
+          who,
+          items: [],
+          upgradeItems: items,
+          pickupCount: items.length,
+          farm: null,
+          map: PICKUP_MEET.map,
+          x: PICKUP_MEET.x,
+          y: PICKUP_MEET.y,
+          serverRegion: ad.server_region || api.parent.server_region,
+          serverIdentifier: ad.server_identifier || api.parent.server_identifier,
+          locAt: now,
+        })
+      ) {
+        api.game_log("gear:progress_pickup " + who + " n=" + items.length);
+      }
+      return true;
+    }
+    return false;
+  }
+
   function enqueueSaturationPickup() {
     const now = api._now ? api._now() : Date.now();
     for (const who of FIGHTERS) {
@@ -547,6 +586,14 @@ function bootMerchant(api, opts) {
       return;
     }
     if (d.gear_got) {
+      if (
+        d.ok &&
+        store.progressionWinners &&
+        store.progressionWinners[d.name] === (d.level || 0)
+      ) {
+        delete store.progressionWinners[d.name];
+        saveQ(store);
+      }
       api.game_log("gear_got from=" + sender + " ok=" + (d.ok ? 1 : 0));
       return;
     }
@@ -1189,6 +1236,12 @@ function bootMerchant(api, opts) {
     const gifts = planGifts(listGiftables(), ads, api.G);
     if (!gifts.length) return false;
     const g = gifts[0];
+    const worn = gearAds[g.who] && gearAds[g.who].slots && gearAds[g.who].slots[g.slot];
+    const progression = !!(
+      worn &&
+      worn.name === g.it.name &&
+      (g.it.level || 0) > (worn.level || 0)
+    );
 
     // Prefer batching onto a pending/active pot run for that fighter (P3)
     const pot = findPotJob(g.who);
@@ -1213,7 +1266,12 @@ function bootMerchant(api, opts) {
         id,
         kind: "dlv_gear",
         who: g.who,
-        gear: { name: g.it.name, level: g.it.level || 0, slot: g.slot },
+        gear: {
+          name: g.it.name,
+          level: g.it.level || 0,
+          slot: g.slot,
+          progression,
+        },
         farm: "bat",
         items: [],
       });
@@ -1462,7 +1520,17 @@ function bootMerchant(api, opts) {
       api.game_log("gear:pull_fail " + g.it.name);
       return false;
     }
-    job.gear = { name: g.it.name, level: g.it.level || 0, slot: g.slot };
+    const worn = ad.slots[g.slot];
+    job.gear = {
+      name: g.it.name,
+      level: g.it.level || 0,
+      slot: g.slot,
+      progression: !!(
+        worn &&
+        worn.name === g.it.name &&
+        (g.it.level || 0) > (worn.level || 0)
+      ),
+    };
     job.pulled = 1;
     api.game_log(
       "gear:batch id=" + job.id + " " + job.gear.name + "@" + (job.gear.level || 0) + "->" + job.who
@@ -1526,6 +1594,7 @@ function bootMerchant(api, opts) {
 
   function isTradeReclaimItem(it) {
     if (!it) return false;
+    if (progressionItemEligible(it)) return true;
     if (isVendorNpcItem(it)) return true;
     if (isGearTargetName(it.name) && !stallRule(it.name)) return true;
     return false;
@@ -1627,6 +1696,103 @@ function bootMerchant(api, opts) {
     return keys;
   }
 
+  function progressionBaselines() {
+    const levels = {};
+    const now = api._now();
+    for (const who of FIGHTERS) {
+      const ad = gearAds[who];
+      if (!gearAdFresh(ad, now)) continue;
+      for (const slot of Object.keys(ad.slots || {})) {
+        const it = ad.slots[slot];
+        if (!canUpgradeItem(it, api.G)) continue;
+        const level = it.level || 0;
+        if (levels[it.name] == null || level < levels[it.name]) levels[it.name] = level;
+      }
+    }
+    return levels;
+  }
+
+  function progressionStopped(it) {
+    const stopped = store.progressionUpgradeStop || {};
+    return it && stopped[it.name] === (it.level || 0);
+  }
+
+  function progressionWinner(it) {
+    const winners = store.progressionWinners || {};
+    return it && winners[it.name] === (it.level || 0);
+  }
+
+  function progressionItemEligible(it) {
+    if (!it) return false;
+    const baseline = progressionBaselines()[it.name];
+    return (
+      baseline != null &&
+      (it.level || 0) <= baseline &&
+      canUpgradeItem(it, api.G) &&
+      !progressionStopped(it)
+    );
+  }
+
+  function progressionUpgradeRows() {
+    const baselines = progressionBaselines();
+    const giftReserve = stallGiftReserveKeys();
+    const rows = [];
+    for (let i = 0; i < (api.character.items || []).length; i++) {
+      const it = api.character.items[i];
+      if (!it) continue;
+      rows.push({ name: it.name, level: it.level || 0, i, l: it.l });
+    }
+    rows.push(...listBankItems());
+    const best = {};
+    for (const row of rows) {
+      const key = row.i != null && row.pack == null ? "bag:" + row.i : row.pack + ":" + row.i;
+      const baseline = baselines[row.name];
+      const it = { name: row.name, level: row.level || 0, l: row.l };
+      if (
+        baseline == null ||
+        (row.level || 0) > baseline ||
+        !canUpgradeItem(it, api.G) ||
+        progressionStopped(it) ||
+        giftReserve.has(key)
+      ) {
+        continue;
+      }
+      const prior = best[row.name];
+      if (
+        !prior ||
+        (row.level || 0) > prior.level ||
+        ((row.level || 0) === prior.level && row.pack == null && prior.pack != null)
+      ) {
+        best[row.name] = Object.assign({ key, baseline }, row);
+      }
+    }
+    return Object.values(best);
+  }
+
+  function progressionUpgradeKeys() {
+    return new Set(progressionUpgradeRows().map((row) => row.key));
+  }
+
+  function progressionAdItems(who) {
+    const ad = gearAds[who];
+    if (!gearAdFresh(ad, api._now())) return [];
+    const baselines = progressionBaselines();
+    const reservations = new Set(ad.reservations || []);
+    return (ad.bag || [])
+      .filter((it) => {
+        const level = it && (it.level || 0);
+        return !!(
+          it &&
+          baselines[it.name] != null &&
+          level <= baselines[it.name] &&
+          canUpgradeItem(it, api.G) &&
+          !progressionStopped(it) &&
+          !reservations.has(it.fingerprint)
+        );
+      })
+      .map((it) => ({ name: it.name, level: it.level || 0 }));
+  }
+
   function riskUpgradeKeys() {
     const keys = new Set();
     const now = api._now();
@@ -1645,6 +1811,7 @@ function bootMerchant(api, opts) {
   function stallCandidate(preferBag, reserveStable) {
     const candidates = [];
     const giftReserve = stallGiftReserveKeys();
+    const progressReserve = progressionUpgradeKeys();
     for (const rule of STALL_SELL || []) {
       if (rule.keep > 0 && !reserveStable) continue;
       if (!stallReserveReady(rule)) continue;
@@ -1652,7 +1819,8 @@ function bootMerchant(api, opts) {
       if (preferBag) choices = choices.filter((x) => x.i != null);
       choices = choices.filter((x) => {
         const key = x.i != null ? "bag:" + x.i : x.bank && x.bank.pack + ":" + x.bank.i;
-        return !giftReserve.has(key);
+        const it = { name: x.rule.name, level: x.level || 0 };
+        return !giftReserve.has(key) && !progressReserve.has(key) && !progressionWinner(it);
       });
       candidates.push(...choices);
     }
@@ -1925,17 +2093,36 @@ function bootMerchant(api, opts) {
     await reclaimTradeJunk();
 
     function findBagJunk() {
-      return api.character.items.findIndex((x) => isVendorNpcItem(x));
+      const protectedKeys = progressionUpgradeKeys();
+      return api.character.items.findIndex(
+        (x, slot) =>
+          isVendorNpcItem(x) &&
+          !progressionWinner(x) &&
+          !protectedKeys.has("bag:" + slot)
+      );
     }
 
     let i = findBagJunk();
     if (i < 0) {
       const hint = api.character.bank || api.character._bank;
-      let any = listBankItems().some((e) => isVendorNpcItem(e));
+      let protectedKeys = progressionUpgradeKeys();
+      let any = listBankItems().some(
+        (e) =>
+          isVendorNpcItem(e) &&
+          !progressionWinner(e) &&
+          !protectedKeys.has(e.pack + ":" + e.i)
+      );
       if (!any && hint) {
         for (const p of Object.keys(hint)) {
           if (p === "gold" || !Array.isArray(hint[p])) continue;
-          if (hint[p].some((x) => isVendorNpcItem(x))) {
+          if (
+            hint[p].some(
+              (x, slot) =>
+                isVendorNpcItem(x) &&
+                !progressionWinner(x) &&
+                !protectedKeys.has(p + ":" + slot)
+            )
+          ) {
             any = true;
             break;
           }
@@ -1948,8 +2135,14 @@ function bootMerchant(api, opts) {
         if ((api.character.esize || 0) < 1) return false;
       }
       if (!(await ensureAtBank())) return false;
+      protectedKeys = progressionUpgradeKeys();
       const hit = listBankItems()
-        .filter((e) => isVendorNpcItem(e))
+        .filter(
+          (e) =>
+            isVendorNpcItem(e) &&
+            !progressionWinner(e) &&
+            !protectedKeys.has(e.pack + ":" + e.i)
+        )
         .sort((a, b) => {
           const order = OBSOLETE_POTIONS.concat(
             EMERGENCY_VENDOR_NPC,
@@ -2026,11 +2219,15 @@ function bootMerchant(api, opts) {
   }
 
   function hasUpgradeableOwned() {
+    if (progressionUpgradeKeys().size) return true;
     if (
       pickUpgradeIndex(
         api.character.items,
         api.G,
-        (it) => !isRiskUpgrade(it) && (!isHunterUpgrade(it) || !hunterUpgradeStopped(it))
+        (it) =>
+          !progressionWinner(it) &&
+          !isRiskUpgrade(it) &&
+          (!isHunterUpgrade(it) || !hunterUpgradeStopped(it))
       ) >= 0
     ) {
       return true;
@@ -2039,6 +2236,7 @@ function bootMerchant(api, opts) {
       const it = { name: e.name, level: e.level || 0 };
       return (
         !isRiskUpgrade(it) &&
+        !progressionWinner(it) &&
         (!isHunterUpgrade(it) || !hunterUpgradeStopped(it)) &&
         upgradeReady(it, api.G)
       );
@@ -2448,10 +2646,37 @@ function bootMerchant(api, opts) {
   /** One conservative upgrade, or one explicitly configured surplus liquidation risk. */
   async function tryUpgradeOne() {
     let riskKeys = riskUpgradeKeys();
+    let progressKeys = progressionUpgradeKeys();
+    const progressionBagIndex = () => {
+      let best = -1;
+      let bestLevel = -1;
+      for (let slot = 0; slot < (api.character.items || []).length; slot++) {
+        const it = api.character.items[slot];
+        if (
+          !it ||
+          !progressKeys.has("bag:" + slot) ||
+          !canUpgradeItem(it, api.G)
+        ) {
+          continue;
+        }
+        if ((it.level || 0) > bestLevel) {
+          best = slot;
+          bestLevel = it.level || 0;
+        }
+      }
+      return best;
+    };
     const allowBag = (it, slot) =>
+      !progressionWinner(it) &&
       (!isRiskUpgrade(it) || riskKeys.has("bag:" + slot)) &&
       (!isHunterUpgrade(it) || !hunterUpgradeStopped(it));
-    let i = pickUpgradeIndex(api.character.items, api.G, allowBag);
+    const pickWorkIndex = () => {
+      const progression = progressionBagIndex();
+      return progression >= 0
+        ? progression
+        : pickUpgradeIndex(api.character.items, api.G, allowBag);
+    };
+    let i = pickWorkIndex();
     if (i < 0) {
       // Bag has only below-gate pieces: log once per piece key, then leave for park.
       // Silent while stall locks parkToBank — otherwise burn-in spammed every minute.
@@ -2470,9 +2695,11 @@ function bootMerchant(api, opts) {
         return false;
       }
       // Bank: only pull pieces we would actually upgrade. Never skip-spam on bank junk.
-      const bankHit = listBankItems().find((e) => {
+      const progressionHit = progressionUpgradeRows().find((e) => e.pack != null);
+      const bankHit = progressionHit || listBankItems().find((e) => {
         const it = { name: e.name, level: e.level || 0 };
         return upgradeReady(it, api.G) &&
+          !progressionWinner(it) &&
           (!isHunterUpgrade(it) || !hunterUpgradeStopped(it)) &&
           (!isRiskUpgrade(it) || riskKeys.has(e.pack + ":" + e.i));
       });
@@ -2480,11 +2707,19 @@ function bootMerchant(api, opts) {
       if ((api.character.esize || 0) < 1) await parkToBank();
       if (!(await ensureAtBank())) return false;
       while ((api.character.esize || 0) > ECON_BAG_RESERVE) {
+        if (progressionHit) {
+          const liveProgressionHit = progressionUpgradeRows().find((e) => e.pack != null);
+          if (!liveProgressionHit) break;
+          const pulled = await api.bank_retrieve(liveProgressionHit.pack, liveProgressionHit.i);
+          if (pulled && pulled.failed) return false;
+          break;
+        }
         const currentRiskKeys = riskUpgradeKeys();
         const hit = listBankItems().find((e) => {
           if (e.name !== bankHit.name) return false;
           const it = { name: e.name, level: e.level || 0 };
           return upgradeReady(it, api.G) &&
+            !progressionWinner(it) &&
             (!isHunterUpgrade(it) || !hunterUpgradeStopped(it)) &&
             (!isRiskUpgrade(it) || currentRiskKeys.has(e.pack + ":" + e.i));
         });
@@ -2494,16 +2729,18 @@ function bootMerchant(api, opts) {
       }
       await leaveBankToPlaza();
       riskKeys = riskUpgradeKeys();
-      i = pickUpgradeIndex(api.character.items, api.G, allowBag);
+      progressKeys = progressionUpgradeKeys();
+      i = pickWorkIndex();
       if (i < 0) return false;
     }
     const it = api.character.items[i];
-    const scn = scrollFor(it, api.G);
+    let progression = progressKeys.has("bag:" + i);
+    const scn = progression ? upgradeScrollFor(it, api.G) : scrollFor(it, api.G);
     if (!scn) return false;
     let risky = isRiskUpgrade(it);
     let hunter = isHunterUpgrade(it);
     const chance = upgradeChance(it);
-    if (!hunter && !risky && chance < MIN_UPGRADE_CHANCE) {
+    if (!progression && !hunter && !risky && chance < MIN_UPGRADE_CHANCE) {
       logUpgradeSkip(it.name, it.level || 0, chance);
       return false;
     }
@@ -2525,10 +2762,12 @@ function bootMerchant(api, opts) {
         api.game_log("gear:upgrade_path_fail");
         return false;
       }
-      const batchSize = api.character.items.filter((x, slot) => {
-        if (!x || scrollFor(x, api.G) !== scn) return false;
-        return upgradeReady(x, api.G) && allowBag(x, slot);
-      }).length;
+      const batchSize = progression
+        ? 1
+        : api.character.items.filter((x, slot) => {
+            if (!x || scrollFor(x, api.G) !== scn) return false;
+            return upgradeReady(x, api.G) && allowBag(x, slot);
+          }).length;
       const batchCap = scn === "scroll0" ? batchSize : Math.min(batchSize, 2);
       const scrollQty = Math.max(1, Math.min(batchCap, Math.floor(spendableGold() / price)));
       const br = await api.buy(scn, scrollQty);
@@ -2539,12 +2778,18 @@ function bootMerchant(api, opts) {
       api.game_log("gear:buy " + scn);
       sci = api.character.items.findIndex((x) => x && x.name === scn);
       riskKeys = riskUpgradeKeys();
-      i = pickUpgradeIndex(api.character.items, api.G, allowBag);
+      progressKeys = progressionUpgradeKeys();
+      i = pickWorkIndex();
       if (sci < 0 || i < 0) return false;
-      if (scrollFor(api.character.items[i], api.G) !== scn) return false;
+      progression = progressKeys.has("bag:" + i);
+      const finalScroll = progression
+        ? upgradeScrollFor(api.character.items[i], api.G)
+        : scrollFor(api.character.items[i], api.G);
+      if (finalScroll !== scn) return false;
     }
     risky = isRiskUpgrade(api.character.items[i]);
     hunter = isHunterUpgrade(api.character.items[i]);
+    progression = progressKeys.has("bag:" + i);
     if (typeof api.upgrade !== "function") return false;
     if (!(await goUpgradeNpc())) {
       api.game_log("gear:upgrade_path_fail");
@@ -2556,11 +2801,18 @@ function bootMerchant(api, opts) {
         !preview ||
         preview.chance == null ||
         preview.chance <= 0 ||
-        (hunter && preview.chance < HUNTER_UPGRADE_MIN_CHANCE) ||
-        (!hunter && !risky && preview.chance < MIN_UPGRADE_CHANCE)
+        (!progression && hunter && preview.chance < HUNTER_UPGRADE_MIN_CHANCE) ||
+        (!progression && !hunter && !risky && preview.chance < MIN_UPGRADE_CHANCE)
       ) {
         const cur = api.character.items[i];
-        if (hunter && cur) {
+        if (progression && cur && (!preview || !preview.chance || preview.chance <= 0)) {
+          store.progressionUpgradeStop = store.progressionUpgradeStop || {};
+          store.progressionUpgradeStop[cur.name] = cur.level || 0;
+          saveQ(store);
+          api.game_log("gear:progress_cap " + cur.name + "@" + (cur.level || 0));
+          return false;
+        }
+        if (!progression && hunter && cur) {
           store.hunterUpgradeStop = store.hunterUpgradeStop || {};
           store.hunterUpgradeStop[cur.name] = cur.level || 0;
           saveQ(store);
@@ -2586,10 +2838,15 @@ function bootMerchant(api, opts) {
       return false;
     }
     riskKeys = riskUpgradeKeys();
-    i = pickUpgradeIndex(api.character.items, api.G, allowBag);
+    progressKeys = progressionUpgradeKeys();
+    i = pickWorkIndex();
     sci = api.character.items.findIndex((x) => x && x.name === scn);
     if (i < 0 || sci < 0) return false;
-    if (scrollFor(api.character.items[i], api.G) !== scn) return false;
+    progression = progressKeys.has("bag:" + i);
+    const finalScroll = progression
+      ? upgradeScrollFor(api.character.items[i], api.G)
+      : scrollFor(api.character.items[i], api.G);
+    if (finalScroll !== scn) return false;
     risky = isRiskUpgrade(api.character.items[i]);
     hunter = isHunterUpgrade(api.character.items[i]);
     const before = api.character.items[i];
@@ -2598,6 +2855,17 @@ function bootMerchant(api, opts) {
     try {
       const r = await api.upgrade(i, sci);
       if (r && r.failed) {
+        if (progression && r.reason === "max_level") {
+          store.progressionUpgradeStop = store.progressionUpgradeStop || {};
+          store.progressionUpgradeStop[nm] = lv0;
+          saveQ(store);
+          api.game_log("gear:progress_cap " + nm + "@" + lv0);
+          return false;
+        }
+        if (progression && r.reason === "destroyed") {
+          api.game_log("gear:progress_destroyed " + nm + "@" + lv0);
+          return true;
+        }
         if (hunter && r.reason === "destroyed") {
           api.game_log("gear:hunter_destroyed " + nm + "@" + lv0);
           return true;
@@ -2611,6 +2879,10 @@ function bootMerchant(api, opts) {
       }
       const after = api.character.items[i];
       const lv1 = after && after.name === nm ? after.level || 0 : -1;
+      if (progression && lv1 < 0) {
+        api.game_log("gear:progress_destroyed " + nm + "@" + lv0);
+        return true;
+      }
       if (hunter && lv1 < 0) {
         api.game_log("gear:hunter_destroyed " + nm + "@" + lv0);
         return true;
@@ -2620,6 +2892,12 @@ function bootMerchant(api, opts) {
         return true;
       }
       api.game_log("gear:upgrade " + nm + "@" + lv0 + "->" + lv1);
+      if (progression) {
+        store.progressionWinners = store.progressionWinners || {};
+        store.progressionWinners[nm] = lv1;
+        saveQ(store);
+        api.game_log("gear:progress " + nm + "@" + lv0 + "->" + lv1);
+      }
       return true;
     } catch (e) {
       api.game_log("gear:upgrade_fail " + nm);
@@ -2809,6 +3087,8 @@ function bootMerchant(api, opts) {
     } catch (e) {
       api.game_log("xyn:err " + ((e && e.message) || e));
     }
+    // Turn one safe duplicate into a challenger before liquidation can consume it.
+    if (progressionUpgradeKeys().size && (await tryUpgradeOne())) return;
     // NPC-vendor cheap junk after any immediately safe Xyn turn-in.
     try {
       if (await tryVendorNpc()) return;
@@ -3054,9 +3334,14 @@ function bootMerchant(api, opts) {
       if (!(await leaveBankToPlaza())) return;
     }
 
-    if (job.kind === "hunter_upgrade" && !job.pickupDone) {
+    if (
+      (job.kind === "hunter_upgrade" || job.kind === "progression_upgrade") &&
+      !job.pickupDone
+    ) {
+      const requestedItems =
+        job.kind === "hunter_upgrade" ? job.hunterItems || [] : job.upgradeItems || [];
       const requested = new Set(
-        (job.hunterItems || []).map((x) => x.name + "@" + (x.level || 0))
+        requestedItems.map((x) => x.name + "@" + (x.level || 0))
       );
       const held = (api.character.items || []).filter(
         (it) => it && requested.has(it.name + "@" + (it.level || 0))
@@ -3066,7 +3351,13 @@ function bootMerchant(api, opts) {
         if (gearAds[job.who]) gearAds[job.who]._t = 0;
         store.active = null;
         saveQ(store);
-        api.game_log("hunter:upgrade_received " + job.who + " n=" + held + " delayed=1");
+        api.game_log(
+          (job.kind === "hunter_upgrade" ? "hunter:upgrade_received " : "gear:progress_received ") +
+            job.who +
+            " n=" +
+            held +
+            " delayed=1"
+        );
         await api.send_cm(job.who, { dlv_done: 1, id: job.id, ok: 1 });
         await retreatPlaza();
         return;
@@ -3074,7 +3365,9 @@ function bootMerchant(api, opts) {
     }
 
     const takeBackNeed =
-      job.kind === "hunter_upgrade" ? Math.max(3, (job.pickupCount || 0) + 1) : 3;
+      job.kind === "hunter_upgrade" || job.kind === "progression_upgrade"
+        ? Math.max(3, (job.pickupCount || 0) + 1)
+        : 3;
     if (!(await ensureTakeBackSlots(takeBackNeed, job.gear && job.pulled ? job.gear : null))) return;
 
     let meet = meetResolveDelivery(api, job, SEND_RANGE);
@@ -3144,8 +3437,13 @@ function bootMerchant(api, opts) {
       return;
     }
 
-    if (job.kind === "hunter_upgrade" && !job.pickupDone) {
-      const names = new Set((job.hunterItems || []).map((x) => x.name + "@" + (x.level || 0)));
+    if (
+      (job.kind === "hunter_upgrade" || job.kind === "progression_upgrade") &&
+      !job.pickupDone
+    ) {
+      const requestedItems =
+        job.kind === "hunter_upgrade" ? job.hunterItems || [] : job.upgradeItems || [];
+      const names = new Set(requestedItems.map((x) => x.name + "@" + (x.level || 0)));
       const countHeld = () =>
         (api.character.items || []).filter(
           (it) => it && names.has(it.name + "@" + (it.level || 0))
@@ -3155,7 +3453,9 @@ function bootMerchant(api, opts) {
       await api.send_cm(job.who, {
         dlv_loot_q: 1,
         id: job.id,
-        hunter_upgrade: 1,
+        hunter_upgrade: job.kind === "hunter_upgrade" ? 1 : 0,
+        progression_upgrade: job.kind === "progression_upgrade" ? 1 : 0,
+        upgrade_items: requestedItems,
         hunter_items: job.hunterItems || [],
       });
       for (let n = 0; n < 12 && countHeld() < expected; n++) {
@@ -3163,8 +3463,15 @@ function bootMerchant(api, opts) {
         else await api.sleep(250);
       }
       const held = countHeld();
-      if (held < 1 && hunterUpgradeAdItems(job.who).length) {
-        api.game_log("hunter:upgrade_wait " + job.who);
+      const remaining =
+        job.kind === "hunter_upgrade"
+          ? hunterUpgradeAdItems(job.who)
+          : progressionAdItems(job.who);
+      if (held < 1 && remaining.length) {
+        api.game_log(
+          (job.kind === "hunter_upgrade" ? "hunter:upgrade_wait " : "gear:progress_wait ") +
+            job.who
+        );
         return;
       }
       job.pickupDone = 1;
@@ -3172,7 +3479,7 @@ function bootMerchant(api, opts) {
       store.active = null;
       saveQ(store);
       api.game_log(
-        "hunter:upgrade_received " +
+        (job.kind === "hunter_upgrade" ? "hunter:upgrade_received " : "gear:progress_received ") +
           job.who +
           " n=" +
           held +
@@ -3271,6 +3578,7 @@ function bootMerchant(api, opts) {
             name: job.gear.name,
             level: job.gear.level || 0,
             slot: job.gear.slot,
+            progression: !!job.gear.progression,
           });
           break;
         }
@@ -3370,7 +3678,9 @@ function bootMerchant(api, opts) {
       }
       // Stall only from idleEcon when truly idle — opening here caused flash open→close on dequeue.
       if (!store.active && !store.q.length) {
-        if (!enqueueHunterUpgradePickup()) enqueueSaturationPickup();
+        if (!enqueueHunterUpgradePickup() && !enqueueProgressionUpgradePickup()) {
+          enqueueSaturationPickup();
+        }
       }
       if (!store.active && store.q.length) {
         store.active = store.q.shift();
