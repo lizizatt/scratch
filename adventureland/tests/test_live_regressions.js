@@ -60,12 +60,12 @@ test("live: bank:full only when no free pack slots", async () => {
   api.character.map = "bank";
   api.character.bank = api.character._bank = {
     gold: 0,
-    items0: new Array(42).fill(null).map(() => ({ name: "gloves", level: 0 })),
-    items1: new Array(42).fill(null).map(() => ({ name: "helmet", level: 0 })),
+    items0: new Array(42).fill(null).map(() => ({ name: "tracker" })),
+    items1: new Array(42).fill(null).map(() => ({ name: "tracker" })),
   };
   const bag = api.character.items;
   for (let i = 0; i < bag.length; i++) bag[i] = null;
-  bag[2] = { name: "pants", level: 7 };
+  bag[2] = { name: "rattail", q: 7 };
   api.character.esize = bag.filter((x) => !x).length;
 
   for (let n = 0; n < 20; n++) await p.tickAll();

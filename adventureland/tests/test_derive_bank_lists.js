@@ -37,9 +37,9 @@ test("derive: legacy sell + combine ringsj x3", () => {
   assert.ok(d.combine.some((c) => c.name === "ringsj" && c.level === 0 && c.copies === 3));
   assert.ok(d.proposed.SELL_WHITELIST.indexOf("strearring") < 0, "goal earrings are not legacy sell");
   assert.ok(d.proposed.SELL_WHITELIST.indexOf("wcap") >= 0);
-  assert.ok(d.proposed.SELL_WHITELIST.indexOf("shoes") < 0, "shoes must be level-gated, not name whitelist");
+  assert.ok(d.proposed.SELL_WHITELIST.indexOf("shoes") >= 0, "shoes are unconditional vendor stock");
   assert.ok(d.sell.some((s) => s.name === "shoes" && s.level === 3));
-  assert.ok(d.keep.some((k) => k.name === "shoes" && k.level === 4));
+  assert.ok(d.sell.some((s) => s.name === "shoes" && s.level === 4));
   assert.ok(d.proposed.BUY_NOW.some((b) => b.name === "cscroll0"));
   assert.ok(d.keep.some((k) => k.name === "gem0"));
 });

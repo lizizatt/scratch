@@ -913,6 +913,12 @@ handlers. Other inactive stock, including ordinary gathered materials and
 reserve currencies, is parked in the bank. Crafting and Hunter purchases count
 banked ingredients and tokens and retrieve them only when needed.
 
+The basic vendor armor names `pants`, `gloves`, `helmet`, `shoes`, and `coat`
+are obsolete once the Hunter targets are configured. Puppygirl never buys,
+upgrades, reserves, or stall-lists these items; unlocked copies at every level
+go directly to the NPC vendor. Equipped fighter items are not part of merchant
+liquidation.
+
 ## 7. Leadership, hold/world, and persistence
 
 ### 7.1 Leadership invariants

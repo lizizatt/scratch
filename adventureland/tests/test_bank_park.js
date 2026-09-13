@@ -62,8 +62,8 @@ test("merchant park stores parkables without logging bank:full when slots free",
   for (let i = 0; i < bag.length; i++) bag[i] = null;
   bag[0] = { name: "hpot1", q: 50 };
   bag[1] = { name: "stand0" };
-  bag[2] = { name: "gloves", level: 7 };
-  bag[3] = { name: "helmet", level: 7 };
+  bag[2] = { name: "basher", level: 0 };
+  bag[3] = { name: "blade", level: 0 };
   bag[4] = { name: "rattail", q: 17 };
   bag[5] = { name: "seashell", q: 83 };
   bag[6] = { name: "monstertoken", q: 61 };
@@ -89,8 +89,8 @@ test("merchant park stores parkables without logging bank:full when slots free",
   for (let n = 0; n < 30; n++) await p.tickAll();
 
   const msgs = api.log.game.map((g) => g.m);
-  assert.ok(msgs.some((m) => m === "bank:store gloves@7"), "gloves should be parked");
-  assert.ok(msgs.some((m) => m === "bank:store helmet@7"), "helmet should be parked");
+  assert.ok(msgs.some((m) => m === "bank:store basher@0"), "basher should be parked");
+  assert.ok(msgs.some((m) => m === "bank:store blade@0"), "blade should be parked");
   assert.ok(msgs.some((m) => m === "bank:store rattail@0"), "passive materials should be parked");
   assert.ok(msgs.some((m) => m === "bank:store seashell@0"), "event materials should be parked");
   assert.ok(msgs.some((m) => m === "bank:store monstertoken@0"), "reserve currency should be parked");

@@ -88,6 +88,8 @@ const EXCHANGE_ITEMS = [
   "mysterybox",
   "xbox",
 ];
+/** Obsolete vendor armor: never buy, upgrade, reserve, or stall-list. */
+const VENDOR_GEAR = ["gloves", "shoes", "helmet", "pants", "coat"];
 /**
  * Instant NPC vendor (`sell`) — holiday junk + materials that never move on stall.
  * Do NOT vendor goal earrings (strearring / vitearring / intearring) or capes.
@@ -102,7 +104,7 @@ const VENDOR_NPC = [
   "leatherboots",
   "beewings",
   "gslime",
-];
+].concat(VENDOR_GEAR);
 /** Upgradeable junk that is safe to NPC-vendor through +1. */
 const VENDOR_NPC_LOW_LEVEL = [
   "wattire",
@@ -142,11 +144,6 @@ const STALL_SELL = [
   { name: "firebow", keep: 0, upgradeTo: 5, minLevel: 5 },
   { name: "shoes1", keep: 0, upgradeTo: 5, minLevel: 5 },
   { name: "stramulet", keep: 0, maxLevel: 1 },
-  { name: "pants", keep: 0 },
-  { name: "gloves", keep: 0 },
-  { name: "helmet", keep: 0 },
-  { name: "shoes", keep: 0 },
-  { name: "coat", keep: 0 },
 ];
 /** Compound priority for bank clean / merchant combine. */
 const COMBINE_PRIORITY = [
@@ -164,10 +161,8 @@ const COMBINE_PRIORITY = [
   "armorring",
 ];
 const GEAR_TYPES = ["gloves", "shoes", "helmet", "pants", "coat", "ringsj", "cape"];
-/** Vendor base pieces we may buy for empty fighter slots (post-MVP sourcing). */
-const VENDOR_GEAR = ["gloves", "shoes", "helmet", "pants", "coat"];
-/** scroll0 upgrade allowlist — armor bases + cape + Jazwyn spiked shield. */
-const SCROLL0_ALLOW = ["pants", "coat", "gloves", "shoes", "helmet", "sshield", "cape"];
+/** scroll0 upgrade allowlist — useful accessories only; vendor armor is liquidated. */
+const SCROLL0_ALLOW = ["sshield", "cape"];
 /**
  * Named gear targets (gift / keep / Ponty·Ron browse).
  * Earrings: str → warrior, vit → priest, int → mage. Cape: basic cape for all fighters.

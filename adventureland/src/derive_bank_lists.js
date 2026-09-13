@@ -9,6 +9,7 @@ const {
   VENDOR_NPC,
   VENDOR_NPC_LOW_LEVEL,
   VENDOR_NPC_MAX_LEVEL,
+  VENDOR_GEAR,
 } = require("./constants");
 
 /** Keep at least this many of each (name → min level to count as hold). */
@@ -36,9 +37,6 @@ const LEGACY_SELL = [
   "wcap",
   "wshoes",
 ];
-
-/** V2 vendor bases — keep the best copy for upgrade/gift; sell lower dupes. */
-const VENDOR_GEAR = ["gloves", "shoes", "helmet", "pants", "coat"];
 
 const COMBINE_PRIORITY = ["orbg", "ringsj", "hpbelt", "hpamulet", "wbook0", "stramulet", "intbelt", "vitring", "armorring"];
 const COMBINE_MAX = 5;
@@ -227,27 +225,6 @@ function deriveBankLists(dump) {
       continue;
     }
 
-    if (VENDOR_GEAR.indexOf(name) >= 0 && def.upgrade) {
-      // Keep only the highest level copy; sell lower duplicates
-      const same = inventory.filter((r) => r.name === name);
-      const maxLv = Math.max(...same.map((r) => r.level));
-      if (lv < maxLv) {
-        sell.push({ name, level: lv, reason: "vendor_dupe_below_" + maxLv, copies: row.copies, locations: row.locations });
-      } else if (row.copies > 1) {
-        sell.push({
-          name,
-          level: lv,
-          reason: "vendor_extra_copies",
-          copies: row.copies - 1,
-          locations: row.locations,
-        });
-        keep.push({ name, level: lv, reason: "best_vendor_piece", copies: 1 });
-      } else {
-        keep.push({ name, level: lv, reason: "best_vendor_piece", copies: row.copies });
-      }
-      continue;
-    }
-
     if (def.type === "material" || def.type === "gem" || def.type === "quest") {
       keep.push({ name, level: lv, reason: "type_" + def.type, copies: row.copies });
       continue;
@@ -274,7 +251,7 @@ function deriveBankLists(dump) {
   const sellNames = [
     ...new Set(
       sell
-        .filter((s) => VENDOR_GEAR.indexOf(s.name) < 0 && VENDOR_NPC_LOW_LEVEL.indexOf(s.name) < 0)
+        .filter((s) => VENDOR_NPC_LOW_LEVEL.indexOf(s.name) < 0)
         .map((s) => s.name)
     ),
   ];
@@ -291,7 +268,7 @@ function deriveBankLists(dump) {
     notes,
     /** Ready to paste into constants / bank_clean */
     proposed: {
-      /** Name-only junk safe to sell at any level (excludes vendor gear needing level gates). */
+      /** Name-only junk safe to sell at any level. */
       SELL_WHITELIST: sellNames.sort(),
       /** Level-aware sells for one-shot clean (includes vendor dupes). */
       SELL_ROWS: sell.map((s) => ({ name: s.name, level: s.level, copies: s.copies, reason: s.reason })),

@@ -47,7 +47,6 @@ const {
   canUpgradeItem,
   upgradeScrollFor,
   upgradeReady,
-  planVendorBuy,
   eligibleUpgrade,
   candidateSlots,
 } = require("./gear");
@@ -2228,31 +2227,6 @@ function bootMerchant(api, opts) {
     return goNpc({ map: "main", x: -207, y: -220 }, { to: "upgrade" });
   }
 
-  function hasUpgradeableOwned() {
-    if (progressionUpgradeKeys().size) return true;
-    if (
-      pickUpgradeIndex(
-        api.character.items,
-        api.G,
-        (it) =>
-          !progressionWinner(it) &&
-          !isRiskUpgrade(it) &&
-          (!isHunterUpgrade(it) || !hunterUpgradeStopped(it))
-      ) >= 0
-    ) {
-      return true;
-    }
-    return listBankItems().some((e) => {
-      const it = { name: e.name, level: e.level || 0 };
-      return (
-        !isRiskUpgrade(it) &&
-        !progressionWinner(it) &&
-        (!isHunterUpgrade(it) || !hunterUpgradeStopped(it)) &&
-        upgradeReady(it, api.G)
-      );
-    });
-  }
-
   /** Exchange one gem0 / anniversarygift with Xyn (idle bank clean). */
   async function tryExchangeOne() {
     if (typeof api.exchange !== "function") return false;
@@ -2617,40 +2591,6 @@ function bootMerchant(api, opts) {
       }
     }
     return false;
-  }
-
-  /** Buy one vendor base piece for an advertised empty/weak slot (no bank cover). */
-  async function tryBuyVendorBase() {
-    if (hasUpgradeableOwned()) return false;
-    const ads = {};
-    for (const who of FIGHTERS) {
-      if (gearAds[who] && gearAds[who].slots) ads[who] = gearAds[who];
-    }
-    if (!Object.keys(ads).length) return false;
-    const plan = planVendorBuy(ads, ownedGearList(), api.G);
-    if (!plan) return false;
-    const price = (api.G.items[plan.name] && api.G.items[plan.name].g) || 800;
-    const scrollPrice = (api.G.items.scroll0 && api.G.items.scroll0.g) || 1000;
-    const haveScroll = (api.character.items || []).some((x) => x && x.name === "scroll0");
-    const need = price + (haveScroll ? 0 : scrollPrice);
-    if (spendableGold() < need) {
-      api.game_log("gear:buy_gold");
-      return false;
-    }
-    if ((api.character.esize || 0) < 1) {
-      await parkToBank();
-      if ((api.character.esize || 0) < 1) return false;
-    }
-    if (!(await goNpc({ map: "main", x: 56, y: -122 }, null, "gear:vendor_path_fail"))) {
-      return false;
-    }
-    const bought = await api.buy(plan.name, 1);
-    if (bought && bought.failed) {
-      api.game_log("gear:buy_fail " + plan.name);
-      return false;
-    }
-    api.game_log("gear:buy " + plan.name + "@0 for " + plan.who);
-    return true;
   }
 
   /** One conservative upgrade, or one explicitly configured surplus liquidation risk. */
@@ -3146,7 +3086,6 @@ function bootMerchant(api, opts) {
       api.game_log("craft:err " + ((e && e.message) || e));
     }
     // Buy/upgrade/combine before parking so bank clean progresses while idle.
-    if (await tryBuyVendorBase()) return;
     if (await tryUpgradeOne()) return;
     try {
       if (await tryCombineOne()) return;

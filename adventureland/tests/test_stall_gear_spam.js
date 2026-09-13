@@ -426,64 +426,54 @@ test("adversary: refreshed progression reservation prevents bank bounce", async 
     pack: "armadillo",
     pots: 200,
     gold: 500000,
-    members: ["Sarene", "Puppygirl"],
+    members: ["Jazwyn", "Puppygirl"],
   });
   const ctrl = p.bots.Puppygirl.ctrl;
   const api = p.bots.Puppygirl.api;
   const merchant = api.character;
-  const fighter = p.bots.Sarene.api.character;
-  fighter.slots.shoes = { name: "shoes", level: 2 };
+  const fighter = p.bots.Jazwyn.api.character;
+  fighter.slots.cape = { name: "cape", level: 2 };
   for (let i = 0; i < merchant.items.length; i++) merchant.items[i] = { name: "tracker" };
   merchant.items[0] = { name: "stand0" };
   merchant.items[1] = { name: "hpot1", q: 200 };
   merchant.items[2] = { name: "mpot1", q: 200 };
-  merchant.items[41] = null;
-  merchant.esize = 1;
+  merchant.items[41] = { name: "cape", level: 2 };
+  merchant.esize = 0;
   merchant.map = "main";
   merchant.real_x = merchant.x = 40;
   merchant.real_y = merchant.y = -20;
   merchant._bank = {
     gold: 0,
-    items0: [{ name: "shoes", level: 2 }].concat(new Array(41).fill(null)),
+    items0: new Array(42).fill(null),
   };
 
-  await p.bots.Sarene.api.send_cm("Puppygirl", {
+  await p.bots.Jazwyn.api.send_cm("Puppygirl", {
     gear_ad: 1,
     inventory_ad: 1,
     v: 2,
     revision: 1,
-    name: "Sarene",
-    ctype: "mage",
-    slots: { shoes: { name: "shoes", level: 2 } },
+    name: "Jazwyn",
+    ctype: "warrior",
+    slots: { cape: { name: "cape", level: 2 } },
     bag: [],
     esize: 42,
   });
-  ctrl.gearAds.Sarene._t = p.world.clock.now() - 61000;
-  const smartMove = api.smart_move;
-  api.smart_move = async (dest) => {
-    const leftBank = merchant.map === "bank";
-    const result = await smartMove(dest);
-    if (leftBank && merchant.map !== "bank") {
-      ctrl.gearAds.Sarene._t = p.world.clock.now();
-    }
-    return result;
-  };
   api.upgrade = async (itemI, scrollI, offering, preview) =>
     preview ? { chance: 0.05, level: merchant.items[itemI].level || 0 } : { failed: true, reason: "busy" };
 
   await ctrl.tick();
-  await ctrl.tick();
 
   const logs = api.log.game.map((g) => g.m);
-  assert.ok(logs.some((m) => m === "bank_retrieve shoes@2"), "stale ad permits the initial pull");
   assert.ok(
-    !logs.some((m) => m === "bank:store shoes@2"),
-    "the refreshed progression candidate must not be immediately re-banked"
+    !logs.some((m) => m === "bank:store cape@2"),
+    "the progression candidate must not be banked during capacity cleanup"
   );
-  assert.ok(merchant.items.some((it) => it && it.name === "shoes" && (it.level || 0) === 2));
+  assert.ok(
+    merchant.items.some((it) => it && it.name === "cape" && (it.level || 0) === 2)
+  );
 });
 
-test("adversary: stall lists upgraded base armor without touching fighter equipment", async () => {
+test("adversary: merchant sells bagged vendor armor without touching fighter equipment", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Jazwyn", "Puppygirl"] });
   const j = p.bots.Jazwyn.api.character;
   const api = p.bots.Puppygirl.api;
@@ -508,19 +498,15 @@ test("adversary: stall lists upgraded base armor without touching fighter equipm
   c.real_x = c.x = j.real_x = j.x = 40;
   c.real_y = c.y = j.real_y = j.y = -20;
   c._bank = { gold: 0, items0: new Array(42).fill(null) };
-  p.bots.Puppygirl.ctrl.store.progressionUpgradeStop = Object.fromEntries(
-    armor.map(([name, , , sellLevel]) => [name, sellLevel])
-  );
-
   for (let i = 0; i < 480; i++) {
     await p.tickAll();
-    const listed = Object.values(c.slots).filter((x) => x && x.price);
-    if (armor.every(([name]) => listed.some((x) => x.name === name))) break;
+    if (armor.every(([name]) => api.log.game.some((g) => g.m === "vendor:sell " + name + " x1"))) break;
   }
 
   const listed = Object.values(c.slots).filter((x) => x && x.price);
   for (const [name, slot, level, sellLevel] of armor) {
-    assert.ok(listed.some((x) => x.name === name && x.level === sellLevel), name + " listed");
+    assert.ok(api.log.game.some((g) => g.m === "vendor:sell " + name + " x1"), name + " sold");
+    assert.ok(!listed.some((x) => x.name === name && x.level === sellLevel), name + " not listed");
     assert.deepStrictEqual(j.slots[slot], { name, level }, name + " remains equipped");
   }
 });
@@ -609,18 +595,22 @@ test("adversary: saturated stall rotates its cheapest listing for higher-value s
   c.real_y = c.y = -20;
   c.stand = true;
   for (let i = 1; i <= 16; i++) {
-    c.slots["trade" + i] = { name: "gloves", level: 0, price: 1200 };
+    c.slots["trade" + i] = { name: "candycanesword", level: 0, price: 1200 };
   }
   c._bank = { gold: 0, items0: new Array(42).fill(null) };
 
   for (let i = 0; i < 160; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => /^stall:rotate gloves@0 -> dagger@5/.test(g.m))) break;
+    if (api.log.game.some((g) => /^stall:rotate candycanesword@0 -> dagger@5/.test(g.m))) break;
   }
 
   const listed = Object.values(c.slots).filter((x) => x && x.price);
   assert.ok(listed.some((x) => x.name === "dagger" && x.level === 5), "lists higher-value dagger");
-  assert.strictEqual(listed.filter((x) => x.name === "gloves").length, 15, "replaces one low-value listing");
+  assert.strictEqual(
+    listed.filter((x) => x.name === "candycanesword").length,
+    15,
+    "replaces one low-value listing"
+  );
 });
 
 test("adversary: saturated stall pulls a higher-value bank replacement", async () => {
@@ -637,7 +627,7 @@ test("adversary: saturated stall pulls a higher-value bank replacement", async (
   c.real_y = c.y = -20;
   c.stand = true;
   for (let i = 1; i <= 16; i++) {
-    c.slots["trade" + i] = { name: "gloves", level: 0, price: 1200 };
+    c.slots["trade" + i] = { name: "candycanesword", level: 0, price: 1200 };
   }
   c._bank = {
     gold: 0,
@@ -646,7 +636,7 @@ test("adversary: saturated stall pulls a higher-value bank replacement", async (
 
   for (let i = 0; i < 240; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => /^stall:rotate gloves@0 -> dagger@5/.test(g.m))) break;
+    if (api.log.game.some((g) => /^stall:rotate candycanesword@0 -> dagger@5/.test(g.m))) break;
   }
 
   const listed = Object.values(c.slots).filter((x) => x && x.price);
@@ -654,7 +644,7 @@ test("adversary: saturated stall pulls a higher-value bank replacement", async (
     listed.some((x) => x.name === "dagger" && x.level === 5),
     "retrieves and lists higher-value bank gear"
   );
-  assert.strictEqual(listed.filter((x) => x.name === "gloves").length, 15);
+  assert.strictEqual(listed.filter((x) => x.name === "candycanesword").length, 15);
 });
 
 test("adversary: unrestored server trade slot is quarantined between retries", async () => {

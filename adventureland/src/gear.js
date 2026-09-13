@@ -18,13 +18,6 @@ const {
 } = require("./constants");
 
 const DENY_UPGRADE = ["candycanesword", "carrotsword", "epyjamas", "eears", "eslippers", "xmashat"];
-const SLOT_VENDOR = {
-  gloves: "gloves",
-  shoes: "shoes",
-  helmet: "helmet",
-  pants: "pants",
-  chest: "coat",
-};
 
 /**
  * Fallback when G.classes is missing — mirrors live class mainhand/offhand/doublehand keys.
@@ -631,6 +624,7 @@ function isHunterUpgrade(it) {
 
 function canUpgradeItem(it, G) {
   if (!it || it.l) return false;
+  if (VENDOR_GEAR.indexOf(it.name) >= 0) return false;
   return !!itemDef(G, it.name).upgrade && itemGrade(it, G) <= 2;
 }
 
@@ -675,34 +669,6 @@ function pickUpgradeIndex(items, G, allow) {
   return best;
 }
 
-/**
- * One vendor buy for the worst empty armor gap vs ads, if no bank/bag piece covers it.
- * owned: [{name,level}] from bank+bag
- */
-function planVendorBuy(ads, owned, G) {
-  owned = owned || [];
-  for (const who of Object.keys(ads || {})) {
-    const ad = ads[who];
-    if (!ad || !ad.slots) continue;
-    const ctype = ad.ctype || "warrior";
-    for (const slot of Object.keys(SLOT_VENDOR)) {
-      const vendorName = SLOT_VENDOR[slot];
-      if (VENDOR_GEAR.indexOf(vendorName) < 0) continue;
-      const worn = ad.slots[slot];
-      const wc = worn ? score(worn, G, ctype) : 0;
-      const base = { name: vendorName, level: 0 };
-      if (!(score(base, G, ctype) > wc)) continue;
-      const covered = owned.some((e) => {
-        if (!e || e.name !== vendorName) return false;
-        return score({ name: e.name, level: e.level || 0 }, G, ctype) > wc;
-      });
-      if (covered) continue;
-      return { who, slot, name: vendorName };
-    }
-  }
-  return null;
-}
-
 module.exports = {
   score,
   setBonusScore,
@@ -738,6 +704,5 @@ module.exports = {
   scrollFor,
   upgradeReady,
   pickUpgradeIndex,
-  planVendorBuy,
   MIN_UPGRADE_CHANCE,
 };

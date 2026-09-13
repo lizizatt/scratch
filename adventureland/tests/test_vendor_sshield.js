@@ -20,12 +20,35 @@ function test(name, fn) {
 }
 
 test("constants: VENDOR_NPC covers stuck stall junk; sshield is Jazwyn offhand target", () => {
-  for (const n of ["wcap", "wshoes", "rednose", "dexamulet", "dexearring", "frogt", "beewings"]) {
+  for (const n of [
+    "wcap",
+    "wshoes",
+    "rednose",
+    "dexamulet",
+    "dexearring",
+    "frogt",
+    "beewings",
+    "pants",
+    "gloves",
+    "helmet",
+    "shoes",
+    "coat",
+  ]) {
     assert.ok(VENDOR_NPC.indexOf(n) >= 0, n);
   }
   assert.strictEqual(GEAR_TARGETS.Jazwyn.offhand, "sshield");
   assert.ok(SCROLL0_ALLOW.indexOf("sshield") >= 0, "upgrade spiked shield");
   assert.ok(SCROLL0_ALLOW.indexOf("wcap") < 0, "do not upgrade wcap");
+});
+
+test("unit: vendor armor is junk and never an upgrade candidate at any level", () => {
+  for (const n of ["pants", "gloves", "helmet", "shoes", "coat"]) {
+    const G = { items: { [n]: { type: n, upgrade: true, sell: true } } };
+    for (const level of [0, 1, 3, 7]) {
+      assert.ok(isSellJunk({ name: n, level }, G), n + "@" + level + " should sell");
+      assert.ok(!eligibleUpgrade({ name: n, level }, G), n + "@" + level + " should not upgrade");
+    }
+  }
 });
 
 test("unit: wearable duplicate junk is vendored through level one", () => {
