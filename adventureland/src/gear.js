@@ -178,21 +178,26 @@ function score(it, G, ctype) {
 
 function setBonusScore(slots, G, ctype) {
   const counts = {};
+  const hunterSets = {};
   for (const slot of Object.keys(slots || {})) {
     const it = slots[slot];
     const set = it && itemDef(G, it.name).set;
-    if (set) counts[set] = (counts[set] || 0) + 1;
+    if (set) {
+      counts[set] = (counts[set] || 0) + 1;
+      if (HUNTER_ITEMS.indexOf(it.name) >= 0) hunterSets[set] = true;
+    }
   }
   const w = SCORE_WEIGHTS[ctype] || SCORE_WEIGHTS.warrior;
   let total = 0;
   for (const set of Object.keys(counts)) {
     const def = G && G.sets && G.sets[set];
     if (!def) continue;
+    const multiplier = hunterSets[set] ? SET_BONUS_MULTIPLIER : 1;
     for (let n = 1; n <= counts[set]; n++) {
       const bonus = def[n] || def["" + n];
       if (!bonus) continue;
       for (const key of Object.keys(bonus)) {
-        if (w[key]) total += Number(bonus[key] || 0) * w[key] * SET_BONUS_MULTIPLIER;
+        if (w[key]) total += Number(bonus[key] || 0) * w[key] * multiplier;
       }
     }
   }

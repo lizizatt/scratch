@@ -220,6 +220,18 @@ test("unit: assigned generic stats and Hunter set bonuses affect loadout score",
     setBonusScore(three, G, "mage"),
     (5 * SCORE_WEIGHTS.mage.int + 2 * SCORE_WEIGHTS.mage.speed) * SET_BONUS_MULTIPLIER
   );
+  G.items.helmet1 = { type: "helmet", set: "rugged" };
+  G.items.gloves1 = { type: "gloves", set: "rugged" };
+  G.sets.rugged = { 2: { int: 1 } };
+  assert.strictEqual(
+    setBonusScore(
+      { helmet: { name: "helmet1" }, gloves: { name: "gloves1" } },
+      G,
+      "mage"
+    ),
+    SCORE_WEIGHTS.mage.int,
+    "ordinary set bonuses must not receive the Hunter progression multiplier"
+  );
   assert.ok(loadoutScore(three, G, "mage") > loadoutScore(two, G, "mage"));
   assert.ok(!classOk({ name: "mmhat" }, "warrior", G), "class-locked armor must be rejected");
 });
@@ -338,6 +350,29 @@ test("two Hunter pieces beat +5 store armor through amplified set bonus", async 
   await equipPending(api, api.G, {});
   assert.strictEqual(c.slots.helmet.name, "mmhat");
   assert.strictEqual(c.slots.gloves.name, "mmgloves");
+});
+
+test("live Sarene loadout replaces a three-piece Rugged bonus without oscillating", async () => {
+  const p = bootParty({ members: ["Sarene"] });
+  const api = p.bots.Sarene.api;
+  const c = api.character;
+  c.slots.chest = { name: "coat1", level: 0 };
+  c.slots.helmet = { name: "helmet1", level: 5 };
+  c.slots.gloves = { name: "gloves1", level: 4 };
+  c.slots.pants = { name: "mmpants", level: 2 };
+  c.items[5] = { name: "mmhat", level: 2 };
+  c.items[6] = { name: "mmgloves", level: 2 };
+
+  await equipPending(api, api.G, {});
+  assert.strictEqual(c.slots.helmet.name, "mmhat");
+  assert.strictEqual(c.slots.gloves.name, "mmgloves");
+  assert.strictEqual(c.slots.pants.name, "mmpants");
+
+  await equipPending(api, api.G, {});
+  assert.strictEqual(c.slots.helmet.name, "mmhat");
+  assert.strictEqual(c.slots.gloves.name, "mmgloves");
+  assert.ok(c.items.some((it) => it && it.name === "helmet1" && it.level === 5));
+  assert.ok(c.items.some((it) => it && it.name === "gloves1" && it.level === 4));
 });
 
 test("Hunter set bundle is neither gifted nor equipped when total loadout is worse", () => {
