@@ -1902,16 +1902,21 @@ function bootMerchant(api, opts) {
     const names = EXCHANGE_ITEMS;
 
     function findBagSlot() {
-      let stacked = -1;
+      let best = -1;
+      let bestTurns = Infinity;
       for (let i = 0; i < api.character.items.length; i++) {
         const it = api.character.items[i];
         if (!it || names.indexOf(it.name) < 0) continue;
         const need = ((api.G.items && api.G.items[it.name]) || {}).e || 1;
         const q = it.q == null ? 1 : it.q;
-        if (q === need) return i;
-        if (q > need && stacked < 0) stacked = i;
+        if (q < need) continue;
+        const turns = Math.ceil(q / need);
+        if (turns < bestTurns) {
+          best = i;
+          bestTurns = turns;
+        }
       }
-      return stacked;
+      return best;
     }
 
     function bankHasExchange() {

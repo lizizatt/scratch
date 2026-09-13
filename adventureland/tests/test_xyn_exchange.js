@@ -85,7 +85,7 @@ test("adversary: bank pressure does not block gifts and emeralds with output spa
   c.items[1] = { name: "hpot1", q: 200 };
   c.items[2] = { name: "mpot1", q: 200 };
   c.items[3] = { name: "anniversarygift", q: 66 };
-  c.items[4] = { name: "gem0", q: 1 };
+  c.items[4] = { name: "gem0", q: 3 };
   for (let i = 5; i < 11; i++) c.items[i] = null;
   c.esize = 6;
   c._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
@@ -96,7 +96,7 @@ test("adversary: bank pressure does not block gifts and emeralds with output spa
   }
 
   const exchanges = api.log.game.filter((g) => /^xyn:exchange /.test(g.m)).map((g) => g.m);
-  assert.strictEqual(exchanges[0], "xyn:exchange gem0", "slot-freeing emerald should go first");
+  assert.strictEqual(exchanges[0], "xyn:exchange gem0", "smaller emerald stack should drain first");
   assert.ok(exchanges.includes("xyn:exchange anniversarygift"), "stacked gifts should drain despite full bank");
   const gifts = c.items.find((x) => x && x.name === "anniversarygift");
   assert.ok(gifts && gifts.q < 66, "at least one anniversary gift was consumed");
