@@ -2605,15 +2605,17 @@ function bootMerchant(api, opts) {
       } catch (e) {
         api.game_log("stall:err " + ((e && e.message) || e));
       }
-      // A full bag plus a full stand cannot prime the bank, retrieve junk, or
-      // list another item. Sacrifice a designated low-value stack to break the
-      // cycle; the next tick can close the stand and resume bank cleanup.
-      if ((api.character.esize || 0) < 1 && (await freeEmergencySlot())) return;
+      // Exact-size exchanges (for example gem0) free their own slot even when
+      // the bag is full; stacked exchanges still enforce XYN_BAG_RESERVE.
       try {
         if (await tryExchangeOne()) return;
       } catch (e) {
         api.game_log("xyn:err " + ((e && e.message) || e));
       }
+      // A full bag plus a full stand cannot prime the bank, retrieve junk, or
+      // list another item. Sacrifice a designated low-value stack to break the
+      // cycle; the next tick can close the stand and resume bank cleanup.
+      if ((api.character.esize || 0) < 1 && (await freeEmergencySlot())) return;
       if (bagParkables(null, { skipUpgrades: false }).length) {
         await parkToBank(null, { skipUpgrades: false });
       }
