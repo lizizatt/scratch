@@ -38,7 +38,7 @@ const SAFE_MEET = {
   armadillo: { map: "main", x: 750, y: 1800 },
   croc: { map: "main", x: 750, y: 1800 },
   tortoise: { map: "main", x: -1124, y: 950 },
-  bat: { map: "cave", x: -340, y: -290 },
+  bat: { map: "cave", x: -350, y: -320 },
   arcticbee: { map: "winterland", x: 1082, y: -600 },
   porcupine: { map: "desertland", x: -829, y: -80 },
   boar: { map: "winterland", x: 20, y: -900 },
