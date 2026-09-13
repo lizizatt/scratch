@@ -587,6 +587,12 @@ test("merchant console hunt/grind/world fan-out reaches Sarene lead (no Jazwyn)"
     sent.filter((s) => s.to === "Sarene" && s.msg && s.msg.grind === 1).length >= 2,
     "grind must retry Sarene after a dropped first CM"
   );
+  assert.strictEqual(p.bots.Sarene.ctrl.state.S.intent.kind, "farm");
+  assert.strictEqual(
+    p.bots.Sarene.ctrl.state.S.intent.mtype,
+    "armadillo",
+    "grind must clear the previous hunt target for the configured default"
+  );
   assert.ok(
     sent.some((s) => s.to === "Sarene" && s.msg && Array.isArray(s.msg.world)),
     "world must CM Sarene"

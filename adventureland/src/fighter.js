@@ -774,9 +774,10 @@ function bootFighter(api, opts) {
       }
       state.S.mode = "farm";
     } else if (cmd === "grind") {
-      if (isLead()) state.setIntent({ kind: "farm", hold: 0 }, present);
+      if (isLead()) state.setIntent({ kind: "farm", mtype: defaultFarm, hold: 0 }, present);
       else {
         state.S.intent.kind = "farm";
+        state.S.intent.mtype = defaultFarm;
         state.S.intent.hold = 0;
       }
     } else if (cmd === "world" && parsed.args[0]) {
