@@ -452,7 +452,7 @@ test("adversary: confirmed cross-map farm uses the observed spawn route", async 
 
   const msgs = mApi.log.game.map((g) => g.m);
   assert.ok(msgs.some((x) => x === "dlv:retarget snake->bat"));
-  assert.ok(msgs.some((x) => x === "dlv:meet cave -294,-241"));
+  assert.ok(msgs.some((x) => x === "dlv:meet cave -340,-290"));
   assert.ok(!mApi.log.moved.some((d) => d && d.to === "bat"), "named bat routing is ambiguous");
   assert.ok(msgs.some((x) => x === "dlv:done id=p_named_bat"), msgs.filter((x) => /^dlv:/.test(x)).join(" | "));
 });
