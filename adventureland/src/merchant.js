@@ -3457,7 +3457,9 @@ function bootMerchant(api, opts) {
     api.game_log("hunt_quest " + (en ? "on" : "off"));
   }
   function grind() {
-    cmFighters({ grind: 1 });
+    // A missed reset leaves the lead pursuing its previous event-map hunt and
+    // pulls the entire party back into that map, so retry this control CM.
+    cmFightersReliable({ grind: 1 }, "grind");
     api.set_message("Grind");
     api.game_log("Grind sent lead~" + fighterLead());
   }

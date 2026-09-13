@@ -574,12 +574,18 @@ test("merchant console hunt/grind/world fan-out reaches Sarene lead (no Jazwyn)"
   assert.strictEqual(p.bots.Sarene.ctrl.state.S.intent.kind, "hunt");
 
   sent.length = 0;
+  mApi.setTimeout = (fn) => fn();
   p.bots.Puppygirl.ctrl.grind();
   p.bots.Puppygirl.ctrl.world("US III");
+  for (let i = 0; i < 5; i++) await p.tickAll();
 
   assert.ok(
     sent.some((s) => s.to === "Sarene" && s.msg && s.msg.grind === 1),
     "grind must CM Sarene"
+  );
+  assert.ok(
+    sent.filter((s) => s.to === "Sarene" && s.msg && s.msg.grind === 1).length >= 2,
+    "grind must retry Sarene after a dropped first CM"
   );
   assert.ok(
     sent.some((s) => s.to === "Sarene" && s.msg && Array.isArray(s.msg.world)),
