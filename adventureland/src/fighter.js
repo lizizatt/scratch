@@ -780,6 +780,9 @@ function bootFighter(api, opts) {
         state.S.intent.mtype = defaultFarm;
         state.S.intent.hold = 0;
       }
+      state.S.mode = "farm";
+      state.S.rare = null;
+      preRareSnap = null;
     } else if (cmd === "world" && parsed.args[0]) {
       const parts = parsed.args[0].split("/");
       if (isLead()) state.setIntent({ world: parts, hold: 0, kind: "farm" }, present);

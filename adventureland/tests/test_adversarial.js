@@ -574,6 +574,8 @@ test("merchant console hunt/grind/world fan-out reaches Sarene lead (no Jazwyn)"
   assert.strictEqual(p.bots.Sarene.ctrl.state.S.intent.kind, "hunt");
 
   sent.length = 0;
+  p.bots.Sarene.ctrl.state.S.mode = "rare";
+  p.bots.Sarene.ctrl.state.S.rare = { by: "Sarene", mtype: "phoenix" };
   mApi.setTimeout = (fn) => fn();
   p.bots.Puppygirl.ctrl.grind();
   p.bots.Puppygirl.ctrl.world("US III");
@@ -593,6 +595,8 @@ test("merchant console hunt/grind/world fan-out reaches Sarene lead (no Jazwyn)"
     "armadillo",
     "grind must clear the previous hunt target for the configured default"
   );
+  assert.strictEqual(p.bots.Sarene.ctrl.state.S.mode, "farm");
+  assert.strictEqual(p.bots.Sarene.ctrl.state.S.rare, null);
   assert.ok(
     sent.some((s) => s.to === "Sarene" && s.msg && Array.isArray(s.msg.world)),
     "world must CM Sarene"
