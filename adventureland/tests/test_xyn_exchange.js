@@ -129,6 +129,38 @@ test("adversary: full bag exchanges emerald before sacrificing materials", async
   assert.ok(!c.items.some((x) => x && x.name === "gem0"), "emerald was consumed");
 });
 
+test("adversary: Xyn inputs outrank vendor and compound backlog", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "gem0", q: 1 };
+  c.items[4] = { name: "frogt", q: 1 };
+  c.items[5] = { name: "ringsj", level: 0 };
+  c.items[6] = { name: "ringsj", level: 0 };
+  c.items[7] = { name: "ringsj", level: 0 };
+  c.items[8] = { name: "cscroll0", q: 1 };
+  c.esize = c.items.filter((x) => !x).length;
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "xyn:exchange gem0")) break;
+  }
+
+  const economy = api.log.game
+    .map((g) => g.m)
+    .filter((m) => /^xyn:exchange |^vendor:sell |^bank:compound /.test(m));
+  assert.strictEqual(
+    economy[0],
+    "xyn:exchange gem0",
+    "Xyn input should be handled before other backlog: " + economy.join(" | ")
+  );
+});
+
 test("adversary: full bag and full stand sacrifice a safe stack instead of looping on Xyn", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;

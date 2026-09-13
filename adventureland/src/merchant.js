@@ -2586,7 +2586,14 @@ function bootMerchant(api, opts) {
     // Keep the merchant's own emergency supply full before spending idle time
     // on optional economy work.
     await restockSelfPots();
-    // NPC-vendor cheap junk first (reclaim trade slots) before Xyn burns idle ticks.
+    // Drain Xyn inputs before other economy work. Exact-size exchanges free
+    // their own slot; stacked inputs yield until one emergency slot remains.
+    try {
+      if (await tryExchangeOne()) return;
+    } catch (e) {
+      api.game_log("xyn:err " + ((e && e.message) || e));
+    }
+    // NPC-vendor cheap junk after any immediately safe Xyn turn-in.
     try {
       if (await tryVendorNpc()) return;
     } catch (e) {
@@ -2605,13 +2612,6 @@ function bootMerchant(api, opts) {
       } catch (e) {
         api.game_log("stall:err " + ((e && e.message) || e));
       }
-      // Exact-size exchanges (for example gem0) free their own slot even when
-      // the bag is full; stacked exchanges still enforce XYN_BAG_RESERVE.
-      try {
-        if (await tryExchangeOne()) return;
-      } catch (e) {
-        api.game_log("xyn:err " + ((e && e.message) || e));
-      }
       // A full bag plus a full stand cannot prime the bank, retrieve junk, or
       // list another item. Sacrifice a designated low-value stack to break the
       // cycle; the next tick can close the stand and resume bank cleanup.
@@ -2620,12 +2620,6 @@ function bootMerchant(api, opts) {
         await parkToBank(null, { skipUpgrades: false });
       }
       return;
-    }
-    // Xyn exchange — one approved gem/gift/box per idle pass.
-    try {
-      if (await tryExchangeOne()) return;
-    } catch (e) {
-      api.game_log("xyn:err " + ((e && e.message) || e));
     }
     try {
       if (await tryStallOne()) return;
@@ -3069,7 +3063,10 @@ function bootMerchant(api, opts) {
       await primeBankHint();
       // Park tossed gear before next delivery (sell junk reserved for tryVendorNpc).
       // Bank below-gate upgrades when idle (no stand lock for junk listing).
-      if (!store.active && !api.character.stand) {
+      const xynSoon =
+        (api.character.items || []).some((it) => it && EXCHANGE_ITEMS.indexOf(it.name) >= 0) ||
+        listBankItems().some((it) => EXCHANGE_ITEMS.indexOf(it.name) >= 0);
+      if (!store.active && !api.character.stand && !xynSoon) {
         const junkSoon =
           countSellJunk(api.character.items) +
             countSellJunkBank(api.character.bank || api.character._bank) >
