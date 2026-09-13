@@ -129,6 +129,21 @@ test("adversary: an unlisted bat spawn derives a local standoff", () => {
   );
 });
 
+test("adversary: stale farm on an event map cannot crash safe meet", () => {
+  const job = {
+    who: "Sarene",
+    farm: "bat",
+    farmConfirmed: true,
+    map: "spookytown",
+    x: 32,
+    y: 1404,
+  };
+  const meet = meetResolveDelivery({ get_player: () => null }, job, SEND_RANGE);
+  assert.strictEqual(meet.map, "spookytown");
+  assert.ok(Number.isFinite(meet.x) && Number.isFinite(meet.y));
+  assert.ok(Math.hypot(meet.x - job.x, meet.y - job.y) <= SEND_RANGE);
+});
+
 test("scenario: Puppygirl routes to the fighter's alternate bat spawn", async () => {
   const p = bootParty({
     pack: "bat",

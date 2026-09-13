@@ -98,7 +98,9 @@ function safeMeet(mtype, map, x, y) {
   const configured = meets && index >= 0 ? meets[index] : SAFE_MEET[mtype];
   if (
     configured &&
-    (x == null || y == null || Math.hypot(x - center.x, y - center.y) <= PACK_DANGER_R + 120)
+    (x == null ||
+      y == null ||
+      (center && Math.hypot(x - center.x, y - center.y) <= PACK_DANGER_R + 120))
   )
     return Object.assign({}, configured);
   if (map != null && x != null && y != null && nearAnyKnownPack(map, x, y)) {
