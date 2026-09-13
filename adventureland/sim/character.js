@@ -216,6 +216,7 @@ function createCharacter(world, over) {
         const e = ents[id];
         if (!e || e.type !== "monster" || e.dead) continue;
         if (args.type && e.mtype !== args.type) continue;
+        if (args.no_target && e.target && e.target !== c.name) continue;
         if (args.max_att != null && e.attack > args.max_att) continue;
         const d = dist(c, e);
         if (d < bestD) {
@@ -244,9 +245,60 @@ function createCharacter(world, over) {
      * (hpot1 over hpot0, mpot1 over mpot0), restores a fixed amount, and sets
      * a shared skill cooldown so fighter.js's heal-check can't spam it.
      */
-    use_skill(skill, target) {
+    use_skill(skill, target, extra) {
       if (skill !== "use_hp" && skill !== "use_mp") {
-        return { failed: true, reason: "unmodeled_skill" };
+        if (api.is_on_cooldown(skill)) return { failed: true, reason: "cooldown" };
+        const def = world.G && world.G.skills && world.G.skills[skill];
+        if (!def) return { failed: true, reason: "unmodeled_skill" };
+        if (def.level && c.level < def.level) return { failed: true, reason: "level" };
+        if (target && def.range && dist(c, target) > def.range) {
+          return { failed: true, reason: "range" };
+        }
+        if ((skill === "reflection" || skill === "energize") && (!target || target.rip)) {
+          return { failed: true, reason: "target_dead" };
+        }
+        if (skill === "revive" && (!target || !target.rip || target.hp < target.max_hp)) {
+          return { failed: true, reason: "gravestone_unhealed" };
+        }
+        const cost = skill === "energize" ? Math.max(1, Number(extra || 1)) : Number(def.mp || 0);
+        if (c.mp < cost) return { failed: true, reason: "no_mp" };
+        c.mp -= cost;
+        c._skillCd = c._skillCd || {};
+        c._skillCd[skill] = world.clock.now() + Number(def.cooldown || 0);
+        const expires = world.clock.now() + Number(def.duration || 0);
+        if (skill === "hardshell" || skill === "charge") {
+          c.s[def.condition] = { expires };
+        } else if (skill === "reflection" && target) {
+          target.s = target.s || {};
+          target.s.reflection = { expires };
+        } else if (skill === "energize" && target) {
+          target.mp = Math.min(target.max_mp, target.mp + cost);
+          target.s = target.s || {};
+          target.s.energized = { expires };
+        } else if (skill === "curse" && target) {
+          target.s = target.s || {};
+          target.s.cursed = { expires };
+        } else if (skill === "taunt" && target) {
+          target.target = c.name;
+        } else if (skill === "absorb" && target) {
+          const entities = world.entitiesOn(serverKey(), c.map);
+          for (const entity of Object.values(entities)) {
+            if (entity && entity.type === "monster" && entity.target === target.name) entity.target = c.name;
+          }
+        } else if (skill === "partyheal") {
+          const names = c.party ? Array.from(c.party) : [c.name];
+          for (const name of names) {
+            const member = world.get(name);
+            if (!member || member.character.map !== c.map || member.character.rip) continue;
+            member.character.hp = Math.min(member.character.max_hp, member.character.hp + 600);
+          }
+        } else if (skill === "revive" && target && target.rip) {
+          target.rip = false;
+          target.hp = Math.max(1, Math.floor(target.max_hp * 0.2));
+        }
+        log.skills.push(skill + (target && target.name ? ":" + target.name : target && target.id ? ":" + target.id : ""));
+        api.game_log("skill:" + skill);
+        return { success: true };
       }
       if (api.is_on_cooldown(skill)) return { failed: true, reason: "cooldown" };
       const isHp = skill === "use_hp";
@@ -274,6 +326,31 @@ function createCharacter(world, over) {
       return { failed: true, reason: "no_pot" };
     },
 
+    locate_item(name) {
+      return c.items.findIndex((item) => item && item.name === name);
+    },
+
+    can_heal(target) {
+      return !!target && dist(c, target) <= c.range;
+    },
+
+    heal(target) {
+      if (!api.can_heal(target)) return Promise.resolve({ failed: true, reason: "range" });
+      const classDef = world.G && world.G.classes && world.G.classes[c.ctype];
+      const mpCost = Number(classDef && classDef.heal_mp || 0);
+      if (c.mp < mpCost) return Promise.resolve({ failed: true, reason: "no_mp" });
+      const gap = (world.G && world.G.attackMs) || knobs.ATTACK_MS || 800;
+      if (world.clock.now() - (c._lastAttackAt || 0) < gap) {
+        return Promise.resolve({ failed: true, reason: "cooldown" });
+      }
+      c.mp -= mpCost;
+      c._lastAttackAt = world.clock.now();
+      target.hp = Math.min(target.max_hp, target.hp + 450);
+      log.skills.push("heal:" + target.name);
+      api.game_log("heal " + target.name + " +450");
+      return Promise.resolve({ success: true });
+    },
+
     change_target(t) {
       c.target = t && (t.id || t.name) ? t.id || t.name : null;
     },
@@ -291,17 +368,21 @@ function createCharacter(world, over) {
     can_attack(t) {
       if (!t || t.dead || t.type !== "monster") return false;
       if (!api.is_in_range(t)) return false;
+      const classDef = world.G && world.G.classes && world.G.classes[c.ctype];
+      if (c.mp < Number(classDef && classDef.attack_mp || 0)) return false;
       const gap = (world.G && world.G.attackMs) || knobs.ATTACK_MS || 800;
       return world.clock.now() - (c._lastAttackAt || 0) >= gap;
     },
     attack(t) {
       if (!api.can_attack(t)) return Promise.resolve({ failed: true });
       const now = world.clock.now();
+      const classDef = world.G && world.G.classes && world.G.classes[c.ctype];
+      c.mp -= Number(classDef && classDef.attack_mp || 0);
       c._lastAttackAt = now;
       c.target = t.id;
       const dmg = c.attack || (c.ctype === "mage" ? 110 : c.ctype === "priest" ? 70 : 95);
       t.hp = Math.max(0, (t.hp != null ? t.hp : t.max_hp || 200) - dmg);
-      t.target = c.name;
+      if (!t.target) t.target = c.name;
       log.skills.push("attack:" + t.id);
       api.game_log("hit " + t.mtype + " -" + dmg + " hp=" + t.hp);
       if (t.hp <= 0) {
@@ -324,22 +405,6 @@ function createCharacter(world, over) {
           if (drops && drops.length) {
             world.spawnChest(serverKey(), c.map, { x: t.real_x || t.x, y: t.real_y || t.y }, drops);
             api.game_log("drop " + drops.map((d) => d.name + (d.level != null ? "@" + d.level : "")).join(","));
-          }
-        }
-      } else {
-        // Minimal player-damage model: a still-live target retaliates on its
-        // own cadence (independent of the player's attack speed) so fighter.js
-        // heal-pot logic (use_hp/use_mp) has something real to react to.
-        const mgap = knobs.MONSTER_ATTACK_MS || 1500;
-        if (now - (t._lastAtkAt || 0) >= mgap) {
-          t._lastAtkAt = now;
-          const mAtk = t.attack != null ? t.attack : 10;
-          c.hp = Math.max(0, (c.hp != null ? c.hp : c.max_hp) - mAtk);
-          api.game_log("hurt " + t.mtype + " -" + mAtk + " hp=" + c.hp);
-          if (c.hp <= 0) {
-            c.hp = 0;
-            c.rip = true;
-            api.game_log("death " + t.mtype);
           }
         }
       }

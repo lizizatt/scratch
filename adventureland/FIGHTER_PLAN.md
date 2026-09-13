@@ -55,6 +55,12 @@ The order of concern is:
 | Status publication | Potion bucket, task, and death changes publish independently, including explicit living/dead state. | Implemented |
 | Recovery | Leave jail, escape trapped event maps, respawn, reload persisted state, re-form the party, and resume intent without a path or hop storm. | Implemented |
 
+### Combat priorities
+
+- **Jazwyn:** use Hardshell below 50% HP or against multiple attackers while preserving 200 MP; taunt enemies off either caster; charge only to close distance; otherwise attack. Fireblade plus shield remains the normal loadout, so weapon-gated Cleave and Stomp are not attempted.
+- **Sarene:** reflect Jazwyn only under meaningful pressure while above 80% MP and preserving 900 MP; energize a depleted Zarook before giving Jazwyn a one-mana attack-speed proc; otherwise attack. Mana Burst and Controlled Mana Burst are intentionally prohibited.
+- **Zarook:** revive, emergency single-heal, selectively Party Heal while above 85% MP, normal single-heal, emergency Absorb from a critically threatened Sarene, then Curse durable targets at no more than one attempt per 15 seconds while above 85% MP; otherwise attack. Preserve 800 MP for healing.
+
 ## 3. Top-level fighter state machine
 
 The fighter controller is a single-flight 250 ms tick. Class combat is invoked

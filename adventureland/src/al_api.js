@@ -26,6 +26,12 @@ function createAlApi() {
     get_nearest_monster: typeof get_nearest_monster === "function" ? get_nearest_monster : function () {
       return null;
     },
+    get_monster: typeof get_monster === "function" ? get_monster : function () {
+      return null;
+    },
+    get_targeted_monster: typeof get_targeted_monster === "function" ? get_targeted_monster : function () {
+      return null;
+    },
     is_in_range: typeof is_in_range === "function" ? is_in_range : function () {
       return false;
     },
@@ -72,6 +78,9 @@ function createAlApi() {
     },
     can_heal: typeof can_heal === "function" ? can_heal : function () {
       return false;
+    },
+    locate_item: typeof locate_item === "function" ? locate_item : function () {
+      return -1;
     },
     change_target: typeof change_target === "function" ? change_target : function () {},
     move: typeof move === "function" ? move : function () {},
@@ -161,6 +170,12 @@ function createAlApi() {
     },
     get_nearest_monster(q) {
       return g.get_nearest_monster(q);
+    },
+    get_monster(id) {
+      return g.get_monster(id);
+    },
+    get_targeted_monster() {
+      return g.get_targeted_monster();
     },
     is_in_range(e) {
       return g.is_in_range(e);
@@ -328,8 +343,8 @@ function createAlApi() {
     use(skill) {
       return g.use(skill);
     },
-    use_skill(skill, target) {
-      return g.use_skill(skill, target);
+    use_skill(skill, target, extra) {
+      return g.use_skill(skill, target, extra);
     },
     attack(t) {
       return g.attack(t);
@@ -342,6 +357,9 @@ function createAlApi() {
     },
     can_heal(t) {
       return g.can_heal(t);
+    },
+    locate_item(name) {
+      return g.locate_item(name);
     },
     change_target(t) {
       return g.change_target(t);

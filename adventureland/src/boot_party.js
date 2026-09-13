@@ -15,7 +15,12 @@ const {
   PRIEST_RANGE,
 } = require("./constants");
 const { packCenter } = require("../sim/world");
-const { combatTank, combatAssist } = require("../sim/combat");
+const {
+  warriorRotation,
+  mageRotation,
+  priestPreCombat,
+  priestRotation,
+} = require("./combat_rotations");
 
 /**
  * Spawn the party in sim and return controllers + world.
@@ -69,14 +74,12 @@ function bootParty(opts) {
     if (name === "Sarene") o.form = FORM_MAGE;
     else if (name === "Zarook") o.form = FORM_PRIEST;
     if (!combatOn) return o;
-    // One lead resolver: fighter.js passes the *current* succession lead
-    // (state.S.lead / isLead(), same source motion.js formation uses) on every
-    // call — whoever that is tanks; no name is hardcoded here.
-    o.combat = (mtype, dyn) => {
-      dyn = dyn || {};
-      const fn = dyn.isLead ? combatTank : combatAssist;
-      fn(api, mtype, { leadName: dyn.leadName, isLead: dyn.isLead });
-    };
+    if (name === "Jazwyn") o.combat = (mtype, dyn) => warriorRotation(api, mtype, dyn);
+    else if (name === "Sarene") o.combat = (mtype, dyn) => mageRotation(api, mtype, dyn);
+    else {
+      o.pre_combat = () => priestPreCombat(api);
+      o.combat = (mtype, dyn) => priestRotation(api, mtype, dyn);
+    }
     return o;
   }
 

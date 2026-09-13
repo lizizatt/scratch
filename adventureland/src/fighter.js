@@ -212,7 +212,7 @@ function bootFighter(api, opts) {
   function runCombat(mtype) {
     if (!opts.combat) return;
     const lead = isLead();
-    opts.combat(mtype, { leadName: state.S.lead, isLead: lead });
+    opts.combat(mtype, { leadName: state.S.lead, isLead: lead }, api);
   }
 
   /** Lead seq must climb above anything heard (plan §6.6.6). */
@@ -1108,7 +1108,7 @@ function bootFighter(api, opts) {
         if (api.is_in_range(m)) {
           // Live + sim: fight the rare. Slot combat no-ops while smart.moving,
           // so also swing directly once closed.
-          if (opts.pre_combat && opts.pre_combat()) return true;
+          if (opts.pre_combat && opts.pre_combat(api)) return true;
           runCombat(m.mtype);
           try {
             if (typeof api.change_target === "function") api.change_target(m);
@@ -1251,7 +1251,7 @@ function bootFighter(api, opts) {
         persist();
         return;
       }
-      if (opts.pre_combat && opts.pre_combat()) {
+      if (opts.pre_combat && opts.pre_combat(api)) {
         persist();
         return;
       }
@@ -1294,7 +1294,7 @@ function bootFighter(api, opts) {
       return;
     }
     publishSelf({ task: "farm" });
-    if (opts.pre_combat && opts.pre_combat()) return;
+    if (opts.pre_combat && opts.pre_combat(api)) return;
     runCombat(mtype);
   }
 

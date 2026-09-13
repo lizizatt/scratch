@@ -92,6 +92,10 @@ function createWorld(opts) {
         const m = servers.get(serverKey);
         return (m && m.get(name)) || null;
       },
+      get(name) {
+        const entry = roster.get(name);
+        return entry && entry.api;
+      },
       partyOf(name) {
         const r = roster.get(name);
         if (!r) return {};
@@ -171,6 +175,7 @@ function createWorld(opts) {
       },
       entitiesOn: self.entitiesOn,
       entity: self.entity,
+      get: self.get,
       partyOf: self.partyOf,
       broadcastParty: self.broadcastParty,
       deliverCm: self.deliverCm,
@@ -339,6 +344,31 @@ function createWorld(opts) {
         const m = bag[id];
         if (!m) continue;
         if (m._wander) tickWander(m, now);
+        if (!m.dead && m.target) {
+          const defenderEntry = roster.get(m.target);
+          const defenderApi = defenderEntry && defenderEntry.api;
+          const defender = defenderApi && defenderApi.character;
+          const mgap = G.monsterAttackMs || 1500;
+          if (
+            defender &&
+            !defender.rip &&
+            defender.map === m.map &&
+            dist(defender, m) <= 200 &&
+            now - (m._lastAtkAt || 0) >= mgap
+          ) {
+            m._lastAtkAt = now;
+            let damage = m.attack != null ? m.attack : 10;
+            if (m.s && m.s.cursed && m.s.cursed.expires > now) damage *= 0.8;
+            if (defender.s && defender.s.hardshell && defender.s.hardshell.expires > now) damage *= 0.1;
+            damage = Math.max(1, Math.round(damage));
+            defender.hp = Math.max(0, defender.hp - damage);
+            defenderApi.game_log("hurt " + m.mtype + " -" + damage + " hp=" + defender.hp);
+            if (defender.hp <= 0) {
+              defender.rip = true;
+              defenderApi.game_log("death " + m.mtype);
+            }
+          }
+        }
         if (!m.dead || !m.respawnAt || now < m.respawnAt) continue;
         m.dead = false;
         m.hp = m.max_hp;
