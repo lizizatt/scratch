@@ -96,7 +96,10 @@ function createPartyState(selfName) {
   function applyDiff(from, parsed) {
     if (!parsed || !S.members[from]) return;
     if (parsed.p) S.members[from].pots = parsed.p;
-    if (parsed.rip != null) S.members[from].rip = !!parsed.rip;
+    if (parsed.rip != null) {
+      S.members[from].rip =
+        parsed.rip === true || parsed.rip === 1 || parsed.rip === "1";
+    }
     if (parsed.task) S.members[from].task = parsed.task;
     if (parsed.seq != null) S.seq[from] = Math.max(S.seq[from] || 0, parsed.seq);
   }
@@ -121,7 +124,7 @@ function createPartyState(selfName) {
 
   function formatDiff() {
     const m = S.members[selfName];
-    return "~d p=" + m.pots + (m.rip ? " rip=1" : "") + (m.task ? " task=" + m.task : "");
+    return "~d p=" + m.pots + " rip=" + (m.rip ? "1" : "0") + (m.task ? " task=" + m.task : "");
   }
 
   function parseLine(line) {

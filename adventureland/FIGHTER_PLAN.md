@@ -52,7 +52,7 @@ The order of concern is:
 | Upgrade pickup | On authenticated request, meet Puppygirl and offload only the exact unlocked Hunter/progression items requested. | Implemented |
 | Inventory ads | Publish revisioned equipment, bag, capacity, location, world, class, and reservation snapshots every 20 seconds and after material changes. | Implemented |
 | Chat | All CODE-originated party messages use a per-character 16-second queue with `echo > rare > diff > heartbeat` priority. | Implemented |
-| Status publication | Potion bucket, task, and death changes must eventually publish without depending on an unrelated field changing. | **Locked gap:** task/rip-only changes currently wait for a potion-bucket diff |
+| Status publication | Potion bucket, task, and death changes publish independently, including explicit living/dead state. | Implemented |
 | Recovery | Leave jail, escape trapped event maps, respawn, reload persisted state, re-form the party, and resume intent without a path or hop storm. | Implemented |
 
 ## 3. Top-level fighter state machine
@@ -394,7 +394,6 @@ then republishes.
 | Gap | Consequence |
 | --- | --- |
 | Death does not reliably publish `rip` before respawn | Dead-but-present succession can temporarily retain the wrong leader |
-| Diff emission is tied to potion-bucket changes | Task/rip-only state changes can remain unpublished |
 | Plain `Transfer ...` and `World ...` notices are not parsed by current party-state parser | They are informational output, not reliable movement control |
 | Item fingerprints are not unique instance IDs | Identical copies require location/count safeguards |
 | Peer planner covers accessory groups only | Armor and weapon optimization remains merchant-mediated |

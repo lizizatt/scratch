@@ -119,11 +119,12 @@ expected (`src/party_state.js`: `bump`, `setSelf`, `setIntent`;
 
 Acceptance is based on the receiver's current `get_party()` membership:
 `currentLeader` nominally selects the first present name whose cached
-`S.members[name].rip` is false, in `Jazwyn, Sarene, Zarook` order. No current
-producer sets its own member `rip`, however, so no `rip=1` diff is emitted and
-this death exclusion is unreachable end to end. For a dead character that
-remains present, fighter succession is therefore presence-only and does not
-advance. Only a heartbeat whose event sender equals that computed leader may
+`S.members[name].rip` is false, in `Jazwyn, Sarene, Zarook` order. Fighters
+publish death and recovery changes, but the live roster's `rip` field is not
+yet included in this decision and party chat is best effort. For a dead
+character that remains present before its diff is observed, fighter succession
+can therefore remain presence-only and fail to advance. Only a heartbeat whose
+event sender equals that computed leader may
 change shared `f`, `m`, and `h`. A sequence lower than the stored sender
 sequence is ignored; an equal sequence is accepted. There is no wall-clock
 TTL. A delayed heartbeat can therefore remain authoritative if its sequence
@@ -135,22 +136,19 @@ passes these checks. See `src/party_state.js`: `currentLeader`,
 Wire form (the marker must be followed by a space and content):
 
 ```text
-~d p=<ok|low|dry> [rip=1] [task=<string>]
+~d p=<ok|low|dry> rip=<0|1> [task=<string>]
 ```
 
-`p` is the local minimum HP/MP potion bucket, `rip` is emitted only when true,
-and `task` is normally emitted because the default is `idle`. The parser also
+`p` is the local minimum HP/MP potion bucket, `rip` explicitly publishes both
+living and dead state, and `task` is normally emitted because the default is
+`idle`. The parser also
 accepts `seq=<text>`, although the current formatter does not emit it.
 `applyDiff` accepts updates only for a sender already present in the fixed
-`members` map; unknown senders are ignored. Values are weakly validated:
-`p`/`task` are arbitrary strings and `rip` uses JavaScript truthiness, so
-`rip=0` would incorrectly become `true`. Diffs are queued only when the
-formatted local snapshot changes (`diffNeeded`), and may be superseded by a
-higher-priority pending message. Current runtime code calls `diffNeeded` only
-inside the branch where `refreshPots` observes a changed potion bucket. A
-task- or rip-only state change therefore emits no diff at all until the potion
-bucket later changes; merely calling `refreshPots` with the same bucket does not
-flush it. Sources: `src/party_state.js`:
+`members` map; unknown senders are ignored. `p`/`task` are arbitrary strings;
+`rip` is true only for boolean/numeric/textual `1`, so `rip=0` clears a stale
+death state. Diffs are queued whenever the formatted local snapshot changes
+(`diffNeeded`) after a potion, task, death, or recovery transition, and may be
+superseded by a higher-priority pending message. Sources: `src/party_state.js`:
 `formatDiff`, `parseLine`, `applyDiff`; `src/fighter.js`: `refreshPots`.
 
 ### 3.3 Rare sighting

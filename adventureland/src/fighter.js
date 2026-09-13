@@ -228,12 +228,14 @@ function bootFighter(api, opts) {
   function refreshPots() {
     const c = countPots(api.character.items);
     const b = potBucket(c.hp, c.mp);
-    if (state.S.members[name].pots !== b) {
-      state.setSelf({ pots: b });
-      const d = state.diffNeeded();
-      if (d) chat.enqueue(d, "diff");
-    }
+    if (state.S.members[name].pots !== b) publishSelf({ pots: b });
     return b;
+  }
+
+  function publishSelf(patch) {
+    state.setSelf(patch);
+    const d = state.diffNeeded();
+    if (d) chat.enqueue(d, "diff");
   }
 
   function hasSellableJunk() {
@@ -1157,7 +1159,7 @@ function bootFighter(api, opts) {
         const mon = api.get_nearest_monster({ type: h.id });
         const inRange = mon && typeof api.is_in_range === "function" ? api.is_in_range(mon) : !!mon;
         if (far && !inRange) {
-          state.setSelf({ task: "moving" });
+          publishSelf({ task: "moving" });
           await motion.goTo({ map: pc.map, x: pc.x, y: pc.y });
           return true;
         }
@@ -1168,7 +1170,7 @@ function bootFighter(api, opts) {
     // No hunt or c===0 → Daisy accept / turn-in
     if (!shouldInteractDaisy(api.character)) return false;
 
-    state.setSelf({ task: "mhunt" });
+    publishSelf({ task: "mhunt" });
     api.set_message(h && huntComplete(h) ? "MH turnin" : "MH Daisy");
     if (!(await goDaisy())) {
       api.game_log("mhunt:daisy_path_fail");
@@ -1246,8 +1248,11 @@ function bootFighter(api, opts) {
     respawnBusy = true;
     api.game_log("rip:respawn");
     noteHuntQuestDeath();
+    publishSelf({ rip: true, task: "dead" });
+    chat.tick(api._now());
     try {
       if (typeof api.respawn === "function") await api.respawn();
+      publishSelf({ rip: false, task: "moving" });
       persist();
       return true;
     } catch (e) {
@@ -1379,7 +1384,7 @@ function bootFighter(api, opts) {
         await hopPrep(HOME);
         return;
       }
-      state.setSelf({ task: "hold" });
+      publishSelf({ task: "hold" });
       return;
     }
     if (state.S.intent.world) {
@@ -1398,7 +1403,7 @@ function bootFighter(api, opts) {
 
     const pots = refreshPots();
     if (now < pickupHoldUntil) {
-      state.setSelf({ task: "pickup" });
+      publishSelf({ task: "pickup" });
       if (pots !== "dry") burnPotsNow(now);
       if (
         api.character.map !== PICKUP_MEET.map ||
@@ -1450,7 +1455,7 @@ function bootFighter(api, opts) {
     if (pots !== "dry") burnPotsNow(now);
 
     if (!isLead()) {
-      state.setSelf({ task: "follow" });
+      publishSelf({ task: "follow" });
       const followed = opts.form
         ? await motion.followFormation(opts.form)
         : await motion.followLeader();
@@ -1490,7 +1495,7 @@ function bootFighter(api, opts) {
       (api.character.map === (mon.map || api.character.map)) &&
       motion.dist(api.character, mon) <= ENGAGE_R;
     if (!monHere) {
-      state.setSelf({ task: "moving" });
+      publishSelf({ task: "moving" });
       if (RARE_WHITELIST.indexOf(mtype) >= 0) {
         // Never path by type for rares (LESSONS #6) — wait for spot / coords
         api.game_log("farm:skip_rare_type " + mtype);
@@ -1512,7 +1517,7 @@ function bootFighter(api, opts) {
       else await motion.goTo({ to: mtype });
       return;
     }
-    state.setSelf({ task: "farm" });
+    publishSelf({ task: "farm" });
     if (opts.pre_combat && opts.pre_combat()) return;
     runCombat(mtype);
   }
@@ -1614,7 +1619,7 @@ function bootFighter(api, opts) {
       if (typeof api.loot === "function") api.loot();
       await stripWrongClass();
       if ((api.character.esize || 0) < 1 && hasSellableJunk()) {
-        state.setSelf({ task: "vendor" });
+        publishSelf({ task: "vendor" });
         await freeBagSlot();
         persist();
         return;
