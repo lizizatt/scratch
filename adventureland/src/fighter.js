@@ -1152,6 +1152,16 @@ function bootFighter(api, opts) {
   }
 
   async function tickFarm(now) {
+    if (/^target(?:_|$)/.test(state.S.intent.mtype || "")) {
+      api.game_log("farm:reject_training_target " + state.S.intent.mtype);
+      state.S.intent.kind = "farm";
+      state.S.intent.mtype = defaultFarm;
+      state.S.intent.hold = 0;
+      state.S.rare = null;
+      preRareSnap = null;
+      if (typeof api.change_target === "function") api.change_target(null);
+      persist();
+    }
     if (state.S.intent.hold) {
       // hop-prep to HOME if not already
       const reg = api.parent.server_region;

@@ -51,10 +51,20 @@ function visibleMonsters(api) {
   const entities = (api.parent && api.parent.entities) || {};
   return Object.keys(entities)
     .map((id) => entities[id])
-    .filter((entity) => entity && entity.type === "monster" && !entity.dead);
+    .filter(
+      (entity) =>
+        entity &&
+        entity.type === "monster" &&
+        !entity.dead &&
+        !/^target(?:_|$)/.test(entity.mtype || "")
+    );
 }
 
 function targetFor(api, mtype, dyn) {
+  if (/^target(?:_|$)/.test(mtype || "")) {
+    if (api.change_target) api.change_target(null);
+    return null;
+  }
   const leadName = (dyn && dyn.leadName) || "Jazwyn";
   const lead = api.get_player(leadName);
   const isLead = dyn && dyn.isLead != null ? dyn.isLead : api.character.name === leadName;
@@ -68,6 +78,8 @@ function targetFor(api, mtype, dyn) {
       api.get_nearest_monster({ type: mtype, no_target: true }) ||
       api.get_nearest_monster({ type: mtype });
   }
+  if (target && /^target(?:_|$)/.test(target.mtype || "")) target = null;
+  if (!target && api.change_target) api.change_target(null);
   return target && target.type === "monster" && !target.dead ? target : null;
 }
 

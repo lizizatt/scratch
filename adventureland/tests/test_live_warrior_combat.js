@@ -152,6 +152,36 @@ test("sim no_target selection skips monsters claimed by another fighter", () => 
   assert.strictEqual(api.get_nearest_monster({ type: "armadillo", no_target: true }).id, free.id);
 });
 
+test("training dummies are never valid combat or persisted farm targets", async () => {
+  const p = readyParty();
+  const bot = p.bots.Jazwyn;
+  const api = bot.api;
+  for (const monster of Object.values(api.parent.entities)) {
+    if (monster && monster.type === "monster") monster.dead = true;
+  }
+  const dummy = p.world.spawnMonster(
+    "US/III",
+    api.character.map,
+    "target_a500",
+    { x: api.character.real_x + 1, y: api.character.real_y },
+    "dummy"
+  );
+  bot.ctrl.state.S.intent.mtype = "target_a500";
+  api.change_target(dummy);
+
+  assert.strictEqual(
+    warriorRotation(api, "target_a500", { leadName: "Jazwyn", isLead: true }),
+    "idle"
+  );
+  assert.strictEqual(api.character.target, null);
+  await bot.ctrl.tick();
+  assert.strictEqual(bot.ctrl.state.S.intent.mtype, "armadillo");
+  assert.ok(
+    api.log.game.some((entry) => /farm:reject_training_target target_a500/.test(entry.m))
+  );
+  assert.strictEqual(skillCount(api, "attack"), 0);
+});
+
 test("priest emergency single heal outranks Party Heal", () => {
   const p = readyParty();
   const api = p.bots.Zarook.api;
