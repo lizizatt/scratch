@@ -903,6 +903,16 @@ A zero-chance preview or server `max_level` response persists
 `progressionUpgradeStop[name]=level`, preventing retry loops at the game cap.
 Locked items and peer-transaction reservations are excluded throughout.
 
+### 6.10 Merchant bag working set
+
+Puppygirl treats her bag as a working set rather than long-term storage.
+Potions, the merchant stand, permanent tools, upgrade/compound scrolls,
+offerings, pending exchanges, vendor junk, listed merchandise, fighter gear
+targets, and active progression items remain available to their immediate
+handlers. Other inactive stock, including ordinary gathered materials and
+reserve currencies, is parked in the bank. Crafting and Hunter purchases count
+banked ingredients and tokens and retrieve them only when needed.
+
 ## 7. Leadership, hold/world, and persistence
 
 ### 7.1 Leadership invariants

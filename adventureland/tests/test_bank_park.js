@@ -48,7 +48,7 @@ test("bank_store pack fallback succeeds when bare call returns invalid", async (
 });
 
 test("merchant park stores parkables without logging bank:full when slots free", async () => {
-  const p = bootParty({ pack: "armadillo", pots: 200 });
+  const p = bootParty({ pack: "armadillo", pots: 200, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
   api.character.map = "bank";
   api.character.x = 0;
@@ -64,6 +64,13 @@ test("merchant park stores parkables without logging bank:full when slots free",
   bag[1] = { name: "stand0" };
   bag[2] = { name: "gloves", level: 7 };
   bag[3] = { name: "helmet", level: 7 };
+  bag[4] = { name: "rattail", q: 17 };
+  bag[5] = { name: "seashell", q: 83 };
+  bag[6] = { name: "monstertoken", q: 61 };
+  bag[7] = { name: "tracker" };
+  bag[8] = { name: "scroll0", q: 11 };
+  bag[9] = { name: "cscroll1", q: 8 };
+  bag[10] = { name: "anniversarygift", q: 4 };
   api.character.esize = bag.filter((x) => !x).length;
 
   const real = api.bank_store.bind(api);
@@ -84,6 +91,16 @@ test("merchant park stores parkables without logging bank:full when slots free",
   const msgs = api.log.game.map((g) => g.m);
   assert.ok(msgs.some((m) => m === "bank:store gloves@7"), "gloves should be parked");
   assert.ok(msgs.some((m) => m === "bank:store helmet@7"), "helmet should be parked");
+  assert.ok(msgs.some((m) => m === "bank:store rattail@0"), "passive materials should be parked");
+  assert.ok(msgs.some((m) => m === "bank:store seashell@0"), "event materials should be parked");
+  assert.ok(msgs.some((m) => m === "bank:store monstertoken@0"), "reserve currency should be parked");
+  for (const name of ["tracker", "scroll0", "cscroll1"]) {
+    assert.ok(api.character.items.some((it) => it && it.name === name), name + " remains operational");
+  }
+  assert.ok(
+    !msgs.some((m) => m === "bank:store anniversarygift@0"),
+    "exchange inputs must be consumed or kept out of the bank"
+  );
   const flat = JSON.stringify(api.log.game || []);
   assert.ok(!/\bbank:full\b/.test(flat), "must not claim bank:full when free slots exist");
 });

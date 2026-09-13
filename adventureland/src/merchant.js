@@ -25,6 +25,7 @@ const {
   EMERGENCY_VENDOR_NPC,
   STALL_SELL,
   GEAR_TARGETS,
+  KEEP_ALWAYS,
   PONTY_WANT,
   PONTY_MULT,
   CRAFT_TARGETS,
@@ -848,6 +849,8 @@ function bootMerchant(api, opts) {
       if (!it) continue;
       if (/^hpot|^mpot/.test(it.name)) continue;
       if (it.name === "stand0") continue;
+      if (KEEP_ALWAYS.indexOf(it.name) >= 0) continue;
+      if (/^(?:c?scroll[0-2]|offering(?:p|x)?)$/.test(it.name)) continue;
       if (EXCHANGE_ITEMS.indexOf(it.name) >= 0) continue;
       if (isVendorNpcItem(it)) continue;
       if (isGearTargetName(it.name)) continue;
@@ -879,9 +882,8 @@ function bootMerchant(api, opts) {
       // Idle / pre-dequeue park skips all scroll0-upgrade candidates so tryUpgradeOne
       // can log skip or upgrade. After that, idleEcon force-parks below-gate pieces.
       if (opts.skipUpgrades !== false && eligibleUpgrade(it, api.G)) continue;
-      // Compound accessories must park even if G.type is missing on a blind tick.
-      const combineName = COMBINE_PRIORITY.indexOf(it.name) >= 0;
-      if (isSellJunk(it, api.G) || isGearPiece(it, api.G) || combineName) out.push(i);
+      // Everything not needed for immediate merchant work belongs in the vault.
+      out.push(i);
     }
     return out;
   }
