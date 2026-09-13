@@ -3298,6 +3298,12 @@ function bootMerchant(api, opts) {
     if (busy) return;
     busy = true;
     try {
+      if (api.character.map === "jail") {
+        api.game_log("jail:leave");
+        if (typeof api.leave === "function") await api.leave();
+        if (typeof api.sleep === "function") await api.sleep(1000);
+        return;
+      }
       // Live: merchant dies on pack during dlv — respawn, abort job, retreat (2026-09-09).
       if (api.character.rip) {
         api.game_log("rip:respawn");

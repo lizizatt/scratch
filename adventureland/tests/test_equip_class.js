@@ -85,6 +85,21 @@ test("adversary: merchant rip:respawn when dead at pack", async () => {
   assert.ok(api.character.hp > 0, "merchant hp restored");
 });
 
+test("adversary: jailed merchant leaves before logistics pathing", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 50, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  api.character.map = "jail";
+  api.character.real_x = api.character.x = -79;
+  api.character.real_y = api.character.y = -153;
+
+  await p.tickAll();
+
+  const msgs = api.log.game.map((g) => g.m);
+  assert.ok(msgs.some((m) => m === "jail:leave"), "merchant must log jail recovery");
+  assert.strictEqual(api.character.map, "main", "merchant must leave jail");
+  assert.ok(!msgs.some((m) => /path_fail/.test(m)), "must not attempt logistics while jailed");
+});
+
 test("adversary: retreatPlaza towns out of winter_cave (no in-place rip loop)", async () => {
   // Live: dlv meet winter_cave → dlv:done → retreatPlaza no-op off main → rip:respawn spam.
   const p = bootParty({ pack: "armadillo", pots: 50, gold: 500000, members: ["Puppygirl"] });
