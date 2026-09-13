@@ -860,6 +860,7 @@ function bootMerchant(api, opts) {
       ) {
         continue;
       }
+      if (progressionItemEligible(it) || progressionWinner(it)) continue;
       if (opts.onlyBelowGate) {
         if (
           !(

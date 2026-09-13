@@ -421,6 +421,68 @@ test("adversary: rolling progression remembers the game cap without retrying", a
   assert.strictEqual(fighter.slots.cape.level, 5);
 });
 
+test("adversary: refreshed progression reservation prevents bank bounce", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 500000,
+    members: ["Sarene", "Puppygirl"],
+  });
+  const ctrl = p.bots.Puppygirl.ctrl;
+  const api = p.bots.Puppygirl.api;
+  const merchant = api.character;
+  const fighter = p.bots.Sarene.api.character;
+  fighter.slots.shoes = { name: "shoes", level: 2 };
+  for (let i = 0; i < merchant.items.length; i++) merchant.items[i] = { name: "tracker" };
+  merchant.items[0] = { name: "stand0" };
+  merchant.items[1] = { name: "hpot1", q: 200 };
+  merchant.items[2] = { name: "mpot1", q: 200 };
+  merchant.items[41] = null;
+  merchant.esize = 1;
+  merchant.map = "main";
+  merchant.real_x = merchant.x = 40;
+  merchant.real_y = merchant.y = -20;
+  merchant._bank = {
+    gold: 0,
+    items0: [{ name: "shoes", level: 2 }].concat(new Array(41).fill(null)),
+  };
+
+  await p.bots.Sarene.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    inventory_ad: 1,
+    v: 2,
+    revision: 1,
+    name: "Sarene",
+    ctype: "mage",
+    slots: { shoes: { name: "shoes", level: 2 } },
+    bag: [],
+    esize: 42,
+  });
+  ctrl.gearAds.Sarene._t = p.world.clock.now() - 61000;
+  const smartMove = api.smart_move;
+  api.smart_move = async (dest) => {
+    const leftBank = merchant.map === "bank";
+    const result = await smartMove(dest);
+    if (leftBank && merchant.map !== "bank") {
+      ctrl.gearAds.Sarene._t = p.world.clock.now();
+    }
+    return result;
+  };
+  api.upgrade = async (itemI, scrollI, offering, preview) =>
+    preview ? { chance: 0.05, level: merchant.items[itemI].level || 0 } : { failed: true, reason: "busy" };
+
+  await ctrl.tick();
+  await ctrl.tick();
+
+  const logs = api.log.game.map((g) => g.m);
+  assert.ok(logs.some((m) => m === "bank_retrieve shoes@2"), "stale ad permits the initial pull");
+  assert.ok(
+    !logs.some((m) => m === "bank:store shoes@2"),
+    "the refreshed progression candidate must not be immediately re-banked"
+  );
+  assert.ok(merchant.items.some((it) => it && it.name === "shoes" && (it.level || 0) === 2));
+});
+
 test("adversary: stall lists upgraded base armor without touching fighter equipment", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Jazwyn", "Puppygirl"] });
   const j = p.bots.Jazwyn.api.character;
