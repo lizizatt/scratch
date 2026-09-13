@@ -339,7 +339,6 @@ permanently authoritative.
 
 | Gap | Effect | Authority |
 |---|---|---|
-| Dead-but-present leadership | A dead member's `rip` does not reliably reach the shared member state, so succession is robust for absence/disconnect but not every death window. | Locked requirement; implementation pending |
 | Fingerprint ambiguity | Identical item instances can share the same fingerprint; peer transfers rely on observed location and count deltas. | Accepted current limitation |
 | Best-effort CM/chat | Delivery is not guaranteed by the platform; application acknowledgements, retries, TTLs, and fallback provide recovery. | Accepted platform constraint |
 | Fighter bank self-service | Fighters cannot fetch their own upgrades from the shared bank. | Deferred design alternative |

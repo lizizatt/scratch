@@ -34,7 +34,7 @@ The order of concern is:
 
 | Area | Requirement | Implementation |
 | --- | --- | --- |
-| Leadership | Exactly one current leader is selected in order `Jazwyn -> Sarene -> Zarook`, excluding absent or dead fighters. Leadership returns to Jazwyn when she returns. | Implemented for absence/disconnect; **dead-but-present gap** |
+| Leadership | Exactly one current leader is selected in order `Jazwyn -> Sarene -> Zarook`, excluding absent or dead fighters. Leadership returns to Jazwyn when she returns. | Implemented |
 | Intent ownership | Only the current leader writes farm/hunt target, hold, requested world, and normal shared mode. Followers consume that intent. | Implemented |
 | Cohesion | Followers never independently select a different farm while a leader is available. Cross-map movement begins with a cohesion wait; followers use leader-relative formation and pack fallback. | Implemented |
 | World changes | Fighters never world-hop for normal farming, potions, gear, or rares. Only explicit hold/world control invokes hop preparation. | Implemented |
@@ -137,13 +137,11 @@ above every sequence it has heard.
 Followers may update local execution state but may not overwrite shared
 intent. A leader heartbeat older than the stored sender sequence is ignored.
 
-### 4.1 Leadership implementation gap
+### 4.1 Live death handling
 
-The locked rule excludes dead fighters. Current selection observes party
-presence but relies on the shared member `rip` field; a fighter's death does
-not reliably publish that field before its rapid respawn. Succession is
-therefore deterministic for absent/disconnected fighters but not guaranteed
-during every dead-but-still-present window.
+Leadership filters the live party roster's death flags before consulting the
+shared state. A dead-but-present fighter therefore yields immediately to the
+next living fighter, and Jazwyn reclaims leadership after recovery.
 
 ## 5. Farm, formation, and combat
 
@@ -393,7 +391,6 @@ then republishes.
 
 | Gap | Consequence |
 | --- | --- |
-| Death does not reliably publish `rip` before respawn | Dead-but-present succession can temporarily retain the wrong leader |
 | Plain `Transfer ...` and `World ...` notices are not parsed by current party-state parser | They are informational output, not reliable movement control |
 | Item fingerprints are not unique instance IDs | Identical copies require location/count safeguards |
 | Peer planner covers accessory groups only | Armor and weapon optimization remains merchant-mediated |

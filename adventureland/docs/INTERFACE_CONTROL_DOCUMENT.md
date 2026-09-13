@@ -118,12 +118,12 @@ expected (`src/party_state.js`: `bump`, `setSelf`, `setIntent`;
 `src/fighter.js`: `tick`).
 
 Acceptance is based on the receiver's current `get_party()` membership:
-`currentLeader` nominally selects the first present name whose cached
-`S.members[name].rip` is false, in `Jazwyn, Sarene, Zarook` order. Fighters
-publish death and recovery changes, but the live roster's `rip` field is not
-yet included in this decision and party chat is best effort. For a dead
-character that remains present before its diff is observed, fighter succession
-can therefore remain presence-only and fail to advance. Only a heartbeat whose
+`currentLeader` selects the first living present name in
+`Jazwyn, Sarene, Zarook` order. Before selection, fighters filter both the live
+party roster's `rip` flags and their own live `character.rip`; cached member
+state remains a secondary exclusion. This same living-member list validates
+heartbeat authority, so a dead-but-present leader yields immediately and the
+preferred leader resumes authority after recovery. Only a heartbeat whose
 event sender equals that computed leader may
 change shared `f`, `m`, and `h`. A sequence lower than the stored sender
 sequence is ignored; an equal sequence is accepted. There is no wall-clock
@@ -921,11 +921,10 @@ liquidation.
 
 ### 7.1 Leadership invariants
 
-* Fighter leadership is recomputed from `get_party()` on every `isLead()` call,
-  in `Jazwyn`, `Sarene`, `Zarook` order. Its nominal death exclusion reads
-  cached `state.S.members[n].rip`, not live `get_party()[n].rip`; because no
-  producer currently publishes self-rip, actual fighter succession is
-  presence-only for a dead-but-still-present leader.
+* Fighter leadership is recomputed from living `get_party()` members on every
+  `isLead()` call, in `Jazwyn`, `Sarene`, `Zarook` order. Live roster death
+  flags and the local fighter's `character.rip` are excluded before cached
+  member state is considered.
 * If the party list is empty, a fighter considers only itself; if a nonempty
   list contains no configured fighter, the first present name is returned.
 * Only the computed lead publishes heartbeat and runs the Daisy quest loop.

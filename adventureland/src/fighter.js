@@ -196,12 +196,29 @@ function bootFighter(api, opts) {
     now: () => api._now(),
   });
 
+  function livePartyMembers() {
+    const party = api.get_party() || {};
+    const present = Object.keys(party).filter((member) => {
+      if (member === name && api.character.rip) return false;
+      return !(party[member] && party[member].rip);
+    });
+    return present.length ? present : [name];
+  }
+
   function isLead() {
-    const party = Object.keys(api.get_party() || {});
-    const present = party.length ? party : [name];
+    const present = livePartyMembers();
     const lead = state.currentLeader(present);
     state.S.lead = lead;
     return lead === name;
+  }
+
+  function wasLeadWhenAlive() {
+    const party = api.get_party() || {};
+    const present = Object.keys(party).filter(
+      (member) => member === name || !(party[member] && party[member].rip)
+    );
+    if (present.indexOf(name) < 0) present.push(name);
+    return state.currentLeader(present) === name;
   }
 
   /**
@@ -925,8 +942,7 @@ function bootFighter(api, opts) {
       return;
     }
     if (parsed.type === "hb") {
-      const party = Object.keys(api.get_party() || {});
-      state.applyHeartbeat(from, parsed, party.length ? party : [name]);
+      state.applyHeartbeat(from, parsed, livePartyMembers());
     }
     else if (parsed.type === "diff") state.applyDiff(from, parsed);
     else if (parsed.type === "rare") {
@@ -1222,7 +1238,7 @@ function bootFighter(api, opts) {
 
   /** Lead death while farming Daisy hunt target → soft-abandon after limit. */
   function noteHuntQuestDeath() {
-    if (!huntQuest || !isLead()) return;
+    if (!huntQuest || !wasLeadWhenAlive()) return;
     const h = getHunt(api.character);
     if (!h || !(h.c > 0) || !h.id) return;
     if (mhuntSoftSkipId === h.id) return;

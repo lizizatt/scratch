@@ -75,4 +75,26 @@ test("fighter: task-only transition publishes without a potion change", async ()
   assert.ok(sent.some((line) => /task=hold/.test(line)), JSON.stringify(sent));
 });
 
+test("fighter: dead-but-present Jazwyn yields leadership and reclaims it after recovery", () => {
+  const w = createWorld();
+  const j = w.spawn({ name: "Jazwyn" });
+  const s = w.spawn({ name: "Sarene" });
+  const z = w.spawn({ name: "Zarook" });
+  w.formParty("US/III", ["Jazwyn", "Sarene", "Zarook"]);
+  const jCtrl = bootFighter(j, { now: () => w.clock.now() });
+  const sCtrl = bootFighter(s, { now: () => w.clock.now() });
+  const zCtrl = bootFighter(z, { now: () => w.clock.now() });
+
+  j.character.rip = true;
+  w.refreshPartyCoords("US/III");
+  assert.strictEqual(sCtrl.isLead(), true);
+  s.party_say("~S f=bee m=farm h=0 seq=5");
+  assert.strictEqual(zCtrl.state.S.intent.mtype, "bee", "successor heartbeat accepted");
+
+  j.character.rip = false;
+  w.refreshPartyCoords("US/III");
+  assert.strictEqual(jCtrl.isLead(), true);
+  assert.strictEqual(sCtrl.isLead(), false);
+});
+
 module.exports = { tests };
