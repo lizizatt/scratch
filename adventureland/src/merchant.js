@@ -131,6 +131,8 @@ function bootMerchant(api, opts) {
   let lastNeedSpaceAt = null;
   let lastCombineNoSpaceAt = null;
   const COMBINE_NO_SPACE_BACKOFF_MS = 15000;
+  const stallSlotBlockedUntil = {};
+  const STALL_SLOT_RESYNC_MS = 180000;
 
   function logUpgradeSkip(name, level, chance) {
     // Once per name@level forever — 60s re-logs still flooded burn-in while stall locked park.
@@ -1978,7 +1980,10 @@ function bootMerchant(api, opts) {
     if (!(await openStandAndSync())) return false;
     let tradeSlot = 0;
     for (let s = 1; s <= 16; s++) {
-      if (!api.character.slots["trade" + s]) {
+      if (
+        !api.character.slots["trade" + s] &&
+        (stallSlotBlockedUntil[s] || 0) <= api._now()
+      ) {
         tradeSlot = s;
         break;
       }
@@ -2031,6 +2036,7 @@ function bootMerchant(api, opts) {
         // A reopened stand can expose a locally empty trade slot before its
         // persisted listing arrives. Force a fresh restore so we do not keep
         // retrieving and retrying stock against that occupied server slot.
+        stallSlotBlockedUntil[tradeSlot] = api._now() + STALL_SLOT_RESYNC_MS;
         closeStandIfOpen();
         if (typeof api.sleep === "function") await api.sleep(1000);
         if (!(await openStandAndSync())) return false;
@@ -2040,6 +2046,7 @@ function bootMerchant(api, opts) {
       api.game_log("stall:list_fail " + it.name + " " + (r.reason || ""));
       return false;
     }
+    delete stallSlotBlockedUntil[tradeSlot];
     if (replaced) {
       api.game_log(
         "stall:rotate " +

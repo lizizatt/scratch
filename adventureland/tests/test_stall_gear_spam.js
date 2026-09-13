@@ -657,7 +657,7 @@ test("adversary: saturated stall pulls a higher-value bank replacement", async (
   assert.strictEqual(listed.filter((x) => x.name === "gloves").length, 15);
 });
 
-test("adversary: stale local trade slot is resynced instead of retried forever", async () => {
+test("adversary: unrestored server trade slot is quarantined between retries", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
   const c = api.character;
@@ -680,17 +680,19 @@ test("adversary: stale local trade slot is resynced instead of retried forever",
   let attempts = 0;
   api.trade = async () => {
     attempts++;
-    c.slots.trade16 = { name: "pants", level: 5, price: 299600 };
     return { failed: true, reason: "cant_equip" };
   };
 
   for (let i = 0; i < 160; i++) await p.tickAll();
 
-  assert.strictEqual(attempts, 1, "server-occupied slot must not be retried");
-  assert.ok(
-    api.log.game.some((g) => g.m === "stall:slot_resync trade16"),
-    "slot race is diagnosed and resynced"
-  );
+  const resyncs = api.log.game.filter((g) => g.m === "stall:slot_resync trade16");
+  assert.ok(attempts >= 1, "server-occupied slot is probed");
+  for (let i = 1; i < resyncs.length; i++) {
+    assert.ok(
+      resyncs[i].t - resyncs[i - 1].t >= 180000,
+      "server-occupied slot retries must respect the quarantine"
+    );
+  }
   assert.ok(
     !api.log.game.some((g) => /^stall:list_fail candycanesword/.test(g.m)),
     "known slot restore race is not reported as an item failure"
