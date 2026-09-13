@@ -224,6 +224,19 @@ test("adversary: idle stall keeps 32 pixels clear of other stalls", async () => 
     Math.hypot(m.real_x - rival.real_x, m.real_y - rival.real_y) >= 32,
     "merchant opened too close to an existing stall"
   );
+  mApi.log.moved.length = 0;
+  const openX = m.real_x;
+  const openY = m.real_y;
+  const free = m.items.findIndex((it) => !it);
+  m.items[free] = { name: "dagger", level: 1 };
+  m.esize--;
+  for (let i = 0; i < 80; i++) await p.tickAll();
+  assert.ok(
+    !mApi.log.moved.some((dest) => dest && dest.x === 40 && dest.y === -20),
+    "listing work must not revisit the crowded plaza origin"
+  );
+  assert.strictEqual(m.real_x, openX, "listing work should retain the clear stall position");
+  assert.strictEqual(m.real_y, openY, "listing work should retain the clear stall position");
 
   rival.real_x = rival.x = m.real_x + 8;
   rival.real_y = rival.y = m.real_y;

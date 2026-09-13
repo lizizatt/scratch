@@ -1649,11 +1649,6 @@ function bootMerchant(api, opts) {
     const reserveStable = stallBagStable();
     let cand = stallCandidate((api.character.esize || 0) < 1, reserveStable);
     if (!cand) return false;
-    // A full bag is the capacity emergency the listing is meant to resolve.
-    // If the item is already in hand on main, list in place rather than letting
-    // a transient plaza path failure deadlock every other cleanup operation.
-    const listInPlace = cand.i != null && (api.character.esize || 0) < 1 && api.character.map === "main";
-    if (!listInPlace && !(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
     if (!(await openStandAndSync())) return false;
     let tradeSlot = 0;
     for (let s = 1; s <= 16; s++) {
@@ -1698,7 +1693,6 @@ function bootMerchant(api, opts) {
       await leaveBankToPlaza();
       cand = stallCandidate(false, true);
       if (!cand || cand.i == null) return false;
-      if (!(await goNpc(PLAZA, null, "stall:path_fail"))) return false;
       if (!(await openStandAndSync())) return false;
     }
     if (api.character.slots["trade" + tradeSlot]) return false;
@@ -2648,7 +2642,6 @@ function bootMerchant(api, opts) {
     if (
       !fighterNearby &&
       !api.character.stand &&
-      (await goNpc(PLAZA, null, "stall:idle_path_fail")) &&
       (await openStandAndSync())
     ) {
       return;
