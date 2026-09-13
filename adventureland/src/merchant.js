@@ -65,11 +65,7 @@ const {
   meetTransitBlockerFilter,
 } = require("./merchant_meet");
 const { packCenter } = require("./packs");
-const {
-  cmSender,
-  isFighterName,
-  planPeerGearTransfers,
-} = require("./gear_coordination");
+const { cmSender, isFighterName } = require("./gear_coordination");
 
 /**
  * Merchant logistics under Jazwyn command.
@@ -96,9 +92,20 @@ function bootMerchant(api, opts) {
   }
 
   let store = loadQ();
-  if (store.gearAwaitRevisions || store.gearAwaitAds) {
+  if (
+    store.gearTx ||
+    store.gearAwaitRevisions ||
+    store.gearAwaitAds ||
+    store.gearPlanFailures ||
+    store.gearPlanAfter ||
+    store.gearPlanRevision
+  ) {
+    delete store.gearTx;
     delete store.gearAwaitRevisions;
     delete store.gearAwaitAds;
+    delete store.gearPlanFailures;
+    delete store.gearPlanAfter;
+    delete store.gearPlanRevision;
     saveQ(store);
   }
   let busy = false;
@@ -530,48 +537,6 @@ function bootMerchant(api, opts) {
     if (!d || typeof d !== "object") return;
     const sender = cmSender(m);
     if (!isFighterName(sender)) return;
-    if (d.gear_tx_report && d.tx) {
-      const tx = store.gearTx;
-      if (!tx || tx.id !== d.tx || d.who !== sender || tx.participants.indexOf(sender) < 0) return;
-      if (d.phase === "prepared") {
-        tx.blocked = null;
-        tx.prepared[sender] = 1;
-        for (const outgoing of d.outgoing || []) {
-          const leg = tx.legs[outgoing.index];
-          if (leg && leg.from === sender && outgoing.item) leg.item = outgoing.item;
-        }
-      } else if (d.phase === "sent") {
-        const leg = tx.legs[d.index];
-        if (leg && leg.from === sender) {
-          leg.sent = 1;
-          tx.blocked = null;
-        }
-      } else if (d.phase === "equipped") {
-        const leg = tx.legs[d.index];
-        if (leg && leg.to === sender) {
-          leg.done = 1;
-          tx.blocked = null;
-        }
-      } else if (d.phase === "failed") {
-        tx.failure = d.error || "fighter_failed";
-      } else if (d.phase === "blocked") {
-        const error = d.error || "blocked";
-        const same =
-          tx.blocked &&
-          tx.blocked.who === sender &&
-          tx.blocked.index === d.index &&
-          tx.blocked.error === error;
-        tx.blocked = {
-          who: sender,
-          index: d.index,
-          error,
-          since: same ? tx.blocked.since : api._now ? api._now() : Date.now(),
-        };
-      }
-      tx.updatedAt = api._now ? api._now() : Date.now();
-      saveQ(store);
-      return;
-    }
     if (d.gear_ad && d.name) {
       if (d.name !== sender) return;
       const prev = gearAds[d.name];
@@ -1002,7 +967,7 @@ function bootMerchant(api, opts) {
    * already-owned target pieces are never purchased again.
    */
   async function startHunterPlan(fromTick) {
-    if (!fromTick && (busy || store.active || store.q.length || store.gearTx)) {
+    if (!fromTick && (busy || store.active || store.q.length)) {
       if (!store.hunterRequested) api.game_log("hunter:requested");
       store.hunterRequested = 1;
       saveQ(store);
@@ -1296,215 +1261,6 @@ function bootMerchant(api, opts) {
     );
   }
 
-  function gearParticipants(legs) {
-    const seen = {};
-    for (const leg of legs || []) {
-      seen[leg.from] = 1;
-      seen[leg.to] = 1;
-    }
-    return Object.keys(seen).sort();
-  }
-
-  function peerPlanInRange(plan) {
-    const counts = {};
-    for (const who of FIGHTERS) counts[who] = { outgoing: 0, incoming: 0 };
-    for (const leg of plan.legs) {
-      const from = gearAds[leg.from];
-      const to = gearAds[leg.to];
-      if (
-        !from ||
-        !to ||
-        from.server_region !== to.server_region ||
-        from.server_identifier !== to.server_identifier ||
-        from.map !== to.map
-      )
-        return false;
-      const dx = Number(from.x) - Number(to.x);
-      const dy = Number(from.y) - Number(to.y);
-      if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.hypot(dx, dy) > SEND_RANGE) return false;
-      counts[leg.from].outgoing += 1;
-      counts[leg.to].incoming += 1;
-    }
-    for (const who of FIGHTERS) {
-      const c = counts[who];
-      if (!c.outgoing && !c.incoming) continue;
-      const need = c.outgoing + (c.incoming ? 1 : 0);
-      if ((gearAds[who].esize || 0) < need) return false;
-    }
-    return true;
-  }
-
-  function gearPlanPayload(tx, who) {
-    return {
-      gear_plan: 1,
-      v: 2,
-      tx: tx.id,
-      plan_revision: tx.planRevision,
-      expires_at: tx.expiresAt,
-      outgoing: tx.legs.filter((x) => x.from === who),
-      incoming: tx.legs
-        .filter((x) => x.to === who)
-        .map((x) => ({ index: x.index, from: x.from, item: x.item, toSlot: x.toSlot })),
-    };
-  }
-
-  function peerGearPlanKey(legs) {
-    return (legs || [])
-      .map(
-        (x) =>
-          x.from +
-          ">" +
-          x.to +
-          ":" +
-          x.toSlot +
-          ":" +
-          (x.item && x.item.fingerprint ? x.item.fingerprint : "")
-      )
-      .sort()
-      .join("|");
-  }
-
-  async function cancelPeerGearTx(reason) {
-    const tx = store.gearTx;
-    if (!tx) return;
-    store.gearAwaitAds = {};
-    for (const who of tx.participants) {
-      store.gearAwaitAds[who] = gearAds[who] ? gearAds[who]._seq : 0;
-    }
-    for (const who of tx.participants) {
-      await api.send_cm(who, { gear_cancel: 1, v: 2, tx: tx.id, reason });
-    }
-    api.game_log("gear_tx:cancel tx=" + tx.id + " reason=" + reason);
-    if (!store.gearPlanFailures) store.gearPlanFailures = {};
-    const prior = store.gearPlanFailures[tx.planKey] || { count: 0 };
-    const count = Math.min(6, (prior.count || 0) + 1);
-    store.gearPlanFailures[tx.planKey] = {
-      count,
-      until: (api._now ? api._now() : Date.now()) + Math.min(300000, 5000 * Math.pow(2, count - 1)),
-      reason,
-    };
-    store.gearTx = null;
-    store.gearPlanAfter = (api._now ? api._now() : Date.now()) + 5000;
-    saveQ(store);
-  }
-
-  async function startPeerGearTx(now) {
-    if (store.gearTx || store.active || store.q.length || (store.gearPlanAfter || 0) > now) return false;
-    const ads = {};
-    for (const who of FIGHTERS) {
-      const ad = gearAds[who];
-      if (!gearAdFresh(ad, now)) return false;
-      if (
-        store.gearAwaitAds &&
-        store.gearAwaitAds[who] != null &&
-        Number(ad._seq) <= Number(store.gearAwaitAds[who])
-      )
-        return false;
-      ads[who] = ad;
-    }
-    store.gearAwaitAds = null;
-    const plan = planPeerGearTransfers(ads, api.G || {});
-    if (!plan || !peerPlanInRange(plan)) return false;
-    const planKey = peerGearPlanKey(plan.legs);
-    const failed = store.gearPlanFailures && store.gearPlanFailures[planKey];
-    if (failed && now < failed.until) return false;
-    const planRevision = (store.gearPlanRevision || 0) + 1;
-    const id = "gt" + now + "_" + planRevision;
-    const legs = plan.legs.map((leg, index) => Object.assign({ index, sent: 0, done: 0 }, leg));
-    store.gearPlanRevision = planRevision;
-    const baselineRevisions = {};
-    for (const who of FIGHTERS) baselineRevisions[who] = ads[who].revision;
-    store.gearTx = {
-      id,
-      planRevision,
-      createdAt: now,
-      expiresAt: now + 120000,
-      phase: "preparing",
-      legs,
-      participants: gearParticipants(legs),
-      prepared: {},
-      baselineRevisions,
-      lastCommandAt: 0,
-      planKey,
-    };
-    saveQ(store);
-    api.game_log(
-      "gear_tx:plan tx=" +
-        id +
-        " " +
-        legs.map((x) => x.from + ":" + x.item.name + "->" + x.to).join(",")
-    );
-    return true;
-  }
-
-  async function finishPeerGearTx() {
-    const tx = store.gearTx;
-    if (!tx) return;
-    store.gearAwaitAds = {};
-    for (const who of tx.participants) {
-      store.gearAwaitAds[who] = gearAds[who] ? gearAds[who]._seq : 0;
-    }
-    for (const who of tx.participants) {
-      await api.send_cm(who, { gear_finish: 1, v: 2, tx: tx.id });
-    }
-    api.game_log("gear_tx:done tx=" + tx.id);
-    if (store.gearPlanFailures) delete store.gearPlanFailures[tx.planKey];
-    store.gearPlanAfter = (api._now ? api._now() : Date.now()) + 3000;
-    store.gearTx = null;
-    saveQ(store);
-  }
-
-  async function tickPeerGearTx(now) {
-    let tx = store.gearTx;
-    if (!tx) {
-      if (!(await startPeerGearTx(now))) return false;
-      tx = store.gearTx;
-    }
-    if (!tx) return false;
-    if (tx.failure) {
-      await cancelPeerGearTx(tx.failure);
-      return true;
-    }
-    if (now >= tx.expiresAt) {
-      await cancelPeerGearTx("expired");
-      return true;
-    }
-    if (tx.blocked && tx.blocked.error !== "not_in_range") {
-      await cancelPeerGearTx(tx.blocked.error);
-      return true;
-    }
-    if (tx.blocked && tx.blocked.error === "not_in_range" && now - tx.blocked.since >= 15000) {
-      await cancelPeerGearTx("not_in_range");
-      return true;
-    }
-    if (now - (tx.lastCommandAt || 0) < 1000) return true;
-    tx.lastCommandAt = now;
-    if (tx.phase === "preparing") {
-      const ready = tx.participants.every((who) => tx.prepared[who]);
-      if (!ready) {
-        for (const who of tx.participants) {
-          if (!tx.prepared[who]) await api.send_cm(who, gearPlanPayload(tx, who));
-        }
-        saveQ(store);
-        return true;
-      }
-      tx.phase = "transferring";
-    }
-
-    const leg = tx.legs.find((x) => !x.done);
-    if (!leg) {
-      await finishPeerGearTx();
-      return true;
-    }
-    if (!leg.sent) {
-      await api.send_cm(leg.from, { gear_transfer: 1, v: 2, tx: tx.id, index: leg.index });
-    } else {
-      await api.send_cm(leg.to, { gear_check: 1, v: 2, tx: tx.id, index: leg.index });
-    }
-    saveQ(store);
-    return true;
-  }
-
   function findPotJob(who) {
     if (store.active && store.active.kind === "dlv_pots" && store.active.who === who) return store.active;
     return store.q.find((j) => j.kind === "dlv_pots" && j.who === who) || null;
@@ -1781,7 +1537,6 @@ function bootMerchant(api, opts) {
     const ad = gearAds[who];
     if (!gearAdFresh(ad, api._now())) return [];
     const baselines = progressionBaselines();
-    const reservations = new Set(ad.reservations || []);
     return (ad.bag || [])
       .filter((it) => {
         const level = it && (it.level || 0);
@@ -1790,8 +1545,7 @@ function bootMerchant(api, opts) {
           baselines[it.name] != null &&
           level <= baselines[it.name] &&
           canUpgradeItem(it, api.G) &&
-          !progressionStopped(it) &&
-          !reservations.has(it.fingerprint)
+          !progressionStopped(it)
         );
       })
       .map((it) => ({ name: it.name, level: it.level || 0 }));
@@ -3576,7 +3330,6 @@ function bootMerchant(api, opts) {
         store.hunterRequested &&
         !store.active &&
         !store.q.length &&
-        !store.gearTx &&
         api._now() >= (store.hunterRetryAt || 0)
       ) {
         const result = await startHunterPlan(true);
@@ -3591,8 +3344,6 @@ function bootMerchant(api, opts) {
         saveQ(store);
         return;
       }
-      const gearActive = await tickPeerGearTx(api._now());
-      if (gearActive && !store.active && !store.q.length) return;
       // Snapshot vault before any stall/park so live-blind main can see sell junk.
       await primeBankHint();
       // Park tossed gear before next delivery (sell junk reserved for tryVendorNpc).

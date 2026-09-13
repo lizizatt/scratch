@@ -73,9 +73,7 @@ version negotiation (`src/gear_coordination.js`: `cmSender`,
   receipt (`src/fighter.js`: `hearParty`; `src/chat_queue.js`: `setLastOk`).
 * General CM has no application-level queue. `cmFighters` starts three sends
   without awaiting them, and `hunt_quest` repeats its fan-out once after
-  800 ms. Peer-gear coordination is the exception: its state machine sends
-  commands on a one-second retry cadence (`src/merchant.js`: `cmFighters`,
-  `cmFightersReliable`, `tickPeerGearTx`).
+  800 ms (`src/merchant.js`: `cmFighters`, `cmFightersReliable`).
 * CM and chat are best effort. There is no transport acknowledgement beyond the
   application messages documented below.
 
@@ -502,11 +500,11 @@ There are two explicit `dlv_loot_q` polling loops:
 
 * If Puppygirl cannot fund a potion purchase while preserving her float,
   `scoopGoldForBuy` approaches the fighter and polls until the required gold is
-  reached or 25 seconds elapse. It polls after each peer tick in simulation or
+  reached or 25 seconds elapse. It polls after each simulation tick or
   approximately every 500 ms live.
 * After arrival in send range, `deliverActive` polls for up to approximately
   3.5 seconds while the visible fighter has more than 100,500 gold. It advances
-  a peer tick in simulation or sleeps approximately 400 ms live.
+  a simulation tick or sleeps approximately 400 ms live.
 
 Each query can trigger loot toss as well as gold offload. Fighter
 `offloadGold` imposes a 2,500 ms attempt damper, so repeated queries
@@ -531,16 +529,13 @@ a location update instead (`src/fighter.js`: `tickFarm`, `townFallback`).
 
 ## 6. Gear interfaces
 
-Two current paths coexist:
-
-1. Puppygirl-held items use the legacy delivery `gear_offer`/`gear_got` path.
-2. Fighter-held accessories use the revisioned, journaled peer-transfer
-   protocol in sections 6.3-6.7.
+All gear routes through Puppygirl. Fighters advertise inventory and answer
+exact pickup requests; Puppygirl owns bank access, progression, and
+`gear_offer`/`gear_got` delivery. Fighters never exchange gear directly.
 
 ### 6.1 Revisioned inventory advertisement
 
-Direction: each fighter to Puppygirl by CM every 20 seconds and immediately
-after peer-transaction finish, cancellation, or local expiry
+Direction: each fighter to Puppygirl by CM every 20 seconds
 (`GEAR_AD_MS`; `src/fighter.js`: `sendGearAd`,
 `currentInventorySnapshot`):
 
@@ -563,27 +558,25 @@ after peer-transaction finish, cancellation, or local expiry
 slots and indexed bag contents. A fighter increments `revision` only when that
 digest changes, not merely because location, free-space, or reservations
 changed. `observed_at` and location/server fields are observations, not part of
-the revision digest. `inventoryRevision` persists; `lastInventoryDigest` does
-not, so the first post-reload snapshot increments the restored revision.
+the revision digest. `inventoryRevision` persists; `lastInventoryDigest` does not, so the first
+post-reload snapshot increments the restored revision.
 
 The merchant requires a configured-fighter envelope sender and
 `d.name === sender`. Older revisions are ignored; equal revisions are accepted
-and replace the prior ad, which allows reservation/location-only updates.
+and replace the prior ad, which allows location-only updates.
 Every accepted ad is also stamped with merchant-local `_seq=++gearAdSeq`;
 rejected decreasing revisions do not advance that receipt sequence. `_seq` is
 neither sent by fighters nor durable across merchant boot.
-Advertisements remain heap-only on Puppygirl. Peer planning additionally
-requires all three fighters' `inventory_ad===1`, `v===2`, non-null revisions,
-and receipt `_t` no older than 60 seconds. Legacy gift and vendor-base planners
-can still consume stored ads without that freshness/version gate
-(`src/merchant.js`: `hearCm`, `gearAdFresh`, `startPeerGearTx`).
+Advertisements remain heap-only on Puppygirl. Merchant gift, pickup, and
+progression planning requires `inventory_ad===1`, `v===2`, a non-null revision,
+and receipt `_t` no older than 60 seconds
+(`src/merchant.js`: `hearCm`, `gearAdFresh`).
 
 The normal producer supplies every displayed field. At the receive boundary
 only truthy `gear_ad`, `name`, and an allowed envelope sender are required;
-`name` must match that sender. Peer planning then requires `inventory_ad`,
-`v`, `revision`, `slots`, and `ctype`; range checks effectively require finite
-coordinates and matching server/map fields. Missing `bag` or `reservations`
-means an empty array, and missing/falsy `esize` means zero. `who` and
+`name` must match that sender. Puppygirl uses fresh advertisements to plan
+merchant-mediated gifts, Hunter pickups, and duplicate progression. Missing
+`bag` means an empty array, and missing/falsy `esize` means zero. `who` and
 `observed_at` are informational to current consumers. `_t` is not transmitted:
 Puppygirl adds it on receipt.
 
@@ -609,248 +602,20 @@ Puppygirl adds it on receipt.
 `index` or `slot`; all other serializable primitive/array/object properties are
 retained. The fingerprint deliberately excludes location and is therefore
 stable across unequip/bag movement, but it includes only the five fields shown:
-quantity and other item attributes are not fingerprinted. `uid` is an
-observation reference, not a permanent game item ID.
+quantity and other item attributes are not fingerprinted. `uid` is an observation reference, not a permanent game item ID. Fingerprints
+support change detection and merchant planning; they are not used as identity
+for a direct fighter-to-fighter transfer.
 
-`resolveObservedItem` requires the exact current `where` and an exact
-fingerprint match. It does not validate `uid`, `observed_revision`, or the other
-compact fields. During prepare, an equipped item is re-resolved, unequipped,
-found by fingerprint in the bag, and rewritten to a transaction-local
-`<tx>:bag:<index>` reference. Unrelated inventory revision changes do not by
-themselves stale a plan.
+### 6.3 Gear-routing authority
 
-### 6.3 Party-wide accessory planner
+Direct fighter-to-fighter gear exchange is intentionally unsupported.
+Puppygirl is the sole gear-routing and bank authority. Fighter inventory
+observations feed Puppygirl's pickup, upgrade, banking, and `gear_offer`
+delivery paths. Fighters remain in the field and do not visit the bank.
 
-`src/gear_coordination.js`: `planPeerGearTransfers` evaluates one of these slot
-groups at a time:
+### 6.8 Merchant-mediated gift flow
 
-```text
-earring1+earring2 | ring1+ring2 | amulet | belt | cape | orb
-```
-
-It requires ads for all three fighters and considers both equipped items and
-bag-held accessories when they are unlocked, unreserved, class-legal, and have
-a candidate slot in the direct accessory group. A bag-held candidate may be
-assigned only to a different fighter: assignment back to any slot owned by the
-bag item's current owner is explicitly excluded. It uses the existing class
-score plus a 10,000-point named
-`GEAR_TARGETS` bonus. A dynamic-programming assignment may leave items/slots
-unassigned, but is rejected if any fighter's aggregate score for that group
-decreases. The selected group must improve total score by more than `0.001`;
-only cross-owner assignments become transfer legs. Leg order is deterministic
-by sender, recipient, destination slot, then item name.
-
-Current scope is accessories only: armor, mainhand, and offhand are excluded.
-No merchant bag/bank item participates in this peer planner. Only the single
-highest-gain group is started.
-
-Before starting, `peerPlanInRange` requires every leg's advertised endpoints
-to have identical server, identifier, and map and be within 320 Euclidean
-units. It requires each participant's advertised `esize` to be at least:
-
-```text
-outgoing-leg count + (has any incoming leg ? 1 : 0)
-```
-
-This reserves room for all unequips and one sequential incoming item, not one
-slot per incoming leg. It is conservative for bag-origin sends because the
-pre-plan counts every outgoing leg; the fighter's preparation check in section
-6.6 counts only outgoing items that must be unequipped. The planner does not
-move fighters together.
-
-### 6.4 Transaction schemas
-
-All commands are Puppygirl-to-fighter CM and pass the fighter's strict merchant
-sender gate. All reports are fighter-to-Puppygirl CM and pass the merchant's
-configured-fighter gate plus transaction/participant checks. `v:2` is emitted
-but not validated by either handler.
-
-#### `gear_plan`
-
-```js
-{
-  gear_plan: 1, v: 2, tx, plan_revision, expires_at,
-  outgoing: [{
-    index, from, to, fromSlot, toSlot,
-    item: <observed-item-ref>, sent: 0, done: 0
-  }],
-  incoming: [{index, from, toSlot, item: <observed-item-ref>}]
-}
-```
-
-The discriminator, `tx`, and both arrays are required by the fighter.
-`plan_revision` and `expires_at` are syntactically optional and copied into
-local state; an already-expired truthy `expires_at` is rejected as
-`failed/expired`. For an outgoing leg, `item.where` and `item.fingerprint` are
-required at prepare, while `index`, `to`, and the rewritten item reference are
-required when executing it. For an incoming leg, `item.fingerprint`, `index`,
-and `toSlot` are required when checking/equipping. `from`, `fromSlot`,
-participant names, and `v` are not independently validated at the fighter
-boundary; malformed values generally cause a later silent no-op or API error.
-
-#### `gear_tx_report`
-
-```js
-{
-  gear_tx_report: 1, tx, who, phase, revision,
-  outgoing?, index?, slot?, error?, need?
-}
-```
-
-The merchant requires the discriminator and `tx` matching its journal, `who`
-equal to envelope sender, and sender membership in `tx.participants`. `phase`
-is required to cause a recognized transition; other top-level fields are
-phase-dependent or diagnostic. Recognized phases are:
-
-| Phase | Additional fields | Meaning |
-|---|---|---|
-| `prepared` | `outgoing` (normally present) | Participant reserved capacity/items; merchant replaces matching sender-leg refs with prepared bag refs. |
-| `sent` | `index` (R to advance) | Matching sender leg is marked sent. |
-| `equipped` | `index` (R to advance), `slot` (informational) | Matching recipient leg is marked done. |
-| `blocked` | `error`, `index?`, `need?`, `slot?` | Temporary/operational failure; coordinator applies policy below. |
-| `failed` | `error` | Terminal transaction failure. |
-| `complete` / `cancelled` | none | Fighter emits after finish/cancel, but merchant has no phase branch for either; at most they update the journal timestamp if it has not yet been cleared. |
-
-`revision` is always emitted but not used for coordinator decisions.
-Unrecognized phases also only update `updatedAt`.
-
-#### Execution commands
-
-| Schema | Required fields | Fighter behavior |
-|---|---|---|
-| `{gear_transfer:1,v:2,tx,index}` | Truthy discriminator, matching transaction in `prepared`, matching outgoing `index`; `v` ignored | Re-resolve reserved bag item, require recipient visible, alive, and within 320, then `send_item(to,index,1)`. |
-| `{gear_check:1,v:2,tx,index}` | Truthy discriminator, matching transaction and incoming `index`; `v` ignored | Detect a new bag occurrence of the fingerprint beyond `beforeCount`, excluding unsent outgoing slots; equip the last match into `toSlot`. |
-| `{gear_finish:1,v:2,tx}` | Truthy discriminator and matching transaction | Clear transaction/reservations, advertise inventory, report `complete`. |
-| `{gear_cancel:1,v:2,tx,reason?}` | Truthy discriminator and matching transaction | Clear transaction/reservations, advertise inventory, report `cancelled`. |
-
-### 6.5 State machine, retries, and timeouts
-
-Merchant journal flow (`src/merchant.js`: `startPeerGearTx`,
-`tickPeerGearTx`, `finishPeerGearTx`, `cancelPeerGearTx`):
-
-```text
-no transaction -> preparing -> transferring -> finished/cleared
-                         \-> failed/blocked/expired -> cancelled/cleared
-```
-
-Each leg progresses `sent:0,done:0` → `sent:1,done:0` →
-`sent:1,done:1`; legs run sequentially. Every one second, Puppygirl resends
-`gear_plan` to unprepared participants, then `gear_transfer` for the first
-unsent leg or `gear_check` for its recipient. Command `receivers` results are
-ignored; periodic resend is the recovery mechanism.
-
-A new transaction starts only while both the delivery queue and active job are
-empty. A delivery request arriving after start is still enqueued; the merchant
-ticks the transaction and then may also process delivery work, because the
-gear-only early return applies only while those delivery fields remain empty.
-
-Duplicate plan handling is idempotent after preparation (the fighter resends
-its prepared report) and inert while the same plan is still preparing.
-`leg.sending` prevents overlapping duplicate `send_item` calls. A duplicate
-transfer after `leg.sent` only resends the `sent` report. A duplicate check
-after equip only resends `equipped`.
-
-The merchant transaction expires after 120 seconds. A fighter independently
-clears a persisted transaction at `expires_at + 5 seconds`, advertises, and
-does not send an expiry report. A `failed` report or any `blocked` reason other
-than `not_in_range` cancels on the next coordinator tick. `not_in_range` is
-retried once per one-second command cycle for 15 seconds from the first
-identical block, then cancels; repeated identical reports preserve the original
-`since`.
-
-After cancellation, the same `planKey` receives exponential backoff:
-5 seconds times `2^(failureCount-1)`, with count capped at six and duration
-nominally capped at 300 seconds (the count cap makes the current maximum 160
-seconds). Global planning also pauses five seconds. Successful finish pauses
-three seconds and clears that plan's failure record.
-
-Before sending either finish or cancel commands, Puppygirl captures each
-participant's current accepted-ad `_seq` in `gearAwaitAds`. Planning remains
-blocked until every such participant has a later accepted advertisement
-(`ad._seq > gearAwaitAds[who]`). This is receipt ordering, not inventory
-revision ordering: an equal-revision location or reservation refresh is
-accepted, receives a new `_seq`, and unblocks recovery.
-
-### 6.6 Preparation, reservations, capacity, and range
-
-A fighter rejects a new plan as `blocked/busy` while another transaction
-exists. It refreshes its inventory snapshot, resolves every outgoing reference,
-and requires free slots equal to:
-
-```text
-number of equipped outgoing items + (has incoming items ? 1 : 0)
-```
-
-Failure produces `failed/stale_item`, `failed/item_moved`,
-`failed/prepared_item_missing`, or `blocked/no_space`/`blocked/unequip`.
-Preparation persists `gearTxn`, unequips outgoing slot items, rewrites their
-refs to bag locations, and stores `gearReservations[uid]={tx,fingerprint}`.
-Incoming `beforeCount` values are persisted to distinguish newly arrived
-duplicates. Reservation exclusion is fingerprint-wide: one reserved
-fingerprint also excludes/protects otherwise identical copies.
-
-From plan preparation until finish, cancellation, or local expiry, the
-existence of `gearTxn` makes the normal tick skip loot, wrong-class stripping,
-automatic equip maintenance, and its periodic fighter-to-merchant offload.
-This prevents those background operations from consuming the scratch slot
-reserved for an inbound item or moving transaction items. Event-driven paths
-such as a received `dlv_loot_q` are not globally disabled, although loot
-offload skips reserved items. Reservation fingerprints additionally protect
-matching items if `freeBagSlot` is invoked by another path. On reload, `gearTxn`,
-`inventoryRevision`, and only reservations belonging to that transaction are
-restored; transient `sending` flags reset to zero.
-
-At send time the fighter re-resolves the exact prepared bag location and
-fingerprint and requires `get_player(to)`, non-rip target, and distance at most
-320. It does not move toward the recipient. A thrown/returned send failure
-reports `blocked/send_failed` or the returned reason. A successful return is
-treated as sent without confirming that the item disappeared. At receive time,
-the new fingerprint count must exceed the prepared count; equip success is
-verified against the destination slot fingerprint. Class/slot legality is
-delegated to the underlying `equip` call rather than rechecked explicitly.
-
-### 6.7 Persistence and current limitations
-
-Puppygirl persists the coordinator journal inside `dlv_q_Puppygirl`:
-`gearTx`, `gearPlanRevision`, `gearPlanFailures`, `gearAwaitAds`, and
-`gearPlanAfter`. `gearTx` contains ID/revisions/timestamps, phase, legs,
-participants, prepared map, baseline revisions, command timestamp, plan key,
-and transient failure/block information. Fighters persist `inventoryRevision`,
-`gearTxn`, and `gearReservations` inside `v2state_<name>`.
-
-Because `gearAds` and their `_seq` values are heap-only and empty on merchant
-boot, `bootMerchant` deletes persisted `gearAwaitAds` and the legacy
-`gearAwaitRevisions` field immediately and saves the cleaned store. Freshness
-requirements already force all three advertisements to repopulate before a
-new plan can start, so a receipt gate from the prior process cannot be compared
-meaningfully and is not restored.
-
-Known current limitations:
-
-* The protocol coordinates one accessory group and one leg at a time; it does
-  not optimize a complete loadout, armor, weapons, or merchant-held inventory.
-* The optimizer may score a same-owner equipped item in another same-owner
-  slot, but same-owner assignments generate no transfer leg or local rearrange
-  command. This is normally neutral for the interchangeable ring/earring pairs,
-  but the modeled final assignment is not explicitly enacted.
-* There is no explicit `received` phase. `gear_check` combines receipt
-  detection and equip.
-* A successful `send_item` result is not reconciled against sender inventory
-  before `sent`; an ambiguous live result can therefore be misclassified.
-* Runtime send-time capacity is left to `send_item`; only advertised and
-  preparation-time capacity are checked.
-* Fingerprints omit quantity and most special item properties, so they are not
-  globally unique. Duplicate handling is count-based, not instance-based.
-* A merchant reload restores its journal but not `gearAds`; it resumes commands
-  from the journal without first reconstructing ownership from fresh ads.
-* Cancellation/finish messages and reports are best effort and unacknowledged.
-  A fighter's local expiry is the eventual reservation-release fallback.
-* A new CM `cancel_all` with only an `id` can still target another fighter's
-  job because owner correlation is enforced only when `who` is supplied.
-
-### 6.8 Legacy merchant-held gift flow
-
-Puppygirl still attaches one merchant-held gift to a potion job or creates the
+Puppygirl attaches one merchant-held gift to a potion job or creates the
 internal standalone `dlv_gear` job described in section 5.1. After
 `send_item`, she sends:
 
@@ -899,7 +664,7 @@ queues a `pickup_progress_*` rendezvous. That copy then becomes the challenger
 against the new equipped level. Destruction ends that branch and reduces stock.
 A zero-chance preview or server `max_level` response persists
 `progressionUpgradeStop[name]=level`, preventing retry loops at the game cap.
-Locked items and peer-transaction reservations are excluded throughout.
+Locked items and active upgrade-pickup reservations are excluded throughout.
 
 ### 6.10 Merchant bag working set
 
@@ -979,8 +744,6 @@ Producer/consumer: the same fighter, JSON in `localStorage`
 | `preRareSnap` | `{kind,mtype,hold}` or null. |
 | `mhuntDeaths`, `mhuntDeathForId`, `mhuntSoftSkipId` | Monster Hunt soft-abandon state. |
 | `inventoryRevision` | Monotonic local inventory-content revision used in version-2 advertisements. |
-| `gearReservations` | Map from observed-item UID to `{tx,fingerprint}` for the restored active gear transaction only. |
-| `gearTxn` | Prepared peer-transfer plan, incoming fingerprint baselines, rewritten outgoing bag refs, per-leg progress, and expiry; null when idle. |
 
 Writes occur throughout tick/control transitions and overwrite the whole value.
 Malformed JSON or storage errors are silently ignored. There is no schema
@@ -1001,12 +764,8 @@ queue. Jobs persist their public request fields plus internal progress such as
 `t0`, `locAt`, `locSeq`, `locProbeAt`, `locProbeSeq`, `farmConfirmed`,
 `routeConfirmed`, `reroutePending`, `bought`, `gear`, `pulled`,
 `gearWaitUntil`, `scoopUntil`, `emptyFails`, and `awaitLocLogAt`. The same
-object also carries the peer-gear fields specified in section 6.7:
-`gearTx`, `gearPlanRevision`, `gearPlanFailures`, `gearAwaitAds`, and
-`gearPlanAfter`. Persisted `gearAwaitAds` and legacy `gearAwaitRevisions` are
-cleared at merchant boot as described there. `saveQ` is called at queue and
-progress transitions. The
-480-second delivery TTL and 120-second peer-gear TTL use persisted timestamps.
+`saveQ` is called at queue and progress transitions. The delivery TTL is 480
+seconds and uses persisted timestamps.
 
 No other production source storage keys implement these interfaces. In
 particular, current code does not use the older `hold_*`, `gear_sess_*`, or
@@ -1073,8 +832,9 @@ and directly empties its handler arrays (`src/al_api.js`: `clearHandlers`;
 2. Existing discriminators and casing are exact: `~S`, `~d`, `~R`, `job`,
    `dlv_*`, `gear_*`, `status`, and control keys.
 3. Delivery and gear IDs correlate messages but are not globally unique or
-   authenticated. Peer gear also uses movement-stable fingerprints and
-   location references, but those are not unique game-item IDs.
+   authenticated. Inventory advertisements include movement-stable
+   fingerprints and location references, but those are observations rather
+   than unique game-item IDs.
 4. Consumers must tolerate extra fields; current producers must retain fields
    marked required because consumers frequently dereference them without
    validation.
@@ -1092,9 +852,8 @@ and directly empties its handler arrays (`src/al_api.js`: `clearHandlers`;
 9. Delivery completion is at-least-best-effort, not transactional: duplicate
    request handling is partial, physical sends can partially succeed, and
    completion/gear reports are not themselves acknowledged.
-10. Merchant inventory advertisements and legacy gift protection are
-    heap-only. Delivery jobs and the peer transaction journal persist; fighter
-    peer reservations/transaction state and inventory revision also persist.
+10. Merchant inventory advertisements and gift protection are heap-only.
+    Delivery jobs persist; fighter inventory revision persists.
 
 ## 11. Known ambiguities in the implemented contract
 

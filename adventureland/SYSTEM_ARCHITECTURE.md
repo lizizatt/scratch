@@ -100,10 +100,9 @@ flowchart TB
     P <--> BANK
 ```
 
-Each character runs independently. There is no central process, shared heap,
-or synchronous transaction manager. Coordination uses platform-visible state,
-party chat, CM, direct item/gold transfer, and persisted per-character
-journals.
+Each character runs independently. There is no shared heap or synchronous
+transaction manager. Coordination uses platform-visible state, party chat, CM,
+merchant-mediated item/gold transfer, and persisted per-character state.
 
 ## 3. Control plane and data plane
 
@@ -119,7 +118,7 @@ flowchart LR
     F -- "~d local status\n~R sightings" --> L
 
     F -- "gear/inventory advertisements\npot requests\nlocation beacons\nloot and take-backs" --> M
-    M -- "acks and status\npickup requests\ngear plans/offers\ncompletion" --> F
+    M -- "acks and status\npickup requests\ngear offers\ncompletion" --> F
 
     L -- "target and movement intent" --> G
     F -- "formation, assist, heal" --> G
@@ -137,8 +136,6 @@ flowchart LR
 | Fighter health, potions, bag, equipment, location | That fighter | Leader and Puppygirl |
 | Delivery queue and active logistics job | Puppygirl | Job recipient through acknowledgements/status |
 | Shared bank inventory | Puppygirl | Fighters only through resulting deliveries |
-| Peer gear transaction journal | Puppygirl | Participating fighters |
-| Prepared item reservations | Item-owning fighter | Puppygirl transaction coordinator |
 | Rare sighting | First observing fighter | Entire fighter party |
 | Monster Hunt chain | Current fighter leader | Followers through shared intent |
 
@@ -169,8 +166,6 @@ stateDiagram-v2
         Restock --> LeadOrFollow: delivery or town fallback complete
         LeadOrFollow --> Pickup: merchant upgrade/saturation pickup
         Pickup --> LeadOrFollow: pickup delivery complete
-        LeadOrFollow --> GearTransaction: peer gear plan
-        GearTransaction --> LeadOrFollow: finish, cancel, or expiry
         LeadOrFollow --> Recovery: rip, jail, or trapped map
         Recovery --> LeadOrFollow: recovered
     }
@@ -180,8 +175,6 @@ stateDiagram-v2
         IdleEconomy --> DeliveryQueue: fighter request or planned pickup
         DeliveryQueue --> ActiveDelivery
         ActiveDelivery --> IdleEconomy: completion or abort
-        IdleEconomy --> PeerCoordinator: beneficial accessory exchange
-        PeerCoordinator --> IdleEconomy: complete/cancel
         IdleEconomy --> HunterPurchase: operator request
         HunterPurchase --> DeliveryQueue: manifest prepared
         IdleEconomy --> Recovery: rip
@@ -309,12 +302,11 @@ flowchart TD
     RESYNC --> HEAP
 ```
 
-Fighter intent, pending delivery, rare/Monster Hunt state, inventory revision,
-gear reservations, and peer transaction state persist per fighter.
-Puppygirl's delivery queue, active job, progression stops/winners, Hunter
-request state, and peer transaction journal persist separately. Bank snapshots
-and fighter advertisements are refreshed after restart rather than treated as
-permanently authoritative.
+Fighter intent, pending delivery, rare/Monster Hunt state, and inventory
+revision persist per fighter. Puppygirl's delivery queue, active job,
+progression stops/winners, and Hunter request state persist separately. Bank
+snapshots and fighter advertisements are refreshed after restart rather than
+treated as permanently authoritative.
 
 ## 7. Safety invariants
 
@@ -339,9 +331,8 @@ permanently authoritative.
 
 | Gap | Effect | Authority |
 |---|---|---|
-| Fingerprint ambiguity | Identical item instances can share the same fingerprint; peer transfers rely on observed location and count deltas. | Accepted current limitation |
 | Best-effort CM/chat | Delivery is not guaranteed by the platform; application acknowledgements, retries, TTLs, and fallback provide recovery. | Accepted platform constraint |
-| Fighter bank self-service | Fighters cannot fetch their own upgrades from the shared bank. | Deferred design alternative |
+| Fighter bank self-service | Fighters intentionally stay in the field; Puppygirl is the exclusive bank and gear-routing authority. | Intentional architecture |
 
 ## 9. Build, simulation, and deployment boundary
 

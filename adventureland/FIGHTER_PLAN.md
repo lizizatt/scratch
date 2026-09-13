@@ -15,14 +15,14 @@ The fighters act as one field unit. One deterministic leader owns shared
 intent; the other two maintain formation, assist the leader's target, and
 preserve class roles. Fighters survive local failures, request logistics
 without leaving the farm unless fallback is required, advertise their exact
-inventory, and cooperate with gear transfers without risking equipped or
-reserved items.
+inventory, and cooperate with Puppygirl's pickup and delivery jobs without
+risking equipped or reserved upgrade items.
 
 The order of concern is:
 
 1. Escape invalid maps and recover from death.
 2. Use emergency potions and preserve life.
-3. Honor active gear reservations and pickup rendezvous.
+3. Honor active upgrade pickup reservations and rendezvous.
 4. Resolve rare interrupts.
 5. Advance the lead-owned Monster Hunt chain.
 6. Maintain potion supply and bag capacity.
@@ -48,7 +48,7 @@ The order of concern is:
 | Equipment | Equip only class-legal, slot-legal improvements. Score full Hunter bundles with set bonuses rather than greedily equipping each piece. | Implemented |
 | Low-tier armor | Bagged `pants`, `gloves`, `helmet`, `shoes`, and `coat` are always NPC-vendor stock at every level. Equipped copies remain safe until replaced. | Implemented |
 | Merchant gear | Accept a merchant gift only when the exact item can be equipped; acknowledge the result and return displaced/surplus items while Puppygirl remains in range. | Implemented |
-| Peer gear | Prepare, reserve, send, receive, equip, finish, cancel, and expire direct accessory transfers under Puppygirl's persisted transaction journal. | Implemented |
+| Gear routing | Never exchange gear directly with another fighter. Offload requested items to Puppygirl and accept upgrades only from Puppygirl. | Implemented |
 | Upgrade pickup | On authenticated request, meet Puppygirl and offload only the exact unlocked Hunter/progression items requested. | Implemented |
 | Inventory ads | Publish revisioned equipment, bag, capacity, location, world, class, and reservation snapshots every 20 seconds and after material changes. | Implemented |
 | Chat | All CODE-originated party messages use a per-character 16-second queue with `echo > rare > diff > heartbeat` priority. | Implemented |
@@ -73,10 +73,8 @@ stateDiagram-v2
     MapEscape --> [*]: town/door/transport and retry
     Respawn --> [*]: persist and retry
 
-    Maintenance --> GearTransaction: prepared peer transfer active
     Maintenance --> BagRecovery: full bag with sellable junk
     Maintenance --> AdvertiseAndOffload: normal
-    GearTransaction --> IntentDispatch: transaction work complete for this tick
     BagRecovery --> [*]: sell and advertise
     AdvertiseAndOffload --> IntentDispatch
 
@@ -97,15 +95,14 @@ stateDiagram-v2
 2. Escape an event/dead-end map that cannot route to the intended farm.
 3. Respawn and account for a Monster Hunt death.
 4. Use emergency HP/MP potions.
-5. Expire stale peer-gear transaction state.
-6. Refresh leader-presence hysteresis.
-7. When no gear transaction is active:
+5. Refresh leader-presence hysteresis.
+6. Run routine maintenance:
     - loot;
     - strip wrong-class equipment;
     - sell junk if the bag is full;
     - equip safe improvements.
-8. Publish a fresh gear advertisement when due.
-9. Offload eligible loot and excess gold to nearby Puppygirl.
+7. Publish a fresh gear advertisement when due.
+8. Offload eligible loot and excess gold to nearby Puppygirl.
 10. Emit metrics and service the chat queue.
 11. Run pickup hold, rare interrupt, Monster Hunt control, or ordinary farm
     control in that priority order.
@@ -295,32 +292,7 @@ winner returns the displaced former baseline directly when possible. Other
 non-keep items and excess gold are offloaded while Puppygirl is still in
 range.
 
-### 9.2 Direct peer transaction
-
-```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> ValidatePlan: authenticated gear_plan
-    ValidatePlan --> Blocked: busy or insufficient capacity
-    ValidatePlan --> Failed: stale or moved item
-    ValidatePlan --> Preparing: exact observed items still match
-    Preparing --> Prepared: equipped outgoing items unequipped and reserved
-    Prepared --> Sending: authenticated transfer command
-    Sending --> Prepared: recipient out of range or send failed
-    Sending --> Sent: exact item sent once
-    Sent --> Equipped: recipient observes count increase and equips exact fingerprint
-    Equipped --> Finished: coordinator completes transaction
-    Blocked --> Idle: cancel/replan
-    Failed --> Idle: cancel/replan
-    Finished --> Idle: clear reservations and advertise
-    Prepared --> Idle: expiry/cancel restores safe equipment
-```
-
-The implemented peer planner covers earrings, rings, amulets, belts, capes,
-and orbs. Armor and weapon redistribution remain outside this direct exchange
-protocol; Puppygirl handles those through merchant delivery.
-
-### 9.3 Upgrade pickup
+### 9.2 Upgrade pickup
 
 On an authenticated pickup status, the fighter enters a pickup hold for up to
 eight minutes, travels to the safe plaza rendezvous, and advertises that
@@ -328,15 +300,15 @@ location. It offloads only requested names and levels:
 
 - Hunter pickup may temporarily unequip configured Hunter pieces.
 - Duplicate progression pickup never sends the equipped baseline.
-- Locked and peer-reserved items are never sent.
+- Locked items are never sent.
 - Completion clears pickup hold and returns the fighter to unchanged party
   intent.
 
 ## 10. Inventory and cleanup
 
-1. Loot whenever no peer transaction owns item positions.
-2. Never move a peer-reserved or upgrade-offload-reserved item through ordinary
-   equip, sale, or merchant offload.
+1. Loot during routine maintenance.
+2. Never move an upgrade-offload-reserved item through ordinary equip, sale,
+   or merchant offload.
 3. Strip class-illegal equipment when a bag slot is available.
 4. Equip class/slot-legal improvements; use full-loadout set scoring for
    Hunter gear.
@@ -381,7 +353,6 @@ Each fighter persists:
 - pending delivery and latest progress;
 - Monster Hunt enablement, death counter, and soft-skip assignment;
 - inventory revision;
-- peer gear transaction and reservations.
 
 Heap-only timers, handlers, and cached visibility are reconstructed after
 reload. The lead waits through a boot quiet period, reseeds its sequence, and
@@ -392,8 +363,6 @@ then republishes.
 | Gap | Consequence |
 | --- | --- |
 | Plain `Transfer ...` and `World ...` notices are not parsed by current party-state parser | They are informational output, not reliable movement control |
-| Item fingerprints are not unique instance IDs | Identical copies require location/count safeguards |
-| Peer planner covers accessory groups only | Armor and weapon optimization remains merchant-mediated |
 
 ## 13. Acceptance and change control
 

@@ -67,17 +67,13 @@ stateDiagram-v2
     TickGate --> DeathRecovery: character.rip
     TickGate --> SelfPreservation: alive
 
-    DeathRecovery --> PlazaIdle: respawn / abort pot or gear delivery / retreat
+    DeathRecovery --> PlazaIdle: respawn / abort active delivery / retreat
 
     SelfPreservation --> HunterPurchase: operator Hunter request and system quiescent
-    SelfPreservation --> PeerGearTransaction: peer accessory transaction active
     SelfPreservation --> PreQueueCleanup: no higher-priority control
 
     HunterPurchase --> TickGate: plan succeeds or terminal validation failure
     HunterPurchase --> TickGate: transient failure / retry after 5 seconds
-
-    PeerGearTransaction --> TickGate: preparing, transferring, blocked, or retrying
-    PeerGearTransaction --> PreQueueCleanup: transaction complete or delivery already active
 
     PreQueueCleanup --> QueuePlanning: bank snapshot and urgent cleanup complete
     QueuePlanning --> ActivateJob: queued work exists
@@ -98,21 +94,20 @@ stateDiagram-v2
 Each tick executes at most one long-running branch:
 
 1. Ignore re-entry while another tick owns the controller.
-2. If dead, respawn, abort an active pot/gear delivery, notify the fighter, and
+2. If dead, respawn, abort an active delivery, notify the fighter, and
    retreat to the plaza.
 3. Use emergency HP/MP potions.
-4. If an operator-requested Hunter purchase is pending and all queues and gear
-   transactions are empty, attempt it.
-5. Advance any peer-to-peer fighter gear transaction.
-6. Prime the live bank snapshot before planning from bank contents.
-7. When there is no active job:
+4. If an operator-requested Hunter purchase is pending and all queues are
+   empty, attempt it.
+5. Prime the live bank snapshot before planning from bank contents.
+6. When there is no active job:
    - vendor urgent junk before new pickups;
    - create capacity if bank junk is blocked by a full bag;
    - park inactive inventory when it is safe to do so.
-8. When fully idle, enqueue at most one pickup in this order:
+7. When fully idle, enqueue at most one pickup in this order:
    Hunter-upgrade pickup, duplicate-progression pickup, saturation cleanup.
-9. Promote the FIFO queue head to `active`.
-10. Run the active delivery; otherwise run one idle-economy action.
+8. Promote the FIFO queue head to `active`.
+9. Run the active delivery; otherwise run one idle-economy action.
 
 ## 4. Delivery job state machine
 
@@ -260,7 +255,7 @@ rows.
 | Class | Examples | Allowed destination |
 |---|---|---|
 | Equipped | Any item in a character equipment slot | Never moved by cleanup |
-| In-flight/reserved | Active gift, peer transfer, Hunter purchase, progression winner | Required recipient only |
+| In-flight/reserved | Active gift, Hunter purchase, progression winner | Required recipient only |
 | Operational carry | `hpot1`, `mpot1`, stand, tracker, pickaxe, rod, required scrolls/offerings | Puppygirl bag |
 | Immediate consumption | Xyn inputs, vendor junk, craft/compound/upgrade batch | Relevant NPC/action |
 | Fighter target | Configured Hunter pieces, earrings, cape, weapons/offhands | Best fighter or protected storage |
@@ -279,7 +274,7 @@ available merely because another copy is wanted.
 ```mermaid
 stateDiagram-v2
     [*] --> Requested
-    Requested --> Validate: no active job, queue, or peer transfer
+    Requested --> Validate: no active job or queue
     Validate --> Blocked: stale ads, catalog mismatch, wrong owner, no capacity
     Validate --> AwaitTokens: verified total below exact remaining manifest cost
     Validate --> Purchase: full budget and all reuse decisions verified
@@ -377,7 +372,6 @@ open-close-Ponty loop: the next eligible sweep is three minutes later.
 | Ponty request failure | Retry no faster than once per second |
 | Ponty completed sweep | Sleep the sweep for three minutes |
 | Stale trade slot | Quarantine that slot for three minutes |
-| Peer transfer blocked out of range | Retry after 15 seconds; do not duplicate commands |
 | Temporary Hunter purchase failure | Retry after five seconds |
 | Terminal Hunter validation failure | Clear operator request and require a new one |
 

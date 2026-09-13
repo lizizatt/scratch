@@ -2,80 +2,47 @@
 
 ## Status
 
-The first coordination slice is implemented. The authoritative current
-contract is [INTERFACE_CONTROL_DOCUMENT.md](INTERFACE_CONTROL_DOCUMENT.md),
-section 6. It covers:
+Puppygirl is the sole gear-routing and bank authority. Fighters never visit the
+bank and never transfer gear directly to one another.
 
-* revisioned, full fighter inventory advertisements;
-* movement-stable item fingerprints and exact observed-location references;
-* CM sender gates;
-* persisted fighter transactions/reservations and Puppygirl's transaction
-  journal;
-* party-wide planning for equipped and eligible unlocked/unreserved bag-held
-  earrings, rings, amulets, belts, capes, and orbs, with bag items assigned
-  only across owners;
-* transaction-time suspension of normal-tick fighter loot, strip/equip
-  maintenance, and periodic offload to preserve reserved inbound bag capacity;
-* post-finish/cancel recovery gated on a later accepted advertisement using
-  merchant-local receipt sequence, including equal-inventory-revision refreshes;
-* `gear_plan`, `gear_tx_report`, `gear_transfer`, `gear_check`, `gear_finish`,
-  and `gear_cancel`, including retries, deadlines, capacity, and range.
+The authoritative wire contracts are documented in
+[INTERFACE_CONTROL_DOCUMENT.md](INTERFACE_CONTROL_DOCUMENT.md), section 6.
+They cover:
 
-This file is no longer a wire-protocol specification. Everything below is
-future design and is not implemented unless moved into the ICD.
+* revisioned fighter inventory advertisements;
+* merchant pickup requests for exact Hunter or duplicate-progression items;
+* fighter-to-merchant offload at a safe rendezvous;
+* Puppygirl's bank retrieval, upgrading, compounding, and delivery queue;
+* merchant-to-fighter `gear_offer` delivery and fighter `gear_got`
+  acknowledgement;
+* returning displaced or surplus gear to Puppygirl while she remains in range.
 
-## Remaining design scope
+## Ownership and routing invariant
 
-### Broader item and slot coverage
+Every movable upgrade follows one route:
 
-* Extend allocation to armor, mainhand, offhand, and class-specific weapon
-  combinations without producing illegal or tactically poor loadouts.
-* Extend bag allocation beyond today's direct accessory groups to broader item
-  categories, merchant bag/bank inventory, quantity-aware stacks, and items
-  that need upgrading before allocation.
-* Model two-handed weapons, offhand displacement, locked/special items, and
-  temporary loadouts explicitly.
+```text
+fighter -> Puppygirl -> bank/economy/progression -> Puppygirl -> fighter
+```
 
-### Operator interface
+Fighter inventory advertisements are observations, not transfer commands.
+Puppygirl uses them to choose pickups, progression challengers, and gifts.
+Only the owning fighter may unequip or send an item, and only in response to a
+Puppygirl pickup request. Only Puppygirl reads or writes the shared bank.
 
-No current operator API exposes dry-run plans, approvals, transaction status,
-forced cancellation, exclusions, or retry controls. A future interface should
-make those operations auditable and authenticated rather than adding more
-loosely validated chat commands.
+The former direct fighter-to-fighter transaction protocol was removed. This
+eliminates multi-party reservation journals, ambiguous identical-copy
+fingerprints during swaps, partial exchange recovery, and accessory-only
+allocation behavior.
 
-### Recovery and reconciliation
+## Safety rules
 
-* Reconcile ownership after ambiguous `send_item` outcomes, reloads, disconnects,
-  partial swaps, and cancellation races.
-* Add explicit receipt/finalization acknowledgements and durable replay rules.
-* Define repair or rollback plans when a multi-leg exchange stops halfway.
-* Reconstruct coordinator state from fresh inventory observations rather than
-  trusting only a restored journal.
-
-### Optimization
-
-* Optimize the complete party loadout rather than one accessory group at a
-  time.
-* Add hysteresis, minimum-gain policy, operator priorities, and upgrade-cost or
-  liquidity constraints.
-* Account for combat role, skills, set bonuses, stat breakpoints, alternate
-  loadouts, and uncertain item metadata.
-* Add movement/rendezvous scheduling instead of requiring participants to
-  already be within transfer range.
-
-## Unresolved risks
-
-* Current fingerprints are not unique instance IDs and omit quantity and many
-  item properties; duplicate items can remain ambiguous.
-* Version `v:2` is emitted but not negotiated or strictly rejected by current
-  consumers.
-* Successful item-send return values are trusted without post-send ownership
-  proof.
-* Finish/cancel reports are not consumed as acknowledgements, and fighter local
-  expiry is silent.
-* Merchant advertisements are heap-only after reload, while the transaction
-  journal is durable.
-* Name-based sender gates depend on trustworthy platform envelope metadata and
-  are not cryptographic authentication.
-* Broader planning can create cycles and temporary-capacity requirements that
-  the current sequential accessory exchange does not solve generally.
+* Equipped baselines are not risked by duplicate progression.
+* Exact requested Hunter/progression names and levels are the only pickup
+  candidates.
+* Locked items are never moved.
+* Fighters maintain field uptime; bank work cannot pull them away from combat.
+* Delivery jobs retain acknowledgements, TTLs, retries, safe rendezvous logic,
+  and post-delivery inventory advertisements.
+* CM remains best effort, so persisted merchant jobs and fresh advertisements
+  provide reconciliation rather than transport-level guarantees.
