@@ -225,6 +225,8 @@ const PONTY_MULT = 1.25;
 const CRAFT_TARGETS = ["orbg", "rod", "pickaxe"];
 const MAX_SAFE_UPGRADE = 5;
 const MIN_UPGRADE_CHANCE = 0.9;
+const HUNTER_UPGRADE_MAX_LEVEL = 5;
+const HUNTER_UPGRADE_MIN_CHANCE = 0.95;
 /** Merchant keeps this gold floor for pot deliveries before gear buys. */
 const GOLD_FLOAT_MERCHANT = 150000;
 const GEAR_AD_MS = 20000;
@@ -296,6 +298,8 @@ module.exports = {
   CRAFT_TARGETS,
   MAX_SAFE_UPGRADE,
   MIN_UPGRADE_CHANCE,
+  HUNTER_UPGRADE_MAX_LEVEL,
+  HUNTER_UPGRADE_MIN_CHANCE,
   GOLD_FLOAT_MERCHANT,
   GEAR_AD_MS,
   GIFT_TTL_MS,

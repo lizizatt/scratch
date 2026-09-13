@@ -275,6 +275,12 @@ test("adversary: bank upgrade work is withdrawn and scrolled as one bounded batc
       esize: 42,
     });
   }
+  p.bots.Puppygirl.ctrl.store.hunterUpgradeStop = Object.values(armor)
+    .reduce((all, slots) => all.concat(Object.values(slots)), [])
+    .reduce((stopped, name) => {
+      stopped[name] = 0;
+      return stopped;
+    }, {});
   for (let i = 0; i < m.items.length; i++) {
     if (m.items[i] && ["stand0", "hpot1", "mpot1"].indexOf(m.items[i].name) >= 0) continue;
     if (m.items[i]) {

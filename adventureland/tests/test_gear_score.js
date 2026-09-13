@@ -15,6 +15,7 @@ const {
   canEquipSlot,
   weaponHandKind,
   equipPending,
+  targetSetEquipPlan,
   candidateSlots,
   wornSnapshot,
   planGifts,
@@ -298,6 +299,65 @@ test("adversary: equipPending upgrades fireblade when better 1H in bag", async (
   assert.ok(n >= 1, "should equip fireblade");
   assert.strictEqual(api.character.slots.mainhand.name, "fireblade");
   assert.strictEqual(api.character.slots.offhand.name, "sshield");
+});
+
+test("Hunter set pieces equip as a jointly better bundle", async () => {
+  const p = bootParty({ members: ["Sarene"] });
+  const api = p.bots.Sarene.api;
+  const c = api.character;
+  c.slots.helmet = { name: "helmet1", level: 3 };
+  c.slots.pants = { name: "pants1", level: 3 };
+  c.slots.gloves = { name: "gloves1", level: 3 };
+  c.items[5] = { name: "mmhat", level: 1 };
+  c.items[6] = { name: "mmpants", level: 1 };
+  c.items[7] = { name: "mmgloves", level: 1 };
+
+  const plan = targetSetEquipPlan(api, api.G);
+  assert.deepStrictEqual(plan.map((x) => x.slot).sort(), ["gloves", "helmet", "pants"]);
+  await equipPending(api, api.G, {});
+  assert.strictEqual(c.slots.helmet.name, "mmhat");
+  assert.strictEqual(c.slots.pants.name, "mmpants");
+  assert.strictEqual(c.slots.gloves.name, "mmgloves");
+});
+
+test("Hunter set bundle is neither gifted nor equipped when total loadout is worse", () => {
+  const G = Gish({
+    oldhat: { type: "helmet", armor: 100 },
+    oldpants: { type: "pants", armor: 100 },
+    mmhat: { type: "helmet", set: "mmage", armor: 1 },
+    mmpants: { type: "pants", set: "mmage", armor: 1 },
+  });
+  G.sets = { mmage: { "2": { int: 1 } } };
+  const slots = {
+    helmet: { name: "oldhat", level: 0 },
+    pants: { name: "oldpants", level: 0 },
+  };
+  const gifts = planGifts(
+    [{ name: "mmhat", level: 0 }, { name: "mmpants", level: 0 }],
+    { Sarene: { ctype: "mage", esize: 2, slots } },
+    G
+  );
+  assert.strictEqual(gifts.length, 0);
+});
+
+test("Merchant gifts a jointly beneficial Hunter set bundle", () => {
+  const p = bootParty({ members: ["Sarene"] });
+  const G = p.bots.Sarene.api.G;
+  const slots = Object.assign({}, p.bots.Sarene.api.character.slots, {
+    helmet: { name: "helmet1", level: 3 },
+    pants: { name: "pants1", level: 3 },
+    gloves: { name: "gloves1", level: 3 },
+  });
+  const gifts = planGifts(
+    [
+      { name: "mmhat", level: 1 },
+      { name: "mmpants", level: 1 },
+      { name: "mmgloves", level: 1 },
+    ],
+    { Sarene: { ctype: "mage", esize: 3, slots } },
+    G
+  );
+  assert.deepStrictEqual(gifts.map((x) => x.it.name).sort(), ["mmgloves", "mmhat", "mmpants"]);
 });
 
 module.exports = { tests };

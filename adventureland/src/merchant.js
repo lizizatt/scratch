@@ -30,6 +30,7 @@ const {
   CRAFT_TARGETS,
   GEAR_AD_MS,
   HUNTER_PLAN,
+  HUNTER_UPGRADE_MIN_CHANCE,
 } = require("./constants");
 const { maybeUsePots } = require("./potions");
 const {
@@ -41,6 +42,7 @@ const {
   scrollFor,
   upgradeChance,
   isRiskUpgrade,
+  isHunterUpgrade,
   upgradeReady,
   planVendorBuy,
   eligibleUpgrade,
@@ -223,6 +225,79 @@ function bootMerchant(api, opts) {
     store.q.push(job);
     saveQ(store);
     return true;
+  }
+
+  function hunterUpgradeStopped(it) {
+    const stopped = store.hunterUpgradeStop || {};
+    return it && stopped[it.name] === (it.level || 0);
+  }
+
+  function hunterUpgradeAdItems(who) {
+    const ad = gearAds[who];
+    if (!gearAdFresh(ad, api._now())) return [];
+    const targets = new Set(Object.values(GEAR_TARGETS[who] || {}));
+    const out = [];
+    for (const it of ad.bag || []) {
+      if (
+        it &&
+        targets.has(it.name) &&
+        isHunterUpgrade(it) &&
+        !it.l &&
+        !hunterUpgradeStopped(it)
+      ) {
+        out.push({ name: it.name, level: it.level || 0 });
+      }
+    }
+    for (const slot of Object.keys(ad.slots || {})) {
+      const it = ad.slots[slot];
+      if (
+        it &&
+        targets.has(it.name) &&
+        isHunterUpgrade(it) &&
+        !it.l &&
+        !hunterUpgradeStopped(it)
+      ) {
+        out.push({ name: it.name, level: it.level || 0 });
+      }
+    }
+    return out;
+  }
+
+  function enqueueHunterUpgradePickup() {
+    const now = api._now();
+    for (const who of FIGHTERS) {
+      const items = hunterUpgradeAdItems(who);
+      if (!items.length) continue;
+      const ad = gearAds[who];
+      const id = "pickup_hunter_" + who + "_" + (ad.revision || 0);
+      if (
+        (store.active && store.active.id === id) ||
+        store.q.some((job) => job.id === id)
+      ) {
+        continue;
+      }
+      if (
+        enqueue({
+          id,
+          kind: "hunter_upgrade",
+          who,
+          items: [],
+          hunterItems: items,
+          pickupCount: items.length,
+          farm: null,
+          map: PICKUP_MEET.map,
+          x: PICKUP_MEET.x,
+          y: PICKUP_MEET.y,
+          serverRegion: ad.server_region || api.parent.server_region,
+          serverIdentifier: ad.server_identifier || api.parent.server_identifier,
+          locAt: now,
+        })
+      ) {
+        api.game_log("hunter:upgrade_pickup " + who + " n=" + items.length);
+      }
+      return true;
+    }
+    return false;
   }
 
   function enqueueSaturationPickup() {
@@ -1951,12 +2026,22 @@ function bootMerchant(api, opts) {
   }
 
   function hasUpgradeableOwned() {
-    if (pickUpgradeIndex(api.character.items, api.G, (it) => !isRiskUpgrade(it)) >= 0) {
+    if (
+      pickUpgradeIndex(
+        api.character.items,
+        api.G,
+        (it) => !isRiskUpgrade(it) && (!isHunterUpgrade(it) || !hunterUpgradeStopped(it))
+      ) >= 0
+    ) {
       return true;
     }
     return listBankItems().some((e) => {
       const it = { name: e.name, level: e.level || 0 };
-      return !isRiskUpgrade(it) && upgradeReady(it, api.G);
+      return (
+        !isRiskUpgrade(it) &&
+        (!isHunterUpgrade(it) || !hunterUpgradeStopped(it)) &&
+        upgradeReady(it, api.G)
+      );
     });
   }
 
@@ -2363,7 +2448,9 @@ function bootMerchant(api, opts) {
   /** One conservative upgrade, or one explicitly configured surplus liquidation risk. */
   async function tryUpgradeOne() {
     let riskKeys = riskUpgradeKeys();
-    const allowBag = (it, slot) => !isRiskUpgrade(it) || riskKeys.has("bag:" + slot);
+    const allowBag = (it, slot) =>
+      (!isRiskUpgrade(it) || riskKeys.has("bag:" + slot)) &&
+      (!isHunterUpgrade(it) || !hunterUpgradeStopped(it));
     let i = pickUpgradeIndex(api.character.items, api.G, allowBag);
     if (i < 0) {
       // Bag has only below-gate pieces: log once per piece key, then leave for park.
@@ -2386,6 +2473,7 @@ function bootMerchant(api, opts) {
       const bankHit = listBankItems().find((e) => {
         const it = { name: e.name, level: e.level || 0 };
         return upgradeReady(it, api.G) &&
+          (!isHunterUpgrade(it) || !hunterUpgradeStopped(it)) &&
           (!isRiskUpgrade(it) || riskKeys.has(e.pack + ":" + e.i));
       });
       if (!bankHit) return false;
@@ -2397,6 +2485,7 @@ function bootMerchant(api, opts) {
           if (e.name !== bankHit.name) return false;
           const it = { name: e.name, level: e.level || 0 };
           return upgradeReady(it, api.G) &&
+            (!isHunterUpgrade(it) || !hunterUpgradeStopped(it)) &&
             (!isRiskUpgrade(it) || currentRiskKeys.has(e.pack + ":" + e.i));
         });
         if (!hit) break;
@@ -2412,8 +2501,9 @@ function bootMerchant(api, opts) {
     const scn = scrollFor(it, api.G);
     if (!scn) return false;
     let risky = isRiskUpgrade(it);
+    let hunter = isHunterUpgrade(it);
     const chance = upgradeChance(it);
-    if (!risky && chance < MIN_UPGRADE_CHANCE) {
+    if (!hunter && !risky && chance < MIN_UPGRADE_CHANCE) {
       logUpgradeSkip(it.name, it.level || 0, chance);
       return false;
     }
@@ -2454,6 +2544,7 @@ function bootMerchant(api, opts) {
       if (scrollFor(api.character.items[i], api.G) !== scn) return false;
     }
     risky = isRiskUpgrade(api.character.items[i]);
+    hunter = isHunterUpgrade(api.character.items[i]);
     if (typeof api.upgrade !== "function") return false;
     if (!(await goUpgradeNpc())) {
       api.game_log("gear:upgrade_path_fail");
@@ -2465,9 +2556,24 @@ function bootMerchant(api, opts) {
         !preview ||
         preview.chance == null ||
         preview.chance <= 0 ||
-        (!risky && preview.chance < MIN_UPGRADE_CHANCE)
+        (hunter && preview.chance < HUNTER_UPGRADE_MIN_CHANCE) ||
+        (!hunter && !risky && preview.chance < MIN_UPGRADE_CHANCE)
       ) {
         const cur = api.character.items[i];
+        if (hunter && cur) {
+          store.hunterUpgradeStop = store.hunterUpgradeStop || {};
+          store.hunterUpgradeStop[cur.name] = cur.level || 0;
+          saveQ(store);
+          api.game_log(
+            "gear:hunter_ready " +
+              cur.name +
+              "@" +
+              (cur.level || 0) +
+              " chance=" +
+              Number(preview.chance || 0).toFixed(3)
+          );
+          return false;
+        }
         logUpgradeSkip(
           (cur && cur.name) || "?",
           (cur && cur.level) || 0,
@@ -2485,12 +2591,17 @@ function bootMerchant(api, opts) {
     if (i < 0 || sci < 0) return false;
     if (scrollFor(api.character.items[i], api.G) !== scn) return false;
     risky = isRiskUpgrade(api.character.items[i]);
+    hunter = isHunterUpgrade(api.character.items[i]);
     const before = api.character.items[i];
     const nm = before.name;
     const lv0 = before.level || 0;
     try {
       const r = await api.upgrade(i, sci);
       if (r && r.failed) {
+        if (hunter && r.reason === "destroyed") {
+          api.game_log("gear:hunter_destroyed " + nm + "@" + lv0);
+          return true;
+        }
         if (risky && r.reason === "destroyed") {
           api.game_log("gear:risk_destroyed " + nm + "@" + lv0);
           return true;
@@ -2500,6 +2611,10 @@ function bootMerchant(api, opts) {
       }
       const after = api.character.items[i];
       const lv1 = after && after.name === nm ? after.level || 0 : -1;
+      if (hunter && lv1 < 0) {
+        api.game_log("gear:hunter_destroyed " + nm + "@" + lv0);
+        return true;
+      }
       if (risky && lv1 < 0) {
         api.game_log("gear:risk_destroyed " + nm + "@" + lv0);
         return true;
@@ -2939,7 +3054,28 @@ function bootMerchant(api, opts) {
       if (!(await leaveBankToPlaza())) return;
     }
 
-    if (!(await ensureTakeBackSlots(3, job.gear && job.pulled ? job.gear : null))) return;
+    if (job.kind === "hunter_upgrade" && !job.pickupDone) {
+      const requested = new Set(
+        (job.hunterItems || []).map((x) => x.name + "@" + (x.level || 0))
+      );
+      const held = (api.character.items || []).filter(
+        (it) => it && requested.has(it.name + "@" + (it.level || 0))
+      ).length;
+      if (requested.size && held > 0) {
+        job.pickupDone = 1;
+        if (gearAds[job.who]) gearAds[job.who]._t = 0;
+        store.active = null;
+        saveQ(store);
+        api.game_log("hunter:upgrade_received " + job.who + " n=" + held + " delayed=1");
+        await api.send_cm(job.who, { dlv_done: 1, id: job.id, ok: 1 });
+        await retreatPlaza();
+        return;
+      }
+    }
+
+    const takeBackNeed =
+      job.kind === "hunter_upgrade" ? Math.max(3, (job.pickupCount || 0) + 1) : 3;
+    if (!(await ensureTakeBackSlots(takeBackNeed, job.gear && job.pulled ? job.gear : null))) return;
 
     let meet = meetResolveDelivery(api, job, SEND_RANGE);
     const locateAt = api._now ? api._now() : Date.now();
@@ -3005,6 +3141,45 @@ function bootMerchant(api, opts) {
     if (!t) {
       if (job.kind === "dlv_pots") await noteEmptySend(job);
       else await retreatPlaza();
+      return;
+    }
+
+    if (job.kind === "hunter_upgrade" && !job.pickupDone) {
+      const names = new Set((job.hunterItems || []).map((x) => x.name + "@" + (x.level || 0)));
+      const countHeld = () =>
+        (api.character.items || []).filter(
+          (it) => it && names.has(it.name + "@" + (it.level || 0))
+        ).length;
+      const before = countHeld();
+      const expected = names.size;
+      await api.send_cm(job.who, {
+        dlv_loot_q: 1,
+        id: job.id,
+        hunter_upgrade: 1,
+        hunter_items: job.hunterItems || [],
+      });
+      for (let n = 0; n < 12 && countHeld() < expected; n++) {
+        if (typeof opts.peerTick === "function") await opts.peerTick();
+        else await api.sleep(250);
+      }
+      const held = countHeld();
+      if (held < 1 && hunterUpgradeAdItems(job.who).length) {
+        api.game_log("hunter:upgrade_wait " + job.who);
+        return;
+      }
+      job.pickupDone = 1;
+      if (gearAds[job.who]) gearAds[job.who]._t = 0;
+      store.active = null;
+      saveQ(store);
+      api.game_log(
+        "hunter:upgrade_received " +
+          job.who +
+          " n=" +
+          held +
+          (before ? " preheld=" + before : "")
+      );
+      await api.send_cm(job.who, { dlv_done: 1, id: job.id, ok: 1 });
+      await retreatPlaza();
       return;
     }
 
@@ -3194,7 +3369,9 @@ function bootMerchant(api, opts) {
         }
       }
       // Stall only from idleEcon when truly idle — opening here caused flash open→close on dequeue.
-      if (!store.active && !store.q.length) enqueueSaturationPickup();
+      if (!store.active && !store.q.length) {
+        if (!enqueueHunterUpgradePickup()) enqueueSaturationPickup();
+      }
       if (!store.active && store.q.length) {
         store.active = store.q.shift();
         store.active.activeAt = api._now();

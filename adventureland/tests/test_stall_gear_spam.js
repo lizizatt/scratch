@@ -49,6 +49,11 @@ async function seedRiskAds(p, slots) {
       esize: 42,
     });
   }
+  const stop = p.bots.Puppygirl.ctrl.store.hunterUpgradeStop || {};
+  for (const who of Object.keys(armor)) {
+    for (const name of Object.values(armor[who])) stop[name] = 0;
+  }
+  p.bots.Puppygirl.ctrl.store.hunterUpgradeStop = stop;
   return senders;
 }
 

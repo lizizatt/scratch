@@ -224,4 +224,105 @@ test("Hunter deliveries equip all fifteen pieces on their intended classes", asy
   }
 });
 
+test("Hunter upgrades accept exactly 95 percent and persist the first lower-chance level", async () => {
+  const p = bootParty({ members: ["Puppygirl"], gold: 500000, pots: 100 });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 100 };
+  c.items[2] = { name: "mpot1", q: 100 };
+  c.items[3] = { name: "mmhat", level: 0 };
+  c.items[4] = { name: "mmpants", level: 0 };
+  c.items[5] = { name: "mmgloves", level: 2 };
+  c.esize = c.items.filter((x) => !x).length;
+  api.upgrade = async (itemIndex, scrollIndex, offeringIndex, preview) => {
+    const item = c.items[itemIndex];
+    if (preview) {
+      return {
+        chance:
+          item &&
+          ((item.name === "mmhat" && (item.level || 0) === 0) ||
+            (item.name === "mmgloves" && (item.level || 0) === 2))
+            ? 0.95
+            : 0.949,
+      };
+    }
+    item.level = (item.level || 0) + 1;
+    const scroll = c.items[scrollIndex];
+    if (scroll.q && scroll.q > 1) scroll.q--;
+    else c.items[scrollIndex] = null;
+    return { success: true, level: item.level };
+  };
+
+  for (let i = 0; i < 500; i++) {
+    await p.tickAll();
+    const stop = p.bots.Puppygirl.ctrl.store.hunterUpgradeStop || {};
+    if (stop.mmhat === 1 && stop.mmpants === 0 && stop.mmgloves === 3) break;
+  }
+
+  const store = p.bots.Puppygirl.ctrl.store;
+  assert.strictEqual(store.hunterUpgradeStop.mmhat, 1);
+  assert.strictEqual(store.hunterUpgradeStop.mmpants, 0);
+  assert.strictEqual(store.hunterUpgradeStop.mmgloves, 3);
+  const logs = api.log.game.map((x) => x.m);
+  assert.ok(logs.some((m) => m === "gear:upgrade mmhat@0->1"));
+  assert.ok(!logs.some((m) => /^gear:upgrade mmpants/.test(m)));
+  assert.ok(logs.some((m) => m === "gear:upgrade mmgloves@2->3"));
+  assert.ok(logs.some((m) => m === "gear:hunter_ready mmhat@1 chance=0.949"));
+  assert.ok(logs.some((m) => m === "gear:hunter_ready mmpants@0 chance=0.949"));
+  assert.ok(api.log.bought.some((x) => x.name === "scroll1"), "Hunter gear must use high-grade scroll1");
+});
+
+test("Owned equipped and bagged Hunter pieces round-trip through Puppygirl and equip as a set", async () => {
+  const p = bootParty({
+    members: ["Puppygirl", "Sarene"],
+    pack: "armadillo",
+    gold: 500000,
+    pots: 200,
+  });
+  const merchant = p.bots.Puppygirl.api;
+  const mage = p.bots.Sarene.api.character;
+  mage.slots.helmet = { name: "mmhat", level: 0 };
+  mage.slots.pants = { name: "pants1", level: 3 };
+  mage.slots.gloves = { name: "gloves1", level: 3 };
+  mage.items[5] = { name: "mmpants", level: 0 };
+  mage.items[6] = { name: "mmgloves", level: 0 };
+  mage.esize = mage.items.filter((x) => !x).length;
+
+  for (let i = 0; i < 6000; i++) {
+    await p.tickAll();
+    const slots = mage.slots;
+    if (
+      slots.helmet &&
+      slots.helmet.name === "mmhat" &&
+      slots.helmet.level === 1 &&
+      slots.pants &&
+      slots.pants.name === "mmpants" &&
+      slots.pants.level === 1 &&
+      slots.gloves &&
+      slots.gloves.name === "mmgloves" &&
+      slots.gloves.level === 1
+    ) {
+      break;
+    }
+  }
+
+  const logs = merchant.log.game.map((x) => x.m);
+  assert.ok(logs.some((m) => /^hunter:upgrade_pickup Sarene n=3$/.test(m)), logs.join(" | "));
+  for (const name of ["mmhat", "mmpants", "mmgloves"]) {
+    assert.ok(
+      logs.some((m) => m === "gear:upgrade " + name + "@0->1"),
+      name + " was not upgraded; " + logs.filter((m) => /hunter|gear:|dlv:/.test(m)).join(" | ")
+    );
+    assert.strictEqual(p.bots.Puppygirl.ctrl.store.hunterUpgradeStop[name], 1);
+  }
+  assert.strictEqual(mage.slots.helmet.name, "mmhat");
+  assert.strictEqual(mage.slots.helmet.level, 1);
+  assert.strictEqual(mage.slots.pants.name, "mmpants");
+  assert.strictEqual(mage.slots.pants.level, 1);
+  assert.strictEqual(mage.slots.gloves.name, "mmgloves");
+  assert.strictEqual(mage.slots.gloves.level, 1);
+});
+
 module.exports = { tests };

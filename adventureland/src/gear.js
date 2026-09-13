@@ -5,6 +5,7 @@ const {
   VENDOR_NPC_LOW_LEVEL,
   VENDOR_NPC_MAX_LEVEL,
   KEEP_ALWAYS,
+  HUNTER_ITEMS,
   GEAR_TYPES,
   GEAR_TARGETS,
   GIFT_TTL_MS,
@@ -12,6 +13,7 @@ const {
   STALL_SELL,
   MAX_SAFE_UPGRADE,
   MIN_UPGRADE_CHANCE,
+  HUNTER_UPGRADE_MAX_LEVEL,
   VENDOR_GEAR,
 } = require("./constants");
 
@@ -346,8 +348,43 @@ function pickBestSlot(api, it, G) {
   return best;
 }
 
+function targetSetEquipPlan(api, G, isReserved) {
+  const targets = GEAR_TARGETS[api.character.name] || {};
+  const worn = (api.character && api.character.slots) || {};
+  const planned = Object.assign({}, worn);
+  const steps = [];
+  for (const slot of Object.keys(targets)) {
+    const name = targets[slot];
+    if (!itemDef(G, name).set) continue;
+    let best = null;
+    for (let i = 0; i < (api.character.items || []).length; i++) {
+      const it = api.character.items[i];
+      if (!it || it.name !== name || (isReserved && isReserved(it, i))) continue;
+      if (!classOk(it, api.character.ctype, G) || !canEquipSlot(api, it, slot, G)) continue;
+      if (!best || score(it, G, api.character.ctype) > score(best.it, G, api.character.ctype)) {
+        best = { i, it, slot };
+      }
+    }
+    if (!best) continue;
+    if (
+      planned[slot] &&
+      planned[slot].name === best.it.name &&
+      (planned[slot].level || 0) >= (best.it.level || 0)
+    ) {
+      continue;
+    }
+    planned[slot] = best.it;
+    steps.push(best);
+  }
+  if (!steps.length) return [];
+  return loadoutScore(planned, G, api.character.ctype) > loadoutScore(worn, G, api.character.ctype) + 0.001
+    ? steps
+    : [];
+}
+
 function pendingBetter(api, it, G) {
-  return !!pickBestSlot(api, it, G);
+  if (pickBestSlot(api, it, G)) return true;
+  return targetSetEquipPlan(api, G).some((step) => step.it === it);
 }
 
 function isKeep(api, it, G, giftTtl) {
@@ -376,6 +413,23 @@ const EQUIP_REJECT_COOLDOWN_MS = 60000;
 async function equipPending(api, G, giftTtl, rejectMemo, isReserved) {
   let n = 0;
   const now = api._now ? api._now() : Date.now();
+  const setPlan = targetSetEquipPlan(api, G, isReserved);
+  for (const step of setPlan) {
+    const it = api.character.items[step.i];
+    if (!it || it !== step.it) continue;
+    const r = await Promise.resolve(api.equip(step.i, step.slot));
+    if (r && r.failed) {
+      if (api.game_log) api.game_log("equip:set_fail " + it.name + " " + (r.reason || ""));
+      break;
+    }
+    const wornNow = api.character.slots[step.slot];
+    if (!wornNow || wornNow.name !== it.name) {
+      if (api.game_log) api.game_log("equip:set_reject " + it.name);
+      break;
+    }
+    n++;
+    if (api.game_log) api.game_log("equip:set " + it.name + " +" + (it.level || 0) + " -> " + step.slot);
+  }
   for (let i = 0; i < api.character.items.length; i++) {
     const it = api.character.items[i];
     if (!it) continue;
@@ -453,6 +507,46 @@ function planGifts(bankItems, ads, G) {
     if (ad.esize != null && ad.esize < 1) continue;
     const ctype = ad.ctype || "warrior";
     const plannedSlots = Object.assign({}, ad.slots);
+    const setPicks = [];
+    for (const slot of Object.keys(GEAR_TARGETS[who] || {})) {
+      const prefer = targetNameFor(who, slot);
+      if (!prefer || !itemDef(G, prefer).set) continue;
+      let best = null;
+      for (let j = 0; j < (bankItems || []).length; j++) {
+        const e = bankItems[j];
+        if (!e || used[j] || e.name !== prefer) continue;
+        const it = { name: e.name, level: e.level || 0 };
+        if (!classOk(it, ctype, G) || candidateSlots(it, G).indexOf(slot) < 0) continue;
+        if (!best || score(it, G, ctype) > score(best.it, G, ctype)) {
+          best = { who, slot, it, e, idx: j };
+        }
+      }
+      if (!best) continue;
+      const worn = plannedSlots[slot];
+      if (
+        worn &&
+        worn.name === prefer &&
+        (worn.level || 0) >= (best.it.level || 0)
+      ) {
+        continue;
+      }
+      plannedSlots[slot] = best.it;
+      setPicks.push(best);
+    }
+    const setGain = loadoutScore(plannedSlots, G, ctype) - loadoutScore(ad.slots, G, ctype);
+    if (
+      setPicks.length &&
+      setPicks.length <= (ad.esize == null ? setPicks.length : ad.esize) &&
+      setGain > 0.001
+    ) {
+      for (const pick of setPicks) {
+        pick.sc = setGain;
+        used[pick.idx] = 1;
+        out.push(pick);
+      }
+    } else {
+      for (const pick of setPicks) plannedSlots[pick.slot] = ad.slots[pick.slot];
+    }
     for (const slot of Object.keys(ad.slots)) {
       const worn = plannedSlots[slot];
       const before = loadoutScore(plannedSlots, G, ctype);
@@ -527,10 +621,19 @@ function isRiskUpgrade(it) {
   return target > 0 && (it.level || 0) < target;
 }
 
+function isHunterUpgrade(it) {
+  return !!(
+    it &&
+    HUNTER_ITEMS.indexOf(it.name) >= 0 &&
+    (it.level || 0) < HUNTER_UPGRADE_MAX_LEVEL
+  );
+}
+
 function eligibleUpgrade(it, G) {
   if (!it) return false;
   const g = itemDef(G, it.name);
   if (!g.upgrade || it.l) return false;
+  if (isHunterUpgrade(it)) return itemGrade(it, G) <= 2;
   if (isRiskUpgrade(it)) return itemGrade(it, G) <= 2;
   if (DENY_UPGRADE.indexOf(it.name) >= 0) return false;
   if (SCROLL0_ALLOW.indexOf(it.name) < 0) return false;
@@ -545,7 +648,7 @@ function scrollFor(it, G) {
 
 function upgradeReady(it, G) {
   if (!eligibleUpgrade(it, G)) return false;
-  return isRiskUpgrade(it) || upgradeChance(it) >= MIN_UPGRADE_CHANCE;
+  return isHunterUpgrade(it) || isRiskUpgrade(it) || upgradeChance(it) >= MIN_UPGRADE_CHANCE;
 }
 
 function pickUpgradeIndex(items, G, allow) {
@@ -596,6 +699,7 @@ module.exports = {
   score,
   setBonusScore,
   loadoutScore,
+  targetSetEquipPlan,
   SCORE_WEIGHTS,
   scaledStat,
   candidateSlots,
@@ -619,6 +723,7 @@ module.exports = {
   upgradeChance,
   riskUpgradeTarget,
   isRiskUpgrade,
+  isHunterUpgrade,
   eligibleUpgrade,
   scrollFor,
   upgradeReady,

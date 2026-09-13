@@ -36,6 +36,7 @@ const {
   markGift,
   classOk,
   canEquipSlot,
+  isHunterUpgrade,
 } = require("./gear");
 const {
   inventoryDigest,
@@ -91,6 +92,8 @@ function bootFighter(api, opts) {
   let pickupHoldUntil = 0;
   let lastInventoryDigest = "";
   let gearTxn = null;
+  let hunterOffloadBusy = false;
+  let hunterOffloadItems = [];
   let respawnBusy = false;
   // equipPending's live "Wrong weapon" rejection memo — persists across ticks
   // so a class-illegal / 2H-conflicted item isn't re-attempted every tick.
@@ -343,7 +346,7 @@ function bootFighter(api, opts) {
     return makeInventorySnapshot(api, inventoryRevision, gearReservations);
   }
 
-  function isGearReserved(it) {
+  function isPeerGearReserved(it) {
     const fp = itemFingerprint(it);
     if (
       gearTxn &&
@@ -353,6 +356,10 @@ function bootFighter(api, opts) {
     return Object.keys(gearReservations).some(
       (id) => gearReservations[id] && gearReservations[id].fingerprint === fp
     );
+  }
+
+  function isGearReserved(it) {
+    return hunterOffloadMatch(it, hunterOffloadItems) || isPeerGearReserved(it);
   }
 
   async function sendGearTxReport(tx, phase, extra) {
@@ -579,7 +586,66 @@ function bootFighter(api, opts) {
     }
   }
 
-  async function tossLoot() {
+  function hunterOffloadMatch(it, hunterItems) {
+    return !!(
+      it &&
+      isHunterUpgrade(it) &&
+      (hunterItems || []).some(
+        (want) => want && want.name === it.name && (want.level || 0) === (it.level || 0)
+      )
+    );
+  }
+
+  async function offloadHunterUpgrades(hunterItems) {
+    const merchant = api.get_player(MERCHANT);
+    if (!merchant || merchant.rip || merchantDist(merchant) > (SEND_RANGE || 320)) return 0;
+    let sent = 0;
+
+    async function sendHunter(name, level) {
+      const i = api.character.items.findIndex(
+        (it) =>
+          hunterOffloadMatch(it, [{ name, level }]) &&
+          !it.l &&
+          !isPeerGearReserved(it)
+      );
+      if (i < 0) return false;
+      const r = await api.send_item(MERCHANT, i, 1);
+      if (r && r.failed) {
+        api.game_log("toss_fail " + name + " " + (r.reason || "unknown"));
+        return false;
+      }
+      api.game_log("toss " + name + "@" + level);
+      sent++;
+      return true;
+    }
+
+    for (const slot of Object.keys(api.character.slots || {})) {
+      const it = api.character.slots[slot];
+      if (!hunterOffloadMatch(it, hunterItems) || it.l || isPeerGearReserved(it)) continue;
+      if ((api.character.esize || 0) < 1) {
+        api.game_log("hunter:unequip_space");
+        break;
+      }
+      const r = await api.unequip(slot);
+      if (r && r.failed) {
+        api.game_log("hunter:unequip_fail " + it.name + " " + (r.reason || ""));
+        continue;
+      }
+      api.game_log("hunter:unequip " + it.name + "@" + (it.level || 0));
+      await sendHunter(it.name, it.level || 0);
+    }
+    for (const want of hunterItems || []) {
+      if (!want) continue;
+      while (await sendHunter(want.name, want.level || 0)) {
+        if (sent >= 12) return sent;
+      }
+    }
+    if (sent) sendGearAd();
+    return sent;
+  }
+
+  async function tossLoot(opts) {
+    opts = opts || {};
     const m = api.get_player(MERCHANT);
     if (!m || m.rip) return 0;
     if (api.character.bank) return 0;
@@ -588,14 +654,18 @@ function bootFighter(api, opts) {
     let n = 0;
     for (let i = 0; i < api.character.items.length && n < 12; i++) {
       const it = api.character.items[i];
-      if (!it || isGearReserved(it)) continue;
+      if (!it) continue;
       const compoundOffload =
         saturated &&
         COMBINE_PRIORITY.indexOf(it.name) >= 0;
-      if (isKeep(api, it, api.G || {}, giftTtl) && !compoundOffload) continue;
+      const hunterOffload = hunterOffloadMatch(it, opts.hunterItems);
+      if (isGearReserved(it) && !hunterOffload) continue;
+      if (opts.onlyHunter && !hunterOffload) continue;
+      if (isKeep(api, it, api.G || {}, giftTtl) && !compoundOffload && !hunterOffload) continue;
       try {
         const r = await api.send_item(MERCHANT, i, it.q == null ? 1 : it.q);
         if (r && r.failed) {
+          api.game_log("toss_fail " + it.name + " " + (r.reason || "unknown"));
           if (r.reason === "no_space") break;
           continue;
         }
@@ -610,9 +680,9 @@ function bootFighter(api, opts) {
     return n;
   }
 
-  async function offloadToMerchant() {
+  async function offloadToMerchant(opts) {
     await offloadGold();
-    return tossLoot();
+    return tossLoot(opts);
   }
 
   async function handleGearOffer(d) {
@@ -971,7 +1041,17 @@ function bootFighter(api, opts) {
     }
     if (d.dlv_done && d.id && /^pickup_/.test(d.id)) pickupHoldUntil = 0;
     if (d.dlv_loot_q) {
-      const n = await offloadToMerchant();
+      hunterOffloadBusy = !!d.hunter_upgrade;
+      hunterOffloadItems = d.hunter_upgrade ? d.hunter_items || [] : [];
+      let n = 0;
+      try {
+        n = d.hunter_upgrade
+          ? await offloadHunterUpgrades(d.hunter_items || [])
+          : await offloadToMerchant();
+      } finally {
+        hunterOffloadBusy = false;
+        hunterOffloadItems = [];
+      }
       api.game_log("dlv:toss n=" + n);
       api.send_cm(MERCHANT, { dlv_loot_done: 1, id: d.id || null, n });
     }
@@ -1501,10 +1581,12 @@ function bootFighter(api, opts) {
         persist();
         return;
       }
-      await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
+      if (!hunterOffloadBusy) {
+        await equipPending(api, api.G || {}, giftTtl, equipRejectMemo, isGearReserved);
+      }
     }
-    if (now - lastGearAd >= GEAR_AD_MS) sendGearAd();
-    if (!gearTxn) await offloadToMerchant();
+    if (!hunterOffloadBusy && now - lastGearAd >= GEAR_AD_MS) sendGearAd();
+    if (!gearTxn && !hunterOffloadBusy) await offloadToMerchant();
     emitMetrics(now);
     if (isLead() && now >= bootQuietUntil && now - lastHb >= HEARTBEAT_MS) {
       reseedSeqAboveHeard();
