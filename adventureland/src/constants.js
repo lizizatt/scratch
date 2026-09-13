@@ -39,8 +39,8 @@ const POTION_DRY = 0;
 const ECON_BAG_RESERVE = 4;
 /** Keep enough vault capacity for several fighter pickups before expanding boxes/gifts. */
 const ECON_BANK_RESERVE = 12;
-/** Stacked Xyn exchanges expand one inventory slot into many; stop before logistics is crowded. */
-const XYN_BAG_RESERVE = 8;
+/** Keep one emergency slot while draining stacked Xyn exchange items one reward at a time. */
+const XYN_BAG_RESERVE = 1;
 /** Obsolete now that every character uses the stronger hpot1/mpot1 tier. */
 const OBSOLETE_POTIONS = ["hpot0", "mpot0"];
 /** Last-resort full-bag slot recovery before sacrificing compound inputs. */

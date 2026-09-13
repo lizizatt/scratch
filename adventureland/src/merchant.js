@@ -1902,14 +1902,16 @@ function bootMerchant(api, opts) {
     const names = EXCHANGE_ITEMS;
 
     function findBagSlot() {
+      let stacked = -1;
       for (let i = 0; i < api.character.items.length; i++) {
         const it = api.character.items[i];
         if (!it || names.indexOf(it.name) < 0) continue;
         const need = ((api.G.items && api.G.items[it.name]) || {}).e || 1;
         const q = it.q == null ? 1 : it.q;
-        if (q >= need) return i;
+        if (q === need) return i;
+        if (q > need && stacked < 0) stacked = i;
       }
-      return -1;
+      return stacked;
     }
 
     function bankHasExchange() {
@@ -1958,12 +1960,7 @@ function bootMerchant(api, opts) {
     const nm = api.character.items[i].name;
     const needed = ((api.G.items && api.G.items[nm]) || {}).e || 1;
     const held = api.character.items[i].q == null ? 1 : api.character.items[i].q;
-    const bankFree = bankFreeSlots();
-    if (
-      held > needed &&
-      ((api.character.esize || 0) <= XYN_BAG_RESERVE ||
-        (bankFree != null && bankFree < ECON_BANK_RESERVE))
-    ) {
+    if (held > needed && (api.character.esize || 0) <= XYN_BAG_RESERVE) {
       const now = api._now();
       if (lastXynNoSpaceAt == null || now - lastXynNoSpaceAt >= 15000) {
         api.game_log("xyn:capacity_hold " + nm);

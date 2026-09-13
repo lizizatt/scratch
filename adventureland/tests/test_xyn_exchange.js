@@ -65,15 +65,41 @@ test("adversary: stacked exchanges stop before consuming the logistics reserve",
   c.items[1] = { name: "hpot1", q: 200 };
   c.items[2] = { name: "mpot1", q: 200 };
   c.items[3] = { name: "anniversarygift", q: 25 };
-  for (let i = 4; i < 12; i++) c.items[i] = null;
-  c.esize = 8;
+  c.items[4] = null;
+  c.esize = 1;
   c._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
 
   for (let i = 0; i < 80; i++) await p.tickAll();
 
   assert.ok(!api.log.game.some((g) => g.m === "xyn:exchange anniversarygift"));
   assert.ok(api.log.game.some((g) => g.m === "xyn:capacity_hold anniversarygift"));
-  assert.strictEqual(c.esize, 8, "exchange does not expand the bag through its reserve");
+  assert.strictEqual(c.esize, 1, "exchange preserves one emergency bag slot");
+});
+
+test("adversary: bank pressure does not block gifts and emeralds with output space", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = { name: "tracker" };
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "anniversarygift", q: 66 };
+  c.items[4] = { name: "gem0", q: 1 };
+  for (let i = 5; i < 11; i++) c.items[i] = null;
+  c.esize = 6;
+  c._bank = { gold: 0, items0: new Array(42).fill({ name: "tracker" }) };
+
+  for (let i = 0; i < 200; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "xyn:exchange anniversarygift")) break;
+  }
+
+  const exchanges = api.log.game.filter((g) => /^xyn:exchange /.test(g.m)).map((g) => g.m);
+  assert.strictEqual(exchanges[0], "xyn:exchange gem0", "slot-freeing emerald should go first");
+  assert.ok(exchanges.includes("xyn:exchange anniversarygift"), "stacked gifts should drain despite full bank");
+  const gifts = c.items.find((x) => x && x.name === "anniversarygift");
+  assert.ok(gifts && gifts.q < 66, "at least one anniversary gift was consumed");
 });
 
 test("adversary: full bag and full stand sacrifice a safe stack instead of looping on Xyn", async () => {
