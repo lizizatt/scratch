@@ -8,6 +8,9 @@ This document is the authority for merchant behavior. When it conflicts with
 older planning language in `V2_PLAN.md`, `README.md`, or
 `docs/MONSTER_TOKEN_PROGRESSION.md`, this document wins. The interface wire
 formats remain authoritative in `docs/INTERFACE_CONTROL_DOCUMENT.md`.
+Party-wide structure is summarized in
+[`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md), and fighter behavior is
+normative in [`FIGHTER_PLAN.md`](FIGHTER_PLAN.md).
 
 ## 1. Operating objective
 
