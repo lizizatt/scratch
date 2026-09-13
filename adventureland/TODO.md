@@ -1,3 +1,5 @@
 # TODO
 
-- [ ] Restock deliveries should include only the potion types the requesting fighter is short on. For example, a request for MP potions must not also deliver HP potions, so unused types do not accumulate on characters such as Zarook.
+- [x] Restock deliveries include only each potion type's deficit. A request for
+  MP potions does not also deliver HP potions when HP stock is already at the
+  target.

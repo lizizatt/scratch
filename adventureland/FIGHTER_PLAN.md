@@ -33,7 +33,7 @@ The order of concern is:
 ## 2. Locked requirements
 
 | Area | Requirement | Implementation |
-|---|---|---|
+| --- | --- | --- |
 | Leadership | Exactly one current leader is selected in order `Jazwyn -> Sarene -> Zarook`, excluding absent or dead fighters. Leadership returns to Jazwyn when she returns. | Implemented for absence/disconnect; **dead-but-present gap** |
 | Intent ownership | Only the current leader writes farm/hunt target, hold, requested world, and normal shared mode. Followers consume that intent. | Implemented |
 | Cohesion | Followers never independently select a different farm while a leader is available. Cross-map movement begins with a cohesion wait; followers use leader-relative formation and pack fallback. | Implemented |
@@ -42,7 +42,7 @@ The order of concern is:
 | Rare | Any fighter may interrupt for `phoenix` or `goldenbat`; all fighters assemble on the spotter, fight, and restore prior intent on kill/gone/timeout. | Implemented |
 | Monster Hunts | The current leader owns Daisy accept/farm/turn-in. Three deaths on one assignment soft-abandon it until it clears. | Implemented |
 | Potions | Use HP below 55% and MP below 50%; request restock below 80 units; at zero, preserve delivery state and use same-world town fallback only after silence. | Implemented |
-| Potion demand | Request only each potion type's deficit to target; omit a type that is not short. | **Locked gap:** ordinary request currently sends both full targets |
+| Potion demand | Request only each potion type's deficit to target; omit a type that is not short. | Implemented |
 | Gold | Keep `100,000` gold for fallback purchasing and send only excess to Puppygirl when she is in range. | Implemented |
 | Full bag | Sell approved junk, never reserved gear. If one potion type is dry and the other monopolizes the bag, sell surplus of the abundant type to free a slot. | Implemented |
 | Equipment | Equip only class-legal, slot-legal improvements. Score full Hunter bundles with set bonuses rather than greedily equipping each piece. | Implemented |
@@ -100,10 +100,10 @@ stateDiagram-v2
 5. Expire stale peer-gear transaction state.
 6. Refresh leader-presence hysteresis.
 7. When no gear transaction is active:
-   - loot;
-   - strip wrong-class equipment;
-   - sell junk if the bag is full;
-   - equip safe improvements.
+    - loot;
+    - strip wrong-class equipment;
+    - sell junk if the bag is full;
+    - equip safe improvements.
 8. Publish a fresh gear advertisement when due.
 9. Offload eligible loot and excess gold to nearby Puppygirl.
 10. Emit metrics and service the chat queue.
@@ -183,7 +183,7 @@ flowchart TD
 ### 5.2 Combat roles
 
 | Role | Behavior |
-|---|---|
+| --- | --- |
 | Current leader | Selects a configured pack target and becomes the party's target source |
 | Followers | Prefer the visible leader's current target; otherwise select a matching pack target |
 | Jazwyn | Closes to melee, uses charge while approaching, cleaves only with a compatible weapon and sufficient MP |
@@ -231,8 +231,7 @@ need(mpot1) = max(0, POTION_TARGET - current MP potion count)
 ```
 
 Only positive entries belong in `dlv_pots.items`. If both are zero, no request
-is created. Puppygirl's send loop already honors this shape; ordinary fighter
-request generation is the remaining implementation work.
+is created. Puppygirl's send loop honors the same demand map.
 
 ## 7. Rare interrupt state machine
 
@@ -358,7 +357,7 @@ becomes ordinary NPC-vendor stock.
 ### 11.1 Party chat
 
 | Message | Purpose |
-|---|---|
+| --- | --- |
 | `~S` | Leader heartbeat containing shared farm/mode/hold state and sequence |
 | `~d` | Fighter-local potion/rip/task diff |
 | `~R` | Rare sighting |
@@ -393,8 +392,7 @@ then republishes.
 ## 12. Known gaps and limits
 
 | Gap | Consequence |
-|---|---|
-| Ordinary potion request contains both full targets | Characters can accumulate a potion type they were not short on |
+| --- | --- |
 | Death does not reliably publish `rip` before respawn | Dead-but-present succession can temporarily retain the wrong leader |
 | Diff emission is tied to potion-bucket changes | Task/rip-only state changes can remain unpublished |
 | Plain `Transfer ...` and `World ...` notices are not parsed by current party-state parser | They are informational output, not reliable movement control |

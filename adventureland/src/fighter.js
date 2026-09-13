@@ -777,15 +777,22 @@ function bootFighter(api, opts) {
       }
     }
     const id = "p" + api._now() + "_" + name.slice(0, 3);
-    dlvPending = { id, kind: "pots", t0: api._now(), acked: 0 };
-    state.S.dlv = { id, who: name, phase: "req", t: api._now() };
+    const have = countPots(api.character.items);
     const qty = opts.potionTarget != null ? opts.potionTarget : POTION_TARGET;
     const items = [
-      { name: "hpot1", q: qty },
-      { name: "mpot1", q: qty },
-    ];
+      { name: "hpot1", q: Math.max(0, qty - have.hp) },
+      { name: "mpot1", q: Math.max(0, qty - have.mp) },
+    ].filter((it) => it.q > 0);
+    if (!items.length) return false;
+    dlvPending = { id, kind: "pots", t0: api._now(), acked: 0 };
+    state.S.dlv = { id, who: name, phase: "req", t: api._now() };
     const farm = state.S.intent.mtype;
-    api.game_log("dlv:req id=" + id + " q=" + qty);
+    api.game_log(
+      "dlv:req id=" +
+        id +
+        " " +
+        items.map((it) => it.name + "=" + it.q).join(" ")
+    );
     persist();
     const r = await api.send_cm(MERCHANT, {
       v: 1,
@@ -804,6 +811,7 @@ function bootFighter(api, opts) {
       api.game_log("cm_unreachable");
       // stay pending; fallback timer uses silence
     }
+    return true;
   }
 
   /** Drain inventory to force restock pressure (sim / long-farm knobs). */

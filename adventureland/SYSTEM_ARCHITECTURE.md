@@ -242,9 +242,8 @@ sequenceDiagram
     M-->>F: dlv_done
 ```
 
-The message shape supports per-type deficits. Ordinary fighter request
-generation still needs the locked correction documented in both behavior
-plans.
+The fighter computes each potion deficit independently, omits satisfied types,
+and Puppygirl sends only the resulting demand map.
 
 ### 5.3 Gear lifecycle
 
@@ -340,7 +339,6 @@ permanently authoritative.
 
 | Gap | Effect | Authority |
 |---|---|---|
-| Per-type potion demand | Ordinary requests still ask for both potion types, causing unnecessary accumulation. | Locked requirement; implementation pending |
 | Dead-but-present leadership | A dead member's `rip` does not reliably reach the shared member state, so succession is robust for absence/disconnect but not every death window. | Locked requirement; implementation pending |
 | Task/rip-only diff publication | Current diff emission is triggered by potion bucket changes, so task or rip changes alone may remain unpublished until another change. | Locked control-plane requirement; implementation pending |
 | Fingerprint ambiguity | Identical item instances can share the same fingerprint; peer transfers rely on observed location and count deltas. | Accepted current limitation |
@@ -361,4 +359,3 @@ controllers against modeled Adventure Land APIs, time, pathing, comms,
 storage, inventory, and combat. Production acceptance additionally requires
 slot-size validation, upload, character reload, visual inspection, and log
 examination.
-

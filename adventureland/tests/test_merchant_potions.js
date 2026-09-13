@@ -91,4 +91,41 @@ test("adversary: potion delivery preserves Puppygirl's personal reserve", async 
   assert.ok(qty(merchantItems, "mpot1") >= POTION_TARGET, "merchant keeps MP reserve");
 });
 
+test("adversary: fighter requests only per-type potion deficits", async () => {
+  const cases = [
+    { hp: 50, mp: 200, want: [{ name: "hpot1", q: 150 }] },
+    { hp: 200, mp: 50, want: [{ name: "mpot1", q: 150 }] },
+    {
+      hp: 50,
+      mp: 70,
+      want: [
+        { name: "hpot1", q: 150 },
+        { name: "mpot1", q: 130 },
+      ],
+    },
+    { hp: 200, mp: 250, want: [] },
+  ];
+
+  for (const c of cases) {
+    const p = bootParty({
+      pack: "armadillo",
+      pots: 0,
+      gold: 500000,
+      members: ["Jazwyn", "Puppygirl"],
+    });
+    const api = p.bots.Jazwyn.api;
+    api.character.items[0] = { name: "hpot1", q: c.hp };
+    api.character.items[1] = { name: "mpot1", q: c.mp };
+    api.character.esize = api.character.items.filter((it) => !it).length;
+
+    const created = await p.bots.Jazwyn.ctrl.requestPots();
+    const req = api.log.cm
+      .map((entry) => entry.message)
+      .find((message) => message && message.job === "dlv_pots");
+
+    assert.strictEqual(created, c.want.length > 0, JSON.stringify(c));
+    assert.deepStrictEqual(req ? req.items : [], c.want, JSON.stringify(c));
+  }
+});
+
 module.exports = { tests };

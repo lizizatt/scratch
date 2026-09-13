@@ -37,7 +37,7 @@ self-service bank pickup remains a deferred alternative, not a requirement.
 |---|---|---|
 | World | Normal logistics and idle economy stay on the party's farm world. World changes occur only to follow a delivery or fulfill explicit hold/home control. | Implemented |
 | Delivery | Potions and gear travel through the persisted FIFO delivery queue. Fighters keep farming; Puppygirl approaches to item-send range. | Implemented |
-| Potion demand | A restock job contains only the potion types and quantities that the fighter is short on. Unneeded HP or MP potions must not accumulate. | **Locked gap:** `TODO.md`; current ordinary requests still ask for both types |
+| Potion demand | A restock job contains only the potion types and quantities that the fighter is short on. Unneeded HP or MP potions must not accumulate. | Implemented |
 | Gold | Fighters retain `100,000` gold and Puppygirl retains `150,000` gold. A delivery may top up a fighter below its float. | Implemented |
 | Capacity | Puppygirl reserves at least three bag slots for fighter take-backs and four slots during economy batches; the bank retains a twelve-slot logistics reserve. | Implemented |
 | Bank | Inactive stock is banked. Operational consumables, tools, exchange inputs, immediate vendor stock, listed merchandise, fighter targets, and active progression items remain available when needed. | Implemented |
@@ -195,9 +195,8 @@ stateDiagram-v2
 5. At least three bag slots are available before an ordinary handoff. Upgrade
    pickups reserve `max(3, pickup count + 1)`.
 6. A fighter below the gold floor may be topped up before item transfer.
-7. A `dlv_pots` job sends only quantities present in its `items` demand map.
-   The remaining implementation gap is generating that map from actual
-   per-type shortages for ordinary fighter requests.
+7. A `dlv_pots` job sends only quantities present in its `items` demand map;
+   fighters generate that map from actual per-type shortages.
 8. A successful gear send is followed by `gear_offer`; the fighter equips,
    acknowledges, and returns the displaced item.
 9. Completion or abort clears the active job, persists queue state, and
@@ -428,16 +427,7 @@ These are explicitly outside the locked state machine:
 They require an explicit requirement change, a state-machine update, adversarial
 tests, a separate commit, production deployment, and live observation.
 
-## 12. Known implementation gap
-
-`TODO.md` contains one remaining behavior gap: ordinary fighter restock
-requests currently construct both `hpot1` and `mpot1` demand at the full target.
-The locked behavior is to calculate each type independently and omit a type
-whose current stock is not short. Puppygirl's send loop already honors a
-per-type demand map, so the correction belongs at fighter request generation
-and requires scenarios for HP-only, MP-only, both-short, and neither-short.
-
-## 13. Acceptance and change control
+## 12. Acceptance and change control
 
 A state transition is accepted only when:
 
