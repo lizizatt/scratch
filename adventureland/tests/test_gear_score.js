@@ -11,6 +11,7 @@ const {
   loadoutScore,
   scaledStat,
   SCORE_WEIGHTS,
+  SET_BONUS_MULTIPLIER,
   classOk,
   canEquipSlot,
   weaponHandKind,
@@ -211,10 +212,13 @@ test("unit: assigned generic stats and Hunter set bonuses affect loadout score",
   const three = Object.assign({}, two, {
     pants: { name: "mmpants", level: 0, stat_type: "int" },
   });
-  assert.strictEqual(setBonusScore(two, G, "mage"), 2 * SCORE_WEIGHTS.mage.int);
+  assert.strictEqual(
+    setBonusScore(two, G, "mage"),
+    2 * SCORE_WEIGHTS.mage.int * SET_BONUS_MULTIPLIER
+  );
   assert.strictEqual(
     setBonusScore(three, G, "mage"),
-    5 * SCORE_WEIGHTS.mage.int + 2 * SCORE_WEIGHTS.mage.speed
+    (5 * SCORE_WEIGHTS.mage.int + 2 * SCORE_WEIGHTS.mage.speed) * SET_BONUS_MULTIPLIER
   );
   assert.ok(loadoutScore(three, G, "mage") > loadoutScore(two, G, "mage"));
   assert.ok(!classOk({ name: "mmhat" }, "warrior", G), "class-locked armor must be rejected");
@@ -317,6 +321,22 @@ test("Hunter set pieces equip as a jointly better bundle", async () => {
   await equipPending(api, api.G, {});
   assert.strictEqual(c.slots.helmet.name, "mmhat");
   assert.strictEqual(c.slots.pants.name, "mmpants");
+  assert.strictEqual(c.slots.gloves.name, "mmgloves");
+});
+
+test("two Hunter pieces beat +5 store armor through amplified set bonus", async () => {
+  const p = bootParty({ members: ["Sarene"] });
+  const api = p.bots.Sarene.api;
+  const c = api.character;
+  c.slots.helmet = { name: "helmet1", level: 5 };
+  c.slots.gloves = { name: "gloves1", level: 5 };
+  c.items[5] = { name: "mmhat", level: 2 };
+  c.items[6] = { name: "mmgloves", level: 2 };
+
+  const plan = targetSetEquipPlan(api, api.G);
+  assert.deepStrictEqual(plan.map((x) => x.slot).sort(), ["gloves", "helmet"]);
+  await equipPending(api, api.G, {});
+  assert.strictEqual(c.slots.helmet.name, "mmhat");
   assert.strictEqual(c.slots.gloves.name, "mmgloves");
 });
 

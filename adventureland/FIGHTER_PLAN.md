@@ -45,7 +45,7 @@ The order of concern is:
 | Potion demand | Request only each potion type's deficit to target; omit a type that is not short. | Implemented |
 | Gold | Keep `100,000` gold for fallback purchasing and send only excess to Puppygirl when she is in range. | Implemented |
 | Full bag | Sell approved junk, never reserved gear. If one potion type is dry and the other monopolizes the bag, sell surplus of the abundant type to free a slot. | Implemented |
-| Equipment | Equip only class-legal, slot-legal improvements. Score full Hunter bundles with set bonuses rather than greedily equipping each piece. | Implemented |
+| Equipment | Equip only class-legal, slot-legal improvements. Score full Hunter bundles with set bonuses weighted 10x so a two-piece Hunter bonus beats +5 store armor. | Implemented |
 | Low-tier armor | Bagged `pants`, `gloves`, `helmet`, `shoes`, and `coat` are always NPC-vendor stock at every level. Equipped copies remain safe until replaced. | Implemented |
 | Merchant gear | Accept a merchant gift only when the exact item can be equipped; acknowledge the result and return displaced/surplus items while Puppygirl remains in range. | Implemented |
 | Gear routing | Never exchange gear directly with another fighter. Offload requested items to Puppygirl and accept upgrades only from Puppygirl. | Implemented |

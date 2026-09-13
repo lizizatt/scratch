@@ -100,6 +100,8 @@ const SCORE_WEIGHTS = {
   },
 };
 
+const SET_BONUS_MULTIPLIER = 10;
+
 function itemDef(G, name) {
   return (G && G.items && G.items[name]) || {};
 }
@@ -190,7 +192,7 @@ function setBonusScore(slots, G, ctype) {
       const bonus = def[n] || def["" + n];
       if (!bonus) continue;
       for (const key of Object.keys(bonus)) {
-        if (w[key]) total += Number(bonus[key] || 0) * w[key];
+        if (w[key]) total += Number(bonus[key] || 0) * w[key] * SET_BONUS_MULTIPLIER;
       }
     }
   }
@@ -675,6 +677,7 @@ module.exports = {
   loadoutScore,
   targetSetEquipPlan,
   SCORE_WEIGHTS,
+  SET_BONUS_MULTIPLIER,
   scaledStat,
   candidateSlots,
   classOk,
