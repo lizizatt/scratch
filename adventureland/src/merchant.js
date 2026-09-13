@@ -40,6 +40,8 @@ const {
   pickUpgradeIndex,
   scrollFor,
   upgradeChance,
+  isRiskUpgrade,
+  upgradeReady,
   planVendorBuy,
   eligibleUpgrade,
   candidateSlots,
@@ -737,7 +739,15 @@ function bootMerchant(api, opts) {
         continue;
       }
       if (opts.onlyBelowGate) {
-        if (!(eligibleUpgrade(it, api.G) && upgradeChance(it) < MIN_UPGRADE_CHANCE)) continue;
+        if (
+          !(
+            eligibleUpgrade(it, api.G) &&
+            !isRiskUpgrade(it) &&
+            upgradeChance(it) < MIN_UPGRADE_CHANCE
+          )
+        ) {
+          continue;
+        }
         out.push(i);
         continue;
       }
@@ -1450,8 +1460,13 @@ function bootMerchant(api, opts) {
     return (STALL_SELL || []).find((x) => x.name === name) || null;
   }
 
-  function stallCopies(rule) {
+  function stallCopies(rule, mode) {
     const copies = [];
+    const canUseLevel = (level) =>
+      mode === "upgrade"
+        ? rule.upgradeTo != null && level < rule.upgradeTo
+        : (rule.minLevel == null || level >= rule.minLevel) &&
+          (rule.maxLevel == null || level <= rule.maxLevel);
     for (let i = 0; i < api.character.items.length; i++) {
       const it = api.character.items[i];
       if (it && it.name === rule.name) {
@@ -1463,7 +1478,7 @@ function bootMerchant(api, opts) {
           sellable:
             !it.l &&
             !it.p &&
-            (rule.maxLevel == null || level <= rule.maxLevel),
+            canUseLevel(level),
         });
       }
     }
@@ -1477,8 +1492,17 @@ function bootMerchant(api, opts) {
           sellable:
             !bank.l &&
             !bank.p &&
-            (rule.maxLevel == null || level <= rule.maxLevel),
+            canUseLevel(level),
         });
+      }
+    }
+    if (mode !== "upgrade") {
+      const slots = api.character.slots || {};
+      for (let s = 1; s <= 16; s++) {
+        const it = slots["trade" + s];
+        if (it && it.name === rule.name) {
+          copies.push({ level: it.level || 0, sellable: false });
+        }
       }
     }
     const now = api._now();
@@ -1528,6 +1552,21 @@ function bootMerchant(api, opts) {
     return keys;
   }
 
+  function riskUpgradeKeys() {
+    const keys = new Set();
+    const now = api._now();
+    if (!FIGHTERS.every((who) => gearAdFresh(gearAds[who], now))) return keys;
+    const giftReserve = stallGiftReserveKeys();
+    for (const rule of STALL_SELL || []) {
+      if (!rule.upgradeTo || !stallReserveReady(rule)) continue;
+      for (const choice of stallCopies(rule, "upgrade")) {
+        const key = choice.i != null ? "bag:" + choice.i : choice.bank.pack + ":" + choice.bank.i;
+        if (!giftReserve.has(key)) keys.add(key);
+      }
+    }
+    return keys;
+  }
+
   function stallCandidate(preferBag, reserveStable) {
     const candidates = [];
     const giftReserve = stallGiftReserveKeys();
@@ -1560,6 +1599,18 @@ function bootMerchant(api, opts) {
     }
     listed.sort((a, b) => a.price - b.price || (a.it.level || 0) - (b.it.level || 0));
     return listed[0] || null;
+  }
+
+  function unreadyRiskListing() {
+    const slots = api.character.slots || {};
+    for (let s = 1; s <= 16; s++) {
+      const it = slots["trade" + s];
+      const rule = it && stallRule(it.name);
+      if (rule && rule.upgradeTo && (it.level || 0) < rule.upgradeTo) {
+        return { slot: s, it };
+      }
+    }
+    return null;
   }
 
   function stallBagStable() {
@@ -1666,6 +1717,17 @@ function bootMerchant(api, opts) {
 
   /** List one reserve-safe surplus item per idle pass. */
   async function tryStallOne() {
+    const unready = unreadyRiskListing();
+    if (unready && (api.character.esize || 0) > 0) {
+      if (!(await openStandAndSync())) return false;
+      const r = await Promise.resolve(api.unequip("trade" + unready.slot));
+      if (r && r.failed) {
+        api.game_log("stall:risk_reclaim_fail " + (r.reason || ""));
+        return false;
+      }
+      api.game_log("stall:risk_reclaim " + unready.it.name + "@" + (unready.it.level || 0));
+      return true;
+    }
     const reserveStable = stallBagStable();
     let cand = stallCandidate((api.character.esize || 0) < 1, reserveStable);
     if (!cand) return false;
@@ -1889,10 +1951,12 @@ function bootMerchant(api, opts) {
   }
 
   function hasUpgradeableOwned() {
-    if (pickUpgradeIndex(api.character.items, api.G) >= 0) return true;
+    if (pickUpgradeIndex(api.character.items, api.G, (it) => !isRiskUpgrade(it)) >= 0) {
+      return true;
+    }
     return listBankItems().some((e) => {
       const it = { name: e.name, level: e.level || 0 };
-      return eligibleUpgrade(it, api.G) && upgradeChance(it) >= MIN_UPGRADE_CHANCE;
+      return !isRiskUpgrade(it) && upgradeReady(it, api.G);
     });
   }
 
@@ -2296,14 +2360,20 @@ function bootMerchant(api, opts) {
     return true;
   }
 
-  /** One conservative scroll0 upgrade (chance ≥ MIN, max +5, allowlist). */
+  /** One conservative upgrade, or one explicitly configured surplus liquidation risk. */
   async function tryUpgradeOne() {
-    let i = pickUpgradeIndex(api.character.items, api.G);
+    let riskKeys = riskUpgradeKeys();
+    const allowBag = (it, slot) => !isRiskUpgrade(it) || riskKeys.has("bag:" + slot);
+    let i = pickUpgradeIndex(api.character.items, api.G, allowBag);
     if (i < 0) {
       // Bag has only below-gate pieces: log once per piece key, then leave for park.
       // Silent while stall locks parkToBank — otherwise burn-in spammed every minute.
       const low = (api.character.items || []).findIndex(
-        (it) => eligibleUpgrade(it, api.G) && upgradeChance(it) < MIN_UPGRADE_CHANCE
+        (it, slot) =>
+          eligibleUpgrade(it, api.G) &&
+          !isRiskUpgrade(it) &&
+          upgradeChance(it) < MIN_UPGRADE_CHANCE &&
+          allowBag(it, slot)
       );
       if (low >= 0) {
         if (!api.character.stand) {
@@ -2315,30 +2385,35 @@ function bootMerchant(api, opts) {
       // Bank: only pull pieces we would actually upgrade. Never skip-spam on bank junk.
       const bankHit = listBankItems().find((e) => {
         const it = { name: e.name, level: e.level || 0 };
-        return eligibleUpgrade(it, api.G) && upgradeChance(it) >= MIN_UPGRADE_CHANCE;
+        return upgradeReady(it, api.G) &&
+          (!isRiskUpgrade(it) || riskKeys.has(e.pack + ":" + e.i));
       });
       if (!bankHit) return false;
       if ((api.character.esize || 0) < 1) await parkToBank();
       if (!(await ensureAtBank())) return false;
       while ((api.character.esize || 0) > ECON_BAG_RESERVE) {
+        const currentRiskKeys = riskUpgradeKeys();
         const hit = listBankItems().find((e) => {
           if (e.name !== bankHit.name) return false;
           const it = { name: e.name, level: e.level || 0 };
-          return eligibleUpgrade(it, api.G) && upgradeChance(it) >= MIN_UPGRADE_CHANCE;
+          return upgradeReady(it, api.G) &&
+            (!isRiskUpgrade(it) || currentRiskKeys.has(e.pack + ":" + e.i));
         });
         if (!hit) break;
         const pulled = await api.bank_retrieve(hit.pack, hit.i);
         if (pulled && pulled.failed) break;
       }
       await leaveBankToPlaza();
-      i = pickUpgradeIndex(api.character.items, api.G);
+      riskKeys = riskUpgradeKeys();
+      i = pickUpgradeIndex(api.character.items, api.G, allowBag);
       if (i < 0) return false;
     }
     const it = api.character.items[i];
     const scn = scrollFor(it, api.G);
     if (!scn) return false;
+    let risky = isRiskUpgrade(it);
     const chance = upgradeChance(it);
-    if (chance < MIN_UPGRADE_CHANCE) {
+    if (!risky && chance < MIN_UPGRADE_CHANCE) {
       logUpgradeSkip(it.name, it.level || 0, chance);
       return false;
     }
@@ -2352,18 +2427,20 @@ function bootMerchant(api, opts) {
       if ((api.character.esize || 0) < 1) {
         await parkToBank(it);
         if ((api.character.esize || 0) < 1) return false;
-        i = pickUpgradeIndex(api.character.items, api.G);
+        riskKeys = riskUpgradeKeys();
+        i = pickUpgradeIndex(api.character.items, api.G, allowBag);
         if (i < 0) return false;
       }
       if (!(await goUpgradeNpc())) {
         api.game_log("gear:upgrade_path_fail");
         return false;
       }
-      const batchSize = api.character.items.filter((x) => {
+      const batchSize = api.character.items.filter((x, slot) => {
         if (!x || scrollFor(x, api.G) !== scn) return false;
-        return eligibleUpgrade(x, api.G) && upgradeChance(x) >= MIN_UPGRADE_CHANCE;
+        return upgradeReady(x, api.G) && allowBag(x, slot);
       }).length;
-      const scrollQty = Math.max(1, Math.min(batchSize, Math.floor(spendableGold() / price)));
+      const batchCap = scn === "scroll0" ? batchSize : Math.min(batchSize, 2);
+      const scrollQty = Math.max(1, Math.min(batchCap, Math.floor(spendableGold() / price)));
       const br = await api.buy(scn, scrollQty);
       if (br && br.failed) {
         api.game_log("gear:scroll_buy_fail");
@@ -2371,9 +2448,12 @@ function bootMerchant(api, opts) {
       }
       api.game_log("gear:buy " + scn);
       sci = api.character.items.findIndex((x) => x && x.name === scn);
-      i = pickUpgradeIndex(api.character.items, api.G);
+      riskKeys = riskUpgradeKeys();
+      i = pickUpgradeIndex(api.character.items, api.G, allowBag);
       if (sci < 0 || i < 0) return false;
+      if (scrollFor(api.character.items[i], api.G) !== scn) return false;
     }
+    risky = isRiskUpgrade(api.character.items[i]);
     if (typeof api.upgrade !== "function") return false;
     if (!(await goUpgradeNpc())) {
       api.game_log("gear:upgrade_path_fail");
@@ -2381,7 +2461,12 @@ function bootMerchant(api, opts) {
     }
     try {
       const preview = await api.upgrade(i, sci, null, true);
-      if (!preview || preview.chance == null || preview.chance < MIN_UPGRADE_CHANCE) {
+      if (
+        !preview ||
+        preview.chance == null ||
+        preview.chance <= 0 ||
+        (!risky && preview.chance < MIN_UPGRADE_CHANCE)
+      ) {
         const cur = api.character.items[i];
         logUpgradeSkip(
           (cur && cur.name) || "?",
@@ -2394,20 +2479,31 @@ function bootMerchant(api, opts) {
       api.game_log("gear:upgrade_preview_fail");
       return false;
     }
-    i = pickUpgradeIndex(api.character.items, api.G);
+    riskKeys = riskUpgradeKeys();
+    i = pickUpgradeIndex(api.character.items, api.G, allowBag);
     sci = api.character.items.findIndex((x) => x && x.name === scn);
     if (i < 0 || sci < 0) return false;
+    if (scrollFor(api.character.items[i], api.G) !== scn) return false;
+    risky = isRiskUpgrade(api.character.items[i]);
     const before = api.character.items[i];
     const nm = before.name;
     const lv0 = before.level || 0;
     try {
       const r = await api.upgrade(i, sci);
       if (r && r.failed) {
+        if (risky && r.reason === "destroyed") {
+          api.game_log("gear:risk_destroyed " + nm + "@" + lv0);
+          return true;
+        }
         api.game_log("gear:upgrade_fail " + nm + "@" + lv0);
         return false;
       }
       const after = api.character.items[i];
       const lv1 = after && after.name === nm ? after.level || 0 : -1;
+      if (risky && lv1 < 0) {
+        api.game_log("gear:risk_destroyed " + nm + "@" + lv0);
+        return true;
+      }
       api.game_log("gear:upgrade " + nm + "@" + lv0 + "->" + lv1);
       return true;
     } catch (e) {
@@ -2612,6 +2708,7 @@ function bootMerchant(api, opts) {
       } catch (e) {
         api.game_log("bank:combine_err " + ((e && e.message) || e));
       }
+      if (await tryUpgradeOne()) return;
       try {
         if (await tryStallOne()) return;
       } catch (e) {

@@ -5,6 +5,7 @@
  */
 const assert = require("assert");
 const { bootParty } = require("../src/boot_party");
+const { scrollFor, upgradeReady } = require("../src/gear");
 const { upgradeChance } = require("../src/gear");
 const { MIN_UPGRADE_CHANCE } = require("../src/constants");
 
@@ -18,6 +19,120 @@ function advance(p, n) {
     for (let i = 0; i < n; i++) await p.tickAll();
   })();
 }
+
+async function seedRiskAds(p, slots) {
+  const ctypes = { Jazwyn: "warrior", Sarene: "mage", Zarook: "priest" };
+  const armor = {
+    Jazwyn: { helmet: "mwhelmet", chest: "mwarmor", pants: "mwpants", shoes: "mwboots", gloves: "mwgloves" },
+    Sarene: { helmet: "mmhat", chest: "mmarmor", pants: "mmpants", shoes: "mmshoes", gloves: "mmgloves" },
+    Zarook: { helmet: "mphat", chest: "mparmor", pants: "mppants", shoes: "mpshoes", gloves: "mpgloves" },
+  };
+  const senders = {};
+  for (const name of Object.keys(ctypes)) {
+    const sender =
+      (p.bots[name] && p.bots[name].api) ||
+      p.world.spawn({ name, ctype: ctypes[name], map: "main", real_x: 0, real_y: 0 });
+    senders[name] = sender;
+    const safeSlots = {};
+    for (const slot of Object.keys(armor[name])) safeSlots[slot] = { name: armor[name][slot], level: 0 };
+    Object.assign(safeSlots, (slots && slots[name]) || {});
+    Object.assign(sender.character.slots, safeSlots);
+    await sender.send_cm("Puppygirl", {
+      gear_ad: 1,
+      inventory_ad: 1,
+      v: 2,
+      revision: 1,
+      name,
+      ctype: ctypes[name],
+      slots: safeSlots,
+      bag: [],
+      esize: 42,
+    });
+  }
+  return senders;
+}
+
+test("unit: risky liquidation uses item-grade scrolls without weakening ordinary upgrades", () => {
+  const p = bootParty({ pack: "armadillo", pots: 10, members: ["Puppygirl"] });
+  const G = p.bots.Puppygirl.api.G;
+  assert.strictEqual(scrollFor({ name: "fireblade", level: 0 }, G), "scroll1");
+  assert.strictEqual(scrollFor({ name: "sshield", level: 3 }, G), "scroll0");
+  assert.strictEqual(scrollFor({ name: "sshield", level: 4 }, G), "scroll1");
+  assert.strictEqual(G.items.scroll1.g, 40000);
+  assert.strictEqual(G.items.scroll2.g, 1600000);
+  assert.ok(upgradeReady({ name: "fireblade", level: 4 }, G), "configured surplus may take a low-chance risk");
+  assert.ok(!upgradeReady({ name: "gloves", level: 3 }, G), "ordinary gear keeps the conservative gate");
+});
+
+test("adversary: a surviving risky upgrade lists only after reaching +5", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 10000000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  api._now = () => 0;
+  for (let i = 0; i < c.items.length; i++) c.items[i] = null;
+  c.items[0] = { name: "stand0" };
+  c.items[1] = { name: "hpot1", q: 200 };
+  c.items[2] = { name: "mpot1", q: 200 };
+  c.items[3] = { name: "firestaff", level: 4 };
+  c.items[4] = { name: "scroll1", q: 2 };
+  c.esize = c.items.filter((x) => !x).length;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+  await seedRiskAds(p);
+  const scrolls = [];
+  api.upgrade = async (itemI, scrollI, offering, calculate) => {
+    const it = c.items[itemI];
+    const scroll = c.items[scrollI];
+    if (calculate) return { chance: 0.6, level: it.level || 0 };
+    scrolls.push(scroll.name);
+    if ((scroll.q || 1) <= 1) {
+      c.items[scrollI] = null;
+      c.esize++;
+    } else {
+      scroll.q--;
+    }
+    it.level = (it.level || 0) + 1;
+    return { success: true, level: it.level, chance: 0.6 };
+  };
+
+  for (let i = 0; i < 240; i++) {
+    await p.tickAll();
+    if (Object.values(c.slots).some((x) => x && x.name === "firestaff" && x.price)) break;
+  }
+
+  const msgs = api.log.game.map((g) => g.m);
+  const listed = Object.values(c.slots).find((x) => x && x.name === "firestaff" && x.price);
+  assert.deepStrictEqual(scrolls, ["scroll1"], "fiery equipment uses its grade-one scroll");
+  assert.ok(msgs.some((m) => m === "gear:upgrade firestaff@4->5"));
+  assert.ok(!msgs.some((m) => /^stall:list firestaff@[0-4]\b/.test(m)), "unfinished stock is withheld");
+  assert.ok(listed && listed.level === 5, "the +5 survivor is listed");
+  assert.ok(listed.price >= 7257600, "the survivor is repriced for its +5 level");
+});
+
+test("adversary: legacy low-level fiery listings are reclaimed for upgrading", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const api = p.bots.Puppygirl.api;
+  const c = api.character;
+  api._now = () => 0;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
+  c.stand = true;
+  c.slots.trade1 = { name: "firebow", level: 0, price: 213600 };
+  c._bank = { gold: 0, items0: new Array(42).fill(null) };
+  await seedRiskAds(p);
+
+  for (let i = 0; i < 120; i++) {
+    await p.tickAll();
+    if (api.log.game.some((g) => g.m === "stall:risk_reclaim firebow@0")) break;
+  }
+
+  assert.ok(api.log.game.some((g) => g.m === "stall:risk_reclaim firebow@0"));
+  assert.ok(!c.slots.trade1, "the obsolete listing leaves the trade slot");
+  assert.ok(c.items.some((x) => x && x.name === "firebow" && (x.level || 0) === 0));
+});
 
 test("adversary: below-gate gear must park while vendor sells — no upgrade_skip spam", async () => {
   assert.ok(upgradeChance({ level: 3 }) < MIN_UPGRADE_CHANCE);
@@ -127,41 +242,57 @@ test("adversary: occupied trade slot arg returns slot_occuppied (sim matches liv
   assert.ok(r && r.failed && r.reason === "slot_occuppied", "expected slot_occuppied, got " + JSON.stringify(r));
 });
 
-test("adversary: stall lists only surplus fiery blades and spiked shields", async () => {
-  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Jazwyn", "Puppygirl"] });
-  const j = p.bots.Jazwyn.api.character;
+test("adversary: risk failures collapse surplus while a useful fighter upgrade is protected", async () => {
+  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
   const c = api.character;
-  j.slots.mainhand = { name: "fireblade", level: 1 };
-  j.slots.helmet = { name: "mwhelmet", level: 0 };
-  j.slots.chest = { name: "mwarmor", level: 0 };
-  j.slots.pants = { name: "mwpants", level: 0 };
-  j.slots.shoes = { name: "mwboots", level: 0 };
-  j.slots.gloves = { name: "mwgloves", level: 0 };
-  j.slots.offhand = { name: "sshield", level: 5 };
+  api._now = () => 0;
+  const jazwynSlots = {
+    mainhand: { name: "fireblade", level: 1 },
+    helmet: { name: "mwhelmet", level: 0 },
+    chest: { name: "mwarmor", level: 0 },
+    pants: { name: "mwpants", level: 0 },
+    shoes: { name: "mwboots", level: 0 },
+    gloves: { name: "mwgloves", level: 0 },
+    offhand: { name: "sshield", level: 5 },
+  };
   for (let i = 0; i < c.items.length; i++) c.items[i] = null;
   c.items[0] = { name: "stand0" };
   c.items[1] = { name: "hpot1", q: 200 };
   c.items[2] = { name: "mpot1", q: 200 };
   c.items[3] = { name: "fireblade", level: 0 };
   c.items[4] = { name: "sshield", level: 2 };
+  c.items[5] = { name: "firestaff", level: 2 };
   c.esize = c.items.filter((x) => !x).length;
-  c.map = j.map = "main";
-  c.real_x = c.x = j.real_x = j.x = 40;
-  c.real_y = c.y = j.real_y = j.y = -20;
+  c.map = "main";
+  c.real_x = c.x = 40;
+  c.real_y = c.y = -20;
   c._bank = { gold: 0, items0: [{ name: "sshield", level: 2 }].concat(new Array(41).fill(null)) };
+  const senders = await seedRiskAds(p, { Jazwyn: jazwynSlots });
+  const j = senders.Jazwyn.character;
 
-  for (let i = 0; i < 240; i++) {
+  for (let i = 0; i < 480; i++) {
     await p.tickAll();
-    const listed = Object.values(c.slots).filter((x) => x && x.price);
-    if (listed.some((x) => x.name === "fireblade") && listed.some((x) => x.name === "sshield")) break;
+    const destroyed = api.log.game.filter((g) => /^gear:risk_destroyed /.test(g.m));
+    if (destroyed.some((g) => /firestaff@2/.test(g.m)) && destroyed.some((g) => /sshield@2/.test(g.m))) break;
   }
 
-  const listed = Object.values(c.slots).filter((x) => x && x.price);
-  assert.strictEqual(listed.filter((x) => x.name === "fireblade").length, 1, "sell one spare blade");
-  assert.strictEqual(listed.filter((x) => x.name === "sshield").length, 1, "keep two of three shields");
-  assert.ok(listed.find((x) => x.name === "fireblade").price >= 115200);
-  assert.ok(listed.find((x) => x.name === "sshield").price >= 200000);
+  const destroyed = api.log.game.map((g) => g.m).filter((m) => /^gear:risk_destroyed /.test(m));
+  assert.ok(
+    destroyed.some((m) => /firestaff@2/.test(m)),
+    "surplus fiery stock is deliberately risked; logs=" +
+      api.log.game.map((g) => g.m).filter((m) => /^gear:/.test(m)).join(" | ")
+  );
+  assert.ok(destroyed.some((m) => /sshield@2/.test(m)), "only one surplus shield is deliberately risked");
+  assert.ok(!destroyed.some((m) => /fireblade/.test(m)), "a newly useful fighter upgrade is not destroyed");
+  assert.ok(
+    c.items.some((x) => x && x.name === "fireblade" && (x.level || 0) === 2),
+    "the newly useful fighter upgrade remains reserved"
+  );
+  assert.ok(
+    c.items.concat(...Object.values(c._bank).filter(Array.isArray)).some((x) => x && x.name === "sshield"),
+    "the second reserved shield remains"
+  );
   assert.strictEqual(j.slots.mainhand.name, "fireblade");
   assert.strictEqual(j.slots.offhand.name, "sshield");
 });
@@ -226,7 +357,7 @@ test("adversary: stall delivers the strongest upgrade before listing displaced g
   c.map = j.map = "main";
   c.real_x = c.x = j.real_x = j.x = 40;
   c.real_y = c.y = j.real_y = j.y = -20;
-  c._bank = { gold: 0, items0: [{ name: "fireblade", level: 0 }].concat(new Array(41).fill(null)) };
+  c._bank = { gold: 0, items0: [{ name: "fireblade", level: 5 }].concat(new Array(41).fill(null)) };
 
   for (let i = 0; i < 240; i++) {
     await p.tickAll();
@@ -242,7 +373,7 @@ test("adversary: stall delivers the strongest upgrade before listing displaced g
 
   const listed = Object.values(c.slots).find((x) => x && x.name === "fireblade" && x.price);
   assert.ok(listed, "a surplus blade must be listed");
-  assert.ok((listed.level || 0) < 5, "only a weaker copy is listed");
+  assert.strictEqual(listed.level, 5, "only a completed +5 copy is listed");
   assert.strictEqual(j.slots.mainhand.level, 5, "strongest copy reaches the fighter first");
   const held = c.items.concat(j.items, Object.values(c.slots), Object.values(j.slots)).filter(Boolean);
   assert.ok(held.some((x) => x.name === "fireblade" && x.level === 5 && !x.price), "strongest copy retained");
@@ -282,25 +413,25 @@ test("adversary: saturated stall rotates its cheapest listing for higher-value s
   c.items[0] = { name: "stand0" };
   c.items[1] = { name: "hpot1", q: 200 };
   c.items[2] = { name: "mpot1", q: 200 };
-  c.items[3] = { name: "dagger", level: 1 };
+  c.items[3] = { name: "dagger", level: 5 };
   c.esize = c.items.filter((x) => !x).length;
   c.map = "main";
   c.real_x = c.x = 40;
   c.real_y = c.y = -20;
   c.stand = true;
   for (let i = 1; i <= 16; i++) {
-    c.slots["trade" + i] = { name: "helmet1", level: 0, price: 38400 };
+    c.slots["trade" + i] = { name: "gloves", level: 0, price: 1200 };
   }
   c._bank = { gold: 0, items0: new Array(42).fill(null) };
 
   for (let i = 0; i < 160; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => /^stall:rotate helmet1@0 -> dagger@1/.test(g.m))) break;
+    if (api.log.game.some((g) => /^stall:rotate gloves@0 -> dagger@5/.test(g.m))) break;
   }
 
   const listed = Object.values(c.slots).filter((x) => x && x.price);
-  assert.ok(listed.some((x) => x.name === "dagger" && x.level === 1), "lists higher-value dagger");
-  assert.strictEqual(listed.filter((x) => x.name === "helmet1").length, 15, "replaces one low-value listing");
+  assert.ok(listed.some((x) => x.name === "dagger" && x.level === 5), "lists higher-value dagger");
+  assert.strictEqual(listed.filter((x) => x.name === "gloves").length, 15, "replaces one low-value listing");
 });
 
 test("adversary: saturated stall pulls a higher-value bank replacement", async () => {
@@ -317,7 +448,7 @@ test("adversary: saturated stall pulls a higher-value bank replacement", async (
   c.real_y = c.y = -20;
   c.stand = true;
   for (let i = 1; i <= 16; i++) {
-    c.slots["trade" + i] = { name: "helmet1", level: 0, price: 38400 };
+    c.slots["trade" + i] = { name: "gloves", level: 0, price: 1200 };
   }
   c._bank = {
     gold: 0,
@@ -326,7 +457,7 @@ test("adversary: saturated stall pulls a higher-value bank replacement", async (
 
   for (let i = 0; i < 240; i++) {
     await p.tickAll();
-    if (api.log.game.some((g) => /^stall:rotate helmet1@0 -> dagger@5/.test(g.m))) break;
+    if (api.log.game.some((g) => /^stall:rotate gloves@0 -> dagger@5/.test(g.m))) break;
   }
 
   const listed = Object.values(c.slots).filter((x) => x && x.price);
@@ -334,7 +465,7 @@ test("adversary: saturated stall pulls a higher-value bank replacement", async (
     listed.some((x) => x.name === "dagger" && x.level === 5),
     "retrieves and lists higher-value bank gear"
   );
-  assert.strictEqual(listed.filter((x) => x.name === "helmet1").length, 15);
+  assert.strictEqual(listed.filter((x) => x.name === "gloves").length, 15);
 });
 
 test("adversary: stale local trade slot is resynced instead of retried forever", async () => {

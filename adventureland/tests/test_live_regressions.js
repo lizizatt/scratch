@@ -112,7 +112,7 @@ test("live: solo merchant does not spam upgrade_skip on bank low-chance gear", a
   );
 });
 
-test("live: reserved below-gate target skip is rate-limited and retained", async () => {
+test("live: unverified reserved risk target is retained without gambling", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
   const api = p.bots.Puppygirl.api;
   api.character.gold = 500000;
@@ -124,8 +124,7 @@ test("live: reserved below-gate target skip is rate-limited and retained", async
   for (let n = 0; n < 60; n++) await p.tickAll();
 
   const skips = api.log.game.filter((g) => /^gear:upgrade_skip/.test(g.m));
-  assert.ok(skips.length >= 1, "expected at least one upgrade_skip");
-  assert.ok(skips.length <= 1, "skip log once-only, got " + skips.length);
+  assert.strictEqual(skips.length, 0, "risk lane must wait for fresh ownership advertisements");
   assert.ok(
     api.character.items.some((x) => x && x.name === "sshield" && (x.level || 0) === 3),
     "protected shield remains held"

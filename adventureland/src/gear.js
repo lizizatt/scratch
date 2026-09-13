@@ -9,12 +9,13 @@ const {
   GEAR_TARGETS,
   GIFT_TTL_MS,
   SCROLL0_ALLOW,
+  STALL_SELL,
   MAX_SAFE_UPGRADE,
   MIN_UPGRADE_CHANCE,
   VENDOR_GEAR,
 } = require("./constants");
 
-const DENY_UPGRADE = ["candycanesword", "carrotsword", "epyjamas", "eears", "eslippers", "xmashat", "fireblade"];
+const DENY_UPGRADE = ["candycanesword", "carrotsword", "epyjamas", "eears", "eslippers", "xmashat"];
 const SLOT_VENDOR = {
   gloves: "gloves",
   shoes: "shoes",
@@ -515,10 +516,22 @@ function upgradeChance(it) {
   return Math.max(0.5, 1 - lv * 0.08);
 }
 
+function riskUpgradeTarget(it) {
+  if (!it) return 0;
+  const rule = STALL_SELL.find((x) => x.name === it.name);
+  return (rule && rule.upgradeTo) || 0;
+}
+
+function isRiskUpgrade(it) {
+  const target = riskUpgradeTarget(it);
+  return target > 0 && (it.level || 0) < target;
+}
+
 function eligibleUpgrade(it, G) {
   if (!it) return false;
   const g = itemDef(G, it.name);
   if (!g.upgrade || it.l) return false;
+  if (isRiskUpgrade(it)) return itemGrade(it, G) <= 2;
   if (DENY_UPGRADE.indexOf(it.name) >= 0) return false;
   if (SCROLL0_ALLOW.indexOf(it.name) < 0) return false;
   if (itemGrade(it, G) !== 0) return false;
@@ -527,16 +540,21 @@ function eligibleUpgrade(it, G) {
 
 function scrollFor(it, G) {
   if (!eligibleUpgrade(it, G)) return null;
-  return "scroll0";
+  return "scroll" + itemGrade(it, G);
 }
 
-function pickUpgradeIndex(items, G) {
+function upgradeReady(it, G) {
+  if (!eligibleUpgrade(it, G)) return false;
+  return isRiskUpgrade(it) || upgradeChance(it) >= MIN_UPGRADE_CHANCE;
+}
+
+function pickUpgradeIndex(items, G, allow) {
   let best = -1;
   let bl = 99;
   for (let i = 0; i < (items || []).length; i++) {
     const it = items[i];
-    if (!eligibleUpgrade(it, G)) continue;
-    if (upgradeChance(it) < MIN_UPGRADE_CHANCE) continue;
+    if (!upgradeReady(it, G)) continue;
+    if (allow && !allow(it, i)) continue;
     const lv = it.level || 0;
     if (lv < bl) {
       bl = lv;
@@ -599,8 +617,11 @@ module.exports = {
   itemDef,
   itemGrade,
   upgradeChance,
+  riskUpgradeTarget,
+  isRiskUpgrade,
   eligibleUpgrade,
   scrollFor,
+  upgradeReady,
   pickUpgradeIndex,
   planVendorBuy,
   MIN_UPGRADE_CHANCE,

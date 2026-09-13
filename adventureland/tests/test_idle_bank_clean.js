@@ -240,9 +240,41 @@ test("adversary: bank compound work is withdrawn and scrolled as one bounded bat
 });
 
 test("adversary: bank upgrade work is withdrawn and scrolled as one bounded batch", async () => {
-  const p = bootParty({ pack: "armadillo", pots: 200, gold: 500000, members: ["Puppygirl"] });
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 200,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
   const api = p.bots.Puppygirl.api;
   const m = api.character;
+  api._now = () => 0;
+  const armor = {
+    Jazwyn: { helmet: "mwhelmet", chest: "mwarmor", pants: "mwpants", shoes: "mwboots", gloves: "mwgloves" },
+    Sarene: { helmet: "mmhat", chest: "mmarmor", pants: "mmpants", shoes: "mmshoes", gloves: "mmgloves" },
+    Zarook: { helmet: "mphat", chest: "mparmor", pants: "mppants", shoes: "mpshoes", gloves: "mpgloves" },
+  };
+  for (const [name, ctype] of [
+    ["Jazwyn", "warrior"],
+    ["Sarene", "mage"],
+    ["Zarook", "priest"],
+  ]) {
+    const sender = p.world.spawn({ name, ctype, map: "main", real_x: 0, real_y: 0 });
+    const slots = {};
+    for (const slot of Object.keys(armor[name])) slots[slot] = { name: armor[name][slot], level: 0 };
+    if (name === "Jazwyn") slots.offhand = { name: "sshield", level: 5 };
+    await sender.send_cm("Puppygirl", {
+      gear_ad: 1,
+      inventory_ad: 1,
+      v: 2,
+      revision: 1,
+      name,
+      ctype,
+      slots,
+      bag: [],
+      esize: 42,
+    });
+  }
   for (let i = 0; i < m.items.length; i++) {
     if (m.items[i] && ["stand0", "hpot1", "mpot1"].indexOf(m.items[i].name) >= 0) continue;
     if (m.items[i]) {
@@ -251,7 +283,7 @@ test("adversary: bank upgrade work is withdrawn and scrolled as one bounded batc
     }
   }
   m._bank = { gold: 0, items0: new Array(42).fill(null) };
-  for (let i = 0; i < 3; i++) m._bank.items0[i] = { name: "sshield", level: 0 };
+  for (let i = 0; i < 4; i++) m._bank.items0[i] = { name: "sshield", level: 0 };
   m.map = "main";
   m.real_x = m.x = 40;
   m.real_y = m.y = -20;
@@ -261,9 +293,14 @@ test("adversary: bank upgrade work is withdrawn and scrolled as one bounded batc
     if (api.log.game.some((g) => /^gear:upgrade sshield@0/.test(g.m))) break;
   }
 
-  assert.strictEqual(api.log.retrieved.filter((x) => x.name === "sshield").length, 3);
+  assert.strictEqual(api.log.retrieved.filter((x) => x.name === "sshield").length, 4);
   const scroll = m.items.find((x) => x && x.name === "scroll0");
   assert.ok(scroll && scroll.q >= 2, "buys the upgrade batch scrolls together");
+  assert.strictEqual(
+    m.items.filter((x) => x && x.name === "sshield" && (x.level || 0) === 0).length,
+    3,
+    "one operation leaves the remaining batch and reserved copy untouched"
+  );
   assert.ok((m.esize || 0) >= 4, "batch withdrawal preserves logistics reserve");
 });
 

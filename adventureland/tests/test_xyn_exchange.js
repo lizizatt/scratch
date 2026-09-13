@@ -204,7 +204,7 @@ test("adversary: full bag lists surplus but defers stacked exchange while vault 
   c.items[1] = { name: "hpot1", q: 200 };
   c.items[2] = { name: "mpot1", q: 200 };
   c.items[3] = { name: "armorbox", q: 4 };
-  c.items[4] = { name: "t2bow", level: 0 };
+  c.items[4] = { name: "dagger", level: 5 };
   c.esize = 0;
   c.map = "main";
   c.real_x = c.x = 40;
@@ -220,7 +220,7 @@ test("adversary: full bag lists surplus but defers stacked exchange while vault 
 
   const msgs = api.log.game.map((g) => g.m);
   assert.ok(msgs.some((m) => m === "xyn:capacity_hold armorbox"), "full stacked exchange is deferred");
-  assert.ok(msgs.some((m) => /^stall:list t2bow@0/.test(m)), "bag item wins over earlier bank candidate");
+  assert.ok(msgs.some((m) => /^stall:list dagger@5/.test(m)), "ready bag item wins over bank work");
   assert.ok(!msgs.some((m) => m === "xyn:exchange armorbox"), "one bag slot is not enough reserve");
 });
 

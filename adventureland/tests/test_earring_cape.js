@@ -228,7 +228,7 @@ test("adversary: idle stall keeps 32 pixels clear of other stalls", async () => 
   const openX = m.real_x;
   const openY = m.real_y;
   const free = m.items.findIndex((it) => !it);
-  m.items[free] = { name: "dagger", level: 1 };
+  m.items[free] = { name: "candycanesword", level: 1 };
   m.esize--;
   for (let i = 0; i < 80; i++) await p.tickAll();
   assert.ok(
