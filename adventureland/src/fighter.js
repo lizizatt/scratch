@@ -213,7 +213,7 @@ function bootFighter(api, opts) {
   function runCombat(mtype) {
     if (!opts.combat) return;
     const lead = isLead();
-    opts.combat(mtype, { leadName: state.S.lead, isLead: lead }, api);
+    return opts.combat(mtype, { leadName: state.S.lead, isLead: lead }, api);
   }
 
   /** Lead seq must climb above anything heard (plan §6.6.6). */
@@ -1306,7 +1306,11 @@ function bootFighter(api, opts) {
     }
     publishSelf({ task: "farm" });
     if (opts.pre_combat && opts.pre_combat(api)) return;
-    runCombat(mtype);
+    const action = runCombat(mtype);
+    if (action === "blocked_path" && RARE_WHITELIST.indexOf(mtype) < 0) {
+      const pc = packCenter(mtype);
+      if (pc) await motion.goTo({ map: pc.map, x: pc.x, y: pc.y });
+    }
   }
 
   let mapEscapeAt = 0;

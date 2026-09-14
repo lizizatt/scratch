@@ -60,6 +60,26 @@ function visibleMonsters(api) {
     );
 }
 
+function distance(api, entity) {
+  if (api.parent && api.parent.distance) return api.parent.distance(api.character, entity);
+  const x = entity.real_x != null ? entity.real_x : entity.x;
+  const y = entity.real_y != null ? entity.real_y : entity.y;
+  return Math.hypot(x - api.character.real_x, y - api.character.real_y);
+}
+
+function approachPoint(api, target) {
+  return {
+    x: api.character.real_x + (target.real_x - api.character.real_x) / 2,
+    y: api.character.real_y + (target.real_y - api.character.real_y) / 2,
+  };
+}
+
+function canApproach(api, target) {
+  if (!target || api.is_in_range(target) || typeof api.can_move_to !== "function") return !!target;
+  const point = approachPoint(api, target);
+  return api.can_move_to(point.x, point.y);
+}
+
 function targetFor(api, mtype, dyn) {
   if (/^target(?:_|$)/.test(mtype || "")) {
     if (api.change_target) api.change_target(null);
@@ -69,14 +89,36 @@ function targetFor(api, mtype, dyn) {
   const lead = api.get_player(leadName);
   const isLead = dyn && dyn.isLead != null ? dyn.isLead : api.character.name === leadName;
   let target = null;
+  let blockedTarget = null;
   if (!isLead && lead && lead.target && api.get_monster) {
     target = api.get_monster(lead.target) || ((api.parent && api.parent.entities) || {})[lead.target];
   }
   if (!target && api.get_targeted_monster) target = api.get_targeted_monster();
-  if (!target || target.dead || target.type !== "monster" || (mtype && target.mtype !== mtype)) {
-    target =
-      api.get_nearest_monster({ type: mtype, no_target: true }) ||
-      api.get_nearest_monster({ type: mtype });
+  if (
+    target &&
+    !target.dead &&
+    target.type === "monster" &&
+    (!mtype || target.mtype === mtype) &&
+    !canApproach(api, target)
+  ) {
+    blockedTarget = target;
+  }
+  if (
+    !target ||
+    target.dead ||
+    target.type !== "monster" ||
+    (mtype && target.mtype !== mtype) ||
+    !canApproach(api, target)
+  ) {
+    const candidates = visibleMonsters(api)
+      .filter((monster) => !mtype || monster.mtype === mtype)
+      .sort((a, b) => {
+        const aClaimed = a.target && a.target !== api.character.name ? 1 : 0;
+        const bClaimed = b.target && b.target !== api.character.name ? 1 : 0;
+        return aClaimed - bClaimed || distance(api, a) - distance(api, b);
+      });
+    target = candidates.find((monster) => canApproach(api, monster));
+    if (!target) target = blockedTarget || candidates[0];
   }
   if (target && /^target(?:_|$)/.test(target.mtype || "")) target = null;
   if (!target && api.change_target) api.change_target(null);
@@ -92,10 +134,19 @@ function engage(api, target, useCharge) {
   api.set_message("Hunt " + target.mtype);
   if (!api.is_in_range(target)) {
     if (useCharge && skillReady(api, "charge", ROTATION.warriorReserve)) api.use_skill("charge");
-    api.move(
-      api.character.real_x + (target.real_x - api.character.real_x) / 2,
-      api.character.real_y + (target.real_y - api.character.real_y) / 2
-    );
+    const point = approachPoint(api, target);
+    if (api.can_move_to && !api.can_move_to(point.x, point.y)) {
+      api.change_target(null);
+      const state = api.character._rotation || (api.character._rotation = {});
+      const at = now(api);
+      const lastBlocked = state.lastBlockedPathAt == null ? -Infinity : state.lastBlockedPathAt;
+      if (at - lastBlocked >= 5000) {
+        api.game_log("combat_path_blocked " + target.mtype);
+        state.lastBlockedPathAt = at;
+      }
+      return "blocked_path";
+    }
+    api.move(point.x, point.y);
     return useCharge ? "charge_move" : "move";
   }
   if (api.can_attack(target)) {
@@ -281,6 +332,7 @@ module.exports = {
   conditionActive,
   skillReady,
   skillInRange,
+  canApproach,
   targetFor,
   warriorRotation,
   mageRotation,

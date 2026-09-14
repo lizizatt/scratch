@@ -152,6 +152,63 @@ test("sim no_target selection skips monsters claimed by another fighter", () => 
   assert.strictEqual(api.get_nearest_monster({ type: "armadillo", no_target: true }).id, free.id);
 });
 
+test("combat skips a blocked monster and attacks a reachable alternative", () => {
+  const p = readyParty();
+  const api = p.bots.Jazwyn.api;
+  for (const monster of Object.values(api.parent.entities)) {
+    if (monster && monster.type === "monster") monster.dead = true;
+  }
+  const here = api.character;
+  const blocked = p.world.spawnMonster(
+    "US/III",
+    here.map,
+    "armadillo",
+    { x: here.real_x + 80, y: here.real_y },
+    "blocked"
+  );
+  const reachable = p.world.spawnMonster(
+    "US/III",
+    here.map,
+    "armadillo",
+    { x: here.real_x, y: here.real_y + 30 },
+    "reachable"
+  );
+  const originalCanMoveTo = api.can_move_to;
+  api.can_move_to = (x, y) => y !== here.real_y && originalCanMoveTo(x, y);
+
+  const action = warriorRotation(api, "armadillo", { leadName: "Jazwyn", isLead: true });
+  assert.ok(action === "attack" || action === "wait");
+  assert.strictEqual(api.character.target, reachable.id);
+  assert.notStrictEqual(api.character.target, blocked.id);
+});
+
+test("combat reports an unreachable target without repeating failed movement", () => {
+  const p = readyParty();
+  const api = p.bots.Jazwyn.api;
+  const monster = nearest(p, "Jazwyn");
+  for (const entity of Object.values(api.parent.entities)) {
+    if (entity && entity.type === "monster" && entity !== monster) entity.dead = true;
+  }
+  api.change_target(monster);
+  api.can_move_to = () => false;
+
+  assert.strictEqual(
+    warriorRotation(api, "armadillo", { leadName: "Jazwyn", isLead: true }),
+    "blocked_path"
+  );
+  assert.strictEqual(api.character.target, null);
+  assert.strictEqual(api.log.moved.length, 0);
+  assert.strictEqual(
+    api.log.game.filter((entry) => entry.m === "combat_path_blocked armadillo").length,
+    1
+  );
+  warriorRotation(api, "armadillo", { leadName: "Jazwyn", isLead: true });
+  assert.strictEqual(
+    api.log.game.filter((entry) => entry.m === "combat_path_blocked armadillo").length,
+    1
+  );
+});
+
 test("training dummies are never valid combat or persisted farm targets", async () => {
   const p = readyParty();
   const bot = p.bots.Jazwyn;

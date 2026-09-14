@@ -73,6 +73,41 @@ test("scenario: farm combat — tank melee, kills, respawns, formation", async (
   assert.ok(packMobs.length >= 3, "pack size=" + packMobs.length);
 });
 
+test("scenario: desert basin farm routes, kills, and avoids reach loops", async () => {
+  const p = bootParty({ pack: "gscorpion", pots: 200, level: 61 });
+  await p.runFor(5 * 60 * 1000);
+  const fighters = ["Jazwyn", "Sarene", "Zarook"];
+  const kills = fighters.reduce(
+    (sum, name) => sum + p.bots[name].api.log.game.filter((entry) => /^kill gscorpion/.test(entry.m)).length,
+    0
+  );
+  assert.ok(kills >= 1, "expected giant-scorpion kills, got " + kills);
+  for (const name of fighters) {
+    const api = p.bots[name].api;
+    assert.strictEqual(api.character.map, "desertland", name + " should reach desertland");
+    assert.ok(
+      !api.log.game.some((entry) => /can't reach|path_fail|no_path|smart_fail/.test(entry.m)),
+      name + " must not loop on blocked desert paths"
+    );
+  }
+});
+
+test("scenario: blocked desert combat approach reroutes the leader into the basin", async () => {
+  const p = bootParty({ pack: "gscorpion", pots: 200, level: 61 });
+  const api = p.bots.Jazwyn.api;
+  const safe = { map: "desertland", x: 391, y: -1200 };
+  assert.ok((await api.smart_move(safe)).success);
+  await p.bots.Jazwyn.ctrl.tick();
+
+  const center = { x: 391, y: -1422 };
+  assert.ok(
+    Math.hypot(api.character.real_x - center.x, api.character.real_y - center.y) < 5,
+    "leader should route around the wall to the pack center"
+  );
+  assert.ok(api.log.game.some((entry) => entry.m === "combat_path_blocked gscorpion"));
+  assert.ok(!api.log.game.some((entry) => entry.m === "can't reach"));
+});
+
 
 test("scenario: dry pots → merchant delivery → dlv_done", async () => {
   const p = bootParty({ pack: "armadillo", pots: 0, gold: 50000 });

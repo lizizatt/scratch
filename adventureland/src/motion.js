@@ -98,6 +98,20 @@ function createMotion(api, opts) {
     return true;
   }
 
+  async function smartMoveTo(dest) {
+    if (dest && dest.map && dest.map !== api.character.map && dest.x != null && dest.y != null) {
+      let entry;
+      try {
+        entry = await api.smart_move({ map: dest.map });
+      } catch (e) {
+        entry = { failed: true, reason: (e && e.reason) || (e && e.message) || "entry_failed" };
+      }
+      if (entry && entry.failed) return api.smart_move(dest);
+      if (api.character.map !== dest.map) return { failed: true, reason: "wrong_map" };
+    }
+    return api.smart_move(dest);
+  }
+
   async function waitParty(now, ms) {
     waitUntil = now + (ms || WAIT_PARTY_MS);
     api.game_log("wait_party");
@@ -127,7 +141,7 @@ function createMotion(api, opts) {
     if (map === api.character.map && dist(api.character, { x, y }) <= FORM_R_IN) return true;
     movingTask = true;
     try {
-      const r = await api.smart_move({ map, x, y });
+      const r = await smartMoveTo({ map, x, y });
       if (r && r.failed) api.game_log("smart_fail " + (r.reason || "fail"));
       return !(r && r.failed);
     } catch (e) {
@@ -170,12 +184,27 @@ function createMotion(api, opts) {
       try {
         api.stop("smart");
       } catch (e) {}
-      if (d > FORM_FAR) api.move(slot.x, slot.y);
+      if (d > FORM_FAR) {
+        if (!api.can_move_to || api.can_move_to(slot.x, slot.y)) api.move(slot.x, slot.y);
+        else {
+          movingTask = true;
+          try {
+            const r = await smartMoveTo(slot);
+            if (r && r.failed) api.game_log("smart_fail " + (r.reason || "fail"));
+            return !(r && r.failed);
+          } catch (e) {
+            api.game_log("smart_fail " + ((e && e.reason) || (e && e.message) || "err"));
+            return false;
+          } finally {
+            movingTask = false;
+          }
+        }
+      }
       return true;
     }
     movingTask = true;
     try {
-      const r = await api.smart_move({ map: slot.map, x: slot.x, y: slot.y });
+      const r = await smartMoveTo({ map: slot.map, x: slot.x, y: slot.y });
       if (r && r.failed) api.game_log("smart_fail " + (r.reason || "fail"));
       return !(r && r.failed);
     } catch (e) {
@@ -189,7 +218,7 @@ function createMotion(api, opts) {
   async function goTo(dest) {
     movingTask = true;
     try {
-      const r = await api.smart_move(dest);
+      const r = await smartMoveTo(dest);
       if (r && r.failed) api.game_log("smart_fail " + (r.reason || "fail"));
       return r;
     } catch (e) {
