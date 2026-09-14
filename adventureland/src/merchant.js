@@ -128,6 +128,7 @@ function bootMerchant(api, opts) {
   const STALL_CLEARANCE = 32;
   const STALL_SPOT_STEP = 40;
   const STALL_SPOT_RADIUS = 4;
+  const STALL_ZONE_RADIUS = STALL_SPOT_STEP * STALL_SPOT_RADIUS;
   /** Once-only gear:upgrade_skip logs per name@level (burn-in 60s spam). */
   const upgradeSkipLogAt = {};
   let bankHintPrimed = false;
@@ -1690,7 +1691,10 @@ function bootMerchant(api, opts) {
   async function ensureStallClearance() {
     const cx = api.character.real_x != null ? api.character.real_x : api.character.x;
     const cy = api.character.real_y != null ? api.character.real_y : api.character.y;
-    if (api.character.map === PLAZA.map && stallSpotClear(cx, cy)) return true;
+    const inStallZone =
+      api.character.map === PLAZA.map &&
+      Math.hypot(cx - PLAZA.x, cy - PLAZA.y) <= STALL_ZONE_RADIUS;
+    if (inStallZone && stallSpotClear(cx, cy)) return true;
     closeStandIfOpen();
     for (const spot of stallSpots()) {
       if (!stallSpotClear(spot.x, spot.y)) continue;

@@ -293,4 +293,35 @@ test("adversary: idle stall keeps 32 pixels clear of Ponty and every map NPC", a
   }
 });
 
+test("adversary: merchant leaves remote work NPCs before opening her stall", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 100,
+    gold: 500000,
+    members: ["Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const m = mApi.character;
+  mApi.G.maps.main.npcs = [];
+  mApi.G.maps.main.seasonal_npcs = [];
+  m._bank = { gold: 0, items0: new Array(42).fill(null) };
+  m.map = "main";
+  m.real_x = m.x = -207;
+  m.real_y = m.y = -220;
+  m.stand = false;
+  p.world.ponty = [];
+
+  for (let i = 0; i < 200 && !m.stand; i++) await p.tickAll();
+
+  assert.strictEqual(m.stand, true, "merchant should open in the dedicated plaza stall zone");
+  assert.ok(
+    Math.hypot(m.real_x - 40, m.real_y + 20) <= 160,
+    "merchant must not open beside a remote work NPC"
+  );
+  assert.ok(
+    Math.hypot(m.real_x + 207, m.real_y + 220) > 32,
+    "merchant remained on top of the repair NPC"
+  );
+});
+
 module.exports = { tests };
