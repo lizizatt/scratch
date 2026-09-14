@@ -341,6 +341,14 @@ test("rejected live combat actions are handled and rate-limited", async () => {
   assert.strictEqual(logs.length, 2, "persistent failures remain visible at a bounded cadence");
 });
 
+test("browser transition without a character pauses every rotation safely", () => {
+  const api = { character: undefined, smart: { moving: false } };
+  assert.strictEqual(warriorRotation(api, "croc", { isLead: true }), "blocked");
+  assert.strictEqual(mageRotation(api, "croc", { isLead: false }), "blocked");
+  assert.strictEqual(priestPreCombat(api), false);
+  assert.strictEqual(priestRotation(api, "croc", { isLead: false }), "blocked");
+});
+
 test("30-minute rotation burn stays within potion and delivery budgets", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, level: 61 });
   const stats = {

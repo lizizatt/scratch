@@ -102,23 +102,33 @@ function visibleMonsters(api) {
 }
 
 function distance(api, entity) {
-  if (api.parent && api.parent.distance) return api.parent.distance(api.character, entity);
+  const self = api && api.character;
+  if (!self || !entity) return Infinity;
+  if (api.parent && api.parent.distance) return api.parent.distance(self, entity);
   const x = entity.real_x != null ? entity.real_x : entity.x;
   const y = entity.real_y != null ? entity.real_y : entity.y;
-  return Math.hypot(x - api.character.real_x, y - api.character.real_y);
+  const selfX = self.real_x != null ? self.real_x : self.x;
+  const selfY = self.real_y != null ? self.real_y : self.y;
+  return Math.hypot(x - selfX, y - selfY);
 }
 
 function approachPoint(api, target) {
+  const self = api && api.character;
+  if (!self || !target) return null;
+  const selfX = self.real_x != null ? self.real_x : self.x;
+  const selfY = self.real_y != null ? self.real_y : self.y;
+  const targetX = target.real_x != null ? target.real_x : target.x;
+  const targetY = target.real_y != null ? target.real_y : target.y;
   return {
-    x: api.character.real_x + (target.real_x - api.character.real_x) / 2,
-    y: api.character.real_y + (target.real_y - api.character.real_y) / 2,
+    x: selfX + (targetX - selfX) / 2,
+    y: selfY + (targetY - selfY) / 2,
   };
 }
 
 function canApproach(api, target) {
   if (!target || api.is_in_range(target) || typeof api.can_move_to !== "function") return !!target;
   const point = approachPoint(api, target);
-  return api.can_move_to(point.x, point.y);
+  return !!point && api.can_move_to(point.x, point.y);
 }
 
 function targetFor(api, mtype, dyn) {
@@ -167,6 +177,7 @@ function targetFor(api, mtype, dyn) {
 }
 
 function engage(api, target, useCharge) {
+  if (!api.character) return "idle";
   if (!target) {
     setRotationMessage(api, "Idle");
     return "idle";
@@ -200,7 +211,7 @@ function engage(api, target, useCharge) {
 }
 
 function warriorRotation(api, mtype, dyn) {
-  if (api.character.rip || (api.smart && api.smart.moving)) return "blocked";
+  if (!api.character || api.character.rip || (api.smart && api.smart.moving)) return "blocked";
   const at = now(api);
   const state = api.character._rotation || (api.character._rotation = {});
   const attackers = visibleMonsters(api).filter((monster) => monster.target === api.character.name);
@@ -232,7 +243,7 @@ function warriorRotation(api, mtype, dyn) {
 }
 
 function mageRotation(api, mtype, dyn) {
-  if (api.character.rip || (api.smart && api.smart.moving)) return "blocked";
+  if (!api.character || api.character.rip || (api.smart && api.smart.moving)) return "blocked";
   const at = now(api);
   const tank = api.get_player("Jazwyn");
   const priest = api.get_player("Zarook");
@@ -284,7 +295,7 @@ function mageRotation(api, mtype, dyn) {
 }
 
 function priestPreCombat(api) {
-  if (api.character.rip || (api.smart && api.smart.moving)) return false;
+  if (!api.character || api.character.rip || (api.smart && api.smart.moving)) return false;
   const party = visibleFighters(api);
   const dead = party.find((member) => member.rip);
   if (dead && dead.hp < dead.max_hp && api.can_heal(dead)) {
@@ -336,7 +347,7 @@ function priestPreCombat(api) {
 }
 
 function priestRotation(api, mtype, dyn) {
-  if (api.character.rip || (api.smart && api.smart.moving)) return "blocked";
+  if (!api.character || api.character.rip || (api.smart && api.smart.moving)) return "blocked";
   const mage = api.get_player("Sarene");
   if (
     mage &&
