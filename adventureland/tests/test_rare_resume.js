@@ -78,9 +78,9 @@ test("adversary: rare_kill mid !hunt bee→armadillo route resumes bee via smart
   p.bots.Jazwyn.ctrl.applyCmd({ cmd: "hunt", args: ["bee"] });
   await p.tickAll();
 
-  // Plant lead mid-map outside engage radius of both packs (unblocked for smart_move).
+  // Route lead mid-map outside engage radius of both packs.
   const api = p.bots.Jazwyn.api;
-  assert.ok(api.move(200, 800), "plant mid-route");
+  assert.ok((await api.smart_move({ map: "main", x: 200, y: 800 })).success, "plant mid-route");
   assert.ok(!nearPack(api, "bee", 280), "precondition: not yet on bee");
   assert.ok(!nearPack(api, "armadillo", 280), "precondition: left armadillo");
 

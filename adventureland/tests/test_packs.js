@@ -6,6 +6,8 @@ const path = require("path");
 const packs = require("../src/packs");
 const world = require("../sim/world");
 const knobs = require("../sim/knobs");
+const { findPathSameMap, inBounds } = require("../sim/path");
+const { createWorld } = require("../sim/server");
 const { RECONNECT_MS, SERVER_REGION_DELAY_MS, WALK_PX_PER_S } = require("../sim/character");
 
 const tests = [
@@ -58,6 +60,38 @@ const tests = [
       for (const s of doc.samples || []) {
         assert.ok(s.ok, "sample not ok: " + s.id);
       }
+    },
+  },
+  {
+    name: "desertland: giant-scorpion basin preserves deployed wall and east entrance",
+    fn() {
+      const G = world.baseG();
+      const safe = packs.safeMeet("gscorpion");
+      const center = packs.packCenter("gscorpion");
+      assert.ok(inBounds("desertland", safe.x, safe.y));
+      assert.ok(inBounds("desertland", center.x, center.y));
+      assert.ok(!world.isBlocked("desertland", safe.x, safe.y, G));
+      assert.ok(!world.isBlocked("desertland", center.x, center.y, G));
+
+      const route = findPathSameMap(safe, center, "desertland", G);
+      assert.ok(route && route.length >= 3, "safe meet must route around the basin wall");
+      assert.ok(
+        route.some((point) => point.x > 568 && point.y < -1230 && point.y > -1290),
+        "route must use the northeast basin entrance"
+      );
+
+      const server = createWorld({ G });
+      const api = server.spawn({
+        name: "Walker",
+        map: "desertland",
+        real_x: safe.x,
+        real_y: safe.y,
+        x: safe.x,
+        y: safe.y,
+      });
+      assert.strictEqual(api.can_move_to(center.x, center.y), false);
+      assert.strictEqual(api.move(center.x, center.y), false);
+      assert.ok(api.log.game.some((entry) => entry.m === "can't reach"));
     },
   },
 ];

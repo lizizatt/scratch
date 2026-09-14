@@ -299,10 +299,21 @@ function baseG() {
       desertland: {
         monsters: [
           { type: "porcupine", boundary: [-860, 100, -800, 170] },
-          { type: "gscorpion", boundary: [360, -1460, 420, -1380] },
+          { type: "gscorpion", boundary: [220.31, -1569.2, 561.04, -1275.72] },
         ],
-        spawns: [[0, 0], [-48, 56]],
+        spawns: [[0, 0], [10, -386], [601, -2365]],
         doors: [{ to: "main", x: 0, y: 0, spawn: 0 }],
+        blocked: [
+          // Deployed desertland geometry around the giant-scorpion basin. The
+          // north safe meet is separated from the pack by a walled enclosure;
+          // its usable opening is on the east side near y=-1405.
+          { x0: 208, y0: -1248, x1: 568, y1: -1232 },
+          { x0: 152, y0: -1608, x1: 168, y1: -1232 },
+          { x0: 688, y0: -1388, x1: 704, y1: -1232 },
+          { x0: 688, y0: -1712, x1: 704, y1: -1422 },
+          { x0: 256, y0: -1720, x1: 640, y1: -1704 },
+          { x0: 428, y0: -1604, x1: 452, y1: -1588 },
+        ],
       },
       bank: {
         monsters: [],

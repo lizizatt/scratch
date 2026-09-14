@@ -1,7 +1,7 @@
 "use strict";
 
 const { dist, isBlocked, VISION_PX, SEND_ITEM_RANGE, LOOT_RANGE, packCenter, NPC, FARM_XY } = require("./world");
-const { findPath } = require("./path");
+const { clearLine, findPath } = require("./path");
 const { createStorage } = require("./storage");
 const knobs = require("./knobs");
 const { classOk, canEquipSlot } = require("../src/gear");
@@ -551,14 +551,22 @@ function createCharacter(world, over) {
     },
 
     move(x, y) {
-      if (isBlocked(c.map, x, y, world.G)) return false;
+      const blocked = (world.G.maps[c.map] && world.G.maps[c.map].blocked) || [];
+      if (isBlocked(c.map, x, y, world.G) || !clearLine({ x: c.real_x, y: c.real_y }, { x, y }, blocked)) {
+        api.game_log("can't reach");
+        return false;
+      }
       place(c.map, x, y);
       log.moved.push({ x, y, t: world.clock.now() });
       return true;
     },
 
     can_move_to(x, y) {
-      return !isBlocked(c.map, x, y, world.G);
+      const blocked = (world.G.maps[c.map] && world.G.maps[c.map].blocked) || [];
+      return (
+        !isBlocked(c.map, x, y, world.G) &&
+        clearLine({ x: c.real_x, y: c.real_y }, { x, y }, blocked)
+      );
     },
 
     use(skill) {

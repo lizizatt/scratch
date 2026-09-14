@@ -8,6 +8,7 @@ const DOOR_COST = 800;
 const MAP_BOUNDS = {
   main: { x0: -1400, y0: -900, x1: 1400, y1: 2200 },
   cave: { x0: -350, y0: -550, x1: 1250, y1: 180 },
+  desertland: { x0: -1608, y0: -2792, x1: 1032, y1: 664 },
 };
 
 function inBounds(map, x, y) {
