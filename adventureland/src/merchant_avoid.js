@@ -277,11 +277,25 @@ async function merchantAvoidGoTo(api, dest, opts) {
 
   if (!dest || dest.x == null || dest.y == null) return { failed: true, reason: "bad_dest" };
 
-  // Cross-map: one smart_move hop onto dest.map, then local avoid.
+  // Enter the map first. Live smart_move can fail to resolve a deep coordinate
+  // across transporter boundaries even though both individual legs are valid.
   if (dest.map && dest.map !== api.character.map) {
     if (typeof api.smart_move !== "function") return { failed: true, reason: "cross_map" };
-    const r = await api.smart_move({ map: dest.map, x: dest.x, y: dest.y });
-    if (r && r.failed) return r;
+    let entry;
+    try {
+      entry = await api.smart_move({ map: dest.map });
+    } catch (e) {
+      entry = { failed: true, reason: (e && e.reason) || (e && e.message) || "entry_failed" };
+    }
+    if (entry && entry.failed) {
+      const direct = await api.smart_move({ map: dest.map, x: dest.x, y: dest.y });
+      if (direct && direct.failed) return direct;
+    } else if (api.character.map !== dest.map) {
+      return { failed: true, reason: "wrong_map" };
+    } else if (distXY(xyOf(api.character), dest) > opts.arriveR) {
+      const local = await api.smart_move({ map: dest.map, x: dest.x, y: dest.y });
+      if (local && local.failed) return local;
+    }
     if (distXY(xyOf(api.character), dest) <= opts.arriveR) return { success: true };
   }
 

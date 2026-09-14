@@ -21,6 +21,41 @@ function dist(a, b) {
   );
 }
 
+test("adversary: cross-map merchant travel stages through the destination map", async () => {
+  const calls = [];
+  const api = {
+    character: { map: "main", real_x: 0, real_y: 0, x: 0, y: 0, rip: false },
+    async smart_move(dest) {
+      calls.push(Object.assign({}, dest));
+      if (dest.map === "desertland" && dest.x == null) {
+        this.character.map = "desertland";
+        this.character.real_x = this.character.x = 0;
+        this.character.real_y = this.character.y = 0;
+        return { success: true };
+      }
+      if (this.character.map !== dest.map) return { failed: true, reason: "no_path" };
+      this.character.real_x = this.character.x = dest.x;
+      this.character.real_y = this.character.y = dest.y;
+      return { success: true };
+    },
+    can_move_to() {
+      return true;
+    },
+    get_monsters() {
+      return [];
+    },
+  };
+
+  const result = await avoid.goTo(api, { map: "desertland", x: 391, y: -1200 });
+
+  assert.ok(result && result.success, "staged desert route should arrive");
+  assert.deepStrictEqual(calls, [
+    { map: "desertland" },
+    { map: "desertland", x: 391, y: -1200 },
+  ]);
+  assert.strictEqual(api.character.map, "desertland");
+});
+
 test("scenario: dlv arrive-and-wait at party, then resolve when fighter has space", async () => {
   // Live shape: Puppygirl reaches the party meet, sends fail (no_space), empty_send
   // keeps store.active — then resolves once the fighter can receive.
