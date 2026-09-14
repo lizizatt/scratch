@@ -148,6 +148,47 @@ test("adversary: ponty buys cape under fair cap when needed", async () => {
   assert.ok(m.items.some((x) => x && x.name === "cape"), "cape in bag");
 });
 
+test("adversary: ponty buys a spare of dynamically advertised equipped gear", async () => {
+  const p = bootParty({
+    pack: "armadillo",
+    pots: 100,
+    gold: 500000,
+    members: ["Sarene", "Puppygirl"],
+  });
+  const mApi = p.bots.Puppygirl.api;
+  const m = mApi.character;
+  m.gold = 500000;
+  m._bank = { gold: 0, items0: new Array(42).fill(null) };
+  m.map = "main";
+  m.real_x = m.x = 40;
+  m.real_y = m.y = -20;
+  m.stand = false;
+  p.bots.Sarene.api.character.slots.mainhand = { name: "firestaff", level: 4 };
+  await p.bots.Sarene.api.send_cm("Puppygirl", {
+    gear_ad: 1,
+    inventory_ad: 1,
+    v: 2,
+    revision: 1,
+    name: "Sarene",
+    ctype: "mage",
+    slots: p.bots.Sarene.api.character.slots,
+    bag: [],
+    esize: 40,
+  });
+  p.world.ponty = [{ name: "firestaff", rid: "fs1", price: 180000, level: 4 }];
+
+  for (let i = 0; i < 200; i++) {
+    await p.tickAll();
+    if (mApi.log.game.some((g) => /^ponty:buy firestaff/.test(g.m))) break;
+  }
+
+  assert.ok(
+    mApi.log.game.some((g) => /^ponty:buy firestaff/.test(g.m)),
+    "currently equipped gear should dynamically enter Ponty's buy list"
+  );
+  assert.ok(m.items.some((x) => x && x.name === "firestaff"), "the spare should enter the bag");
+});
+
 test("adversary: merchant waits three minutes between completed Ponty sweeps", async () => {
   const p = bootParty({
     pack: "armadillo",

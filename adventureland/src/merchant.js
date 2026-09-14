@@ -2106,6 +2106,16 @@ function bootMerchant(api, opts) {
         break;
       }
     }
+    let equipped = 0;
+    for (const who of FIGHTERS) {
+      const ad = gearAds[who];
+      if (!gearAdFresh(ad, api._now()) || !ad.slots) continue;
+      for (const slot of Object.keys(ad.slots)) {
+        const it = ad.slots[slot];
+        if (it && it.name === name) equipped++;
+      }
+    }
+    if (equipped > 0) want = Math.max(want, equipped + 1);
     return want > 0 ? Math.max(0, want - pontyHave(name)) : 0;
   }
 
@@ -2115,7 +2125,7 @@ function bootMerchant(api, opts) {
     return Math.floor(base * (1 + 0.12 * lv));
   }
 
-  /** One Ponty secondhand buy toward PONTY_WANT / empty earring·cape targets. */
+  /** One Ponty buy toward configured quotas or a spare of currently equipped gear. */
   async function tryPontyBuy() {
     if (typeof api.get_secondhands !== "function" || typeof api.buy_secondhand !== "function") {
       return false;
