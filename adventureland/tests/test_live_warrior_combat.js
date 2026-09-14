@@ -50,6 +50,21 @@ test("combat source excludes temperamental Mana Burst variants", () => {
   assert.ok(!/\b(?:burst|cburst)\b/.test(source), "mage rotation must contain no Mana Burst path");
 });
 
+test("combat status messages only emit when the displayed action changes", () => {
+  const p = readyParty();
+  const api = p.bots.Jazwyn.api;
+  let messages = 0;
+  const originalSetMessage = api.set_message;
+  api.set_message = (message) => {
+    messages++;
+    originalSetMessage(message);
+  };
+  warriorRotation(api, "armadillo", { leadName: "Jazwyn", isLead: true });
+  warriorRotation(api, "armadillo", { leadName: "Jazwyn", isLead: true });
+  assert.strictEqual(api.character._msg, "Hunt armadillo");
+  assert.strictEqual(messages, 1);
+});
+
 test("warrior prioritizes Hardshell under critical pressure", () => {
   const p = readyParty();
   const api = p.bots.Jazwyn.api;

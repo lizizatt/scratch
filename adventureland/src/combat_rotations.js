@@ -25,6 +25,13 @@ function conditionActive(entity, name, at) {
   return true;
 }
 
+function setRotationMessage(api, message) {
+  const state = api.character._rotation || (api.character._rotation = {});
+  if (state.message === message) return;
+  state.message = message;
+  api.set_message(message);
+}
+
 function skillReady(api, name, reserve) {
   const skill = api.G && api.G.skills && api.G.skills[name];
   if (!skill) return false;
@@ -127,11 +134,11 @@ function targetFor(api, mtype, dyn) {
 
 function engage(api, target, useCharge) {
   if (!target) {
-    api.set_message("Idle");
+    setRotationMessage(api, "Idle");
     return "idle";
   }
   api.change_target(target);
-  api.set_message("Hunt " + target.mtype);
+  setRotationMessage(api, "Hunt " + target.mtype);
   if (!api.is_in_range(target)) {
     if (useCharge && skillReady(api, "charge", ROTATION.warriorReserve)) api.use_skill("charge");
     const point = approachPoint(api, target);
@@ -169,7 +176,7 @@ function warriorRotation(api, mtype, dyn) {
   ) {
     api.use_skill("hardshell");
     state.lastHardshellAt = at;
-    api.set_message("Hard Shell");
+    setRotationMessage(api, "Hard Shell");
     return "hardshell";
   }
 
@@ -181,7 +188,7 @@ function warriorRotation(api, mtype, dyn) {
   if (threatened && skillReady(api, "taunt", ROTATION.warriorReserve)) {
     api.use_skill("taunt", threatened);
     api.change_target(threatened);
-    api.set_message("Taunt " + threatened.mtype);
+    setRotationMessage(api, "Taunt " + threatened.mtype);
     return "taunt";
   }
 
@@ -207,7 +214,7 @@ function mageRotation(api, mtype, dyn) {
     skillReady(api, "reflection", ROTATION.mageReserve)
   ) {
     api.use_skill("reflection", tank);
-    api.set_message("Reflect Jazwyn");
+    setRotationMessage(api, "Reflect Jazwyn");
     return "reflection";
   }
 
@@ -221,7 +228,7 @@ function mageRotation(api, mtype, dyn) {
   ) {
     const amount = Math.min(200, Math.max(1, priest.max_mp - priest.mp));
     api.use_skill("energize", priest, amount);
-    api.set_message("Energize Zarook");
+    setRotationMessage(api, "Energize Zarook");
     return "energize_priest";
   }
 
@@ -246,7 +253,7 @@ function priestPreCombat(api) {
   const dead = party.find((member) => member.rip);
   if (dead && dead.hp < dead.max_hp && api.can_heal(dead)) {
     api.heal(dead);
-    api.set_message("Heal Gravestone");
+    setRotationMessage(api, "Heal Gravestone");
     return "heal_gravestone";
   }
   if (
@@ -258,7 +265,7 @@ function priestPreCombat(api) {
     skillReady(api, "revive", ROTATION.priestReserve)
   ) {
     api.use_skill("revive", dead);
-    api.set_message("Revive");
+    setRotationMessage(api, "Revive");
     return "revive";
   }
 
@@ -269,7 +276,7 @@ function priestPreCombat(api) {
   );
   if (lowest && pct(lowest, "hp", "max_hp") < 0.45 && api.can_heal(lowest)) {
     api.heal(lowest);
-    api.set_message("Emergency Heal");
+    setRotationMessage(api, "Emergency Heal");
     return "heal_emergency";
   }
 
@@ -280,13 +287,13 @@ function priestPreCombat(api) {
     skillReady(api, "partyheal", ROTATION.priestReserve)
   ) {
     api.use_skill("partyheal");
-    api.set_message("Party Heal");
+    setRotationMessage(api, "Party Heal");
     return "partyheal";
   }
 
   if (lowest && pct(lowest, "hp", "max_hp") < 0.8 && api.can_heal(lowest)) {
     api.heal(lowest);
-    api.set_message("Heal");
+    setRotationMessage(api, "Heal");
     return "heal";
   }
   return false;
@@ -304,7 +311,7 @@ function priestRotation(api, mtype, dyn) {
     skillReady(api, "absorb", ROTATION.priestReserve)
   ) {
     api.use_skill("absorb", mage);
-    api.set_message("Absorb Sarene");
+    setRotationMessage(api, "Absorb Sarene");
     return "absorb";
   }
 
@@ -321,7 +328,7 @@ function priestRotation(api, mtype, dyn) {
   ) {
     api.use_skill("curse", target);
     state.lastCurseAt = now(api);
-    api.set_message("Curse " + target.mtype);
+    setRotationMessage(api, "Curse " + target.mtype);
     return "curse";
   }
   return engage(api, target, false);
@@ -330,6 +337,7 @@ function priestRotation(api, mtype, dyn) {
 module.exports = {
   ROTATION,
   conditionActive,
+  setRotationMessage,
   skillReady,
   skillInRange,
   canApproach,
