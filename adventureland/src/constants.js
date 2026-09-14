@@ -5,6 +5,7 @@ const FIGHTERS = ["Jazwyn", "Sarene", "Zarook"];
 const MERCHANT = "Puppygirl";
 const FARM = ["US", "III"];
 const HOME = ["US", "II"];
+const DEFAULT_FARM = "gscorpion";
 
 const CHAT_GAP_MS = 16000;
 const HEARTBEAT_MS = 60000;
@@ -236,6 +237,7 @@ module.exports = {
   MERCHANT,
   FARM,
   HOME,
+  DEFAULT_FARM,
   CHAT_GAP_MS,
   HEARTBEAT_MS,
   FORM_R_IN,

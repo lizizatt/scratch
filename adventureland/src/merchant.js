@@ -32,6 +32,7 @@ const {
   GEAR_AD_MS,
   HUNTER_PLAN,
   HUNTER_UPGRADE_MIN_CHANCE,
+  DEFAULT_FARM,
 } = require("./constants");
 const { maybeUsePots } = require("./potions");
 const {
@@ -1067,7 +1068,7 @@ function bootMerchant(api, opts) {
           kind: "dlv_gear",
           who: step.who,
           gear: { name: step.name, level: owned.level, slot: step.slot },
-          farm: meetFarmAt(ad.farm, ad.map, ad.x, ad.y) || "bat",
+          farm: meetFarmAt(ad.farm, ad.map, ad.x, ad.y) || DEFAULT_FARM,
           map: ad.map,
           x: ad.x,
           y: ad.y,
@@ -1242,7 +1243,7 @@ function bootMerchant(api, opts) {
           slot: g.slot,
           progression,
         },
-        farm: "bat",
+        farm: DEFAULT_FARM,
         items: [],
       });
       return true;

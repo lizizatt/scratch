@@ -6,6 +6,7 @@ const {
   LEADER_ORDER,
   FARM,
   HOME,
+  DEFAULT_FARM,
   HEARTBEAT_MS,
   ACK_MS,
   PENDING_MS,
@@ -61,7 +62,8 @@ function bootFighter(api, opts) {
   opts = opts || {};
   const name = api.character.name;
   const SK = "v2state_" + name;
-  const state = createPartyState(name);
+  const defaultFarm = opts.farm || DEFAULT_FARM;
+  const state = createPartyState(name, defaultFarm);
   const chat = createChatQueue(api);
   api._now = () => (opts.now ? opts.now() : Date.now());
 
@@ -80,7 +82,6 @@ function bootFighter(api, opts) {
   let mhuntDeaths = 0;
   let mhuntDeathForId = null;
   let mhuntSoftSkipId = null;
-  const defaultFarm = opts.farm || "bat";
   /** Intent snapshot taken when entering rare — restored on rare_kill/gone/timeout. */
   let preRareSnap = null;
   const giftTtl = {};
@@ -1245,7 +1246,7 @@ function bootFighter(api, opts) {
       const followed = opts.form
         ? await motion.followFormation(opts.form)
         : await motion.followLeader();
-      const mtype = state.S.intent.mtype || "bat";
+      const mtype = state.S.intent.mtype || defaultFarm;
       const pc = packCenter(mtype);
       // Out of party / no lead coords / follow "ok" but still far (stale party xy):
       // hard-path to pack instead of standing Idle at town forever.
@@ -1270,7 +1271,7 @@ function bootFighter(api, opts) {
     }
 
     // Leader farms
-    const mtype = state.S.intent.mtype || "bat";
+    const mtype = state.S.intent.mtype || defaultFarm;
     const mon = api.get_nearest_monster({ type: mtype });
     // Far "seen" mobs (sim ignores vision; live can still be long-range) must not
     // skip pack smart_move — stepToward walks into walls and stalls mid-route.
@@ -1328,7 +1329,7 @@ function bootFighter(api, opts) {
     const map = api.character.map;
     if (map && map !== "main" && map !== "bank" && map !== "cave" && map !== "winterland" && map !== "winter_cave" && map !== "tunnel") {
       const farmMaps = { main: 1, cave: 1, winterland: 1, winter_cave: 1, tunnel: 1 };
-      const want = packCenter(state.S.intent.mtype || "bat");
+      const want = packCenter(state.S.intent.mtype || defaultFarm);
       if (want && want.map && map !== want.map && !farmMaps[map]) {
         if (now - mapEscapeAt < 12000) {
           persist();

@@ -15,7 +15,7 @@ function test(name, fn) {
   tests.push({ name, fn });
 }
 
-test("default grind targets bats", async () => {
+test("simulation pack override targets bats", async () => {
   const p = bootParty();
   assert.strictEqual(p.bots.Jazwyn.ctrl.state.S.intent.mtype, "bat");
   assert.strictEqual(p.bots.Jazwyn.api.character.map, packCenter("bat").map);

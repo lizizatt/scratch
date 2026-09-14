@@ -30,6 +30,9 @@ The order of concern is:
 8. Maintain formation and class combat responsibilities.
 9. Advertise inventory, offload loot/gold, and improve equipment.
 
+The configured default farm is `gscorpion`; `grind()` restores that target after
+holds, rare hunts, rejected targets, and Monster Hunt soft-abandons.
+
 ## 2. Locked requirements
 
 | Area | Requirement | Implementation |

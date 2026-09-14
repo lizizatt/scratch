@@ -16,7 +16,7 @@ function baseG() {
       arcticbee: { attack: 64, xp: 1800 },
       porcupine: { attack: 16, xp: 3200 },
       boar: { attack: 240, xp: 10800 },
-      gscorpion: { attack: 120, xp: 48000 },
+      gscorpion: { attack: 120, xp: 48000, hp: 32000, armor: 300, frequency: 0.8 },
       wolfie: { attack: 320, xp: 16400 },
       wolf: { attack: 480, xp: 48800 },
       phoenix: { attack: 400, xp: 120000, rare: true },

@@ -10,6 +10,12 @@ function test(name, fn) {
   tests.push({ name, fn });
 }
 
+test("party state defaults production farming to gscorpion", () => {
+  const st = createPartyState("Jazwyn");
+  assert.strictEqual(st.S.intent.kind, "farm");
+  assert.strictEqual(st.S.intent.mtype, "gscorpion");
+});
+
 test("applyHeartbeat: stale seq is ignored (no farm poison)", () => {
   const st = createPartyState("Sarene");
   st.applyHeartbeat("Jazwyn", { f: "armadillo", m: "farm", h: 0, seq: 5 }, ["Jazwyn", "Sarene"]);

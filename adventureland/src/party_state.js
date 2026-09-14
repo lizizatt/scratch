@@ -1,6 +1,6 @@
 "use strict";
 
-const { LEADER_ORDER, POTION_LOW, POTION_DRY } = require("./constants");
+const { LEADER_ORDER, POTION_LOW, POTION_DRY, DEFAULT_FARM } = require("./constants");
 
 function potBucket(hpCount, mpCount) {
   const n = Math.min(hpCount || 0, mpCount || 0);
@@ -25,11 +25,11 @@ function emptyMember() {
   return { pots: "ok", rip: false, task: "idle", gear: null };
 }
 
-function createPartyState(selfName) {
+function createPartyState(selfName, defaultFarm) {
   const S = {
     seq: {},
     lead: "Jazwyn",
-    intent: { kind: "farm", mtype: "bat", hold: 0, t: 0 },
+    intent: { kind: "farm", mtype: defaultFarm || DEFAULT_FARM, hold: 0, t: 0 },
     mode: "farm",
     rare: null,
     dlv: null,
