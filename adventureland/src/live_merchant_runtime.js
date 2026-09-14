@@ -88,10 +88,10 @@ function v2_start_merchant() {
       game_log("mtick:" + v2_err(e));
     }
     tickBusy = false;
-  // Merchant planning scans the live bag and bank. Running that work at the
-  // fighter cadence can exceed Mainframe's sustained CPU budget while idle;
-  // 1.5s remains comfortably inside potion and logistics response windows.
-  }, 1500);
+  // Merchant planning scans the live bag and bank. Mainframe measurements
+  // showed even a 1.5s cadence sustaining 2.5x the worker CPU budget; five
+  // seconds keeps logistics responsive without repeatedly restarting CODE.
+  }, 5000);
 
   try {
     if (typeof globalThis !== "undefined") globalThis[key] = iv;

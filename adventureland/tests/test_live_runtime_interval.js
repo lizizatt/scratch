@@ -107,7 +107,7 @@ test("live runtime: v2_start_merchant clears prior interval on reload", () => {
   assert.strictEqual(r.setCalls, 2, "reload starts a second interval");
   assert.ok(r.clearCalls.indexOf(r.firstId) >= 0, "reload clears first interval");
   assert.notStrictEqual(r.secondId, r.firstId, "new interval id assigned");
-  assert.strictEqual(r.periodMs, 1500, "merchant planning stays within the live CPU budget");
+  assert.strictEqual(r.periodMs, 5000, "merchant planning stays within the live CPU budget");
   assert.strictEqual(r.activeCount, 1, "only one active interval");
 });
 
