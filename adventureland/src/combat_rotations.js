@@ -32,6 +32,40 @@ function setRotationMessage(api, message) {
   api.set_message(message);
 }
 
+function combatFailureReason(error) {
+  if (error == null) return "unknown";
+  if (typeof error === "string") return error;
+  if (error.reason) return String(error.reason);
+  if (error.message) return String(error.message);
+  try {
+    return JSON.stringify(error);
+  } catch (e) {
+    return String(error);
+  }
+}
+
+function runCombatAction(api, label, action) {
+  function report(error) {
+    const state = api.character._rotation || (api.character._rotation = {});
+    const at = now(api);
+    const reason = combatFailureReason(error);
+    const key = label + ":" + reason;
+    if (!state.actionFailures) state.actionFailures = {};
+    if (at - (state.actionFailures[key] || -Infinity) >= 5000) {
+      api.game_log("combat_action_fail " + label + " " + reason);
+      state.actionFailures[key] = at;
+    }
+  }
+  try {
+    const result = action();
+    if (result && typeof result.then === "function") result.catch(report);
+    return result;
+  } catch (error) {
+    report(error);
+    return null;
+  }
+}
+
 function skillReady(api, name, reserve) {
   const skill = api.G && api.G.skills && api.G.skills[name];
   if (!skill) return false;
@@ -140,7 +174,9 @@ function engage(api, target, useCharge) {
   api.change_target(target);
   setRotationMessage(api, "Hunt " + target.mtype);
   if (!api.is_in_range(target)) {
-    if (useCharge && skillReady(api, "charge", ROTATION.warriorReserve)) api.use_skill("charge");
+    if (useCharge && skillReady(api, "charge", ROTATION.warriorReserve)) {
+      runCombatAction(api, "charge", () => api.use_skill("charge"));
+    }
     const point = approachPoint(api, target);
     if (api.can_move_to && !api.can_move_to(point.x, point.y)) {
       api.change_target(null);
@@ -157,7 +193,7 @@ function engage(api, target, useCharge) {
     return useCharge ? "charge_move" : "move";
   }
   if (api.can_attack(target)) {
-    api.attack(target);
+    runCombatAction(api, "attack", () => api.attack(target));
     return "attack";
   }
   return "wait";
@@ -174,7 +210,7 @@ function warriorRotation(api, mtype, dyn) {
     at - (state.lastHardshellAt || -Infinity) >= ROTATION.hardshellCadenceMs &&
     skillReady(api, "hardshell", ROTATION.warriorReserve)
   ) {
-    api.use_skill("hardshell");
+    runCombatAction(api, "hardshell", () => api.use_skill("hardshell"));
     state.lastHardshellAt = at;
     setRotationMessage(api, "Hard Shell");
     return "hardshell";
@@ -186,7 +222,7 @@ function warriorRotation(api, mtype, dyn) {
       (!api.parent.distance || api.parent.distance(api.character, monster) <= 200)
   );
   if (threatened && skillReady(api, "taunt", ROTATION.warriorReserve)) {
-    api.use_skill("taunt", threatened);
+    runCombatAction(api, "taunt", () => api.use_skill("taunt", threatened));
     api.change_target(threatened);
     setRotationMessage(api, "Taunt " + threatened.mtype);
     return "taunt";
@@ -213,7 +249,7 @@ function mageRotation(api, mtype, dyn) {
     skillInRange(api, "reflection", tank) &&
     skillReady(api, "reflection", ROTATION.mageReserve)
   ) {
-    api.use_skill("reflection", tank);
+    runCombatAction(api, "reflection", () => api.use_skill("reflection", tank));
     setRotationMessage(api, "Reflect Jazwyn");
     return "reflection";
   }
@@ -227,7 +263,7 @@ function mageRotation(api, mtype, dyn) {
     skillReady(api, "energize", ROTATION.mageReserve)
   ) {
     const amount = Math.min(200, Math.max(1, priest.max_mp - priest.mp));
-    api.use_skill("energize", priest, amount);
+    runCombatAction(api, "energize", () => api.use_skill("energize", priest, amount));
     setRotationMessage(api, "Energize Zarook");
     return "energize_priest";
   }
@@ -241,7 +277,7 @@ function mageRotation(api, mtype, dyn) {
     skillInRange(api, "energize", tank) &&
     skillReady(api, "energize", ROTATION.mageReserve)
   ) {
-    api.use_skill("energize", tank, 1);
+    runCombatAction(api, "energize", () => api.use_skill("energize", tank, 1));
     return "energize_tank";
   }
   return engage(api, target, false);
@@ -252,7 +288,7 @@ function priestPreCombat(api) {
   const party = visibleFighters(api);
   const dead = party.find((member) => member.rip);
   if (dead && dead.hp < dead.max_hp && api.can_heal(dead)) {
-    api.heal(dead);
+    runCombatAction(api, "heal", () => api.heal(dead));
     setRotationMessage(api, "Heal Gravestone");
     return "heal_gravestone";
   }
@@ -264,7 +300,7 @@ function priestPreCombat(api) {
     skillInRange(api, "revive", dead) &&
     skillReady(api, "revive", ROTATION.priestReserve)
   ) {
-    api.use_skill("revive", dead);
+    runCombatAction(api, "revive", () => api.use_skill("revive", dead));
     setRotationMessage(api, "Revive");
     return "revive";
   }
@@ -275,7 +311,7 @@ function priestPreCombat(api) {
     null
   );
   if (lowest && pct(lowest, "hp", "max_hp") < 0.45 && api.can_heal(lowest)) {
-    api.heal(lowest);
+    runCombatAction(api, "heal", () => api.heal(lowest));
     setRotationMessage(api, "Emergency Heal");
     return "heal_emergency";
   }
@@ -286,13 +322,13 @@ function priestPreCombat(api) {
     pct(api.character, "mp", "max_mp") > 0.85 &&
     skillReady(api, "partyheal", ROTATION.priestReserve)
   ) {
-    api.use_skill("partyheal");
+    runCombatAction(api, "partyheal", () => api.use_skill("partyheal"));
     setRotationMessage(api, "Party Heal");
     return "partyheal";
   }
 
   if (lowest && pct(lowest, "hp", "max_hp") < 0.8 && api.can_heal(lowest)) {
-    api.heal(lowest);
+    runCombatAction(api, "heal", () => api.heal(lowest));
     setRotationMessage(api, "Heal");
     return "heal";
   }
@@ -310,7 +346,7 @@ function priestRotation(api, mtype, dyn) {
     skillInRange(api, "absorb", mage) &&
     skillReady(api, "absorb", ROTATION.priestReserve)
   ) {
-    api.use_skill("absorb", mage);
+    runCombatAction(api, "absorb", () => api.use_skill("absorb", mage));
     setRotationMessage(api, "Absorb Sarene");
     return "absorb";
   }
@@ -326,7 +362,7 @@ function priestRotation(api, mtype, dyn) {
     skillInRange(api, "curse", target) &&
     skillReady(api, "curse", ROTATION.priestReserve)
   ) {
-    api.use_skill("curse", target);
+    runCombatAction(api, "curse", () => api.use_skill("curse", target));
     state.lastCurseAt = now(api);
     setRotationMessage(api, "Curse " + target.mtype);
     return "curse";
@@ -338,6 +374,7 @@ module.exports = {
   ROTATION,
   conditionActive,
   setRotationMessage,
+  runCombatAction,
   skillReady,
   skillInRange,
   canApproach,

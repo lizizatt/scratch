@@ -6,6 +6,7 @@ const path = require("path");
 const { bootParty } = require("../src/boot_party");
 const {
   ROTATION,
+  runCombatAction,
   warriorRotation,
   mageRotation,
   priestPreCombat,
@@ -317,6 +318,27 @@ test("priest Curse is durable-target-only and capped to 15-second cadence", () =
   delete monster.s.cursed;
   priestRotation(api, "armadillo", { leadName: "Jazwyn", isLead: false });
   assert.strictEqual(skillCount(api, "curse"), 1);
+});
+
+test("rejected live combat actions are handled and rate-limited", async () => {
+  let at = 1000;
+  const logs = [];
+  const api = {
+    character: {},
+    _now: () => at,
+    game_log: (message) => logs.push(message),
+  };
+
+  runCombatAction(api, "attack", () => Promise.reject({ reason: "target_gone" }));
+  await new Promise((resolve) => setImmediate(resolve));
+  runCombatAction(api, "attack", () => Promise.reject({ reason: "target_gone" }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepStrictEqual(logs, ["combat_action_fail attack target_gone"]);
+
+  at += 5000;
+  runCombatAction(api, "attack", () => Promise.reject({ reason: "target_gone" }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.strictEqual(logs.length, 2, "persistent failures remain visible at a bounded cadence");
 });
 
 test("30-minute rotation burn stays within potion and delivery budgets", async () => {
