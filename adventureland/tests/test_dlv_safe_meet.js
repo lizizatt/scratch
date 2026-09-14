@@ -246,6 +246,20 @@ test("adversary: snake fallback avoids the unreachable north grove", async () =>
   assert.ok(Math.hypot(meet.x - snake.x, meet.y - snake.y) <= SEND_RANGE, "replacement must be in send range");
 });
 
+test("adversary: giant-scorpion meet stays clear of the north basin wall", () => {
+  const G = baseG();
+  const entry = { map: "desertland", x: 10, y: -386 };
+  const oldMeet = { map: "desertland", x: 391, y: -1200 };
+  const meet = safeMeet("gscorpion");
+  const pack = packCenter("gscorpion");
+
+  assert.deepStrictEqual(meet, { map: "desertland", x: 391, y: -1120 });
+  assert.ok(findPath(entry, meet, "desertland", G), "merchant entry must reach the meetup");
+  assert.ok(!nearPack("gscorpion", meet.map, meet.x, meet.y), "meetup must remain outside pack danger");
+  assert.ok(Math.hypot(meet.x - pack.x, meet.y - pack.y) <= SEND_RANGE, "meetup must remain in send range");
+  assert.ok(meet.y > oldMeet.y, "replacement must stand farther north of the basin lip");
+});
+
 test("adversary: delivery status elicits current location before fighter is dry", async () => {
   const p = bootParty({
     pack: "croc",

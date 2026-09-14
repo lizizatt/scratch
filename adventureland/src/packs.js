@@ -42,7 +42,9 @@ const SAFE_MEET = {
   arcticbee: { map: "winterland", x: 1082, y: -600 },
   porcupine: { map: "desertland", x: -829, y: -80 },
   boar: { map: "winterland", x: 20, y: -900 },
-  gscorpion: { map: "desertland", x: 391, y: -1200 },
+  // Keep well north of the basin lip. Live merchant routing stalls against
+  // the wall when approaching the old y=-1200 point from inside the basin.
+  gscorpion: { map: "desertland", x: 391, y: -1120 },
   wolfie: { map: "winterland", x: -169, y: -1800 },
   wolf: { map: "winterland", x: 433, y: -2500 },
 };

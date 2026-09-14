@@ -46,12 +46,13 @@ test("adversary: cross-map merchant travel stages through the destination map", 
     },
   };
 
-  const result = await avoid.goTo(api, { map: "desertland", x: 391, y: -1200 });
+  const meet = safeMeet("gscorpion");
+  const result = await avoid.goTo(api, meet);
 
   assert.ok(result && result.success, "staged desert route should arrive");
   assert.deepStrictEqual(calls, [
     { map: "desertland" },
-    { map: "desertland", x: 391, y: -1200 },
+    meet,
   ]);
   assert.strictEqual(api.character.map, "desertland");
 });
