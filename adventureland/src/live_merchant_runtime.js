@@ -50,11 +50,21 @@ function v2_start_merchant() {
   } catch (e) {}
 
   let tickBusy = false;
+  let emergencyRespawn = null;
   const iv = setInterval(function () {
     // Long smart_move/delivery awaits keep tickBusy true for seconds. Keep
-    // checking emergency potions from the interval while that work is active.
+    // checking life support from the interval while that work is active.
     if (tickBusy) {
       try {
+        if (character.rip && !emergencyRespawn && ctrl.respawnIfDead) {
+          emergencyRespawn = Promise.resolve(ctrl.respawnIfDead())
+            .catch(function (e) {
+              game_log("respawn:" + v2_err(e));
+            })
+            .finally(function () {
+              emergencyRespawn = null;
+            });
+        }
         ctrl.usePots();
       } catch (e) {}
       return;

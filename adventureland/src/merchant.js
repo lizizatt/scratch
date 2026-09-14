@@ -3293,6 +3293,32 @@ function bootMerchant(api, opts) {
     }
   }
 
+  async function respawnIfDead() {
+    if (!api.character.rip) return false;
+    api.game_log("rip:respawn");
+    try {
+      if (typeof api.respawn !== "function") throw new Error("respawn unavailable");
+      await api.respawn();
+      if (typeof api.sleep === "function") await api.sleep(1000);
+      if (api.character.rip) throw new Error("character remains dead");
+    } catch (e) {
+      const msg = e && e.message ? e.message : e && e.reason ? e.reason : e;
+      api.game_log("rip:respawn_fail " + String(msg));
+      throw e;
+    }
+    if (store.active && (store.active.kind === "dlv_pots" || store.active.kind === "dlv_gear")) {
+      const j = store.active;
+      api.game_log("dlv:rip_abort id=" + j.id);
+      try {
+        await api.send_cm(j.who, { dlv_done: 1, id: j.id, ok: 0, reason: "rip" });
+      } catch (e) {}
+      store.active = null;
+      saveQ(store);
+    }
+    await retreatPlaza();
+    return true;
+  }
+
   async function tick() {
     if (!api._now) api._now = () => (opts.now ? opts.now() : Date.now());
     if (busy) return;
@@ -3304,25 +3330,7 @@ function bootMerchant(api, opts) {
         if (typeof api.sleep === "function") await api.sleep(1000);
         return;
       }
-      // Live: merchant dies on pack during dlv — respawn, abort job, retreat (2026-09-09).
-      if (api.character.rip) {
-        api.game_log("rip:respawn");
-        try {
-          if (typeof api.respawn === "function") await api.respawn();
-        } catch (e) {}
-        if (typeof api.sleep === "function") await api.sleep(1000);
-        if (store.active && (store.active.kind === "dlv_pots" || store.active.kind === "dlv_gear")) {
-          const j = store.active;
-          api.game_log("dlv:rip_abort id=" + j.id);
-          try {
-            await api.send_cm(j.who, { dlv_done: 1, id: j.id, ok: 0, reason: "rip" });
-          } catch (e) {}
-          store.active = null;
-          saveQ(store);
-        }
-        await retreatPlaza();
-        return;
-      }
+      if (await respawnIfDead()) return;
       await maybeUsePots(api);
       if (
         store.hunterRequested &&
@@ -3507,6 +3515,7 @@ function bootMerchant(api, opts) {
 
   return {
     tick,
+    respawnIfDead,
     usePots: () => maybeUsePots(api),
     enqueue,
     hunt,

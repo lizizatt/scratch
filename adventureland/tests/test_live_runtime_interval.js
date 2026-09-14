@@ -162,6 +162,70 @@ test("live runtime: busy merchant tick still checks emergency potions", async ()
   await Promise.resolve();
 });
 
+test("live runtime: busy merchant tick still respawns after dying during movement", async () => {
+  const root = path.join(__dirname, "..");
+  let intervalFn = null;
+  let respawnCalls = 0;
+  let resolveRespawn = null;
+  const character = { name: "Puppygirl", rip: false };
+  const sandbox = {
+    console,
+    Date,
+    Math,
+    JSON,
+    Promise,
+    globalThis: {},
+    character,
+    game_log() {},
+    createAlApi() {
+      return { character };
+    },
+    bootMerchant() {
+      return {
+        tick() {
+          return new Promise(() => {});
+        },
+        respawnIfDead() {
+          respawnCalls++;
+          return new Promise((resolve) => {
+            resolveRespawn = () => {
+              character.rip = false;
+              resolve(true);
+            };
+          });
+        },
+        usePots() {},
+        hunt() {},
+        hunt_quest() {},
+        grind() {},
+        hold() {},
+        resume() {},
+        world() {},
+      };
+    },
+    setInterval(fn) {
+      intervalFn = fn;
+      return 1;
+    },
+    clearInterval() {},
+  };
+  vm.createContext(sandbox);
+  const src = fs.readFileSync(path.join(root, "src", "live_merchant_runtime.js"), "utf8");
+  vm.runInContext(src, sandbox);
+
+  sandbox.v2_start_merchant();
+  intervalFn();
+  character.rip = true;
+  intervalFn();
+  intervalFn();
+  assert.strictEqual(respawnCalls, 1, "only one emergency respawn may run at a time");
+  resolveRespawn();
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.strictEqual(character.rip, false);
+});
+
 test("live runtime: v2_start_fighter clears prior interval on reload", () => {
   const r = bootRuntimeTwice({
     name: "Jazwyn",
