@@ -28,6 +28,12 @@ const {
 const { createChatQueue } = require("./chat_queue");
 const { createPartyState, countPots, potBucket } = require("./party_state");
 const { createMotion } = require("./motion");
+const {
+  createEncounterMovement,
+  resolveCombatTarget,
+  resolveCombatThreat,
+} = require("./party_movement");
+const { createCombatRunner } = require("./combat_runner");
 const { maybeUsePots } = require("./potions");
 const { packCenter } = require("./packs");
 const {
@@ -179,6 +185,11 @@ function bootFighter(api, opts) {
     leadMoving: () => state.S.members[state.S.lead] && state.S.members[state.S.lead].task === "moving",
     now: () => api._now(),
   });
+  const encounterMovement = createEncounterMovement(api);
+  const combatRunner = createCombatRunner(api, {
+    preCombat: opts.pre_combat,
+    rotation: opts.combat,
+  });
 
   function livePartyMembers() {
     const party = api.get_party() || {};
@@ -210,10 +221,26 @@ function bootFighter(api, opts) {
    * *current* succession lead, not a name baked in at boot. Whoever
    * currentLeader() names (state.S.lead) becomes tank; everyone else assists.
    */
-  function runCombat(mtype) {
-    if (!opts.combat) return;
+  function runEncounter(mtype) {
     const lead = isLead();
-    return opts.combat(mtype, { leadName: state.S.lead, isLead: lead }, api);
+    const dyn = { leadName: state.S.lead, isLead: lead };
+    const target = resolveCombatTarget(api, mtype, dyn);
+    const threat = resolveCombatThreat(api);
+    const movementResult = encounterMovement.tick({
+      mtype,
+      target,
+      threat,
+      leadName: dyn.leadName,
+      isLead: dyn.isLead,
+      pack: packCenter(mtype),
+    });
+    const combatResult = combatRunner.tick({
+      mtype,
+      target,
+      leadName: dyn.leadName,
+      isLead: dyn.isLead,
+    });
+    return { movement: movementResult, combat: combatResult, target };
   }
 
   /** Lead seq must climb above anything heard (plan §6.6.6). */
@@ -1015,6 +1042,7 @@ function bootFighter(api, opts) {
       const party = Object.keys(api.get_party() || {});
       const present = party.length ? party : [name];
       state.setIntent({ kind: "farm", mtype: defaultFarm, hold: 0 }, present);
+      chat.enqueue(state.formatHeartbeat(), "echo");
       api.game_log("mhunt:soft_abandon id=" + h.id + " farm=" + defaultFarm);
       api.set_message("HQ skip " + h.id);
     }
@@ -1109,14 +1137,12 @@ function bootFighter(api, opts) {
         if (api.is_in_range(m)) {
           // Live + sim: fight the rare. Slot combat no-ops while smart.moving,
           // so also swing directly once closed.
-          if (opts.pre_combat && opts.pre_combat(api)) return true;
-          runCombat(m.mtype);
-          try {
-            if (typeof api.change_target === "function") api.change_target(m);
-            if (typeof api.attack === "function") {
-              if (!api.can_attack || api.can_attack(m)) api.attack(m);
-            }
-          } catch (eAtk) {}
+          combatRunner.tick({
+            mtype: m.mtype,
+            target: m,
+            leadName: state.S.lead,
+            isLead: isLead(),
+          });
           if (m.dead || !(m.hp > 0)) {
             exitRare("rare_kill " + m.mtype);
             return true;
@@ -1243,11 +1269,22 @@ function bootFighter(api, opts) {
 
     if (!isLead()) {
       publishSelf({ task: "follow" });
-      const followed = opts.form
-        ? await motion.followFormation(opts.form)
-        : await motion.followLeader();
       const mtype = state.S.intent.mtype || defaultFarm;
       const pc = packCenter(mtype);
+      const nearby = resolveCombatTarget(api, mtype, {
+        leadName: state.S.lead,
+        isLead: false,
+      });
+      const nearbyHere =
+        nearby &&
+        api.character.map === (nearby.map || api.character.map) &&
+        motion.dist(api.character, nearby) <= FIGHTER_ENGAGE_R;
+      let followed = true;
+      if (!nearbyHere) {
+        followed = opts.form
+          ? await motion.followFormation(opts.form)
+          : await motion.followLeader();
+      }
       // Out of party / no lead coords / follow "ok" but still far (stale party xy):
       // hard-path to pack instead of standing Idle at town forever.
       if (pc && RARE_WHITELIST.indexOf(mtype) < 0) {
@@ -1262,11 +1299,10 @@ function bootFighter(api, opts) {
         persist();
         return;
       }
-      if (opts.pre_combat && opts.pre_combat(api)) {
-        persist();
-        return;
+      const encounter = runEncounter(mtype);
+      if (encounter.movement.execution.blocked && pc) {
+        await motion.goTo({ map: pc.map, x: pc.x, y: pc.y });
       }
-      runCombat(mtype);
       return;
     }
 
@@ -1305,9 +1341,8 @@ function bootFighter(api, opts) {
       return;
     }
     publishSelf({ task: "farm" });
-    if (opts.pre_combat && opts.pre_combat(api)) return;
-    const action = runCombat(mtype);
-    if (action === "blocked_path" && RARE_WHITELIST.indexOf(mtype) < 0) {
+    const encounter = runEncounter(mtype);
+    if (encounter.movement.execution.blocked && RARE_WHITELIST.indexOf(mtype) < 0) {
       const pc = packCenter(mtype);
       if (pc) await motion.goTo({ map: pc.map, x: pc.x, y: pc.y });
     }
@@ -1472,6 +1507,7 @@ function bootFighter(api, opts) {
     state,
     chat,
     motion,
+    encounterMovement,
     isLead,
     requestPots,
     hopPrep,

@@ -112,54 +112,25 @@ function distance(api, entity) {
   return Math.hypot(x - selfX, y - selfY);
 }
 
-function approachPoint(api, target) {
-  const self = api && api.character;
-  if (!self || !target) return null;
-  const selfX = self.real_x != null ? self.real_x : self.x;
-  const selfY = self.real_y != null ? self.real_y : self.y;
-  const targetX = target.real_x != null ? target.real_x : target.x;
-  const targetY = target.real_y != null ? target.real_y : target.y;
-  return {
-    x: selfX + (targetX - selfX) / 2,
-    y: selfY + (targetY - selfY) / 2,
-  };
-}
-
-function canApproach(api, target) {
-  if (!target || api.is_in_range(target) || typeof api.can_move_to !== "function") return !!target;
-  const point = approachPoint(api, target);
-  return !!point && api.can_move_to(point.x, point.y);
-}
-
 function targetFor(api, mtype, dyn) {
   if (/^target(?:_|$)/.test(mtype || "")) {
     if (api.change_target) api.change_target(null);
     return null;
   }
   const leadName = (dyn && dyn.leadName) || "Jazwyn";
+  if (dyn && dyn.target && !dyn.target.dead) return dyn.target;
   const lead = api.get_player(leadName);
   const isLead = dyn && dyn.isLead != null ? dyn.isLead : api.character.name === leadName;
   let target = null;
-  let blockedTarget = null;
   if (!isLead && lead && lead.target && api.get_monster) {
     target = api.get_monster(lead.target) || ((api.parent && api.parent.entities) || {})[lead.target];
   }
   if (!target && api.get_targeted_monster) target = api.get_targeted_monster();
   if (
-    target &&
-    !target.dead &&
-    target.type === "monster" &&
-    (!mtype || target.mtype === mtype) &&
-    !canApproach(api, target)
-  ) {
-    blockedTarget = target;
-  }
-  if (
     !target ||
     target.dead ||
     target.type !== "monster" ||
-    (mtype && target.mtype !== mtype) ||
-    !canApproach(api, target)
+    (mtype && target.mtype !== mtype)
   ) {
     const candidates = visibleMonsters(api)
       .filter((monster) => !mtype || monster.mtype === mtype)
@@ -168,15 +139,14 @@ function targetFor(api, mtype, dyn) {
         const bClaimed = b.target && b.target !== api.character.name ? 1 : 0;
         return aClaimed - bClaimed || distance(api, a) - distance(api, b);
       });
-    target = candidates.find((monster) => canApproach(api, monster));
-    if (!target) target = blockedTarget || candidates[0];
+    target = candidates[0];
   }
   if (target && /^target(?:_|$)/.test(target.mtype || "")) target = null;
   if (!target && api.change_target) api.change_target(null);
   return target && target.type === "monster" && !target.dead ? target : null;
 }
 
-function engage(api, target, useCharge) {
+function engage(api, target) {
   if (!api.character) return "idle";
   if (!target) {
     setRotationMessage(api, "Idle");
@@ -185,23 +155,7 @@ function engage(api, target, useCharge) {
   api.change_target(target);
   setRotationMessage(api, "Hunt " + target.mtype);
   if (!api.is_in_range(target)) {
-    if (useCharge && skillReady(api, "charge", ROTATION.warriorReserve)) {
-      runCombatAction(api, "charge", () => api.use_skill("charge"));
-    }
-    const point = approachPoint(api, target);
-    if (api.can_move_to && !api.can_move_to(point.x, point.y)) {
-      api.change_target(null);
-      const state = api.character._rotation || (api.character._rotation = {});
-      const at = now(api);
-      const lastBlocked = state.lastBlockedPathAt == null ? -Infinity : state.lastBlockedPathAt;
-      if (at - lastBlocked >= 5000) {
-        api.game_log("combat_path_blocked " + target.mtype);
-        state.lastBlockedPathAt = at;
-      }
-      return "blocked_path";
-    }
-    api.move(point.x, point.y);
-    return useCharge ? "charge_move" : "move";
+    return "out_of_range";
   }
   if (api.can_attack(target)) {
     runCombatAction(api, "attack", () => api.attack(target));
@@ -211,7 +165,7 @@ function engage(api, target, useCharge) {
 }
 
 function warriorRotation(api, mtype, dyn) {
-  if (!api.character || api.character.rip || (api.smart && api.smart.moving)) return "blocked";
+  if (!api.character || api.character.rip) return "blocked";
   const at = now(api);
   const state = api.character._rotation || (api.character._rotation = {});
   const attackers = visibleMonsters(api).filter((monster) => monster.target === api.character.name);
@@ -239,11 +193,11 @@ function warriorRotation(api, mtype, dyn) {
     return "taunt";
   }
 
-  return engage(api, targetFor(api, mtype, dyn), true);
+  return engage(api, targetFor(api, mtype, dyn));
 }
 
 function mageRotation(api, mtype, dyn) {
-  if (!api.character || api.character.rip || (api.smart && api.smart.moving)) return "blocked";
+  if (!api.character || api.character.rip) return "blocked";
   const at = now(api);
   const tank = api.get_player("Jazwyn");
   const priest = api.get_player("Zarook");
@@ -291,11 +245,11 @@ function mageRotation(api, mtype, dyn) {
     runCombatAction(api, "energize", () => api.use_skill("energize", tank, 1));
     return "energize_tank";
   }
-  return engage(api, target, false);
+  return engage(api, target);
 }
 
 function priestPreCombat(api) {
-  if (!api.character || api.character.rip || (api.smart && api.smart.moving)) return false;
+  if (!api.character || api.character.rip) return false;
   const party = visibleFighters(api);
   const dead = party.find((member) => member.rip);
   if (dead && dead.hp < dead.max_hp && api.can_heal(dead)) {
@@ -347,7 +301,7 @@ function priestPreCombat(api) {
 }
 
 function priestRotation(api, mtype, dyn) {
-  if (!api.character || api.character.rip || (api.smart && api.smart.moving)) return "blocked";
+  if (!api.character || api.character.rip) return "blocked";
   const mage = api.get_player("Sarene");
   if (
     mage &&
@@ -378,7 +332,7 @@ function priestRotation(api, mtype, dyn) {
     setRotationMessage(api, "Curse " + target.mtype);
     return "curse";
   }
-  return engage(api, target, false);
+  return engage(api, target);
 }
 
 module.exports = {
@@ -388,7 +342,6 @@ module.exports = {
   runCombatAction,
   skillReady,
   skillInRange,
-  canApproach,
   targetFor,
   warriorRotation,
   mageRotation,

@@ -1,7 +1,7 @@
 # Adventure Land Party System Architecture
 
 **Status:** normative overview  
-**Locked:** 2026-09-13
+**Locked:** 2026-09-14
 
 This document explains how the four-character system is structured and how
 its state machines interact. Detailed behavior is normative in:
@@ -190,6 +190,28 @@ The three machines are orthogonal:
   surviving local conditions and cooperating with logistics.
 - **Merchant execution** services supply and economy work without owning
   combat intent.
+
+  ### 4.1 Fighter tick interfaces
+
+  Encounter execution has two independent owners:
+
+  1. `PartyMovementImplementation` receives the immutable tick frame and returns
+     exactly one movement directive for the local fighter plus advisory peer
+     posture information.
+  2. `PartyCombatRunner` receives the same resolved target and invokes the
+     local action-only class rotation.
+
+  Both run on every eligible encounter tick. Combat rotations cannot move, and
+  movement implementations cannot attack or heal. `EncounterMovement` owns
+  holding, approach, fleeing-target interception, visible-peer separation, and
+  ranged kiting. Cross-map routing, recovery, rare assembly, and logistics holds
+  remain separate movement modes and never run concurrently with encounter
+  movement.
+
+  The deployment remains physically distributed: each browser may execute only
+  its own directive. Peer posture is advisory, stable identity determines
+  formation side and yield priority, and stale party-list coordinates are never
+  used for local collision avoidance.
 
 A rare interrupt temporarily overrides farm/hunt execution but does not erase
 the prior intent. A pickup hold temporarily overrides fighter movement but

@@ -54,7 +54,14 @@ const SLOTS = [
     out: "v2_fighter.js",
     kind: "bundle",
     role: "Fighter runtime (AL API shim + fighter + live hooks)",
-    sources: ["src/al_api.js", "src/combat_rotations.js", "src/fighter.js", "src/live_fighter_runtime.js"],
+    sources: [
+      "src/al_api.js",
+      "src/party_movement.js",
+      "src/combat_rotations.js",
+      "src/combat_runner.js",
+      "src/fighter.js",
+      "src/live_fighter_runtime.js",
+    ],
     upload: { name: "v2_fighter", match: /^v2_fighter$/i },
   },
   {

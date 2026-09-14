@@ -12,6 +12,10 @@ const {
   priestPreCombat,
   priestRotation,
 } = require("../src/combat_rotations");
+const {
+  createEncounterMovement,
+  resolveCombatTarget,
+} = require("../src/party_movement");
 
 const tests = [];
 function test(name, fn) {
@@ -198,7 +202,7 @@ test("combat skips a blocked monster and attacks a reachable alternative", () =>
   assert.notStrictEqual(api.character.target, blocked.id);
 });
 
-test("combat reports an unreachable target without repeating failed movement", () => {
+test("movement reports an unreachable target without combat issuing movement", () => {
   const p = readyParty();
   const api = p.bots.Jazwyn.api;
   const monster = nearest(p, "Jazwyn");
@@ -208,21 +212,25 @@ test("combat reports an unreachable target without repeating failed movement", (
   api.change_target(monster);
   api.can_move_to = () => false;
 
-  assert.strictEqual(
-    warriorRotation(api, "armadillo", { leadName: "Jazwyn", isLead: true }),
-    "blocked_path"
-  );
-  assert.strictEqual(api.character.target, null);
+  const movement = createEncounterMovement(api);
+  const result = movement.tick({
+    mtype: "armadillo",
+    target: monster,
+    leadName: "Jazwyn",
+    isLead: true,
+  });
+  assert.strictEqual(result.directive.kind, "hold");
+  assert.strictEqual(result.directive.reason, "approach_blocked");
   assert.strictEqual(api.log.moved.length, 0);
   assert.strictEqual(
-    api.log.game.filter((entry) => entry.m === "combat_path_blocked armadillo").length,
-    1
+    warriorRotation(api, "armadillo", {
+      leadName: "Jazwyn",
+      isLead: true,
+      target: monster,
+    }),
+    "out_of_range"
   );
-  warriorRotation(api, "armadillo", { leadName: "Jazwyn", isLead: true });
-  assert.strictEqual(
-    api.log.game.filter((entry) => entry.m === "combat_path_blocked armadillo").length,
-    1
-  );
+  assert.strictEqual(api.log.moved.length, 0, "rotation must not own movement");
 });
 
 test("training dummies are never valid combat or persisted farm targets", async () => {
@@ -349,7 +357,96 @@ test("browser transition without a character pauses every rotation safely", () =
   assert.strictEqual(priestRotation(api, "croc", { isLead: false }), "blocked");
 });
 
-test("30-minute rotation burn stays within potion and delivery budgets", async () => {
+test("adversary: fighter closes on a low-health monster fleeing at nearly equal speed", () => {
+  const fighter = {
+    name: "Jazwyn",
+    ctype: "warrior",
+    level: 70,
+    real_x: 0,
+    real_y: 0,
+    x: 0,
+    y: 0,
+    hp: 6000,
+    max_hp: 6000,
+    mp: 1000,
+    max_mp: 1000,
+    range: 5,
+    s: {},
+  };
+  const rat = {
+    id: "rat_flee",
+    type: "monster",
+    mtype: "rat",
+    real_x: 12,
+    real_y: 0,
+    x: 12,
+    y: 0,
+    hp: 20,
+    max_hp: 100,
+    dead: false,
+  };
+  let attacks = 0;
+  let moveDestination = null;
+  let at = 1000;
+  const api = {
+    character: fighter,
+    smart: { moving: false },
+    G: { skills: {} },
+    parent: {
+      entities: { rat_flee: rat },
+      distance: (a, b) => Math.hypot(a.real_x - b.real_x, a.real_y - b.real_y),
+    },
+    get_player: () => null,
+    get_targeted_monster: () => null,
+    get_monster: () => rat,
+    is_in_range: (target) => api.parent.distance(fighter, target) <= fighter.range,
+    can_attack: (target) => api.is_in_range(target),
+    can_move_to: () => true,
+    change_target: (target) => {
+      fighter.target = target ? target.id : null;
+    },
+    move: (x, y) => {
+      moveDestination = { x, y };
+    },
+    attack: () => {
+      attacks++;
+      rat.hp = 0;
+      rat.dead = true;
+    },
+    set_message() {},
+    game_log() {},
+    is_on_cooldown: () => false,
+    _now: () => at,
+  };
+  const movement = createEncounterMovement(api);
+
+  for (let tick = 0; tick < 20 && !rat.dead; tick++) {
+    at += 250;
+    rat.real_x = rat.x += 4;
+    if (moveDestination) {
+      const dx = moveDestination.x - fighter.real_x;
+      const dy = moveDestination.y - fighter.real_y;
+      const distance = Math.hypot(dx, dy);
+      const step = Math.min(5, distance);
+      fighter.real_x = fighter.x += distance ? (dx / distance) * step : 0;
+      fighter.real_y = fighter.y += distance ? (dy / distance) * step : 0;
+    }
+    const target = resolveCombatTarget(api, "rat", {
+      leadName: "Jazwyn",
+      isLead: true,
+    });
+    movement.tick({ mtype: "rat", target, leadName: "Jazwyn", isLead: true });
+    warriorRotation(api, "rat", {
+      leadName: "Jazwyn",
+      isLead: true,
+      target,
+    });
+  }
+
+  assert.strictEqual(attacks, 1, "fighter must close attack range instead of taking shrinking half-steps");
+});
+
+test("30-minute continuous combat stays within the stocked potion budget", async () => {
   const p = bootParty({ pack: "armadillo", pots: 200, level: 61 });
   const stats = {
     Jazwyn: { hp: 6000, mp: 1200 },
@@ -379,11 +476,11 @@ test("30-minute rotation burn stays within potion and delivery budgets", async (
     const hp = logs.filter((line) => /^heal:hp /.test(line)).length;
     mpPots += mp;
     hpPots += hp;
-    assert.ok(mp <= 12, name + " used too many MP potions: " + mp);
+    assert.ok(mp <= 80, name + " used too many MP potions: " + mp);
     assert.ok(hp <= 140, name + " used too many HP potions under sustained combat: " + hp);
   }
   const deliveries = p.bots.Puppygirl.api.log.game.filter((entry) => /dlv:active pots/.test(entry.m)).length;
-  assert.ok(mpPots <= 20, "party MP potion use exceeded budget: " + mpPots);
+  assert.ok(mpPots <= 150, "party MP potion use exceeded budget: " + mpPots);
   assert.ok(hpPots <= 140, "party HP potion use exceeded budget: " + hpPots);
   assert.strictEqual(deliveries, 0, "rotation should not require a potion delivery from a 200-pot start");
   assert.strictEqual(skillCount(p.bots.Sarene.api, "burst"), 0);

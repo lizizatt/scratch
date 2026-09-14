@@ -1,7 +1,7 @@
 # Fighter Requirements and State Machines
 
 **Status:** normative  
-**Locked:** 2026-09-13  
+**Locked:** 2026-09-14
 **Scope:** Jazwyn, Sarene, and Zarook
 
 This document is the authority for fighter behavior. Party-wide structure is
@@ -39,7 +39,9 @@ holds, rare hunts, rejected targets, and Monster Hunt soft-abandons.
 | --- | --- | --- |
 | Leadership | Exactly one current leader is selected in order `Jazwyn -> Sarene -> Zarook`, excluding absent or dead fighters. Leadership returns to Jazwyn when she returns. | Implemented |
 | Intent ownership | Only the current leader writes farm/hunt target, hold, requested world, and normal shared mode. Followers consume that intent. | Implemented |
-| Cohesion | Followers never independently select a different farm while a leader is available. Cross-map movement begins with a cohesion wait; followers use leader-relative formation and pack fallback. | Implemented |
+| Cohesion | Followers never independently select a different farm while a leader is available. Cross-map movement begins with a cohesion wait; one party-movement implementation owns local positioning during an encounter. | Implemented |
+| Movement authority | Combat rotations cannot move. Exactly one selected movement implementation returns one local directive per encounter tick, including an explicit hold. | Implemented |
+| Combat independence | The combat runner invokes the local class rotation every eligible encounter tick independently of hold, approach, pursuit, separation, or kite movement. | Implemented |
 | World changes | Fighters never world-hop for normal farming, potions, gear, or rares. Only explicit hold/world control invokes hop preparation. | Implemented |
 | Hold | Hold is a long-lived operator assembly state on the configured home world; resume returns to prior farm/hunt operation. | Implemented |
 | Rare | Any fighter may interrupt for `phoenix` or `goldenbat`; all fighters assemble on the spotter, fight, and restore prior intent on kill/gone/timeout. | Implemented |
@@ -66,9 +68,10 @@ holds, rare hunts, rejected targets, and Monster Hunt soft-abandons.
 
 ## 3. Top-level fighter state machine
 
-The fighter controller is a single-flight 250 ms tick. Class combat is invoked
-from the shared controller only when movement, recovery, pickup, and gear
-transactions allow it.
+The fighter controller is a single-flight 250 ms tick. During an encounter it
+resolves one target, runs the selected party-movement implementation, and runs
+the action-only combat runner. Movement and combat consume the same target
+decision but neither calls nor suppresses the other.
 
 ```mermaid
 stateDiagram-v2
@@ -149,7 +152,7 @@ Leadership filters the live party roster's death flags before consulting the
 shared state. A dead-but-present fighter therefore yields immediately to the
 next living fighter, and Jazwyn reclaims leadership after recovery.
 
-## 5. Farm, formation, and combat
+## 5. Farm movement and combat
 
 ```mermaid
 flowchart TD
@@ -161,42 +164,54 @@ flowchart TD
     P -- yes --> PM[Move to safe pickup rendezvous]
     P -- no --> R[Evaluate potion supply]
     R --> L{Current leader?}
-    L -- no --> F[Follow formation or leader]
-    F --> FP{Still far from configured pack?}
+    L -- no --> F{Target inside encounter radius?}
+    F -- no --> FP{Still far from configured pack?}
+    F -- yes --> T
     FP -- yes --> FB[Fallback route to pack]
-    FP -- no --> FC[Assist leader target]
+    FP -- no --> FF[Follow leader]
     L -- yes --> M{Target present within engage radius?}
     M -- no --> C[Wait briefly for cohesion and route to pack]
-    M -- yes --> T[Select target and run class combat]
+    M -- yes --> T
+    T --> MV[Party movement implementation]
+    T --> CR[Combat runner]
+    MV --> ME[Apply one movement directive]
+    CR --> CE[Run action-only class rotation]
 ```
 
-### 5.1 Formation
+### 5.1 Movement ownership
 
-- Enter present/formed state when the leader is visible within 220 pixels.
-- Exit only after loss of vision or distance beyond 400 pixels persists for
-  20 seconds.
-- Sarene and Zarook use face-relative formation offsets.
-- Formation re-anchors after 70 pixels of leader drift.
-- Within 18 pixels of the formation slot, stop movement; within 220 pixels,
-  use direct movement when farther than 40 pixels; otherwise use
-  `smart_move`.
-- If leader coordinates are missing or stale and the follower remains more
-  than 400 pixels from the intended pack, route to the configured pack rather
-  than idling in town.
+- Cross-map travel and pack ingress remain routed movement concerns.
+- Once a matching target is inside the encounter radius,
+  `EncounterMovement` is the sole movement owner.
+- Encounter movement returns exactly one local directive: hold or direct
+  movement. Routed movement remains owned by the mutually exclusive travel,
+  recovery, rare, and ingress paths.
+- Holding is idempotent and does not repeatedly call `stop`.
+- Jazwyn anchors in melee. Sarene and Zarook use distinct stable sides of the
+  encounter and orbit in opposite directions when personally threatened.
+- A fighter already inside its legal action envelope remains stationary unless
+  hard separation, fleeing-target pursuit, or kiting requires movement.
+- Hard overlap has deterministic priority: the lower-priority visible fighter
+  yields while the higher-priority fighter holds.
+- A fleeing target is detected from sampled outward velocity and pursued with
+  a bounded intercept rather than shrinking midpoint steps.
+- A blocked local directive is reported once at bounded cadence and escalates
+  to the existing routed pack movement.
 
 ### 5.2 Combat roles
 
 | Role | Behavior |
 | --- | --- |
-| Current leader | Selects a configured pack target and becomes the party's target source |
-| Followers | Prefer the visible leader's current target; otherwise select a matching pack target |
-| Jazwyn | Closes to melee, uses charge while approaching, cleaves only with a compatible weapon and sufficient MP |
-| Sarene | Holds mage formation and attacks from range |
+| Current leader | Owns the configured farm/hunt policy; target resolution is shared by movement and combat |
+| Followers | Prefer the visible leader's target; otherwise resolve the same configured target policy locally |
+| Jazwyn | Anchors, closes to melee through encounter movement, taunts, protects casters, and attacks |
+| Sarene | Holds range, kites tangentially when personally threatened, and attacks/supports |
 | Zarook | Revives first, party-heals multiple injured members, heals the lowest member, then curses/attacks |
 
-No class combat runs while dead or during active smart movement. Wrong-class
-and incompatible two-hand/offhand equipment is rejected rather than retried
-every tick.
+Class rotations contain no movement calls. They may return `out_of_range`, but
+only the movement implementation decides how to close. Wrong-class and
+incompatible two-hand/offhand equipment is rejected rather than retried every
+tick.
 
 ## 6. Potion and fallback state machine
 
