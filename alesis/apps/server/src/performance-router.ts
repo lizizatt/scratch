@@ -16,6 +16,7 @@ export class PerformanceRouter {
   private readonly sustainedChannels = new Set<number>();
   private lastNoteChannel: number | null = null;
   private sustainValue: number | null = null;
+  private readonly bentChannels = new Set<number>();
 
   route(event: MidiEvent): MidiEvent[] {
     if (event.type === "note-on" && event.velocity > 0) {
@@ -33,7 +34,14 @@ export class PerformanceRouter {
     }
     if (event.type === "control-change" && event.controller === 64) return this.routeSustain(event);
     if (event.type !== "pitch-bend") return [event];
-    return this.routeGlobalControl(event);
+    if (event.value === 0 && this.bentChannels.size > 0) {
+      const channels = [...this.bentChannels];
+      this.bentChannels.clear();
+      return channels.map((channel) => ({ ...event, channel }));
+    }
+    const routed = this.routeGlobalControl(event);
+    if (event.value !== 0) for (const routedEvent of routed) this.bentChannels.add(routedEvent.channel);
+    return routed;
   }
 
   private routeSustain(event: Extract<MidiEvent, { type: "control-change" }>): MidiEvent[] {
@@ -64,5 +72,6 @@ export class PerformanceRouter {
     this.sustainedChannels.clear();
     this.lastNoteChannel = null;
     this.sustainValue = null;
+    this.bentChannels.clear();
   }
 }

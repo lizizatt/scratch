@@ -2,13 +2,10 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import toneMidi from "@tonejs/midi";
-import type { Midi as MidiType } from "@tonejs/midi";
+import { writeMidi, type MidiEvent as FileMidiEvent } from "midi-file";
 import { NeonPressureSynth, type NeonPressureParameters } from "@alesis/audio";
 import { exportNameSchema, type EngineSnapshot, type Take } from "@alesis/protocol";
 import type { RecordedMidiEvent } from "./loop-playback.js";
-
-const { Midi } = toneMidi;
 
 export interface ExportRequest {
   name: string;
@@ -112,55 +109,70 @@ function renderNeonWav(recording: RecordedMidiEvent[], take: Take, snapshot: Eng
 }
 
 export function recordingToMidi(recording: RecordedMidiEvent[], take: Take, snapshot: EngineSnapshot): Uint8Array {
-  const midi = new Midi();
-  midi.header.setTempo(snapshot.settings.bpm);
-  midi.header.timeSignatures.push({ ticks: 0, timeSignature: [snapshot.settings.beatsPerMeasure, 4] });
-  midi.header.update();
-  const cycleSeconds = 60 / snapshot.settings.bpm * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
-  const tracks = new Map<number, ReturnType<MidiType["addTrack"]>>();
-  const activeNotes = new Map<string, Array<{ time: number; velocity: number }>>();
+  const ticksPerBeat = 480;
+  const totalTicks = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures * ticksPerBeat;
+  const preset = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
+  const drumKit = snapshot.pads.drumKits.find(({ id }) => id === snapshot.pads.selectedDrumKitId);
+  const tracks = new Map<number, Array<{ tick: number; priority: number; event: FileMidiEvent }>>();
+  const activeNoteTicks = new Map<string, number[]>();
   const trackFor = (channel: number) => {
     let track = tracks.get(channel);
     if (!track) {
-      track = midi.addTrack();
-      track.channel = channel;
-      track.name = `Channel ${channel + 1}`;
+      track = [];
       if (channel !== 9) {
-        track.instrument.number = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId)?.program ?? 0;
-        const chorusSend = snapshot.synth.parameterValues["chorus-send"] ?? 0;
-        const reverbSend = snapshot.synth.parameterValues["reverb-send"] ?? 0;
-        track.addCC({ number: 93, value: chorusSend, time: 0 });
-        track.addCC({ number: 91, value: reverbSend, time: 0 });
+        const bank = preset?.bank ?? 0;
+        track.push(
+          { tick: 0, priority: 0, event: { deltaTime: 0, type: "controller", channel, controllerType: 0, value: bank >> 7 } },
+          { tick: 0, priority: 1, event: { deltaTime: 0, type: "controller", channel, controllerType: 32, value: bank & 0x7f } },
+          { tick: 0, priority: 2, event: { deltaTime: 0, type: "programChange", channel, programNumber: preset?.program ?? 0 } },
+          { tick: 0, priority: 3, event: { deltaTime: 0, type: "controller", channel, controllerType: 93, value: Math.round((snapshot.synth.parameterValues["chorus-send"] ?? 0) * 127) } },
+          { tick: 0, priority: 3, event: { deltaTime: 0, type: "controller", channel, controllerType: 91, value: Math.round((snapshot.synth.parameterValues["reverb-send"] ?? 0) * 127) } },
+        );
+      } else {
+        track.push({ tick: 0, priority: 2, event: { deltaTime: 0, type: "programChange", channel, programNumber: drumKit?.program ?? 0 } });
       }
       tracks.set(channel, track);
     }
     return track;
   };
 
-  for (const { position, event } of [...recording].sort((left, right) => left.position - right.position)) {
-    const time = Math.max(0, Math.min(cycleSeconds, position * cycleSeconds));
+  for (const { position, event } of recording) {
+    let tick = Math.max(0, Math.min(totalTicks, Math.round(position * totalTicks)));
     const track = trackFor(event.channel);
     if (event.type === "note-on" && event.velocity > 0) {
       const key = `${event.channel}:${event.note}`;
-      const starts = activeNotes.get(key) ?? [];
-      starts.push({ time, velocity: event.velocity / 127 * take.level });
-      activeNotes.set(key, starts);
+      const starts = activeNoteTicks.get(key) ?? [];
+      starts.push(tick);
+      activeNoteTicks.set(key, starts);
+      track.push({ tick, priority: 5, event: { deltaTime: 0, type: "noteOn", channel: event.channel, noteNumber: event.note, velocity: Math.round(event.velocity * take.level) } });
     } else if (event.type === "note-off" || event.type === "note-on" && event.velocity === 0) {
       const key = `${event.channel}:${event.note}`;
-      const start = activeNotes.get(key)?.shift();
-      if (start) track.addNote({ midi: event.note, time: start.time, duration: Math.max(0.01, time - start.time), velocity: Math.min(1, start.velocity) });
+      const startTick = activeNoteTicks.get(key)?.shift();
+      if (startTick !== undefined && tick <= startTick) tick = startTick + 1;
+      track.push({ tick, priority: 4, event: { deltaTime: 0, type: "noteOff", channel: event.channel, noteNumber: event.note, velocity: 0 } });
     } else if (event.type === "control-change") {
-      track.addCC({ number: event.controller, value: event.value / 127, time });
+      track.push({ tick, priority: 3, event: { deltaTime: 0, type: "controller", channel: event.channel, controllerType: event.controller, value: event.value } });
     } else if (event.type === "pitch-bend") {
-      track.addPitchBend({ value: Math.max(-8_192, Math.min(8_191, Math.round(event.value * 8_192))), time });
+      track.push({ tick, priority: 3, event: { deltaTime: 0, type: "pitchBend", channel: event.channel, value: Math.max(-8_192, Math.min(8_191, Math.round(event.value * 8_192))) } });
     }
   }
-  for (const [key, starts] of activeNotes) {
-    const [channelText, noteText] = key.split(":");
-    const track = trackFor(Number(channelText));
-    for (const start of starts) track.addNote({ midi: Number(noteText), time: start.time, duration: Math.max(0.01, cycleSeconds - start.time), velocity: Math.min(1, start.velocity) });
-  }
-  return midi.toArray();
+
+  const encodedTracks = [...tracks.values()].map((events): FileMidiEvent[] => {
+    let previousTick = 0;
+    const encoded = events.sort((left, right) => left.tick - right.tick || left.priority - right.priority).map(({ tick, event }) => {
+      const withDelta = { ...event, deltaTime: tick - previousTick } as FileMidiEvent;
+      previousTick = tick;
+      return withDelta;
+    });
+    encoded.push({ deltaTime: Math.max(0, totalTicks - previousTick), type: "endOfTrack", meta: true });
+    return encoded;
+  });
+  const headerTrack: FileMidiEvent[] = [
+    { deltaTime: 0, type: "setTempo", meta: true, microsecondsPerBeat: Math.round(60_000_000 / snapshot.settings.bpm) },
+    { deltaTime: 0, type: "timeSignature", meta: true, numerator: snapshot.settings.beatsPerMeasure, denominator: 4, metronome: 24, thirtyseconds: 8 },
+    { deltaTime: totalTicks, type: "endOfTrack", meta: true },
+  ];
+  return Uint8Array.from(writeMidi({ header: { format: 1, numTracks: encodedTracks.length + 1, ticksPerBeat }, tracks: [headerTrack, ...encodedTracks] }));
 }
 
 async function renderSoundFontMidi(midiPath: string, wavPath: string, soundFontPath: string, percussionSoundFontPath: string | undefined, snapshot: EngineSnapshot): Promise<void> {
@@ -177,7 +189,7 @@ async function renderSoundFontMidi(midiPath: string, wavPath: string, soundFontP
     "-o", "synth.reverb.level=0.3",
     "-o", `synth.reverb.room-size=${params["reverb-room"] ?? 0.2}`,
     "-o", `synth.reverb.damp=${params["reverb-damping"] ?? 0}`,
-    "-o", `synth.reverb.width=${(params["reverb-width"] ?? 0.5) * 100}`,
+    "-o", `synth.reverb.width=${params["reverb-width"] ?? 0.5}`,
   ];
   if (percussionSoundFontPath) args.push(percussionSoundFontPath);
   args.push(soundFontPath, midiPath);

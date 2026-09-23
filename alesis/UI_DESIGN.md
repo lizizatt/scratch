@@ -55,7 +55,7 @@ fixed bottom-left navigation, and no document-level page scrolling.
 
 ### Promoted
 
-- Promoted takes play as immutable synchronized layers.
+- Up to 12 promoted takes play as immutable synchronized layers, leaving one isolated melodic channel for staged audition.
 - Each row has waveform, level, mute, and delete controls.
 - Export includes every promoted take, even when its playback mute is active, and applies each take's level.
 - One-level undo restores the latest deleted take.

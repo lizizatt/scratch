@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 2 as const;
+export const PROTOCOL_VERSION = 4 as const;
 
 const waveformSchema = z.array(z.number().min(-1).max(1)).max(256);
 const takeIdSchema = z.string().min(1).max(128);
@@ -89,6 +89,33 @@ export const drumSettingsSchema = z.object({
   volume: z.number().min(0).max(1),
 });
 
+export const padModeSchema = z.enum(["drums", "samples"]);
+export const padNavigationTargetSchema = z.enum(["voices", "drum-kits", "sample-pages"]);
+export const drumKitSchema = z.object({
+  id: z.string().min(1).max(128),
+  bank: z.number().int().min(0).max(16_383),
+  program: z.number().int().min(0).max(127),
+  name: z.string().min(1).max(256),
+});
+export const samplePadSchema = z.object({
+  id: z.string().min(1).max(256),
+  name: z.string().min(1).max(256),
+  pad: z.number().int().min(0).max(7),
+}).nullable();
+export const padsSchema = z.object({
+  mode: padModeSchema,
+  navigationTarget: padNavigationTargetSchema,
+  navigationIndex: z.number().int().nonnegative(),
+  navigationCount: z.number().int().nonnegative(),
+  selectedDrumKitId: z.string().min(1).nullable(),
+  samplePageIndex: z.number().int().nonnegative(),
+  samplePageCount: z.number().int().nonnegative(),
+  samplePage: z.array(samplePadSchema).length(8),
+  sampleLibraryStatus: z.enum(["ready", "loading", "error"]),
+  sampleLibraryError: z.string().optional(),
+  drumKits: z.array(drumKitSchema),
+});
+
 export const engineSnapshotSchema = z.object({
   protocolVersion: z.literal(PROTOCOL_VERSION),
   revision: z.number().int().nonnegative(),
@@ -115,10 +142,12 @@ export const engineSnapshotSchema = z.object({
     selectedSoundFontPresetId: z.string().nullable(),
     parameterValues: z.record(z.number()),
   }),
+  pads: padsSchema,
   arpeggiator: arpeggiatorSchema,
   drums: drumSettingsSchema,
   capture: z.object({
     currentWaveform: waveformSchema,
+    hasCurrentEvents: z.boolean(),
     staged: takeSchema.nullable(),
     previousStaged: takeSchema.nullable(),
     stagedAudible: z.boolean(),
@@ -126,6 +155,15 @@ export const engineSnapshotSchema = z.object({
   }),
   promoted: z.array(takeSchema),
   canUndoDelete: z.boolean(),
+});
+
+export const snapshotUpdateSchema = engineSnapshotSchema.pick({
+  revision: true,
+  engine: true,
+  transport: true,
+  capture: true,
+  synth: true,
+  pads: true,
 });
 
 const commandSchema = z.discriminatedUnion("type", [
@@ -137,6 +175,12 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("select-soundfont"), soundFontId: z.string().min(1).max(128) }),
   z.object({ type: z.literal("select-soundfont-preset"), presetId: z.string().min(1).max(128) }),
   z.object({ type: z.literal("refresh-soundfonts") }),
+  z.object({ type: z.literal("set-pad-mode"), mode: padModeSchema }),
+  z.object({ type: z.literal("set-pad-navigation-target"), target: padNavigationTargetSchema }),
+  z.object({ type: z.literal("select-pad-program"), program: z.number().int().nonnegative().safe() }),
+  z.object({ type: z.literal("step-pad-navigation"), direction: z.union([z.literal(-1), z.literal(1)]) }),
+  z.object({ type: z.literal("refresh-samples") }),
+  z.object({ type: z.literal("trigger-sample-pad"), pad: z.number().int().min(0).max(7), velocity: z.number().int().min(1).max(127) }),
   z.object({ type: z.literal("set-synth-parameter"), parameterId: z.string().min(1), value: z.number() }),
   z.object({ type: z.literal("configure-arpeggiator"), settings: arpeggiatorSchema.partial() }),
   z.object({ type: z.literal("configure-drums"), settings: drumSettingsSchema.partial() }),
@@ -159,6 +203,7 @@ export const commandEnvelopeSchema = z.object({
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema }),
+  z.object({ type: z.literal("snapshot-update"), update: snapshotUpdateSchema, readiness: readinessSchema }),
   z.object({
     type: z.literal("command-result"),
     commandId: z.string().uuid(),
@@ -178,11 +223,17 @@ export type SoundFont = z.infer<typeof soundFontSchema>;
 export type SoundFontPreset = z.infer<typeof soundFontPresetSchema>;
 export type ArpeggiatorSettings = z.infer<typeof arpeggiatorSchema>;
 export type DrumSettings = z.infer<typeof drumSettingsSchema>;
+export type PadMode = z.infer<typeof padModeSchema>;
+export type PadNavigationTarget = z.infer<typeof padNavigationTargetSchema>;
+export type DrumKit = z.infer<typeof drumKitSchema>;
+export type SamplePad = z.infer<typeof samplePadSchema>;
+export type Pads = z.infer<typeof padsSchema>;
 export type QuantizationMode = z.infer<typeof quantizationModeSchema>;
 export type VelocityCurve = z.infer<typeof velocityCurveSchema>;
 export type DependencyReadiness = z.infer<typeof dependencyReadinessSchema>;
 export type Readiness = z.infer<typeof readinessSchema>;
 export type EngineSnapshot = z.infer<typeof engineSnapshotSchema>;
+export type SnapshotUpdate = z.infer<typeof snapshotUpdateSchema>;
 export type EngineCommand = z.infer<typeof commandSchema>;
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;

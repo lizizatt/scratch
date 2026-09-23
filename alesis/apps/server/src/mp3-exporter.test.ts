@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import toneMidi from "@tonejs/midi";
+import { parseMidi } from "midi-file";
 import { describe, expect, it } from "vitest";
 import { SimulatedHostEngine } from "@alesis/engine";
 import type { RecordedMidiEvent } from "./loop-playback.js";
@@ -10,7 +11,7 @@ import { exportMp3Session, recordingToMidi } from "./mp3-exporter.js";
 
 const { Midi } = toneMidi;
 
-const soundFontPath = "/home/liz.izatt/Downloads/HS Synthetic Electronic.sf2";
+const soundFontPath = process.env.ALESIS_TEST_SOUNDFONT ?? "";
 const percussionPath = "/usr/share/sounds/sf2/FluidR3_GM.sf2";
 
 function exportSnapshot() {
@@ -70,6 +71,99 @@ describe("MP3 exporter", () => {
     expect(midi.tracks.find(({ channel }) => channel === 0)?.pitchBends.some(({ value }) => Math.abs(value - 0.5) < 0.005)).toBe(true);
     expect(midi.tracks.find(({ channel }) => channel === 9)?.notes[0]).toMatchObject({ midi: 36 });
   });
+
+  it("orders a 14-bit SoundFont bank before program and note events", () => {
+    const snapshot = exportSnapshot();
+    snapshot.synth.soundFontPresets = [{ id: "1200:56", bank: 1200, program: 56, name: "Trumpet" }];
+    snapshot.synth.selectedSoundFontPresetId = "1200:56";
+
+    const midi = parseMidi(recordingToMidi(melodicRecording, snapshot.promoted[0]!, snapshot));
+    const events = midi.tracks.find((track) => track.some((event) => event.type === "noteOn"))!;
+    const relevant = events.filter((event) => event.type === "controller" && (event.controllerType === 0 || event.controllerType === 32) || event.type === "programChange" || event.type === "noteOn");
+
+    expect(relevant.slice(0, 4)).toMatchObject([
+      { type: "controller", controllerType: 0, value: 9 },
+      { type: "controller", controllerType: 32, value: 48 },
+      { type: "programChange", programNumber: 56 },
+      { type: "noteOn", noteNumber: 60 },
+    ]);
+  });
+
+  it("initializes channel 9 with the selected drum kit program without a bank or melodic preset", () => {
+    const snapshot = exportSnapshot();
+    snapshot.pads.drumKits = [
+      { id: "kit-3", bank: 128, program: 3, name: "Kit Three" },
+      { id: "kit-7", bank: 128, program: 7, name: "Kit Seven" },
+    ];
+    snapshot.pads.selectedDrumKitId = "kit-7";
+    snapshot.synth.soundFontPresets = [{ id: "5:56", bank: 5, program: 56, name: "Trumpet" }];
+    snapshot.synth.selectedSoundFontPresetId = "5:56";
+
+    const midi = parseMidi(recordingToMidi([
+      ...melodicRecording,
+      { position: 0.25, event: { type: "note-on", channel: 9, note: 36, velocity: 110 } },
+    ], snapshot.promoted[0]!, snapshot));
+    const drumEvents = midi.tracks.find((track) => track.some((event) => "channel" in event && event.channel === 9))!;
+    const drumProgramIndex = drumEvents.findIndex((event) => event.type === "programChange");
+    const drumNoteIndex = drumEvents.findIndex((event) => event.type === "noteOn");
+    const melodicEvents = midi.tracks.find((track) => track.some((event) => event.type === "noteOn" && event.channel === 0))!;
+
+    expect(drumEvents[drumProgramIndex]).toMatchObject({ type: "programChange", channel: 9, programNumber: 7 });
+    expect(drumProgramIndex).toBeGreaterThanOrEqual(0);
+    expect(drumProgramIndex).toBeLessThan(drumNoteIndex);
+    expect(drumEvents.some((event) => event.type === "controller" && (event.controllerType === 0 || event.controllerType === 32))).toBe(false);
+    expect(melodicEvents.find((event) => event.type === "programChange")).toMatchObject({ channel: 0, programNumber: 56 });
+  });
+
+  it("falls back to drum program zero when the selected kit is unavailable", () => {
+    const snapshot = exportSnapshot();
+    snapshot.pads.drumKits = [{ id: "kit-3", bank: 128, program: 3, name: "Kit Three" }];
+    snapshot.pads.selectedDrumKitId = "missing-kit";
+
+    const midi = parseMidi(recordingToMidi([
+      { position: 0.25, event: { type: "note-on", channel: 9, note: 36, velocity: 110 } },
+    ], snapshot.promoted[0]!, snapshot));
+    const drumEvents = midi.tracks.find((track) => track.some((event) => "channel" in event && event.channel === 9))!;
+
+    expect(drumEvents.find((event) => event.type === "programChange")).toMatchObject({ channel: 9, programNumber: 0 });
+  });
+
+  it("keeps a same-tick note release after its note-on", () => {
+    const snapshot = exportSnapshot();
+    const midi = parseMidi(recordingToMidi([
+      { position: 0.25, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
+      { position: 0.25, event: { type: "note-off", channel: 0, note: 60 } },
+    ], snapshot.promoted[0]!, snapshot));
+    const notes = midi.tracks.flat().filter((event) => event.type === "noteOn" || event.type === "noteOff");
+
+    expect(notes).toMatchObject([
+      { type: "noteOn", deltaTime: 480 },
+      { type: "noteOff", deltaTime: 1 },
+    ]);
+  });
+
+  it("renders a melodic Neon session to MP3 without a SoundFont fixture", async () => {
+    const outputRoot = await mkdtemp(join(tmpdir(), "alesis-neon-export-test-"));
+    try {
+      const snapshot = exportSnapshot();
+      snapshot.synth.selectedId = "subtractive";
+      snapshot.synth.parameterValues = { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.2, cutoff: 6_300, resonance: 0.2 };
+      snapshot.promoted = [snapshot.promoted[0]!];
+
+      const result = await exportMp3Session({
+        name: "Portable Neon Test",
+        snapshot,
+        recordings: new Map([["take-1", melodicRecording]]),
+        soundFontPath: "unused.sf2",
+        outputRoot,
+      });
+
+      expect((await stat(result.tracks[0]!)).size).toBeGreaterThan(1_000);
+      expect((await stat(result.mix)).size).toBeGreaterThan(1_000);
+    } finally {
+      await rm(outputRoot, { recursive: true, force: true });
+    }
+  }, 30_000);
 
   it.skipIf(!existsSync(soundFontPath) || !existsSync(percussionPath))("writes every promoted track and a merged MP3", async () => {
     const outputRoot = await mkdtemp(join(tmpdir(), "alesis-recordings-test-"));

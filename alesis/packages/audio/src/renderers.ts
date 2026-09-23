@@ -8,6 +8,7 @@ export interface SoundFontRenderParameters {
   bank?: number;
   program?: number;
   gain?: number;
+  velocity?: number;
   chorusSend?: number;
   reverbSend?: number;
   chorusRate?: number;
@@ -49,6 +50,8 @@ export class NeonPressureSynth {
   private readonly parameters: NeonPressureParameters;
   private readonly voices = new Map<string, NeonVoice>();
   private readonly pitchBend = new Map<number, number>();
+  private readonly sustainedChannels = new Set<number>();
+  private readonly deferredNoteOffs = new Set<string>();
   private sampleIndex = 0;
   private x1 = 0;
   private x2 = 0;
@@ -65,6 +68,7 @@ export class NeonPressureSynth {
 
   dispatchMidi(event: MidiEvent): void {
     if (event.type === "note-on" && event.velocity > 0) {
+      this.deferredNoteOffs.delete(`${event.channel}:${event.note}`);
       this.voices.set(`${event.channel}:${event.note}`, {
         channel: event.channel,
         note: event.note,
@@ -74,11 +78,41 @@ export class NeonPressureSynth {
         released: false,
       });
     } else if (event.type === "note-off" || (event.type === "note-on" && event.velocity === 0)) {
-      const voice = this.voices.get(`${event.channel}:${event.note}`);
-      if (voice) voice.released = true;
+      const key = `${event.channel}:${event.note}`;
+      const voice = this.voices.get(key);
+      if (voice && this.sustainedChannels.has(event.channel)) this.deferredNoteOffs.add(key);
+      else if (voice) voice.released = true;
     } else if (event.type === "pitch-bend") {
       this.pitchBend.set(event.channel, event.value);
+    } else if (event.type === "control-change" && event.controller === 64) {
+      if (event.value >= 64) {
+        this.sustainedChannels.add(event.channel);
+      } else {
+        this.sustainedChannels.delete(event.channel);
+        for (const key of this.deferredNoteOffs) {
+          const voice = this.voices.get(key);
+          if (voice?.channel !== event.channel) continue;
+          voice.released = true;
+          this.deferredNoteOffs.delete(key);
+        }
+      }
+    } else if (event.type === "control-change" && (event.controller === 120 || event.controller === 123)) {
+      for (const [key, voice] of this.voices) if (voice.channel === event.channel) this.voices.delete(key);
+      for (const key of this.deferredNoteOffs) if (key.startsWith(`${event.channel}:`)) this.deferredNoteOffs.delete(key);
+      this.sustainedChannels.delete(event.channel);
+      this.pitchBend.delete(event.channel);
     }
+  }
+
+  panic(): void {
+    this.voices.clear();
+    this.pitchBend.clear();
+    this.sustainedChannels.clear();
+    this.deferredNoteOffs.clear();
+    this.x1 = 0;
+    this.x2 = 0;
+    this.y1 = 0;
+    this.y2 = 0;
   }
 
   render(frameCount: number): Float32Array {
@@ -135,7 +169,8 @@ export async function renderSoundFontFixture(soundFontPath: string, parameters: 
     bank: parameters.bank ?? 0,
     program: parameters.program ?? 0,
     gain: parameters.gain ?? 0.72,
-    chorusSend: parameters.chorusSend ?? 0.12,
+    velocity: parameters.velocity ?? 110,
+    chorusSend: 0,
     reverbSend: parameters.reverbSend ?? 0.24,
     chorusRate: parameters.chorusRate ?? 0.3,
     chorusDepth: parameters.chorusDepth ?? 8,
@@ -148,21 +183,17 @@ export async function renderSoundFontFixture(soundFontPath: string, parameters: 
   const midiPath = join(directory, "fixture.mid");
   const wavPath = join(directory, "render.wav");
   try {
-    await writeFile(midiPath, midiFixture(values.bank, values.program, values.chorusSend, values.reverbSend));
+    await writeFile(midiPath, midiFixture(values.bank, values.program, values.velocity, values.chorusSend, values.reverbSend));
     await run("fluidsynth", [
       "-ni", "-F", wavPath, "-r", "48000",
       "-o", "audio.file.format=s16",
       "-o", `synth.gain=${values.gain}`,
-      "-o", `synth.chorus.active=${values.chorusSend > 0 ? 1 : 0}`,
-      "-o", "synth.chorus.level=0.3",
-      "-o", `synth.chorus.speed=${values.chorusRate}`,
-      "-o", `synth.chorus.depth=${values.chorusDepth}`,
-      "-o", `synth.chorus.nr=${Math.round(values.chorusVoices)}`,
+      "-o", "synth.chorus.active=0",
       "-o", `synth.reverb.active=${values.reverbSend > 0 ? 1 : 0}`,
-      "-o", "synth.reverb.level=0.3",
+      "-o", `synth.reverb.level=${values.reverbSend}`,
       "-o", `synth.reverb.room-size=${values.reverbRoom}`,
       "-o", `synth.reverb.damp=${values.reverbDamping}`,
-      "-o", `synth.reverb.width=${values.reverbWidth * 100}`,
+      "-o", `synth.reverb.width=${values.reverbWidth}`,
       soundFontPath,
       midiPath,
     ]);
@@ -206,14 +237,14 @@ function applyDrive(sample: number, drive: number): number {
   return Math.tanh(sample * amount) / Math.tanh(amount);
 }
 
-function midiFixture(bank: number, program: number, chorus: number, reverb: number): Buffer {
+function midiFixture(bank: number, program: number, velocity: number, chorus: number, reverb: number): Buffer {
   const track = Buffer.from([
     0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
     0x00, 0xb0, 0x00, Math.round(bank),
     0x00, 0xc0, Math.round(program),
-    0x00, 0xb0, 0x5d, Math.round(chorus * 127),
-    0x00, 0xb0, 0x5b, Math.round(reverb * 127),
-    0x00, 0x90, 0x3c, 0x6e,
+    0x00, 0xb0, 0x5d, chorus > 0 ? 127 : 0,
+    0x00, 0xb0, 0x5b, reverb > 0 ? 127 : 0,
+    0x00, 0x90, 0x3c, Math.max(1, Math.min(127, Math.round(velocity))),
     0x83, 0x60, 0x80, 0x3c, 0x00,
     0x87, 0x40, 0xff, 0x2f, 0x00,
   ]);

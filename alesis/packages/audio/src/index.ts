@@ -8,6 +8,8 @@ import type { MidiEvent } from "@alesis/engine";
 import { NeonPressureSynth, type NeonPressureParameters } from "./renderers.js";
 
 export { NeonPressureSynth, type NeonPressureParameters } from "./renderers.js";
+export { SampleLibrary, SampleMixer, SamplePlayer, SAMPLE_MAX_DURATION_SECONDS, SAMPLE_MAX_FILE_BYTES, SAMPLE_MAX_PAGE_BYTES, SAMPLE_PAGE_SIZE } from "./samples.js";
+export type { DecodedSample, SampleDescriptor, SampleLibraryOptions, SamplePlayerOptions } from "./samples.js";
 
 export interface AudioOutput {
   readonly id: string;
@@ -17,6 +19,7 @@ export interface AudioOutput {
   dispatchMidi(event: MidiEvent): void;
   playMetronome(accent: boolean, volume: number): void;
   playDrum(note: number, velocity: number): void;
+  selectDrumKit(bank: number, program: number): void;
   loadSoundFont(path: string): Promise<void>;
   selectSoundFontPreset(bank: number, program: number): void;
   selectSynth(synthId: string): Promise<void>;
@@ -75,11 +78,7 @@ interface SoundFontParameterValues {
   bank: number;
   program: number;
   gain: number;
-  "chorus-send": number;
   "reverb-send": number;
-  "chorus-rate": number;
-  "chorus-depth": number;
-  "chorus-voices": number;
   "reverb-room": number;
   "reverb-damping": number;
   "reverb-width": number;
@@ -89,11 +88,7 @@ const soundFontParameterRanges: Record<keyof SoundFontParameterValues, readonly 
   bank: [0, 16_383],
   program: [0, 127],
   gain: [0, 1],
-  "chorus-send": [0, 0.5],
-  "reverb-send": [0, 0.5],
-  "chorus-rate": [0.2, 2],
-  "chorus-depth": [0, 20],
-  "chorus-voices": [0, 8],
+  "reverb-send": [0, 1],
   "reverb-room": [0, 1],
   "reverb-damping": [0, 1],
   "reverb-width": [0, 1],
@@ -107,6 +102,7 @@ export interface FluidSynthOptions {
   gain?: number;
   percussionSoundFontPath?: string;
   commandObserver?: (command: string) => void;
+  healthObserver?: (ready: boolean, reason?: string) => void;
 }
 
 export const fluidSynthStdio: ["pipe", "pipe", "pipe"] = ["pipe", "pipe", "pipe"];
@@ -174,6 +170,7 @@ export class SilentAudioOutput implements AudioOutput {
   dispatchMidi(): void {}
   playMetronome(): void {}
   playDrum(): void {}
+  selectDrumKit(): void {}
   async loadSoundFont(): Promise<void> {}
   selectSoundFontPreset(): void {}
   async selectSynth(): Promise<void> {}
@@ -186,10 +183,13 @@ export class NeonPressureOutput {
   private process: ChildProcessWithoutNullStreams | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly pcm: string) {}
+  private closing = false;
+
+  constructor(private readonly pcm: string, private readonly unexpectedExit?: (reason: string) => void) {}
 
   async start(): Promise<void> {
     if (this.process) return;
+    this.closing = false;
     const child = spawn("aplay", alsaPlaybackArguments(this.pcm), {
       stdio: fluidSynthStdio,
     });
@@ -200,8 +200,12 @@ export class NeonPressureOutput {
     child.stdout.resume();
     child.stderr.resume();
     child.stdin.on("error", () => {});
-    child.once("exit", () => {
-      if (this.process === child) this.process = null;
+    child.once("exit", (code, signal) => {
+      if (this.process !== child) return;
+      this.process = null;
+      if (this.timer) clearInterval(this.timer);
+      this.timer = null;
+      if (!this.closing) this.unexpectedExit?.(`Neon playback exited (${signal ?? code ?? "unknown"})`);
     });
     this.process = child;
     this.timer = setInterval(() => {
@@ -219,9 +223,15 @@ export class NeonPressureOutput {
     this.synth.setParameter(parameterId as keyof NeonPressureParameters, value);
   }
 
+  panic(): void {
+    this.synth.panic();
+  }
+
   async close(): Promise<void> {
+    this.closing = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.synth.panic();
     const child = this.process;
     this.process = null;
     if (!child || child.exitCode !== null) return;
@@ -241,10 +251,13 @@ export class FluidSynthOutput implements AudioOutput {
   private readonly percussionSoundFontPath: string | null;
   private clickTimers = new Set<ReturnType<typeof setTimeout>>();
   private recovery: Promise<void> | null = null;
+  private pendingRecoveryReason: string | null = null;
   private closing = false;
   private readonly soundFontParameters: SoundFontParameterValues;
   private readonly neonOutput: NeonPressureOutput;
   private selectedSynthId = "soundfont";
+  private percussionBank = 128;
+  private percussionProgram = 0;
 
   constructor(private readonly options: FluidSynthOptions) {
     this.id = options.device.id;
@@ -253,14 +266,16 @@ export class FluidSynthOutput implements AudioOutput {
     this.gain = options.gain ?? 0.6;
     const defaultPercussion = "/usr/share/sounds/sf2/FluidR3_GM.sf2";
     this.percussionSoundFontPath = options.percussionSoundFontPath ?? (existsSync(defaultPercussion) ? defaultPercussion : null);
-    this.soundFontParameters = { bank: 0, program: 0, gain: this.gain, "chorus-send": 0.12, "reverb-send": 0.24, "chorus-rate": 0.3, "chorus-depth": 8, "chorus-voices": 3, "reverb-room": 0.2, "reverb-damping": 0, "reverb-width": 0.5 };
-    this.neonOutput = new NeonPressureOutput(options.device.pcm);
+    this.soundFontParameters = { bank: 0, program: 0, gain: this.gain, "reverb-send": 0.45, "reverb-room": 0.2, "reverb-damping": 0, "reverb-width": 0.5 };
+    this.neonOutput = new NeonPressureOutput(options.device.pcm, (reason) => this.recoverUnexpectedExit(reason));
   }
 
   async start(): Promise<void> {
     if (this.process) return;
     this.closing = false;
     await this.launch();
+    if (this.selectedSynthId === "subtractive") await this.neonOutput.start();
+    this.options.healthObserver?.(true);
   }
 
   private async launch(): Promise<void> {
@@ -272,8 +287,10 @@ export class FluidSynthOutput implements AudioOutput {
       child.once("spawn", resolve);
       child.once("error", reject);
     });
-    child.once("exit", () => {
-      if (this.process === child) this.process = null;
+    child.once("exit", (code, signal) => {
+      if (this.process !== child) return;
+      this.process = null;
+      if (!this.closing) this.recoverUnexpectedExit(`FluidSynth exited (${signal ?? code ?? "unknown"})`);
     });
     child.stdin.on("error", () => {});
     child.stderr.on("data", (chunk) => {
@@ -298,9 +315,8 @@ export class FluidSynthOutput implements AudioOutput {
   }
 
   panic(): void {
+    this.neonOutput.panic();
     for (let channel = 0; channel < 16; channel += 1) {
-      this.neonOutput.dispatchMidi({ type: "control-change", channel, controller: 64, value: 0 });
-      this.neonOutput.dispatchMidi({ type: "control-change", channel, controller: 123, value: 0 });
       for (const command of [
         `cc ${channel} 64 0`,
         `cc ${channel} 120 0`,
@@ -312,7 +328,7 @@ export class FluidSynthOutput implements AudioOutput {
   }
 
   dispatchMidi(event: MidiEvent): void {
-    if (this.selectedSynthId === "subtractive") {
+    if (this.selectedSynthId === "subtractive" && event.channel !== 9) {
       this.neonOutput.dispatchMidi(event);
       return;
     }
@@ -339,6 +355,14 @@ export class FluidSynthOutput implements AudioOutput {
       this.writeCommand(commands.noteOff);
     }, 80);
     this.clickTimers.add(timer);
+  }
+
+  selectDrumKit(bank: number, program: number): void {
+    if (!Number.isInteger(bank) || bank < 0 || bank > 16_383) throw new RangeError(`Drum-kit bank out of range: ${bank}`);
+    if (!Number.isInteger(program) || program < 0 || program > 127) throw new RangeError(`Drum-kit program out of range: ${program}`);
+    this.percussionBank = bank;
+    this.percussionProgram = program;
+    this.writeCommand(`select 9 ${this.percussionSoundFontId()} ${bank} ${program}`);
   }
 
   async loadSoundFont(path: string): Promise<void> {
@@ -408,6 +432,11 @@ export class FluidSynthOutput implements AudioOutput {
   private applySoundFontParameters(): void {
     for (const command of soundFontInitializationCommands(this.soundFontParameters)) this.writeCommand(command);
     for (const command of auxiliaryPercussionSelectionCommands(this.percussionSoundFontPath !== null)) this.writeCommand(command);
+    this.writeCommand(`select 9 ${this.percussionSoundFontId()} ${this.percussionBank} ${this.percussionProgram}`);
+  }
+
+  private percussionSoundFontId(): number {
+    return this.percussionSoundFontPath !== null ? 2 : 1;
   }
 
   private recover(child: ChildProcessWithoutNullStreams): void {
@@ -423,6 +452,29 @@ export class FluidSynthOutput implements AudioOutput {
       console.error(`FluidSynth audio recovery failed: ${String(error)}`);
     }).finally(() => {
       if (this.recovery === recovery) this.recovery = null;
+    });
+    this.recovery = recovery;
+  }
+
+  private recoverUnexpectedExit(reason: string): void {
+    if (this.closing) return;
+    this.options.healthObserver?.(false, reason);
+    if (this.recovery) {
+      this.pendingRecoveryReason = reason;
+      return;
+    }
+    const recovery = (async () => {
+      if (!this.process) await this.launch();
+      if (this.selectedSynthId === "subtractive") await this.neonOutput.start();
+      if (!this.pendingRecoveryReason) this.options.healthObserver?.(true);
+    })().catch((error) => {
+      this.options.healthObserver?.(false, `Audio recovery failed: ${error instanceof Error ? error.message : String(error)}`);
+    }).finally(() => {
+      if (this.recovery !== recovery) return;
+      this.recovery = null;
+      const pendingReason = this.pendingRecoveryReason;
+      this.pendingRecoveryReason = null;
+      if (pendingReason) this.recoverUnexpectedExit(pendingReason);
     });
     this.recovery = recovery;
   }
@@ -516,22 +568,15 @@ export function soundFontParameterCommands(parameterId: string, value: number, s
     case "bank": return soundFontSelectionCommands(Math.round(value), selection.program);
     case "program": return soundFontSelectionCommands(selection.bank, Math.round(value));
     case "gain": return [`gain ${value}`];
-    case "chorus-send": return [
-      `chorus ${value > 0 ? 1 : 0}`,
-      "cho_set_level 0.3",
-      ...performanceChannels.map((channel) => `cc ${channel} 93 ${Math.round(value * 127)}`),
-    ];
     case "reverb-send": return [
       `reverb ${value > 0 ? 1 : 0}`,
-      "rev_setlevel 0.3",
-      ...performanceChannels.map((channel) => `cc ${channel} 91 ${Math.round(value * 127)}`),
+      `rev_setlevel ${value}`,
+      ...performanceChannels.map((channel) => `cc ${channel} 91 ${value > 0 ? 127 : 0}`),
     ];
-    case "chorus-rate": return [`cho_set_speed ${value}`];
-    case "chorus-depth": return [`cho_set_depth ${value}`];
-    case "chorus-voices": return [`cho_set_nr ${Math.round(value)}`];
     case "reverb-room": return [`rev_setroomsize ${value}`];
     case "reverb-damping": return [`rev_setdamp ${value}`];
-    case "reverb-width": return [`rev_setwidth ${value * 100}`];
+    // Widths above 1 exaggerate the side signal and suppress tails in the Pi's mono mix.
+    case "reverb-width": return [`rev_setwidth ${value}`];
     default: throw new Error(`Unknown SoundFont parameter: ${parameterId}`);
   }
 }
@@ -539,7 +584,7 @@ export function soundFontParameterCommands(parameterId: string, value: number, s
 export function soundFontInitializationCommands(parameters: SoundFontParameterValues): string[] {
   return [
     ...soundFontSelectionCommands(parameters.bank, parameters.program),
-    ...["gain", "chorus-rate", "chorus-depth", "chorus-voices", "reverb-room", "reverb-damping", "reverb-width", "chorus-send", "reverb-send"].flatMap((parameterId) =>
+    ...["gain", "reverb-room", "reverb-damping", "reverb-width", "reverb-send"].flatMap((parameterId) =>
       soundFontParameterCommands(parameterId, parameters[parameterId as keyof SoundFontParameterValues], parameters)),
   ];
 }

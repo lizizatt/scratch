@@ -155,16 +155,174 @@ describe("control server", () => {
     socket.close();
   });
 
+  it("serializes host-submitted MIDI selections with WebSocket mutations", async () => {
+    engine = new SimulatedHostEngine({ drumKits: [
+      { id: "kit-a", bank: 128, program: 0, name: "A" },
+      { id: "kit-b", bank: 128, program: 1, name: "B" },
+    ] });
+    const order: string[] = [];
+    const executeCommand = vi.fn(async (command) => {
+      order.push(`start:${command.type}`);
+      await Promise.resolve();
+      const result = await engine!.execute(command);
+      order.push(`end:${command.type}`);
+      return result;
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "3958a14d-8146-4ae7-8ff6-959615dc2057", command: { type: "set-pad-navigation-target", target: "drum-kits" } }));
+    await collectUntil(inbox, (message) => message.type === "command-result");
+    const midiSelection = server.submit({ type: "step-pad-navigation", direction: 1 });
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "67ee1c87-9610-4568-966f-eae39b511bf5", command: { type: "step-pad-navigation", direction: 1 } }));
+    await midiSelection;
+    await collectUntil(inbox, (message) => message.type === "command-result");
+
+    expect(order).toEqual([
+      "start:set-pad-navigation-target", "end:set-pad-navigation-target",
+      "start:step-pad-navigation", "end:step-pad-navigation",
+      "start:step-pad-navigation", "end:step-pad-navigation",
+    ]);
+    expect(engine.snapshot().pads).toMatchObject({ selectedDrumKitId: "kit-a", navigationIndex: 0 });
+    socket.close();
+  });
+
+  it("executes mutating commands in receive order", async () => {
+    engine = new SimulatedHostEngine();
+    let releasePlay!: () => void;
+    const playGate = new Promise<void>((resolve) => { releasePlay = resolve; });
+    const order: string[] = [];
+    const executeCommand = vi.fn(async (command) => {
+      order.push(`start:${command.type}`);
+      if (command.type === "play") await playGate;
+      const result = await engine!.execute(command);
+      order.push(`end:${command.type}`);
+      return result;
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "01f84aaf-d5da-42ec-a791-7ee67d3af381", command: { type: "play" } }));
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "48a1cebf-a919-447e-b3d4-e120bc49f3df", command: { type: "stop" } }));
+    await vi.waitFor(() => expect(order).toEqual(["start:play"]));
+    releasePlay();
+    await collectCommandResults(inbox, 2);
+
+    expect(order).toEqual(["start:play", "end:play", "start:stop", "end:stop"]);
+    expect(engine.snapshot().transport.state).toBe("stopped");
+    socket.close();
+  });
+
+  it("shares one in-flight execution for duplicate command IDs", async () => {
+    engine = new SimulatedHostEngine();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const executeCommand = vi.fn(async (command) => {
+      await gate;
+      return engine!.execute(command);
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    const envelope = { protocolVersion: PROTOCOL_VERSION, commandId: "0c62f21e-e11c-4191-a9d8-b246045950b2", command: { type: "play" } };
+
+    socket.send(JSON.stringify(envelope));
+    socket.send(JSON.stringify(envelope));
+    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledTimes(1));
+    release();
+    const results = await collectCommandResults(inbox, 2);
+
+    expect(results[0]).toEqual(results[1]);
+    expect(executeCommand).toHaveBeenCalledTimes(1);
+    socket.close();
+  });
+
+  it("does not hold Stop behind a long-running export", async () => {
+    engine = new SimulatedHostEngine();
+    let releaseExport!: () => void;
+    const exportGate = new Promise<void>((resolve) => { releaseExport = resolve; });
+    const executeCommand = vi.fn(async (command) => {
+      if (command.type === "export-mp3") {
+        await exportGate;
+        const snapshot = engine!.snapshot();
+        return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+      }
+      return engine!.execute(command);
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "2030495e-26db-46d2-8283-8f01c3310fac", command: { type: "export-mp3", name: "Session" } }));
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "4f05d5d7-99b8-49c0-a116-c437f61620fd", command: { type: "stop" } }));
+    const firstResult = (await collectUntil(inbox, (message) => message.type === "command-result")).at(-1);
+
+    expect(firstResult).toMatchObject({ type: "command-result", commandId: "4f05d5d7-99b8-49c0-a116-c437f61620fd", accepted: true });
+    releaseExport();
+    await collectUntil(inbox, (message) => message.type === "command-result" && message.commandId === "2030495e-26db-46d2-8283-8f01c3310fac");
+    socket.close();
+  });
+
+  it("starts export after mutations received before it", async () => {
+    engine = new SimulatedHostEngine();
+    let releaseMutation!: () => void;
+    const mutationGate = new Promise<void>((resolve) => { releaseMutation = resolve; });
+    const order: string[] = [];
+    const executeCommand = vi.fn(async (command) => {
+      order.push(`start:${command.type}`);
+      if (command.type === "select-synth") await mutationGate;
+      const snapshot = engine!.snapshot();
+      const result = command.type === "export-mp3"
+        ? { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle }
+        : await engine!.execute(command);
+      order.push(`end:${command.type}`);
+      return result;
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "da69b458-bace-4d76-a61b-7a806d9dfc3e", command: { type: "select-synth", synthId: "subtractive" } }));
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "496bd415-f7d0-4bba-a73b-da323add3bf5", command: { type: "export-mp3", name: "Session" } }));
+    await vi.waitFor(() => expect(order).toEqual(["start:select-synth"]));
+    releaseMutation();
+    await collectCommandResults(inbox, 2);
+
+    expect(order).toEqual(["start:select-synth", "end:select-synth", "start:export-mp3", "end:export-mp3"]);
+    socket.close();
+  });
+
+  it("returns executor exceptions as rejected command results", async () => {
+    engine = new SimulatedHostEngine();
+    server = await createControlServer(engine, 0, undefined, async () => { throw new Error("catalog failed"); });
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "612f1dbb-e388-440d-817f-b775e1028d19", command: { type: "refresh-soundfonts" } }));
+    const messages = await collectUntil(inbox, (message) => message.type === "command-result");
+
+    expect(messages.at(-1)).toMatchObject({ accepted: false, error: "Command failed: catalog failed" });
+    socket.close();
+  });
+
   it("coalesces high-rate MIDI updates while delivering the latest state", async () => {
     engine = new SimulatedHostEngine();
     server = await createControlServer(engine);
     const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
     const inbox = new MessageInbox(socket);
     await inbox.next();
-    const snapshots: ServerMessage[] = [];
+    const updates: ServerMessage[] = [];
     socket.on("message", (data) => {
       const message = serverMessageSchema.parse(JSON.parse(data.toString()));
-      if (message.type === "snapshot") snapshots.push(message);
+      if (message.type === "snapshot-update") updates.push(message);
     });
 
     for (let index = 0; index < 256; index += 1) {
@@ -172,9 +330,15 @@ describe("control server", () => {
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    expect(snapshots.length).toBeGreaterThan(0);
-    expect(snapshots.length).toBeLessThanOrEqual(4);
-    expect(snapshots.at(-1)).toMatchObject({ snapshot: { engine: { midiEventsReceived: 256, lastMidiEvent: "pitch-bend" } } });
+    expect(updates.length).toBeGreaterThan(0);
+    expect(updates.length).toBeLessThanOrEqual(4);
+    expect(updates.at(-1)).toMatchObject({
+      update: {
+        engine: { midiEventsReceived: 256, lastMidiEvent: "pitch-bend" },
+        synth: expect.any(Object),
+        pads: expect.any(Object),
+      },
+    });
     socket.close();
   });
 
@@ -218,4 +382,13 @@ async function collectUntil(inbox: MessageInbox, predicate: (message: ServerMess
     messages.push(message);
     if (predicate(message)) return messages;
   }
+}
+
+async function collectCommandResults(inbox: MessageInbox, count: number): Promise<ServerMessage[]> {
+  const results: ServerMessage[] = [];
+  while (results.length < count) {
+    const message = await inbox.next();
+    if (message.type === "command-result") results.push(message);
+  }
+  return results;
 }

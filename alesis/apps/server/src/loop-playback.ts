@@ -33,6 +33,7 @@ export class MidiLoopScheduler {
   private playbackPosition = -1;
   private activeNotes = new Map<string, { takeId: string; channel: number; note: number }>();
   private activeBends = new Map<string, { takeId: string; channel: number; value: number }>();
+  private activeSustains = new Map<string, { takeId: string; channel: number; value: number }>();
   private takeChannels = new Map<string, number>();
 
   constructor(private readonly output: AudioOutput) {}
@@ -114,6 +115,16 @@ export class MidiLoopScheduler {
     this.retainedDeletedTakeId = null;
   }
 
+  hasCurrentRecording(): boolean {
+    return this.currentRecording.length > 0 || this.heldRecordingNotes.size > 0;
+  }
+
+  discardCurrentRecording(): void {
+    this.currentRecording = [];
+    this.heldRecordingNotes.clear();
+    this.recordingCycle = null;
+  }
+
   storageStats(): { recordings: number; rawRecordings: number; channels: number } {
     return { recordings: this.recordings.size, rawRecordings: this.rawRecordings.size, channels: this.takeChannels.size };
   }
@@ -167,6 +178,10 @@ export class MidiLoopScheduler {
       const key = `${takeId}:${event.channel}`;
       if (remapped.value === 0) this.activeBends.delete(key);
       else this.activeBends.set(key, { takeId, channel: remapped.channel, value: remapped.value });
+    } else if (remapped.type === "control-change" && remapped.controller === 64) {
+      const key = `${takeId}:${event.channel}`;
+      if (remapped.value < 64) this.activeSustains.delete(key);
+      else this.activeSustains.set(key, { takeId, channel: remapped.channel, value: remapped.value });
     }
   }
 
@@ -182,6 +197,12 @@ export class MidiLoopScheduler {
       const remaining = [...this.activeBends.values()].find((candidate) => candidate.channel === bend.channel && audibleTakeIds.has(candidate.takeId));
       this.output.dispatchMidi({ type: "pitch-bend", channel: bend.channel, value: remaining?.value ?? 0 });
     }
+    for (const [key, sustain] of this.activeSustains) {
+      if (audibleTakeIds.has(sustain.takeId)) continue;
+      this.activeSustains.delete(key);
+      const remaining = [...this.activeSustains.values()].find((candidate) => candidate.channel === sustain.channel && audibleTakeIds.has(candidate.takeId));
+      this.output.dispatchMidi({ type: "control-change", channel: sustain.channel, controller: 64, value: remaining?.value ?? 0 });
+    }
   }
 
   private releaseAllNotes(): void {
@@ -193,6 +214,10 @@ export class MidiLoopScheduler {
       this.output.dispatchMidi({ type: "pitch-bend", channel, value: 0 });
     }
     this.activeBends.clear();
+    for (const channel of new Set([...this.activeSustains.values()].map(({ channel }) => channel))) {
+      this.output.dispatchMidi({ type: "control-change", channel, controller: 64, value: 0 });
+    }
+    this.activeSustains.clear();
   }
 
   private channelFor(takeId: string): number {
@@ -239,7 +264,8 @@ export function quantizeRecording(recording: RecordedMidiEvent[], mode: Quantiza
   const gridSize = totalBeats * subdivisionsPerBeat[mode];
   const deduplicated = new Map<string, RecordedMidiEvent & { order: number }>();
   recording.forEach(({ position, event }, order) => {
-    const bin = Math.round(position * gridSize) % gridSize;
+    const terminalRelease = position === 1 && (event.type === "note-off" || event.type === "note-on" && event.velocity === 0);
+    const bin = terminalRelease ? gridSize : Math.round(position * gridSize) % gridSize;
     const quantized = bin / gridSize;
     const key = `${bin}:${eventIdentity(event)}`;
     deduplicated.set(key, { position: quantized, event: structuredClone(event), order });

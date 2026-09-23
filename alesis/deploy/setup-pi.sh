@@ -16,7 +16,7 @@ printf '%s  %s\n' "$soundfont_sha256" "$soundfont" | sha256sum --check --status 
   || { printf 'STH.sf2 checksum mismatch\n' >&2; exit 65; }
 
 apt-get update
-apt-get install -y --no-install-recommends alsa-utils chromium curl fluidsynth libasound2-dev nodejs npm rsync
+apt-get install -y --no-install-recommends alsa-utils chromium curl ffmpeg fluidsynth fluid-soundfont-gm libasound2-dev nodejs npm rsync
 
 if amixer -q -c Device set Speaker 151 unmute; then
   alsactl store Device

@@ -10,13 +10,20 @@ The Linux host owns MIDI, synthesis, transport, loops, and audio output. Browser
 - HS Synthetic Electronic and other host SoundFonts through FluidSynth.
 - Named SoundFont presets, bounded effects, and the Neon Pressure subtractive synth.
 - Host-timed arpeggiator and synchronized drum patterns.
-- MIDI loop capture with staging, promotion, mute, level, delete/undo, pitch bend, and percussion-channel preservation.
+- Independent drum/sample pad mode, preset navigation, and live MP3 sample pads.
+- MIDI loop capture with staging, up to 12 promoted layers, mute, level, delete/undo, pitch bend, and percussion-channel preservation.
 - Staged quantization at 1/4, 1/8, 1/16, or 1/32 resolution.
 - A silent previous-staged recovery slot that expires after one cycle.
 - Beat-aligned waveform intensity summaries and a monitor-only metronome.
 - Named MP3 export of every promoted take plus a merged mix.
 
 PCM loop capture and session persistence are not implemented.
+Live sample-pad triggers are not included in loop capture or MP3 exports. The
+sample-pad controls show host/controller state only; the host cannot write the
+Vortex's onboard display, and host UI changes do not synchronize that display.
+
+See [Sample pads](docs/SAMPLE_PADS.md) for configuring a sample library, making
+synthetic test pages, the Vortex Program Change setup, and sample limits.
 
 Use the save control in the Loops toolbar to choose a folder name. The host writes every promoted take, including muted takes, to `~/alesis_recordings/<name>/track-01.mp3`, `track-02.mp3`, and so on, with the combined result at `mix.mp3`. Existing folders are never overwritten.
 

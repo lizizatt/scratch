@@ -11,6 +11,7 @@ describe("MIDI normalization", () => {
     expect(decodeMidiMessage([0xb0, 64, 127])).toEqual({ type: "control-change", channel: 0, controller: 64, value: 127 });
     expect(decodeMidiMessage([0xd0, 73])).toEqual({ type: "channel-pressure", channel: 0, value: 73 });
     expect(decodeMidiMessage([0xe0, 0, 64])).toEqual({ type: "pitch-bend", channel: 0, value: 0 });
+    expect(decodeMidiMessage([0xc3, 17])).toEqual({ type: "program-change", channel: 3, program: 17 });
   });
 
   it("models expressive Vortex controls without hardware", () => {
@@ -22,11 +23,13 @@ describe("MIDI normalization", () => {
     vortex.pitchBend(-0.5);
     vortex.control("accelerometer", 96);
     vortex.pressure(70);
+    vortex.programChange(12, 9);
     vortex.keyUp(64);
 
     expect(listener.mock.calls.map(([event]) => event.type)).toEqual([
-      "note-on", "pitch-bend", "control-change", "channel-pressure", "note-off",
+      "note-on", "pitch-bend", "control-change", "channel-pressure", "program-change", "note-off",
     ]);
+    expect(listener.mock.calls[4]?.[0]).toEqual({ type: "program-change", channel: 9, program: 12 });
   });
 
   it.each(["13B2:005E", "13B2:005F"])("discovers the Vortex USB device %s rather than relying on its ALSA card number", (usbId) => {
@@ -65,12 +68,13 @@ describe("MIDI normalization", () => {
 
     decoder.push([0x90, 60]);
     decoder.push([0xf8, 100, 62, 0, 0xf0, 1, 2]);
-    decoder.push([0xf7, 0xe0, 0, 64]);
+    decoder.push([0xf7, 0xe0, 0, 64, 0xc2, 7]);
 
     expect(events).toEqual([
       { type: "note-on", channel: 0, note: 60, velocity: 100 },
       { type: "note-off", channel: 0, note: 62 },
       { type: "pitch-bend", channel: 0, value: 0 },
+      { type: "program-change", channel: 2, program: 7 },
     ]);
   });
 });

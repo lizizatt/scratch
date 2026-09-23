@@ -51,6 +51,20 @@ describe("PerformanceRouter", () => {
     ]);
   });
 
+  it("centers every channel that received a fanned pitch bend", () => {
+    const router = new PerformanceRouter();
+    router.route({ type: "note-on", channel: 1, note: 60, velocity: 100 });
+    router.route({ type: "note-on", channel: 2, note: 67, velocity: 100 });
+    router.route({ type: "pitch-bend", channel: 0, value: 0.5 });
+    router.route({ type: "note-off", channel: 1, note: 60 });
+    router.route({ type: "note-off", channel: 2, note: 67 });
+
+    expect(router.route({ type: "pitch-bend", channel: 0, value: 0 })).toEqual([
+      { type: "pitch-bend", channel: 1, value: 0 },
+      { type: "pitch-bend", channel: 2, value: 0 },
+    ]);
+  });
+
   it("routes sustain press and release onto every active note channel", () => {
     const router = new PerformanceRouter();
     router.route({ type: "note-on", channel: 1, note: 67, velocity: 100 });

@@ -12,6 +12,7 @@ function fakeOutput(): AudioOutput & { playMetronome: ReturnType<typeof vi.fn> }
     dispatchMidi: () => {},
     playMetronome: vi.fn(),
     playDrum: () => {},
+    selectDrumKit: () => {},
     loadSoundFont: async () => {},
     selectSoundFontPreset: () => {},
     selectSynth: async () => {},

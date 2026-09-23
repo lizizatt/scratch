@@ -3,7 +3,11 @@ import {
   engineSnapshotSchema,
   type EngineCommand,
   type EngineSnapshot,
+  type DrumKit,
   type InstrumentDescriptor,
+  type PadNavigationTarget,
+  type Pads,
+  type SamplePad,
   type SoundFont,
   type SoundFontPreset,
   type Take,
@@ -48,14 +52,9 @@ const instruments: InstrumentDescriptor[] = [
   {
     id: "soundfont", name: "SoundFont Player", engine: "fluidsynth", controls: [
       { id: "gain", label: "Volume", kind: "range", group: "output", advanced: false, defaultValue: 0.72, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
-      { id: "chorus-send", label: "Chorus Send", kind: "range", group: "effects", advanced: false, defaultValue: 0.12, minimum: 0, maximum: 0.5, step: 0.005, unit: "%" },
-      { id: "reverb-send", label: "Reverb Send", kind: "range", group: "effects", advanced: false, defaultValue: 0.24, minimum: 0, maximum: 0.5, step: 0.005, unit: "%" },
-      { id: "chorus-rate", label: "Chorus Rate", kind: "range", group: "effects", advanced: true, defaultValue: 0.3, minimum: 0.2, maximum: 2, step: 0.01, unit: "Hz" },
-      { id: "chorus-depth", label: "Chorus Depth", kind: "range", group: "effects", advanced: true, defaultValue: 8, minimum: 0, maximum: 20, step: 0.1, unit: "ms" },
-      { id: "chorus-voices", label: "Chorus Voices", kind: "range", group: "effects", advanced: true, defaultValue: 3, minimum: 0, maximum: 8, step: 1, unit: "" },
+      { id: "reverb-send", label: "Reverb Mix", kind: "range", group: "effects", advanced: false, defaultValue: 0.45, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
       { id: "reverb-room", label: "Room Size", kind: "range", group: "effects", advanced: true, defaultValue: 0.2, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
       { id: "reverb-damping", label: "Damping", kind: "range", group: "effects", advanced: true, defaultValue: 0, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
-      { id: "reverb-width", label: "Stereo Width", kind: "range", group: "effects", advanced: true, defaultValue: 0.5, minimum: 0, maximum: 1, step: 0.005, unit: "%" },
     ],
   },
 ];
@@ -67,11 +66,14 @@ interface DeletedTake {
   index: number;
 }
 
+const maxPromotedTakes = 12;
+
 export interface SimulatedHostEngineOptions {
   soundFonts?: SoundFont[];
   selectedSoundFontId?: string | null;
   soundFontPresets?: SoundFontPreset[];
   selectedSoundFontPresetId?: string | null;
+  drumKits?: DrumKit[];
 }
 
 export class SimulatedHostEngine implements HostEngine {
@@ -89,6 +91,7 @@ export class SimulatedHostEngine implements HostEngine {
     const selectedSoundFontId = options.selectedSoundFontId ?? soundFonts[0]?.id ?? null;
     const soundFontPresets = options.soundFontPresets ?? [];
     const selectedSoundFontPresetId = options.selectedSoundFontPresetId ?? soundFontPresets[0]?.id ?? null;
+    const drumKits = options.drumKits ?? [];
     this.state = engineSnapshotSchema.parse({
       protocolVersion: PROTOCOL_VERSION,
       revision: 0,
@@ -115,12 +118,25 @@ export class SimulatedHostEngine implements HostEngine {
         selectedSoundFontPresetId,
         parameterValues: defaultParameterValues(instruments[0]!),
       },
+      pads: {
+        mode: "drums",
+        navigationTarget: "voices",
+        navigationIndex: 0,
+        navigationCount: 0,
+        selectedDrumKitId: drumKits[0]?.id ?? null,
+        samplePageIndex: 0,
+        samplePageCount: 0,
+        samplePage: emptySamplePage(),
+        sampleLibraryStatus: "loading",
+        drumKits: structuredClone(drumKits),
+      },
       arpeggiator: { enabled: false, mode: "up", rate: "1/8", octaves: 1, gate: 0.5, latch: false, swing: 0 },
       drums: { enabled: false, pattern: "four-on-floor", volume: 0.7 },
-      capture: { currentWaveform: [], staged: null, previousStaged: null, stagedAudible: true, quantization: "off" },
+      capture: { currentWaveform: [], hasCurrentEvents: false, staged: null, previousStaged: null, stagedAudible: true, quantization: "off" },
       promoted: [],
       canUndoDelete: false,
     });
+    this.updatePadNavigation(false);
   }
 
   snapshot(): EngineSnapshot {
@@ -137,15 +153,22 @@ export class SimulatedHostEngine implements HostEngine {
     const noteKey = "note" in event ? `${event.channel}:${event.note}` : null;
     if (event.type === "note-on" && event.velocity > 0) this.activeNotes.set(noteKey!, event.velocity);
     if (noteKey && (event.type === "note-off" || (event.type === "note-on" && event.velocity === 0))) this.activeNotes.delete(noteKey);
-    if (this.state.transport.state === "playing") this.writeIntensity(this.state.transport.progress, this.state.transport.progress);
+    if (this.state.transport.state === "playing") {
+      this.state.capture.hasCurrentEvents = true;
+      this.writeIntensity(this.state.transport.progress, this.state.transport.progress);
+    }
     this.state.engine.midiEventsReceived += 1;
     this.state.engine.lastMidiEvent = event.type;
     this.publish();
   }
 
+  markCaptureActivity(): void {
+    if (this.state.transport.state === "playing") this.state.capture.hasCurrentEvents = true;
+  }
+
   async execute(command: EngineCommand): Promise<EngineResult> {
     const result = this.applyCommand(command);
-    if (result.accepted) this.publish();
+    if (result.accepted) this.publish(false);
     return result;
   }
 
@@ -160,6 +183,7 @@ export class SimulatedHostEngine implements HostEngine {
     }
     this.state.synth.soundFonts = structuredClone(soundFonts);
     this.state.synth.selectedSoundFontId = selectedSoundFontId;
+    this.updatePadNavigation(false);
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
@@ -171,6 +195,7 @@ export class SimulatedHostEngine implements HostEngine {
     }
     this.state.synth.soundFontPresets = structuredClone(presets);
     this.state.synth.selectedSoundFontPresetId = selectedPresetId;
+    this.updatePadNavigation(false);
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
@@ -186,6 +211,7 @@ export class SimulatedHostEngine implements HostEngine {
     this.state.synth.selectedSoundFontId = soundFontId;
     this.state.synth.soundFontPresets = structuredClone(presets);
     this.state.synth.selectedSoundFontPresetId = selectedPresetId;
+    this.updatePadNavigation(false);
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
@@ -202,9 +228,37 @@ export class SimulatedHostEngine implements HostEngine {
     this.state.synth.selectedSoundFontId = soundFontId;
     this.state.synth.soundFontPresets = structuredClone(presets);
     this.state.synth.selectedSoundFontPresetId = selectedPresetId;
+    this.updatePadNavigation(false);
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
+  }
+
+  replaceDrumKits(drumKits: DrumKit[]): void {
+    this.state.pads.drumKits = structuredClone(drumKits);
+    if (!drumKits.some(({ id }) => id === this.state.pads.selectedDrumKitId)) {
+      this.state.pads.selectedDrumKitId = drumKits[0]?.id ?? null;
+    }
+    this.updatePadNavigation(false);
+    this.state.revision += 1;
+    this.publish(false);
+  }
+
+  setSampleLibraryStatus(status: Pads["sampleLibraryStatus"], error?: string): void {
+    this.state.pads.sampleLibraryStatus = status;
+    if (error === undefined) delete this.state.pads.sampleLibraryError;
+    else this.state.pads.sampleLibraryError = error;
+    this.state.revision += 1;
+    this.publish(false);
+  }
+
+  setSamplePage(index: number, count: number, page: SamplePad[]): void {
+    this.state.pads.samplePageIndex = Math.max(0, index);
+    this.state.pads.samplePageCount = Math.max(0, count);
+    this.state.pads.samplePage = page.length === 8 ? structuredClone(page) : emptySamplePage();
+    if (this.state.pads.navigationTarget === "sample-pages") this.updatePadNavigation(false);
+    this.state.revision += 1;
+    this.publish(false);
   }
 
   advance(seconds: number): void {
@@ -274,6 +328,7 @@ export class SimulatedHostEngine implements HostEngine {
         this.state.transport.state = "stopped";
         this.state.transport.progress = 0;
         this.state.capture.currentWaveform = [];
+        this.state.capture.hasCurrentEvents = false;
         this.currentWaveform = emptyWaveform();
         this.elapsedSeconds = 0;
         this.countInSecondsRemaining = 0;
@@ -310,13 +365,39 @@ export class SimulatedHostEngine implements HostEngine {
       case "select-soundfont":
         if (!this.state.synth.soundFonts.some(({ id }) => id === command.soundFontId)) return reject(`Unknown SoundFont: ${command.soundFontId}`);
         this.state.synth.selectedSoundFontId = command.soundFontId;
+        this.updatePadNavigation(false);
         break;
       case "select-soundfont-preset":
         if (!this.state.synth.soundFontPresets.some(({ id }) => id === command.presetId)) return reject(`Unknown SoundFont preset: ${command.presetId}`);
         this.state.synth.selectedSoundFontPresetId = command.presetId;
+        this.updatePadNavigation(false);
         break;
       case "refresh-soundfonts":
         return reject("SoundFont refresh requires the host catalog");
+      case "set-pad-mode":
+        this.state.pads.mode = command.mode;
+        break;
+      case "set-pad-navigation-target":
+        this.state.pads.navigationTarget = command.target;
+        this.updatePadNavigation(false);
+        break;
+      case "select-pad-program": {
+        const count = this.padNavigationCount();
+        if (command.program >= count) return reject("Pad program is outside the available navigation range");
+        this.state.pads.navigationIndex = command.program;
+        this.applyPadNavigationIndex();
+        break;
+      }
+      case "step-pad-navigation": {
+        const count = this.padNavigationCount();
+        if (count === 0) return reject("No entries are available for pad navigation");
+        this.state.pads.navigationIndex = (this.state.pads.navigationIndex + command.direction + count) % count;
+        this.applyPadNavigationIndex();
+        break;
+      }
+      case "refresh-samples":
+      case "trigger-sample-pad":
+        return reject(`${command.type} requires the host sample service`);
       case "set-synth-parameter": {
         const instrument = this.state.synth.instruments.find(({ id }) => id === this.state.synth.selectedId);
         const control = instrument?.controls.find(({ id }) => id === command.parameterId);
@@ -351,11 +432,13 @@ export class SimulatedHostEngine implements HostEngine {
         break;
       case "promote-staged":
         if (!this.state.capture.staged) return reject("No staged take to promote");
+        if (this.state.promoted.length >= maxPromotedTakes) return reject(`At most ${maxPromotedTakes} promoted takes are supported`);
         this.state.promoted.push(this.state.capture.staged);
         this.state.capture.staged = null;
         break;
       case "promote-previous-staged":
         if (!this.state.capture.previousStaged) return reject("No previous staged take to promote");
+        if (this.state.promoted.length >= maxPromotedTakes) return reject(`At most ${maxPromotedTakes} promoted takes are supported`);
         this.state.promoted.push({ ...this.state.capture.previousStaged, muted: false });
         this.state.capture.previousStaged = null;
         break;
@@ -405,12 +488,71 @@ export class SimulatedHostEngine implements HostEngine {
       waveform: [...this.currentWaveform],
     };
     this.currentWaveform = emptyWaveform();
+    this.state.capture.hasCurrentEvents = false;
     this.state.transport.cycle += 1;
     this.state.revision += 1;
   }
 
+  private padNavigationCount(target: PadNavigationTarget = this.state.pads.navigationTarget): number {
+    if (target === "voices") return this.voicesInCurrentBank().length;
+    if (target === "drum-kits") return this.sortedDrumKits().length;
+    return this.state.pads.samplePageCount;
+  }
+
+  private updatePadNavigation(preserveIndex: boolean): void {
+    const pads = this.state.pads;
+    const target = pads.navigationTarget;
+    const count = this.padNavigationCount(target);
+    pads.navigationCount = count;
+    if (count === 0) {
+      pads.navigationIndex = 0;
+      return;
+    }
+    if (preserveIndex) {
+      pads.navigationIndex = Math.min(pads.navigationIndex, count - 1);
+      return;
+    }
+    if (target === "voices") {
+      const selected = this.voicesInCurrentBank().findIndex(({ id }) => id === this.state.synth.selectedSoundFontPresetId);
+      pads.navigationIndex = selected >= 0 ? selected : 0;
+    } else if (target === "drum-kits") {
+      const selected = this.sortedDrumKits().findIndex(({ id }) => id === pads.selectedDrumKitId);
+      pads.navigationIndex = selected >= 0 ? selected : 0;
+    } else {
+      pads.navigationIndex = Math.min(pads.samplePageIndex, count - 1);
+    }
+  }
+
+  private applyPadNavigationIndex(): void {
+    const { navigationTarget, navigationIndex } = this.state.pads;
+    if (navigationTarget === "voices") {
+      const preset = this.voicesInCurrentBank()[navigationIndex];
+      if (preset) this.state.synth.selectedSoundFontPresetId = preset.id;
+    } else if (navigationTarget === "drum-kits") {
+      const kit = this.sortedDrumKits()[navigationIndex];
+      if (kit) this.state.pads.selectedDrumKitId = kit.id;
+    } else {
+      this.state.pads.samplePageIndex = navigationIndex;
+    }
+    this.updatePadNavigation(true);
+  }
+
+  private voicesInCurrentBank(): SoundFontPreset[] {
+    const selected = this.state.synth.soundFontPresets.find(({ id }) => id === this.state.synth.selectedSoundFontPresetId);
+    const bank = selected?.bank ?? 0;
+    return this.state.synth.soundFontPresets
+      .filter((preset) => preset.bank === bank)
+      .sort((left, right) => left.program - right.program || left.name.localeCompare(right.name));
+  }
+
+  private sortedDrumKits(): DrumKit[] {
+    return [...this.state.pads.drumKits]
+      .sort((left, right) => left.bank - right.bank || left.program - right.program || left.name.localeCompare(right.name));
+  }
+
   private clearAudio(): void {
     this.state.capture.currentWaveform = [];
+    this.state.capture.hasCurrentEvents = false;
     this.state.capture.staged = null;
     this.state.capture.previousStaged = null;
     this.state.promoted = [];
@@ -456,4 +598,8 @@ function defaultParameterValues(instrument: InstrumentDescriptor): Record<string
 
 function emptyWaveform(): number[] {
   return Array.from({ length: waveformBucketCount }, () => 0);
+}
+
+function emptySamplePage(): SamplePad[] {
+  return Array.from({ length: 8 }, () => null);
 }

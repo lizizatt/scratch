@@ -9,6 +9,14 @@ async function captureOneCycle(engine: SimulatedHostEngine): Promise<void> {
 }
 
 describe("SimulatedHostEngine", () => {
+  it("returns the revision published in the authoritative snapshot", async () => {
+    const engine = new SimulatedHostEngine();
+
+    const result = await engine.execute({ type: "configure", settings: { bpm: 96 } });
+
+    expect(result.revision).toBe(engine.snapshot().revision);
+  });
+
   it("does not publish unchanged snapshots while transport is stopped", () => {
     const engine = new SimulatedHostEngine();
     let snapshots = 0;
@@ -45,6 +53,24 @@ describe("SimulatedHostEngine", () => {
     expect(snapshot.synth.parameterValues.cutoff).toBeUndefined();
   });
 
+  it("exposes Reverb Mix through 100 percent", async () => {
+    const engine = new SimulatedHostEngine();
+    await engine.execute({ type: "select-synth", synthId: "soundfont" });
+    const instrument = engine.snapshot().synth.instruments.find(({ id }) => id === "soundfont")!;
+    const parameterId = "reverb-send";
+    expect(instrument.controls.find(({ id }) => id === parameterId)).toMatchObject({ label: "Reverb Mix", minimum: 0, maximum: 1, unit: "%" });
+    expect(instrument.controls.some(({ id }) => id.startsWith("chorus-"))).toBe(false);
+
+    for (const value of [0, 0.5, 0.75, 1]) {
+      expect((await engine.execute({ type: "set-synth-parameter", parameterId, value })).accepted).toBe(true);
+      expect(engine.snapshot().synth.parameterValues[parameterId]).toBe(value);
+    }
+    for (const value of [-0.01, 1.01]) {
+      expect((await engine.execute({ type: "set-synth-parameter", parameterId, value })).accepted).toBe(false);
+      expect(engine.snapshot().synth.parameterValues[parameterId]).toBe(1);
+    }
+  });
+
   it("selects only SoundFonts from the host catalog", async () => {
     const engine = new SimulatedHostEngine({
       soundFonts: [{ id: "sonic", name: "Sonic" }, { id: "fluid", name: "FluidR3" }],
@@ -56,6 +82,55 @@ describe("SimulatedHostEngine", () => {
     expect(engine.snapshot().synth.selectedSoundFontId).toBe("fluid");
     expect((await engine.execute({ type: "select-soundfont", soundFontId: "missing" })).accepted).toBe(false);
     expect(engine.snapshot().synth.selectedSoundFontId).toBe("fluid");
+  });
+
+  it("limits pad voice navigation to the selected bank and ignores out-of-range programs", async () => {
+    const presets = [
+      { id: "5:40", bank: 5, program: 40, name: "Zeta" },
+      { id: "2:1", bank: 2, program: 1, name: "Other bank" },
+      { id: "5:3", bank: 5, program: 3, name: "Alpha" },
+    ];
+    const engine = new SimulatedHostEngine({ soundFontPresets: presets, selectedSoundFontPresetId: "5:40" });
+
+    expect(engine.snapshot().pads).toMatchObject({ navigationTarget: "voices", navigationIndex: 1, navigationCount: 2 });
+    expect((await engine.execute({ type: "select-pad-program", program: 0 })).accepted).toBe(true);
+    expect(engine.snapshot().synth.selectedSoundFontPresetId).toBe("5:3");
+    expect(engine.snapshot().synth.soundFontPresets.find(({ id }) => id === engine.snapshot().synth.selectedSoundFontPresetId)?.bank).toBe(5);
+    expect((await engine.execute({ type: "select-pad-program", program: 2 })).accepted).toBe(false);
+    expect(engine.snapshot().synth.selectedSoundFontPresetId).toBe("5:3");
+  });
+
+  it("wraps kit navigation server-side and updates the selected kit", async () => {
+    const engine = new SimulatedHostEngine({
+      drumKits: [
+        { id: "kit-2", bank: 128, program: 2, name: "Two" },
+        { id: "kit-0", bank: 128, program: 0, name: "Zero" },
+      ],
+    });
+    await engine.execute({ type: "set-pad-navigation-target", target: "drum-kits" });
+
+    expect(engine.snapshot().pads).toMatchObject({ navigationIndex: 1, navigationCount: 2, selectedDrumKitId: "kit-2" });
+    expect((await engine.execute({ type: "step-pad-navigation", direction: 1 })).accepted).toBe(true);
+    expect(engine.snapshot().pads).toMatchObject({ navigationIndex: 0, selectedDrumKitId: "kit-0" });
+    expect((await engine.execute({ type: "step-pad-navigation", direction: -1 })).accepted).toBe(true);
+    expect(engine.snapshot().pads).toMatchObject({ navigationIndex: 1, selectedDrumKitId: "kit-2" });
+  });
+
+  it("tracks exactly eight sample pads and wraps sample page navigation", async () => {
+    const engine = new SimulatedHostEngine();
+    engine.setSamplePage(0, 3, [
+      { id: "sample-a", name: "A", pad: 0 },
+      null, null, null, null, null, null, null,
+    ]);
+    await engine.execute({ type: "set-pad-mode", mode: "samples" });
+    await engine.execute({ type: "set-pad-navigation-target", target: "sample-pages" });
+
+    expect(engine.snapshot().pads.samplePage).toHaveLength(8);
+    expect(engine.snapshot().pads.samplePage[0]).toEqual({ id: "sample-a", name: "A", pad: 0 });
+    expect((await engine.execute({ type: "select-pad-program", program: 2 })).accepted).toBe(true);
+    expect(engine.snapshot().pads.samplePageIndex).toBe(2);
+    expect((await engine.execute({ type: "step-pad-navigation", direction: 1 })).accepted).toBe(true);
+    expect(engine.snapshot().pads.samplePageIndex).toBe(0);
   });
 
   it("replaces the SoundFont catalog while preserving a valid selection", () => {
@@ -102,6 +177,18 @@ describe("SimulatedHostEngine", () => {
     engine.dispatchMidi({ type: "pitch-bend", channel: 0, value: 0.5 });
 
     expect(engine.snapshot().engine).toMatchObject({ midiEventsReceived: 1, lastMidiEvent: "pitch-bend" });
+  });
+
+  it("reports current capture activity until the cycle rolls over", async () => {
+    const engine = new SimulatedHostEngine();
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+
+    engine.dispatchMidi({ type: "note-on", channel: 0, note: 60, velocity: 100 });
+    expect(engine.snapshot().capture.hasCurrentEvents).toBe(true);
+
+    engine.advance(2);
+    expect(engine.snapshot().capture.hasCurrentEvents).toBe(false);
   });
 
   it("counts in, captures, and rolls a cycle into staging", async () => {
@@ -217,6 +304,22 @@ describe("SimulatedHostEngine", () => {
 
     await engine.execute({ type: "undo-delete" });
     expect(engine.snapshot().promoted[0]).toMatchObject({ id: takeId, level: 0.55, muted: true });
+  });
+
+  it("keeps promoted takes within isolated melodic playback capacity", async () => {
+    const engine = new SimulatedHostEngine();
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+    for (let index = 0; index < 12; index += 1) {
+      engine.advance(2);
+      expect((await engine.execute({ type: "promote-staged" })).accepted).toBe(true);
+    }
+    engine.advance(2);
+
+    const result = await engine.execute({ type: "promote-staged" });
+
+    expect(result).toMatchObject({ accepted: false, error: "At most 12 promoted takes are supported" });
+    expect(engine.snapshot().promoted).toHaveLength(12);
   });
 
   it("stops by discarding partial capture while retaining staged audio", async () => {

@@ -14,6 +14,7 @@ describe("Pi deployment", () => {
     expect(setup).toContain('ln -sfn /dev/null "$runtime_home/.config/systemd/user/$unit"');
     expect(setup).toContain('install -o root -g root -m 0644 "$root/deploy/asoundrc" /etc/asound.conf');
     expect(setup).toContain("amixer -q -c Device set Speaker 151 unmute");
+    expect(setup).toContain("ffmpeg fluidsynth fluid-soundfont-gm");
   });
 
   it("runs the server as the default user with bounded crash restart", async () => {

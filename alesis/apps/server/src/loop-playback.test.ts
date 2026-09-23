@@ -12,6 +12,7 @@ function fakeOutput(): AudioOutput & { dispatchMidi: ReturnType<typeof vi.fn> } 
     dispatchMidi: vi.fn(),
     playMetronome: () => {},
     playDrum: () => {},
+    selectDrumKit: () => {},
     loadSoundFont: async () => {},
     selectSoundFontPreset: () => {},
     selectSynth: async () => {},
@@ -85,6 +86,18 @@ describe("MidiLoopScheduler", () => {
   it("wraps events nearest the loop end onto the first circular bin", () => {
     const result = quantizeRecording([{ position: 0.99, event: { type: "note-off", channel: 0, note: 60 } }], "1/4", 4);
     expect(result[0]?.position).toBe(0);
+  });
+
+  it("preserves a terminal release for a note held through the full cycle", () => {
+    const result = quantizeRecording([
+      { position: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
+      { position: 1, event: { type: "note-off", channel: 0, note: 60 } },
+    ], "1/4", 4);
+
+    expect(result).toEqual([
+      { position: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
+      { position: 1, event: { type: "note-off", channel: 0, note: 60 } },
+    ]);
   });
 
   it.each(["1/4", "1/8", "1/16", "1/32"] as const)("keeps every %s arrival within half a grid step", (mode) => {
@@ -183,6 +196,18 @@ describe("MidiLoopScheduler", () => {
     expect(scheduler.storageStats()).toEqual({ recordings: 2, rawRecordings: 1, channels: 2 });
     scheduler.clearRecordings();
     expect(scheduler.storageStats()).toEqual({ recordings: 0, rawRecordings: 0, channels: 0 });
+  });
+
+  it("discards a partial current recording synchronously", async () => {
+    const engine = new SimulatedHostEngine();
+    const scheduler = new MidiLoopScheduler(fakeOutput());
+    await engine.execute({ type: "configure", settings: { countInEnabled: false } });
+    await engine.execute({ type: "play" });
+    scheduler.record({ type: "note-on", channel: 0, note: 60, velocity: 100 }, engine.snapshot());
+
+    expect(scheduler.hasCurrentRecording()).toBe(true);
+    scheduler.discardCurrentRecording();
+    expect(scheduler.hasCurrentRecording()).toBe(false);
   });
 
   it("exports defensive copies of requested retained recordings", async () => {
@@ -296,6 +321,23 @@ describe("MidiLoopScheduler", () => {
     await engine.execute({ type: "set-staged-audible", audible: false });
     scheduler.update(engine.snapshot());
     expect(output.dispatchMidi).toHaveBeenLastCalledWith({ type: "note-off", channel: 1, note: 69 });
+  });
+
+  it("releases sustain when a sounding take is muted", async () => {
+    const engine = new SimulatedHostEngine();
+    const output = fakeOutput();
+    const scheduler = new MidiLoopScheduler(output);
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+    record(engine, scheduler, { type: "control-change", channel: 0, controller: 64, value: 127 });
+    engine.advance(2);
+    scheduler.update(engine.snapshot());
+    output.dispatchMidi.mockClear();
+
+    await engine.execute({ type: "set-staged-audible", audible: false });
+    scheduler.update(engine.snapshot());
+
+    expect(output.dispatchMidi).toHaveBeenCalledWith({ type: "control-change", channel: 1, controller: 64, value: 0 });
   });
 
   it("releases held playback notes before retriggering them at a cycle boundary", async () => {

@@ -98,7 +98,7 @@ async function sendCommands(port, commands) {
   for (const command of commands) {
     const commandId = randomUUID();
     pending.add(commandId);
-    socket.send(JSON.stringify({ protocolVersion: 1, commandId, command }));
+    socket.send(JSON.stringify({ protocolVersion: 3, commandId, command }));
   }
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Timed out waiting for audio-host commands")), 3_000);

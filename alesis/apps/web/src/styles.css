@@ -48,15 +48,51 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .parameter { min-width: 0; display: grid; align-content: center; gap: 12px; color: var(--dim); text-align: center; text-transform: uppercase; }
 .parameter input { width: 100%; accent-color: var(--cyan); }
 .parameter output { color: var(--cyan); }
-.effects-advanced { grid-column: 1 / -1; min-width: 0; color: var(--dim); text-transform: uppercase; }
-.effects-advanced summary { cursor: pointer; font-size: 11px; }
-.effects-controls { margin-top: 10px; display: grid; grid-template-columns: repeat(6,minmax(70px,1fr)); gap: 12px; }
+.effects-rack { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0,1fr); }
+.effect-module { min-width: 0; display: grid; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.effect-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.effect-heading h2 { margin: 0; color: var(--ice); font: 700 clamp(16px,2vw,24px) "Space Mono",monospace; text-transform: uppercase; }
+.effect-toggle { display: flex; align-items: center; gap: 7px; color: var(--dim); font-size: 11px; text-transform: uppercase; }
+.effect-toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--cyan); }
+.effect-mix { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 10px; color: var(--dim); text-transform: uppercase; }
+.effect-mix input { min-width: 0; width: 100%; accent-color: var(--cyan); }
+.effect-mix output { min-width: 44px; color: var(--cyan); text-align: right; }
+.effect-advanced { color: var(--dim); text-transform: uppercase; }
+.effect-advanced summary { cursor: pointer; font-size: 11px; }
+.effects-controls { margin-top: 10px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .midi-effect { width: min(1080px,88vw); margin: 8px auto 0; color: var(--dim); text-transform: uppercase; }
 .midi-effect summary { cursor: pointer; font-size: 11px; }
 .midi-effect-grid { margin-top: 8px; display: grid; grid-template-columns: repeat(7,minmax(80px,1fr)); gap: 8px; }
 .midi-effect-grid label { min-width: 0; display: grid; gap: 4px; font-size: 9px; }
 .midi-effect-grid input, .midi-effect-grid select { min-width: 0; width: 100%; color: var(--cyan); background: #000; accent-color: var(--cyan); }
 .drum-effect-grid { grid-template-columns: repeat(3,minmax(100px,1fr)); }
+.pads-pane { padding: clamp(24px,5vh,42px) 5vw 72px; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--blue) #000; scrollbar-width: thin; }
+.pads-heading { width: min(1040px,100%); margin: 0 auto 14px; display: flex; align-items: end; justify-content: space-between; gap: 18px; }
+.pads-heading h1 { margin: 3px 0 0; color: var(--ice); font: 700 clamp(18px,2.6vw,28px) "Space Mono",monospace; letter-spacing: .08em; }
+.pad-settings { display: flex; gap: 9px; }
+.pad-settings label, .pad-entry-picker { min-width: 0; display: grid; gap: 4px; color: var(--dim); font-size: 9px; text-transform: uppercase; }
+.pad-settings select, .pad-entry-picker select { min-width: 120px; height: 34px; padding: 0 8px; color: var(--ice); border: 1px solid var(--line); border-radius: 5px; background: #000; }
+.pad-navigation { width: min(1040px,100%); min-height: 54px; margin: 0 auto 12px; padding: 6px 10px; display: grid; grid-template-columns: 42px minmax(130px,1fr) 42px minmax(150px,1.2fr); align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 7px; background: rgba(0,17,34,.42); }
+.pad-navigation .icon-button { width: 38px; height: 34px; font-size: 22px; }
+.pad-entry-picker select { width: 100%; }
+.pad-position { overflow: hidden; color: var(--cyan); font-size: clamp(10px,1.4vw,14px); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.sample-bank { width: min(1040px,100%); margin: 0 auto; }
+.sample-bank-heading { min-height: 35px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sample-bank-heading > div { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.sample-state { color: var(--dim); font-size: 9px; }
+.sample-error { color: var(--danger); }
+.sample-pad-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); grid-template-rows: repeat(2,minmax(64px,1fr)); gap: 8px; }
+.sample-pad { min-width: 0; min-height: 64px; padding: 7px 10px; display: grid; grid-template-columns: 27px minmax(0,1fr); align-items: center; gap: 8px; border-color: rgba(0,183,255,.2); color: var(--dim); text-align: left; }
+.sample-pad.loaded { border-color: rgba(0,183,255,.55); color: var(--ice); background: linear-gradient(145deg,rgba(3,43,97,.72),rgba(0,17,34,.72)); }
+.sample-pad.loaded:hover { color: #fff; border-color: var(--cyan); background: rgba(3,43,97,.9); }
+.sample-pad-number { color: var(--blue); font: 700 12px "Space Mono",monospace; }
+.sample-pad-name { overflow: hidden; font-size: clamp(9px,1.2vw,12px); text-overflow: ellipsis; }
+.sample-folder-note { margin: 8px 0 3px; color: var(--dim); font-size: 9px; line-height: 1.5; }
+.sample-folder-note code { color: var(--ice); font: inherit; }
+.pad-help { width: min(1040px,100%); margin: 8px auto 0; padding-top: 7px; border-top: 1px solid var(--line); color: var(--dim); }
+.pad-help summary { cursor: pointer; color: var(--ice); font-size: 10px; text-transform: uppercase; }
+.pad-help p { margin: 7px 0; font-size: 10px; line-height: 1.5; }
+.pad-help strong { color: var(--text); }
 .loop-pane { padding: max(12px,env(safe-area-inset-top)) 3vw 8px; }
 .loop-toolbar { height: 44px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
 .loop-toolbar > .icon-button { justify-self: end; }
@@ -106,20 +142,38 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
   .settings-list { gap: 6px; }
   .setting { font-size: clamp(14px,2.5vw,23px); }
   .synth-pane { padding-top: 25px; }
+  .pads-pane { padding-top: 20px; }
+  .pads-heading { margin-bottom: 7px; }
+  .pad-navigation { min-height: 44px; margin-bottom: 7px; }
+  .sample-pad-grid { grid-template-rows: repeat(2,minmax(52px,1fr)); gap: 5px; }
+  .sample-pad { min-height: 52px; padding: 5px 7px; }
+  .sample-folder-note { margin-top: 5px; }
+  .pad-help { margin-top: 5px; }
   .synth-selectors { margin-bottom: 7px; }
   .synth-select, .soundfont-select, .soundfont-preset-select { height: 34px; }
   .soundfont-picker { grid-template-columns: minmax(0,1fr) 35px; }
   .soundfont-picker .icon-button { height: 34px; }
   .synth-module { min-height:0; height:auto; padding:12px; gap:8px; }
-  .effects-controls { grid-template-columns:repeat(6,1fr); gap:8px; }
+  .effects-rack { gap: 16px; }
+  .effect-module { gap: 7px; padding-top: 8px; }
+  .effects-controls { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
   .midi-effect-grid { grid-template-columns:repeat(7,1fr); gap:5px; }
   .take-row { min-height: 42px; }
   .take-row .waveform { height: 32px; }
   .quantization-select { width: 94px; height: 28px; font-size: 9px; }
 }
 @media (max-width:700px) and (orientation:landscape) {
+  .pads-pane { padding-inline: 3vw; }
+  .pads-heading { gap: 8px; }
+  .pad-settings { gap: 5px; }
+  .pad-settings select { min-width: 100px; }
+  .pad-navigation { grid-template-columns: 34px minmax(90px,1fr) 34px minmax(115px,1fr); gap: 5px; padding-inline: 6px; }
+  .sample-pad-grid { gap: 5px; }
+  .sample-pad { grid-template-columns: 22px minmax(0,1fr); gap: 4px; }
+  .pad-help p { font-size: 9px; }
   .setting { grid-template-columns:1fr 1fr; gap:14px; }
   .synth-module { grid-template-columns:repeat(6,1fr); }
+  .effects-rack { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
   .take-row { grid-template-columns:20px minmax(100px,1fr) 70px 32px 32px; gap:5px; }
 }
 @media (prefers-reduced-motion:reduce) { * { animation-duration:.01ms !important; animation-iteration-count:1 !important; } }

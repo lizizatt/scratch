@@ -50,6 +50,11 @@ export function useControlSocket(): {
           setSnapshot(parsed.data.snapshot);
           setReadiness(parsed.data.readiness);
         }
+        if (parsed.data.type === "snapshot-update") {
+          const update = parsed.data.update;
+          setSnapshot((current) => current ? { ...current, ...update } : current);
+          setReadiness(parsed.data.readiness);
+        }
         if (parsed.data.type === "command-result" && !parsed.data.accepted) setLastError(parsed.data.error ?? "Command rejected");
         if (parsed.data.type === "command-result" && parsed.data.accepted && parsed.data.message) setLastMessage(parsed.data.message);
       });

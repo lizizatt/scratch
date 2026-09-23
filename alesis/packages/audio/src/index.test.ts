@@ -61,6 +61,16 @@ describe("FluidSynth output", () => {
     }
   });
 
+  it("keeps reverb mono-compatible and sends normal note-offs without muting tails", () => {
+    const commands: string[] = [];
+    const output = new FluidSynthOutput({ device: { id: "test", name: "Test", pcm: "test" }, commandObserver: (command) => commands.push(command) });
+    output.setSynthParameter("soundfont", "reverb-width", 0.5);
+    output.dispatchMidi({ type: "note-on", channel: 1, note: 50, velocity: 93 });
+    output.dispatchMidi({ type: "note-off", channel: 1, note: 50 });
+
+    expect(commands).toEqual(["rev_setwidth 0.5", "noteon 1 50 93", "noteoff 1 50"]);
+  });
+
   it("builds an explicit direct ALSA invocation with conservative buffering", () => {
     expect(fluidSynthArguments("alesis_cm108", "/sounds/gm.sf2", 0.25)).toEqual([
       "-q",
@@ -172,35 +182,74 @@ describe("FluidSynth output", () => {
 
   it("maps every SoundFont control to real-time FluidSynth commands", () => {
     expect(soundFontParameterCommands("gain", 0.72)).toEqual(["gain 0.72"]);
-    expect(soundFontParameterCommands("chorus-send", 0.5)).toContain("cc 0 93 64");
-    expect(soundFontParameterCommands("chorus-rate", 1.2)).toEqual(["cho_set_speed 1.2"]);
-    expect(soundFontParameterCommands("chorus-depth", 12)).toEqual(["cho_set_depth 12"]);
-    expect(soundFontParameterCommands("chorus-voices", 4)).toEqual(["cho_set_nr 4"]);
-    expect(soundFontParameterCommands("reverb-send", 0.5)).toContain("cc 14 91 64");
+    expect(soundFontParameterCommands("reverb-send", 0.5)).toEqual(expect.arrayContaining(["reverb 1", "rev_setlevel 0.5", "cc 14 91 127"]));
     expect(soundFontParameterCommands("reverb-room", 0.7)).toEqual(["rev_setroomsize 0.7"]);
     expect(soundFontParameterCommands("reverb-damping", 0.4)).toEqual(["rev_setdamp 0.4"]);
-    expect(soundFontParameterCommands("reverb-width", 0.6)).toEqual(["rev_setwidth 60"]);
-    expect(soundFontParameterCommands("chorus-send", 0)).toContain("chorus 0");
+    expect(soundFontParameterCommands("reverb-width", 0.6)).toEqual(["rev_setwidth 0.6"]);
     expect(soundFontParameterCommands("reverb-send", 0)).toContain("reverb 0");
-    expect(() => soundFontParameterCommands("chorus-send", 0.6)).toThrow(/out of range/);
     expect(() => soundFontParameterCommands("reverb-width", 2)).toThrow(/out of range/);
+  });
+
+  it("supports Reverb Mix through 100 percent without affecting percussion", () => {
+    const parameterId = "reverb-send";
+    const controller = 91;
+    const commands: string[] = [];
+    const output = new FluidSynthOutput({ device: { id: "test", name: "Test", pcm: "test" }, commandObserver: (command) => commands.push(command) });
+    output.setSynthParameter("soundfont", parameterId, 1);
+
+    const sends = commands.filter((command) => command.startsWith("cc "));
+    expect(sends).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14].map((channel) => `cc ${channel} ${controller} 127`));
+    expect(soundFontParameterCommands(parameterId, 0.75)).toContain(`cc 0 ${controller} 127`);
+    for (const invalid of [-0.01, 1.01, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => soundFontParameterCommands(parameterId, invalid)).toThrow(/out of range/);
+    }
+  });
+
+  it("selects a percussion kit on channel 9 without changing the metronome channel", () => {
+    const commands: string[] = [];
+    const output = new FluidSynthOutput({
+      device: { id: "test", name: "Test", pcm: "test" },
+      percussionSoundFontPath: "/sounds/percussion.sf2",
+      commandObserver: (command) => commands.push(command),
+    });
+
+    output.selectDrumKit(128, 7);
+    output.playMetronome(true, 1);
+
+    expect(commands).toEqual(["select 9 2 128 7", "noteon 15 76 127"]);
+    expect(() => output.selectDrumKit(16_384, 0)).toThrow(/out of range/);
+  });
+
+  it("restores the chosen percussion kit when the FluidSynth process launches", () => {
+    const commands: string[] = [];
+    const output = new FluidSynthOutput({
+      device: { id: "test", name: "Test", pcm: "test" },
+      percussionSoundFontPath: "/sounds/percussion.sf2",
+      commandObserver: (command) => commands.push(command),
+    });
+    output.selectDrumKit(128, 12);
+    commands.length = 0;
+
+    (output as unknown as { applySoundFontParameters: () => void }).applySoundFontParameters();
+
+    expect(commands).toContain("select 9 2 128 12");
+    expect(commands).toContain("select 15 2 128 0");
   });
 
   it("initializes every performance channel and all semantic effects", () => {
     const commands = soundFontInitializationCommands({
       bank: 0, program: 0, gain: 0.72,
-      "chorus-send": 0.12, "reverb-send": 0.24,
-      "chorus-rate": 0.3, "chorus-depth": 8, "chorus-voices": 3,
+      "reverb-send": 0.45,
       "reverb-room": 0.2, "reverb-damping": 0, "reverb-width": 0.5,
     });
     const channels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
     expect(commands.filter((command) => command.startsWith("select "))).toHaveLength(14);
     for (const channel of channels) {
-      expect(commands).toContain(`cc ${channel} 93 15`);
-      expect(commands).toContain(`cc ${channel} 91 30`);
+      expect(commands).toContain("rev_setlevel 0.45");
+      expect(commands).toContain(`cc ${channel} 91 127`);
     }
     expect(commands.some((command) => command.startsWith("cc 9 "))).toBe(false);
-    expect(commands.indexOf("gain 0.72")).toBeLessThan(commands.indexOf("cho_set_speed 0.3"));
+    expect(commands.indexOf("gain 0.72")).toBeLessThan(commands.indexOf("rev_setroomsize 0.2"));
     expect(auxiliaryPercussionSelectionCommands(true)).toEqual(["select 9 2 128 0", "select 15 2 128 0"]);
     expect(auxiliaryPercussionSelectionCommands(false)).toEqual(["select 9 1 128 0", "select 15 1 128 0"]);
   });

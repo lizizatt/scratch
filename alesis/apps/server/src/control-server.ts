@@ -13,6 +13,7 @@ import sirv from "sirv";
 
 export interface ControlServer {
   readonly port: number;
+  submit(command: EngineCommand): Promise<EngineResult>;
   close(): Promise<void>;
 }
 
@@ -34,8 +35,16 @@ export async function createControlServer(
   const httpServer = createHttpServer(staticDirectory, readiness);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control" });
   const results = new Map<string, ServerMessage>();
+  const inFlight = new Map<string, Promise<ServerMessage>>();
+  let commandTail = Promise.resolve();
+  const enqueueCommand = <T>(execute: () => Promise<T>): Promise<T> => {
+    const pending = commandTail.then(execute, execute);
+    commandTail = pending.then(() => undefined, () => undefined);
+    return pending;
+  };
   let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
   let snapshotPending = false;
+  let latestSnapshot = engine.snapshot();
 
   const broadcastSnapshotNow = (): void => {
     const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage);
@@ -43,14 +52,26 @@ export async function createControlServer(
       if (client.readyState === WebSocket.OPEN) client.send(payload);
     });
   };
-  const scheduleSnapshot = (): void => {
+  const broadcastSnapshotUpdateNow = (): void => {
+    const { revision, engine: engineState, transport, capture, synth, pads } = latestSnapshot;
+    const payload = JSON.stringify({
+      type: "snapshot-update",
+      update: { revision, engine: engineState, transport, capture, synth, pads },
+      readiness,
+    } satisfies ServerMessage);
+    webSocketServer.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) client.send(payload);
+    });
+  };
+  const scheduleSnapshot = (snapshot: ReturnType<HostEngine["snapshot"]>): void => {
+    latestSnapshot = snapshot;
     snapshotPending = true;
     if (snapshotTimer) return;
     snapshotTimer = setTimeout(() => {
       snapshotTimer = undefined;
       if (!snapshotPending) return;
       snapshotPending = false;
-      broadcastSnapshotNow();
+      broadcastSnapshotUpdateNow();
     }, 1000 / 30);
   };
   const unsubscribe = engine.subscribe(scheduleSnapshot);
@@ -70,16 +91,23 @@ export async function createControlServer(
         return;
       }
 
-      const notReady = envelope.command.type === "play" ? readinessFailure(readiness) : null;
-      const snapshot = engine.snapshot();
-      const result = notReady
-        ? { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: notReady }
-        : await executeCommand(envelope.command);
+      let pending = inFlight.get(envelope.commandId);
+      if (!pending) {
+        const execute = () => executeEnvelope(envelope, engine, executeCommand, readiness);
+        if (envelope.command.type === "export-mp3") {
+          pending = commandTail.then(execute, execute);
+        } else {
+          pending = enqueueCommand(execute);
+        }
+        inFlight.set(envelope.commandId, pending);
+        void pending.then((message) => {
+          results.set(envelope.commandId, message);
+          if (results.size > 512) results.delete(results.keys().next().value!);
+        }).finally(() => inFlight.delete(envelope.commandId));
+      }
+      const message = await pending;
       snapshotPending = false;
       broadcastSnapshotNow();
-      const message = commandResult(envelope, result);
-      results.set(envelope.commandId, message);
-      if (results.size > 512) results.delete(results.keys().next().value!);
       socket.send(JSON.stringify(message));
     });
   });
@@ -91,6 +119,10 @@ export async function createControlServer(
 
   return {
     port: (httpServer.address() as AddressInfo).port,
+    submit(command) {
+      const execute = () => executeCommand(command);
+      return command.type === "export-mp3" ? commandTail.then(execute, execute) : enqueueCommand(execute);
+    },
     async close() {
       unsubscribe();
       if (snapshotTimer) clearTimeout(snapshotTimer);
@@ -99,6 +131,35 @@ export async function createControlServer(
       await closeHttpServer(httpServer);
     },
   };
+}
+
+async function executeEnvelope(
+  envelope: CommandEnvelope,
+  engine: HostEngine,
+  executeCommand: (command: EngineCommand) => Promise<EngineResult>,
+  readiness: Readiness,
+): Promise<ServerMessage> {
+  const snapshot = engine.snapshot();
+  const notReady = envelope.command.type === "play" ? readinessFailure(readiness) : null;
+  if (notReady) {
+    return commandResult(envelope, {
+      accepted: false,
+      revision: snapshot.revision,
+      appliedCycle: snapshot.transport.cycle,
+      error: notReady,
+    });
+  }
+  try {
+    return commandResult(envelope, await executeCommand(envelope.command));
+  } catch (error) {
+    const current = engine.snapshot();
+    return commandResult(envelope, {
+      accepted: false,
+      revision: current.revision,
+      appliedCycle: current.transport.cycle,
+      error: `Command failed: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
 }
 
 function createHttpServer(staticDirectory: string | undefined, readiness: Readiness): HttpServer {

@@ -1,7 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { commandEnvelopeSchema, engineSnapshotSchema, PROTOCOL_VERSION } from "./index.js";
+import { commandEnvelopeSchema, engineSnapshotSchema, PROTOCOL_VERSION, serverMessageSchema } from "./index.js";
 
 describe("control protocol", () => {
+  it("accepts compact high-rate snapshot updates", () => {
+    const message = serverMessageSchema.parse({
+      type: "snapshot-update",
+      update: {
+        revision: 1,
+        engine: { mode: "simulated", midiConnected: true, audioConnected: true, midiEventsReceived: 2, lastMidiEvent: "note-on" },
+        transport: { state: "playing", cycle: 0, progress: 0.25 },
+        capture: { currentWaveform: [], hasCurrentEvents: true, staged: null, previousStaged: null, stagedAudible: true, quantization: "off" },
+        synth: { selectedId: "subtractive", instruments: [], soundFonts: [], selectedSoundFontId: null, soundFontPresets: [], selectedSoundFontPresetId: null, parameterValues: {} },
+        pads: { mode: "drums", navigationTarget: "voices", navigationIndex: 0, navigationCount: 0, selectedDrumKitId: null, samplePageIndex: 0, samplePageCount: 0, samplePage: Array(8).fill(null), sampleLibraryStatus: "ready", drumKits: [] },
+      },
+      readiness: {
+        soundFont: { ready: true },
+        synth: { ready: true },
+        audio: { ready: true },
+        midi: { ready: true },
+      },
+    });
+
+    expect(message.type).toBe("snapshot-update");
+  });
+
   it("accepts a versioned command envelope", () => {
     const parsed = commandEnvelopeSchema.parse({
       protocolVersion: PROTOCOL_VERSION,
@@ -10,6 +32,25 @@ describe("control protocol", () => {
     });
 
     expect(parsed.command.type).toBe("set-take-level");
+  });
+
+  it("validates pad commands and rejects invalid pad indices", () => {
+    const envelope = (command: unknown) => commandEnvelopeSchema.safeParse({
+      protocolVersion: PROTOCOL_VERSION,
+      commandId: crypto.randomUUID(),
+      command,
+    }).success;
+
+    expect(envelope({ type: "set-pad-mode", mode: "samples" })).toBe(true);
+    expect(envelope({ type: "step-pad-navigation", direction: -1 })).toBe(true);
+    expect(envelope({ type: "select-pad-program", program: 127 })).toBe(true);
+    expect(envelope({ type: "select-pad-program", program: 128 })).toBe(true);
+    expect(envelope({ type: "select-pad-program", program: 1.5 })).toBe(false);
+    expect(envelope({ type: "select-pad-program", program: -1 })).toBe(false);
+    expect(envelope({ type: "select-pad-program", program: Number.MAX_SAFE_INTEGER + 1 })).toBe(false);
+    expect(envelope({ type: "trigger-sample-pad", pad: 7, velocity: 1 })).toBe(true);
+    expect(envelope({ type: "trigger-sample-pad", pad: 8, velocity: 1 })).toBe(false);
+    expect(envelope({ type: "trigger-sample-pad", pad: 0, velocity: 0 })).toBe(false);
   });
 
   it("rejects unsafe or incompatible network values", () => {
@@ -54,9 +95,10 @@ describe("control protocol", () => {
       transport: { state: "stopped", cycle: 0, progress: 0 },
       monitorOnly: false,
       synth: { selectedId: "subtractive", instruments: [], soundFonts: [], selectedSoundFontId: null, soundFontPresets: [], selectedSoundFontPresetId: null, parameterValues: {} },
+      pads: { mode: "drums", navigationTarget: "voices", navigationIndex: 0, navigationCount: 0, selectedDrumKitId: null, samplePageIndex: 0, samplePageCount: 0, samplePage: Array(8).fill(null), sampleLibraryStatus: "ready", drumKits: [] },
       arpeggiator: { enabled: false, mode: "up", rate: "1/8", octaves: 1, gate: 0.5, latch: false, swing: 0 },
       drums: { enabled: false, pattern: "four-on-floor", volume: 0.7 },
-      capture: { currentWaveform: Array.from({ length: 257 }, () => 0), staged: null, previousStaged: null, stagedAudible: true, quantization: "off" },
+      capture: { currentWaveform: Array.from({ length: 257 }, () => 0), hasCurrentEvents: false, staged: null, previousStaged: null, stagedAudible: true, quantization: "off" },
       promoted: [],
       canUndoDelete: false,
     };

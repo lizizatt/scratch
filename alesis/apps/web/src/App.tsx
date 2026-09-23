@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import {
   Download,
+  Drum,
   Headphones,
   Music2,
   Pause,
@@ -18,7 +19,7 @@ import {
 import type { EngineCommand, EngineSnapshot, Settings as EngineSettings, Take } from "@alesis/protocol";
 import { useControlSocket } from "./use-control-socket";
 
-type Pane = "settings" | "synth" | "loops";
+type Pane = "settings" | "synth" | "pads" | "loops";
 
 export function App() {
   const { snapshot, readiness, connection, lastError, lastMessage, send } = useControlSocket();
@@ -39,10 +40,12 @@ export function App() {
       {lastMessage && <div className="success-line" role="status">{lastMessage}</div>}
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
+      {pane === "pads" && <PadsPane snapshot={snapshot} send={send} />}
       {pane === "loops" && <LoopPane snapshot={snapshot} send={send} />}
       <nav className="app-nav" aria-label="Application sections">
         <NavButton active={pane === "settings"} label="Options" onClick={() => setPane("settings")}><Settings /></NavButton>
         <NavButton active={pane === "synth"} label="Synth" onClick={() => setPane("synth")}><Music2 /></NavButton>
+        <NavButton active={pane === "pads"} label="Pads" onClick={() => setPane("pads")}><Drum /></NavButton>
         <NavButton active={pane === "loops"} label="Loops" onClick={() => setPane("loops")}><Repeat2 /></NavButton>
       </nav>
     </main>
@@ -81,9 +84,9 @@ function SettingsPane({ snapshot, send }: PaneProps) {
     }
     if (value === snapshot.settings[field]) return;
     const timingChange = field === "bpm" || field === "beatsPerMeasure" || field === "loopMeasures";
-    const hasAudio = snapshot.promoted.length > 0 || snapshot.capture.staged !== null || snapshot.capture.previousStaged !== null;
+    const hasAudio = snapshot.capture.hasCurrentEvents || snapshot.promoted.length > 0 || snapshot.capture.staged !== null || snapshot.capture.previousStaged !== null;
     if (timingChange && hasAudio && !confirm("Changing timing clears all recorded audio. Continue?")) {
-      setDraft(snapshot.settings);
+      setNumberDraft(numberDraftFrom(snapshot.settings));
       return;
     }
     send({ type: "configure", settings: { [field]: value }, clearAudio: timingChange && hasAudio });
@@ -121,8 +124,8 @@ function SettingsPane({ snapshot, send }: PaneProps) {
 
 function SynthPane({ snapshot, send }: PaneProps) {
   const instrument = snapshot.synth.instruments.find(({ id }) => id === snapshot.synth.selectedId)!;
-  const primaryControls = instrument.controls.filter(({ advanced }) => !advanced);
-  const advancedEffects = instrument.controls.filter(({ advanced, group }) => advanced && group === "effects");
+  const primaryControls = instrument.controls.filter(({ advanced, group }) => !advanced && group !== "effects");
+  const reverbControls = instrument.controls.filter(({ id }) => id.startsWith("reverb-"));
   const renderControl = (control: typeof instrument.controls[number]) => (
     <label className={`parameter parameter-${control.group}`} key={control.id}>
       <span>{control.label}</span>
@@ -130,6 +133,29 @@ function SynthPane({ snapshot, send }: PaneProps) {
       <output>{formatParameter(snapshot.synth.parameterValues[control.id]!, control.unit)}</output>
     </label>
   );
+  const renderEffect = (name: string, controls: typeof instrument.controls) => {
+    const mix = controls.find(({ advanced }) => !advanced);
+    if (!mix) return null;
+    const value = snapshot.synth.parameterValues[mix.id]!;
+    const advancedControls = controls.filter(({ advanced }) => advanced);
+    return (
+      <section className="effect-module" aria-label={`${name} effect`} key={name}>
+        <div className="effect-heading">
+          <h2>{name}</h2>
+          <label className="effect-toggle">On<input aria-label={`${name} enabled`} type="checkbox" checked={value > 0} onChange={(event) => send({ type: "set-synth-parameter", parameterId: mix.id, value: event.target.checked ? mix.defaultValue : 0 })} /></label>
+        </div>
+        <label className="effect-mix">
+          <span>Mix</span>
+          <input aria-label={`${name} mix`} type="range" min={mix.minimum} max={mix.maximum} step={mix.step} value={value} onChange={(event) => send({ type: "set-synth-parameter", parameterId: mix.id, value: Number(event.target.value) })} />
+          <output>{formatParameter(value, mix.unit)}</output>
+        </label>
+        {advancedControls.length > 0 && <details className="effect-advanced">
+          <summary>Shape</summary>
+          <div className="effects-controls">{advancedControls.map(renderControl)}</div>
+        </details>}
+      </section>
+    );
+  };
   return (
     <section className="pane synth-pane" aria-label="Synth controls">
       <div className="synth-selectors">
@@ -150,10 +176,9 @@ function SynthPane({ snapshot, send }: PaneProps) {
       </div>
       <section className="synth-module" aria-label="Synth parameter module">
         {primaryControls.map(renderControl)}
-        {advancedEffects.length > 0 && <details className="effects-advanced">
-          <summary>Advanced Effects</summary>
-          <div className="effects-controls">{advancedEffects.map(renderControl)}</div>
-        </details>}
+        {snapshot.synth.selectedId === "soundfont" && <div className="effects-rack">
+          {renderEffect("Reverb", reverbControls)}
+        </div>}
       </section>
       <details className="midi-effect arpeggiator-controls">
         <summary>Arpeggiator</summary>
@@ -174,6 +199,97 @@ function SynthPane({ snapshot, send }: PaneProps) {
           <label>Pattern<select aria-label="Drum pattern" value={snapshot.drums.pattern} onChange={(event) => send({ type: "configure-drums", settings: { pattern: event.target.value as EngineSnapshot["drums"]["pattern"] } })}>{["four-on-floor", "backbeat", "breakbeat"].map((pattern) => <option key={pattern} value={pattern}>{pattern}</option>)}</select></label>
           <label>Volume<input aria-label="Drum volume" type="range" min="0" max="100" value={snapshot.drums.volume * 100} onChange={(event) => send({ type: "configure-drums", settings: { volume: Number(event.target.value) / 100 } })} /></label>
         </div>
+      </details>
+    </section>
+  );
+}
+
+function PadsPane({ snapshot, send }: PaneProps) {
+  const pads = snapshot.pads;
+  const currentBank = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId)?.bank ?? 0;
+  const voices = snapshot.synth.soundFontPresets
+    .filter(({ bank }) => bank === currentBank)
+    .sort((left, right) => left.program - right.program || left.name.localeCompare(right.name));
+  const drumKits = [...pads.drumKits].sort((left, right) => left.bank - right.bank || left.program - right.program || left.name.localeCompare(right.name));
+  const entries = pads.navigationTarget === "voices" ? voices : pads.navigationTarget === "drum-kits" ? drumKits : [];
+  const selectedEntry = entries[pads.navigationIndex];
+  const currentLabel = pads.navigationTarget === "sample-pages"
+    ? pads.samplePageCount > 0 ? `Sample page ${pads.samplePageIndex + 1}` : "No sample pages"
+    : selectedEntry?.name ?? (pads.navigationTarget === "voices" ? "No voices available" : "No drum kits available");
+  const targetLabel = pads.navigationTarget === "voices" ? "voice" : pads.navigationTarget === "drum-kits" ? "drum kit" : "sample page";
+  const sampleStatus = pads.sampleLibraryStatus;
+  const samplePads = pads.samplePage;
+
+  return (
+    <section className="pane pads-pane" aria-label="Pad controls">
+      <header className="pads-heading">
+        <div>
+          <span className="lane-label">Performance controls</span>
+          <h1>PAD BANK</h1>
+        </div>
+        <div className="pad-settings">
+          <label>Pad mode
+            <select aria-label="Pad mode" value={pads.mode} onChange={(event) => send({ type: "set-pad-mode", mode: event.target.value as EngineSnapshot["pads"]["mode"] })}>
+              <option value="drums">Drums</option>
+              <option value="samples">Samples</option>
+            </select>
+          </label>
+          <label>+ / − target
+            <select aria-label="Pad navigation target" value={pads.navigationTarget} onChange={(event) => send({ type: "set-pad-navigation-target", target: event.target.value as EngineSnapshot["pads"]["navigationTarget"] })}>
+              <option value="voices">Voices</option>
+              <option value="drum-kits">Drum kits</option>
+              <option value="sample-pages">Sample pages</option>
+            </select>
+          </label>
+        </div>
+      </header>
+
+      <section className="pad-navigation" aria-label="Pad navigation">
+        <IconButton label={`Previous ${targetLabel}`} disabled={pads.navigationCount === 0} onClick={() => send({ type: "step-pad-navigation", direction: -1 })}><span aria-hidden="true">−</span></IconButton>
+        <label className="pad-entry-picker">Current entry
+          <select aria-label="Current pad navigation entry" value={pads.navigationIndex} disabled={pads.navigationCount === 0} onChange={(event) => send({ type: "select-pad-program", program: Number(event.target.value) })}>
+            {pads.navigationCount === 0
+              ? <option value={0}>{currentLabel}</option>
+              : pads.navigationTarget === "sample-pages"
+                ? Array.from({ length: pads.navigationCount }, (_, index) => <option key={index} value={index}>Sample page {index + 1}</option>)
+                : entries.map((entry, index) => <option key={entry.id} value={index}>{entry.name}</option>)}
+          </select>
+        </label>
+        <IconButton label={`Next ${targetLabel}`} disabled={pads.navigationCount === 0} onClick={() => send({ type: "step-pad-navigation", direction: 1 })}><span aria-hidden="true">+</span></IconButton>
+        <output className="pad-position" aria-live="polite" aria-label="Current pad navigation position">
+          {String(pads.navigationCount === 0 ? 0 : pads.navigationIndex + 1).padStart(2, "0")} / {currentLabel} / {String(pads.navigationCount).padStart(2, "0")}
+        </output>
+      </section>
+
+      <section className="sample-bank" aria-label="Sample pads">
+        <div className="sample-bank-heading">
+          <div>
+            <span className="lane-label">{pads.mode === "samples" ? "Live sample triggers" : "Sample triggers inactive in drum mode"}</span>
+            {sampleStatus === "loading" && <span className="sample-state" role="status">Loading sample library…</span>}
+            {sampleStatus === "error" && <span className="sample-state sample-error" role="alert">Sample library error: {pads.sampleLibraryError ?? "Unable to load samples"}</span>}
+            {sampleStatus === "ready" && pads.samplePageCount === 0 && <span className="sample-state" role="status">No MP3 samples found. Add files to the configured folder, then refresh.</span>}
+            {sampleStatus === "ready" && pads.samplePageCount > 0 && <span className="sample-state" role="status">{samplePads.filter((sample) => sample !== null).length} samples loaded on this page.</span>}
+          </div>
+          <IconButton label="Refresh samples" disabled={sampleStatus === "loading"} onClick={() => send({ type: "refresh-samples" })}><RefreshCw /></IconButton>
+        </div>
+        <div className="sample-pad-grid">
+          {samplePads.map((sample, index) => {
+            const enabled = pads.mode === "samples" && sampleStatus === "ready" && sample !== null;
+            const name = sample?.name ?? "Empty slot";
+            return <button className={`sample-pad ${enabled ? "loaded" : ""}`} type="button" key={index} aria-label={`Pad ${index + 1} — ${name}`} disabled={!enabled} onClick={() => send({ type: "trigger-sample-pad", pad: index, velocity: 100 })}>
+              <span className="sample-pad-number">{String(index + 1).padStart(2, "0")}</span>
+              <span className="sample-pad-name">{name}</span>
+            </button>;
+          })}
+        </div>
+        <p className="sample-folder-note">Set <code>SAMPLE_LIBRARY_DIR</code> on the host to use another folder (default <code>~/.local/share/alesis/samples</code>); add MP3 files, then refresh. See sample-pad help for format limits.</p>
+      </section>
+
+      <details className="pad-help">
+        <summary>Vortex display, pad mapping &amp; capture limits</summary>
+        <p>Vortex +/− loads onboard presets. For matching host navigation, configure identical mappings with <strong>Program Change Send On Load</strong> and programs 0…N−1. The Vortex display indicates its onboard controller preset only. Host UI navigation cannot write that display and does not synchronize it.</p>
+        <p>Selecting an entry under <strong>Voices</strong> changes the selected SoundFont voice. It does not switch synthesizers; if Neon is selected, Neon stays active.</p>
+        <p>Physical sample pads use MIDI channel 10 (wire channel 9), notes 36–43. Live sample triggers are not included in loop capture or MP3 exports.</p>
       </details>
     </section>
   );

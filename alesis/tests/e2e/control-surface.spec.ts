@@ -47,11 +47,11 @@ test("connects every selected pane to the host without viewport overflow", async
   await expect(soundFont.locator("option", { hasText: "FluidR3_GM" })).toHaveCount(1);
   await page.getByRole("button", { name: "Refresh SoundFonts" }).click();
   await expect(soundFont).toHaveValue("sth-sf2");
-  await expect(page.locator(".synth-module > .parameter")).toHaveCount(3);
+  await expect(page.locator(".synth-module > .parameter")).toHaveCount(1);
   await expect(page.locator(".effects-controls")).not.toBeVisible();
-  await page.getByText("Advanced Effects", { exact: true }).click();
+  await page.getByRole("region", { name: "Reverb effect" }).getByText("Shape", { exact: true }).click();
   await expect(page.locator(".effects-controls")).toBeVisible();
-  await expect(page.locator(".effects-controls .parameter")).toHaveCount(6);
+  await expect(page.locator(".effects-controls .parameter")).toHaveCount(2);
   await page.getByText("Arpeggiator", { exact: true }).click();
   await page.getByLabel("Arpeggiator mode").selectOption("up-to-root-then-down");
   await expect(page.getByLabel("Arpeggiator mode")).toHaveValue("up-to-root-then-down");
@@ -128,6 +128,92 @@ test("scrolls the Synth pane to controls below a constrained viewport", async ({
   await arpeggiator.scrollIntoViewIfNeeded();
   await expect(arpeggiator).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollTop)).toBe(0);
+});
+
+test("keeps pad mode and navigation target independent and supports program selection and stepping", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText(/connected \/\/ rev/i)).toBeVisible();
+  await page.getByRole("button", { name: "Pads" }).click();
+  await expect(page.getByRole("region", { name: "Pad controls" })).toBeVisible();
+
+  const mode = page.getByLabel("Pad mode");
+  const target = page.getByLabel("Pad navigation target");
+  await mode.selectOption("samples");
+  await target.selectOption("voices");
+  await expect(mode).toHaveValue("samples");
+  await target.selectOption("sample-pages");
+  await expect(mode).toHaveValue("samples");
+  await expect(target).toHaveValue("sample-pages");
+  await mode.selectOption("drums");
+  await expect(target).toHaveValue("sample-pages");
+
+  await mode.selectOption("samples");
+  await target.selectOption("voices");
+  const entry = page.getByLabel("Current pad navigation entry");
+  const position = page.getByLabel("Current pad navigation position");
+  const count = Number((await position.textContent())?.split("/").at(-1)?.trim());
+  if (count > 0) {
+    const startingIndex = Number(await entry.inputValue());
+    await page.getByRole("button", { name: "Next voice" }).click();
+    await expect(entry).toHaveValue(String(count > 1 ? (startingIndex + 1) % count : startingIndex));
+    await expect(position).toContainText("/");
+    await entry.selectOption("0");
+    await expect(entry).toHaveValue("0");
+  } else {
+    await expect(page.getByRole("button", { name: "Next voice" })).toBeDisabled();
+  }
+
+  await page.getByText("Vortex display, pad mapping & capture limits", { exact: true }).click();
+  await expect(page.getByText(/Program Change Send On Load/)).toBeVisible();
+  await expect(page.getByText(/cannot write that display/i)).toBeVisible();
+  await expect(page.getByText(/not included in loop capture or MP3 exports/i)).toBeVisible();
+});
+
+test("refreshes sample pads, disables empty slots, and pages available libraries", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText(/connected \/\/ rev/i)).toBeVisible();
+  await page.getByRole("button", { name: "Pads" }).click();
+  await page.getByLabel("Pad mode").selectOption("samples");
+  await page.getByLabel("Pad navigation target").selectOption("sample-pages");
+  await expect(page.locator(".sample-pad")).toHaveCount(8);
+  await expect(page.getByRole("button", { name: "Refresh samples" })).toBeEnabled();
+  await page.getByRole("button", { name: "Refresh samples" }).click();
+  await expect(page.getByRole("button", { name: "Refresh samples" })).toBeEnabled();
+
+  const entry = page.getByLabel("Current pad navigation entry");
+  await expect.poll(async () => await page.locator(".sample-state[role='status']").count() > 0 || await page.locator(".sample-state[role='alert']").count() > 0).toBe(true);
+  await expect(page.locator(".sample-pad")).toHaveCount(8);
+  const pageCount = await entry.locator("option").count();
+  if (await page.locator(".sample-state[role='alert']").count() > 0) {
+    await expect(page.locator(".sample-state[role='alert']")).toContainText("Sample library error");
+    await expect(page.locator(".sample-pad:disabled")).toHaveCount(8);
+  } else if (pageCount === 1 && (await entry.locator("option").first().textContent()) === "No sample pages") {
+    await expect(page.getByText(/No MP3 samples found/)).toBeVisible();
+    for (let index = 1; index <= 8; index += 1) {
+      const emptyPad = page.getByRole("button", { name: `Pad ${index} — Empty slot` });
+      await expect(emptyPad).toBeDisabled();
+    }
+  } else {
+    const firstPageEnabled = await page.locator(".sample-pad:enabled").count();
+    if (firstPageEnabled > 0) {
+      await page.locator(".sample-pad:enabled").first().click();
+      await expect(page.locator(".error-line")).toHaveCount(0);
+    }
+    if (pageCount > 1) {
+      await entry.selectOption("1");
+      await expect(entry).toHaveValue("1");
+      await expect(page.getByLabel("Current pad navigation position")).toContainText("Sample page 2");
+      await expect(page.locator(".sample-state[role='status']")).toContainText(/samples loaded on this page/);
+      if (await page.getByRole("button", { name: /Pad 1 — Synthetic Tone/ }).count() > 0) {
+        await expect(page.locator(".sample-pad:enabled")).toHaveCount(2);
+        await expect(page.locator(".sample-pad:disabled")).toHaveCount(6);
+      }
+      await page.getByRole("button", { name: "Next sample page" }).click();
+      await expect(entry).toHaveValue("0");
+      await expect(page.getByLabel("Current pad navigation position")).toContainText("Sample page 1");
+    }
+  }
+  await expect(page.getByText(/SAMPLE_LIBRARY_DIR/)).toBeVisible();
 });
 
 test("edits BPM locally and confirms only on commit", async ({ page }, testInfo) => {

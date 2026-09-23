@@ -3,7 +3,8 @@ import { Input } from "@julusian/midi/lazy";
 import { createReadStream, existsSync, readFileSync, readdirSync, type ReadStream } from "node:fs";
 import { basename, join } from "node:path";
 
-export type MidiListener = (event: MidiEvent) => void;
+export type MidiInputEvent = MidiEvent | { type: "program-change"; channel: number; program: number };
+export type MidiListener = (event: MidiInputEvent) => void;
 
 export interface MidiSource {
   readonly id: string;
@@ -71,12 +72,16 @@ export class SoftwareVortex implements MidiSource {
     this.emit({ type: "channel-pressure", channel: midiChannel(channel), value: dataByte(value) });
   }
 
+  programChange(program: number, channel = 0): void {
+    this.emit({ type: "program-change", channel: midiChannel(channel), program: dataByte(program) });
+  }
+
   control(control: SoftwareControl, value: number, channel = 0): void {
     const controller = SOFTWARE_VORTEX_PROFILE[control];
     this.emit({ type: "control-change", channel: midiChannel(channel), controller, value: dataByte(value) });
   }
 
-  private emit(event: MidiEvent): void {
+  private emit(event: MidiInputEvent): void {
     this.listeners.forEach((listener) => listener(event));
   }
 }
@@ -274,7 +279,7 @@ export class MidiByteStreamDecoder {
   }
 }
 
-export function decodeMidiMessage(bytes: readonly number[]): MidiEvent | null {
+export function decodeMidiMessage(bytes: readonly number[]): MidiInputEvent | null {
   const status = bytes[0];
   if (status === undefined || status < 0x80 || status >= 0xf0) return null;
   const type = status & 0xf0;
@@ -287,6 +292,7 @@ export function decodeMidiMessage(bytes: readonly number[]): MidiEvent | null {
       ? { type: "note-off", channel, note: dataByte(first) }
       : { type: "note-on", channel, note: dataByte(first), velocity: dataByte(second) };
   }
+  if (type === 0xc0 && first !== undefined) return { type: "program-change", channel, program: dataByte(first) };
   if (type === 0x80 && first !== undefined) return { type: "note-off", channel, note: dataByte(first) };
   if (type === 0xb0 && first !== undefined && second !== undefined) return { type: "control-change", channel, controller: dataByte(first), value: dataByte(second) };
   if (type === 0xd0 && first !== undefined) return { type: "channel-pressure", channel, value: dataByte(first) };
