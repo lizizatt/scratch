@@ -16,6 +16,66 @@ function fixtureSample(id: string, values: number[]): { id: string; name: string
   return { id, name: id, samples: new Float32Array(values) };
 }
 
+class ReferenceSampleMixer {
+  private page: Array<{ id: string; name: string; samples: Float32Array } | null> = Array(SAMPLE_PAGE_SIZE).fill(null);
+  private readonly voices: Array<{ sample: NonNullable<ReferenceSampleMixer["page"][number]>; gain: number; startedAt: number; frame: number }> = [];
+  private sequence = 0;
+
+  constructor(private readonly maxVoices: number) {}
+
+  get activeVoiceCount(): number {
+    return this.voices.length;
+  }
+
+  setPage(samples: readonly ({ id: string; name: string; samples: Float32Array } | null)[]): void {
+    this.page = Array.from({ length: SAMPLE_PAGE_SIZE }, (_, index) => samples[index] ?? null);
+    this.panic();
+  }
+
+  trigger(pad: number, velocity: number): void {
+    if (!Number.isFinite(pad) || !Number.isInteger(pad) || pad < 0 || pad >= SAMPLE_PAGE_SIZE) return;
+    if (!Number.isFinite(velocity) || velocity <= 0) return;
+    const sample = this.page[pad];
+    if (!sample || sample.samples.length < 2) return;
+    if (this.voices.length >= this.maxVoices) {
+      let oldestIndex = 0;
+      for (let index = 1; index < this.voices.length; index += 1) {
+        if (this.voices[index]!.startedAt < this.voices[oldestIndex]!.startedAt) oldestIndex = index;
+      }
+      this.voices.splice(oldestIndex, 1);
+    }
+    this.voices.push({ sample, gain: Math.max(0, Math.min(1, velocity / 127)), startedAt: this.sequence++, frame: 0 });
+  }
+
+  render(frameCount: number): Float32Array {
+    const output = new Float32Array(frameCount * 2);
+    for (let frame = 0; frame < frameCount; frame += 1) {
+      let left = 0;
+      let right = 0;
+      for (let index = this.voices.length - 1; index >= 0; index -= 1) {
+        const voice = this.voices[index]!;
+        const offset = voice.frame * 2;
+        if (offset + 1 >= voice.sample.samples.length) {
+          this.voices.splice(index, 1);
+          continue;
+        }
+        const sampleLeft = voice.sample.samples[offset]!;
+        const sampleRight = voice.sample.samples[offset + 1]!;
+        left += (Number.isFinite(sampleLeft) ? Math.max(-1, Math.min(1, sampleLeft)) : 0) * voice.gain;
+        right += (Number.isFinite(sampleRight) ? Math.max(-1, Math.min(1, sampleRight)) : 0) * voice.gain;
+        voice.frame += 1;
+      }
+      output[frame * 2] = Math.max(-1, Math.min(1, left));
+      output[frame * 2 + 1] = Math.max(-1, Math.min(1, right));
+    }
+    return output;
+  }
+
+  panic(): void {
+    this.voices.length = 0;
+  }
+}
+
 function fixtureChild() {
   return Object.assign(new EventEmitter(), {
     stdin: new PassThrough(),
@@ -90,6 +150,58 @@ describe("SampleMixer", () => {
     mixer.panic();
     mixer.trigger(3, 127);
     expect(mixer.render(1)).toEqual(new Float32Array([0, 0]));
+  });
+
+  it("matches the original mixer exactly across variable blocks, pathological PCM, expiry, steals, and panic", () => {
+    let seed = 0x1234abcd;
+    const pages = Array.from({ length: 3 }, (_, pageIndex) => Array.from({ length: SAMPLE_PAGE_SIZE }, (_, pad) => {
+      const lengths = [3, 47, 971, 4_001, 17, 1_503, 29, 20_003];
+      const samples = new Float32Array(lengths[pad]!);
+      for (let index = 0; index < samples.length; index += 1) {
+        seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
+        const value = (seed / 0x1_0000_0000) * 2 - 1;
+        samples[index] = index % 127 === 0 ? Number.NaN : index % 31 === 0 ? value * 3 : value;
+      }
+      if (pad === 0) samples[1] = Number.POSITIVE_INFINITY;
+      return { id: `${pageIndex}-${pad}`, name: `${pageIndex}-${pad}`, samples };
+    }));
+    const originals = pages.flat().map(({ samples }) => samples.slice());
+    const mixer = new SampleMixer(5);
+    const reference = new ReferenceSampleMixer(5);
+    mixer.setPage(pages[0]!);
+    reference.setPage(pages[0]!);
+
+    const blockSizes = [0, 1, 2, 7, 31, 480, 511, 13, 2_048];
+    for (let step = 0; step < 180; step += 1) {
+      if (step > 0 && step % 41 === 0) {
+        const page = pages[(step / 41) % pages.length]!;
+        mixer.setPage(page);
+        reference.setPage(page);
+      } else if (step % 37 === 0) {
+        mixer.panic();
+        reference.panic();
+      } else if (step % 3 !== 0) {
+        const pad = (step * 5 + 3) % SAMPLE_PAGE_SIZE;
+        const velocity = [1, 32, 64, 127, 254][step % 5]!;
+        mixer.trigger(pad, velocity);
+        reference.trigger(pad, velocity);
+      } else {
+        const frames = blockSizes[step % blockSizes.length]!;
+        expect(mixer.render(frames)).toEqual(reference.render(frames));
+      }
+      expect(mixer.activeVoiceCount).toBe(reference.activeVoiceCount);
+    }
+    expect(pages.flat().every(({ samples }, index) => samples.every((value, sampleIndex) => Object.is(value, originals[index]![sampleIndex])))).toBe(true);
+  });
+
+  it("preserves voice expiry at block boundaries", () => {
+    const mixer = new SampleMixer();
+    mixer.setPage([fixtureSample("one-frame", [0.25, -0.25])]);
+    mixer.trigger(0, 127);
+    expect(mixer.render(1)).toEqual(new Float32Array([0.25, -0.25]));
+    expect(mixer.activeVoiceCount).toBe(1);
+    expect(mixer.render(1)).toEqual(new Float32Array([0, 0]));
+    expect(mixer.activeVoiceCount).toBe(0);
   });
 });
 

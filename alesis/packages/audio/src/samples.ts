@@ -313,6 +313,28 @@ export class SampleMixer {
   render(frameCount: number): Float32Array {
     if (!Number.isSafeInteger(frameCount) || frameCount < 0) throw new RangeError("frameCount must be a non-negative integer");
     const output = new Float32Array(frameCount * CHANNELS);
+    if (frameCount === 0 || this.voices.length === 0) return output;
+
+    if (this.voices.length === 1) {
+      const voice = this.voices[0]!;
+      const samples = voice.sample.samples;
+      const framesToRender = Math.min(frameCount, Math.floor(samples.length / CHANNELS) - voice.frame);
+      for (let frame = 0; frame < framesToRender; frame += 1) {
+        const offset = (voice.frame + frame) * CHANNELS;
+        const sampleLeft = samples[offset]!;
+        const sampleRight = samples[offset + 1]!;
+        let left = 0;
+        let right = 0;
+        left += (Number.isFinite(sampleLeft) ? Math.max(-1, Math.min(1, sampleLeft)) : 0) * voice.gain;
+        right += (Number.isFinite(sampleRight) ? Math.max(-1, Math.min(1, sampleRight)) : 0) * voice.gain;
+        output[frame * CHANNELS] = Math.max(-1, Math.min(1, left));
+        output[frame * CHANNELS + 1] = Math.max(-1, Math.min(1, right));
+      }
+      voice.frame += framesToRender;
+      if (framesToRender < frameCount) this.voices.length = 0;
+      return output;
+    }
+
     for (let frame = 0; frame < frameCount; frame += 1) {
       let left = 0;
       let right = 0;
@@ -323,10 +345,10 @@ export class SampleMixer {
           this.voices.splice(index, 1);
           continue;
         }
-        const l = voice.sample.samples[offset]!;
-        const r = voice.sample.samples[offset + 1]!;
-        left += (Number.isFinite(l) ? Math.max(-1, Math.min(1, l)) : 0) * voice.gain;
-        right += (Number.isFinite(r) ? Math.max(-1, Math.min(1, r)) : 0) * voice.gain;
+        const sampleLeft = voice.sample.samples[offset]!;
+        const sampleRight = voice.sample.samples[offset + 1]!;
+        left += (Number.isFinite(sampleLeft) ? Math.max(-1, Math.min(1, sampleLeft)) : 0) * voice.gain;
+        right += (Number.isFinite(sampleRight) ? Math.max(-1, Math.min(1, sampleRight)) : 0) * voice.gain;
         voice.frame += 1;
       }
       output[frame * CHANNELS] = Math.max(-1, Math.min(1, left));
