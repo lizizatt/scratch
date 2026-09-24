@@ -1,0 +1,181 @@
+{
+  "success": true,
+  "source": "last_account_snapshot",
+  "observed_at": null,
+  "retrieved_at": "2026-09-10T06:25:30.966Z",
+  "freshness": "unverified",
+  "stale": false,
+  "mounted_character_id": null,
+  "gold": 1000,
+  "packs": {
+    "items0": [
+      {
+        "name": "ringsj",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 1,
+        "grace": 0
+      },
+      null,
+      {
+        "name": "hpamulet",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "fireblade",
+        "level": 0
+      },
+      null,
+      {
+        "name": "monstertoken",
+        "q": 23
+      },
+      null,
+      {
+        "name": "stinger",
+        "level": 0
+      },
+      {
+        "name": "stinger",
+        "level": 0
+      },
+      null,
+      {
+        "name": "ascale",
+        "q": 2
+      },
+      null,
+      {
+        "name": "stinger",
+        "level": 0
+      },
+      null,
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "fireblade",
+        "level": 0
+      },
+      {
+        "name": "fireblade",
+        "level": 0
+      },
+      {
+        "name": "shoes",
+        "level": 3
+      },
+      {
+        "name": "stramulet",
+        "level": 0
+      },
+      {
+        "name": "beewings",
+        "q": 18
+      },
+      {
+        "name": "stormfeather",
+        "q": 6
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      null,
+      {
+        "name": "gem0",
+        "q": 8
+      },
+      {
+        "name": "seashell",
+        "q": 3
+      },
+      null,
+      {
+        "name": "reefglass",
+        "q": 3
+      },
+      null,
+      {
+        "name": "stramulet",
+        "level": 1,
+        "grace": 0.8
+      },
+      null,
+      null,
+      {
+        "name": "carrotsword",
+        "level": 0,
+        "grace": 0.4,
+        "p": "shiny"
+      },
+      {
+        "name": "candycanesword",
+        "level": 0
+      },
+      {
+        "name": "vitearring",
+        "level": 0
+      },
+      null,
+      {
+        "name": "staff",
+        "level": 3
+      },
+      {
+        "name": "vitscroll",
+        "q": 2
+      },
+      null,
+      {
+        "name": "wbook0",
+        "level": 1,
+        "grace": 0
+      }
+    ],
+    "items1": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "note": "Saved bank items and gold, not live data. stale flags a mounted bank, not data age. Freshness is unverified; observed_at is unknown and retrieved_at is the read time."
+}

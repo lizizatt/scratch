@@ -1,0 +1,7 @@
+﻿node : Expected property name or '}' in JSON at position 1
+At C:\Users\liz\AppData\Local\Temp\ps-script-a8126613-e18d-4a79-9100-fdbbc897430b.ps1:106 char:1
++ node adventureland/live_mcp.js call get_code_method "{\"name\":\"trad ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Expected proper...N at position 1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

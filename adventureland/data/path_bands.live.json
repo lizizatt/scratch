@@ -1,0 +1,63 @@
+{
+  "generatedAt": "2026-09-08T02:14:24.128Z",
+  "source": "live",
+  "status": "measured",
+  "routes": [
+    {
+      "id": "town_to_potions",
+      "liveMs": 2266,
+      "failRate": 0,
+      "ok": true,
+      "reason": "-",
+      "samples": 1,
+      "simMs": 4474,
+      "inSimBand": true
+    },
+    {
+      "id": "potions_to_goo",
+      "liveMs": 5451,
+      "failRate": 0,
+      "ok": true,
+      "reason": "-",
+      "samples": 1,
+      "simMs": 10238,
+      "inSimBand": true
+    },
+    {
+      "id": "potions_to_bee",
+      "liveMs": 24938,
+      "failRate": 0,
+      "ok": true,
+      "reason": "-",
+      "samples": 1,
+      "simMs": 42620,
+      "inSimBand": true
+    },
+    {
+      "id": "potions_to_bank",
+      "liveMs": 6991,
+      "failRate": 0,
+      "ok": true,
+      "reason": "-",
+      "samples": 1,
+      "simMs": 11483,
+      "inSimBand": true
+    },
+    {
+      "id": "phoenix_by_type_fail",
+      "liveMs": 3,
+      "failRate": 1,
+      "ok": true,
+      "reason": "destination_not_found",
+      "samples": 1,
+      "simMs": 0,
+      "inSimBand": true
+    }
+  ],
+  "note": "Mainframe Puppygirl idle-CODE run 2026-09-08. Live ms are ~0.5× sim bands (sim walk speed conservative). Phoenix fails with destination_not_found (parity with no_path).",
+  "summary": {
+    "okCount": 5,
+    "failCount": 0,
+    "liveFasterThanSimFactorApprox": 0.5
+  }
+}

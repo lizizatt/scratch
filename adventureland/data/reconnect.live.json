@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-09-08T02:21:04.014Z",
+  "source": "live",
+  "status": "measured",
+  "reconnectMs": 35214,
+  "serverRegionDelayMs": null,
+  "assumedReconnectMs": 40000,
+  "assumedServerRegionDelayMs": 3000,
+  "from": "US III",
+  "to": "US II",
+  "note": "Wall-clock from hop issue via MCP poll; region delay is after game_connected"
+}

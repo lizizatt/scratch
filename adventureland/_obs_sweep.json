@@ -1,0 +1,787 @@
+{
+  "cut": "2026-09-10T15:59:37.900Z",
+  "hist": {
+    "Jazwyn": {
+      "xy": [
+        {
+          "map": "main",
+          "x": 54,
+          "y": 678
+        },
+        {
+          "map": "main",
+          "x": 758,
+          "y": 1749
+        },
+        {
+          "map": "main",
+          "x": 758,
+          "y": 1749
+        },
+        {
+          "map": "main",
+          "x": 620,
+          "y": 1805
+        },
+        {
+          "map": "main",
+          "x": 320,
+          "y": 944
+        },
+        {
+          "map": "main",
+          "x": 152,
+          "y": 775
+        },
+        {
+          "map": "main",
+          "x": 734,
+          "y": 1541
+        },
+        {
+          "map": "main",
+          "x": 767,
+          "y": 1539
+        },
+        {
+          "map": "main",
+          "x": 755,
+          "y": 1593
+        },
+        {
+          "map": "main",
+          "x": 790,
+          "y": 1613
+        },
+        {
+          "map": "main",
+          "x": 780,
+          "y": 1649
+        },
+        {
+          "map": "main",
+          "x": 778,
+          "y": 1684
+        }
+      ],
+      "msgs": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "pots": [
+        {
+          "hp": 2,
+          "mp": 633,
+          "n": 2
+        },
+        {
+          "hp": 2,
+          "mp": 633,
+          "n": 2
+        },
+        {
+          "hp": 2,
+          "mp": 633,
+          "n": 2
+        },
+        {
+          "hp": 1,
+          "mp": 632,
+          "n": 2
+        },
+        {
+          "hp": 0,
+          "mp": 632,
+          "n": 1
+        },
+        {
+          "hp": 200,
+          "mp": 832,
+          "n": 2
+        },
+        {
+          "hp": 200,
+          "mp": 832,
+          "n": 2
+        },
+        {
+          "hp": 199,
+          "mp": 832,
+          "n": 2
+        },
+        {
+          "hp": 199,
+          "mp": 832,
+          "n": 2
+        },
+        {
+          "hp": 199,
+          "mp": 831,
+          "n": 3
+        },
+        {
+          "hp": 199,
+          "mp": 831,
+          "n": 3
+        },
+        {
+          "hp": 199,
+          "mp": 831,
+          "n": 3
+        }
+      ],
+      "logs": [
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "gear_ad",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc"
+      ]
+    },
+    "Sarene": {
+      "xy": [
+        {
+          "map": "main",
+          "x": 25,
+          "y": 641
+        },
+        {
+          "map": "main",
+          "x": 56,
+          "y": 91
+        },
+        {
+          "map": "main",
+          "x": 435,
+          "y": 1110
+        },
+        {
+          "map": "main",
+          "x": 613,
+          "y": 1875
+        },
+        {
+          "map": "main",
+          "x": 696,
+          "y": 1184
+        },
+        {
+          "map": "main",
+          "x": 325,
+          "y": 948
+        },
+        {
+          "map": "main",
+          "x": 606,
+          "y": 1212
+        },
+        {
+          "map": "main",
+          "x": 776,
+          "y": 1480
+        },
+        {
+          "map": "main",
+          "x": 776,
+          "y": 1480
+        },
+        {
+          "map": "main",
+          "x": 849,
+          "y": 1636
+        },
+        {
+          "map": "main",
+          "x": 849,
+          "y": 1636
+        },
+        {
+          "map": "main",
+          "x": 734,
+          "y": 1735
+        }
+      ],
+      "msgs": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "pots": [
+        {
+          "hp": 2344,
+          "mp": 208,
+          "n": 4
+        },
+        {
+          "hp": 2344,
+          "mp": 208,
+          "n": 2
+        },
+        {
+          "hp": 2344,
+          "mp": 208,
+          "n": 2
+        },
+        {
+          "hp": 2344,
+          "mp": 207,
+          "n": 2
+        },
+        {
+          "hp": 2344,
+          "mp": 207,
+          "n": 3
+        },
+        {
+          "hp": 2344,
+          "mp": 207,
+          "n": 3
+        },
+        {
+          "hp": 2344,
+          "mp": 207,
+          "n": 3
+        },
+        {
+          "hp": 2344,
+          "mp": 206,
+          "n": 3
+        },
+        {
+          "hp": 2344,
+          "mp": 205,
+          "n": 2
+        },
+        {
+          "hp": 2344,
+          "mp": 203,
+          "n": 2
+        },
+        {
+          "hp": 2344,
+          "mp": 202,
+          "n": 2
+        },
+        {
+          "hp": 2344,
+          "mp": 201,
+          "n": 2
+        }
+      ],
+      "logs": [
+        "Hunt croc",
+        "Hunt croc",
+        "gear_ad",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Idle",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Idle",
+        "Hunt croc",
+        "gear_ad",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc"
+      ]
+    },
+    "Zarook": {
+      "xy": [
+        {
+          "map": "main",
+          "x": 38,
+          "y": 54
+        },
+        {
+          "map": "main",
+          "x": -260,
+          "y": 97
+        },
+        {
+          "map": "main",
+          "x": -1116,
+          "y": 1108
+        },
+        {
+          "map": "main",
+          "x": -234,
+          "y": 102
+        },
+        {
+          "map": "main",
+          "x": 396,
+          "y": 1044
+        },
+        {
+          "map": "main",
+          "x": 459,
+          "y": 1027
+        },
+        {
+          "map": "main",
+          "x": 64,
+          "y": 704
+        },
+        {
+          "map": "main",
+          "x": 824,
+          "y": 1547
+        },
+        {
+          "map": "main",
+          "x": 824,
+          "y": 1547
+        },
+        {
+          "map": "main",
+          "x": 824,
+          "y": 1547
+        },
+        {
+          "map": "main",
+          "x": 776,
+          "y": 1718
+        },
+        {
+          "map": "main",
+          "x": 776,
+          "y": 1718
+        }
+      ],
+      "msgs": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "pots": [
+        {
+          "hp": 10450,
+          "mp": 126,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 126,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 126,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 126,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 126,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 125,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 125,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 125,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 121,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 115,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 111,
+          "n": 3
+        },
+        {
+          "hp": 10450,
+          "mp": 105,
+          "n": 3
+        }
+      ],
+      "logs": [
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Idle",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc",
+        "Hunt croc"
+      ]
+    },
+    "Puppygirl": {
+      "xy": [
+        {
+          "map": "main",
+          "x": 168,
+          "y": -134
+        },
+        {
+          "map": "main",
+          "x": -163,
+          "y": -153
+        },
+        {
+          "map": "main",
+          "x": -200,
+          "y": -128
+        },
+        {
+          "map": "main",
+          "x": -24,
+          "y": -432
+        },
+        {
+          "map": "main",
+          "x": -200,
+          "y": -128
+        },
+        {
+          "map": "bank",
+          "x": 0,
+          "y": -37
+        },
+        {
+          "map": "main",
+          "x": 168,
+          "y": -134
+        },
+        {
+          "map": "main",
+          "x": 11,
+          "y": 626
+        },
+        {
+          "map": "main",
+          "x": 752,
+          "y": 1800
+        },
+        {
+          "map": "main",
+          "x": 18,
+          "y": 586
+        },
+        {
+          "map": "main",
+          "x": 68,
+          "y": -272
+        },
+        {
+          "map": "main",
+          "x": 158,
+          "y": -124
+        }
+      ],
+      "msgs": [
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        ""
+      ],
+      "pots": [
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 16
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 20
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 18
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 17
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 17
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 17
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 16
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 17
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 18
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 19
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 17
+        },
+        {
+          "hp": 1250,
+          "mp": 916,
+          "n": 19
+        }
+      ],
+      "logs": [
+        "bank:store eslippers@0",
+        "ponty:list 309",
+        "ponty:none",
+        "bank:buy cscroll0",
+        "bank:compound ringsj@0",
+        "metrics kpm=0 gpm=81098",
+        "bank:store ringsj@1",
+        "dlv:cancel",
+        "xyn:exchange anniversarygift",
+        "ponty:list 309",
+        "ponty:none",
+        "gear:upgrade coat@0->1",
+        "metrics kpm=0 gpm=49471",
+        "ponty:list 309",
+        "ponty:none",
+        "gear:upgrade coat@1->2",
+        "ponty:list 309",
+        "ponty:none",
+        "gear:upgrade_skip chance=0.84",
+        "bank:store coat@2",
+        "ponty:list 309",
+        "ponty:none",
+        "gear:plan t2bow@0->Jazwyn",
+        "metrics kpm=0 gpm=48150",
+        "bank:store t2bow@0",
+        "dlv:active dlv_gear -> Jazwyn",
+        "dlv:meet main 750,1800",
+        "gold_topup",
+        "dlv:send_gear t2bow@0 id=g1789056055929_Jaz",
+        "gear_got from=Jazwyn ok=0",
+        "dlv:loot_done n=0",
+        "dlv:done id=g1789056055929_Jaz",
+        "dlv:retreat",
+        "bank:store hpamulet@0",
+        "bank:store hpamulet@0",
+        "metrics kpm=0 gpm=37115",
+        "xyn:exchange anniversarygift",
+        "metrics kpm=0 gpm=36707",
+        "ponty:list 311",
+        "ponty:none"
+      ]
+    }
+  },
+  "issues": [
+    {
+      "who": "Jazwyn",
+      "stuck": 0,
+      "onPack": true,
+      "lastMsg": "",
+      "lastPots": {
+        "hp": 199,
+        "mp": 831,
+        "n": 3
+      },
+      "bad": 0,
+      "connected": true
+    },
+    {
+      "who": "Sarene",
+      "stuck": 0,
+      "onPack": true,
+      "lastMsg": "",
+      "lastPots": {
+        "hp": 2344,
+        "mp": 201,
+        "n": 2
+      },
+      "bad": 0,
+      "connected": true
+    },
+    {
+      "who": "Zarook",
+      "stuck": 1,
+      "onPack": true,
+      "lastMsg": "",
+      "lastPots": {
+        "hp": 10450,
+        "mp": 105,
+        "n": 3
+      },
+      "bad": 0,
+      "connected": true
+    },
+    {
+      "who": "Puppygirl",
+      "stuck": 0,
+      "onPack": false,
+      "lastMsg": "",
+      "lastPots": {
+        "hp": 1250,
+        "mp": 916,
+        "n": 19
+      },
+      "bad": 0,
+      "connected": true
+    }
+  ]
+}

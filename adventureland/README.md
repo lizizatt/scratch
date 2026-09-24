@@ -1,83 +1,183 @@
-# Adventure Land — party grind (1–90)
+# Adventure Land party — V2
 
-| Character | Class | Role | File | CODE slot |
-| --- | --- | --- | --- | ---: |
-| Jazwyn | warrior | party lead / tank | `warrior.js` | 1 (`warrior`) |
-| Sarene | mage | assist / formation | `mage.js` | 2 (`mage`) |
-| Zarook | priest | heal / formation | `priest.js` | 3 (`priest`) |
-| puppygirl | merchant | stand / sales | `merchant.js` | 4 (`merchant`) |
-| *(shared)* | — | fighter runtime | `fighter_core.js` | `fighter_core` |
+Sim-first rewrite. Spec: `[V2_PLAN.md](V2_PLAN.md)`. Server lessons: `[LESSONS.md](LESSONS.md)`. Publish: `[PUBLISH.md](PUBLISH.md)`. Review pack: `[reviews/](reviews/)`.
 
-## Deploy (recommended)
-
-Use the Adventure Land MCP token (Mainframe → **Connect an AI** → Reveal token). Save it as `adventureland/.al_mcp_token` (gitignored), then:
+## Layout
 
 ```
-node adventureland/deploy_mcp.js
+sim/           # multi-character simulator (clock, comms §4.0, path, invariants, trace)
+src/           # readable bot code (fighters + merchant + live slots) — edit here
+src/slots/     # Mainframe character entrypoints (load_code + class combat)
+data/          # path/vision explorer fixtures (*.sim.json committed; *.live.json local)
+tests/         # unit + integration scenarios (includes dist smoke tests)
+tools/         # compress, viz record, route/live explorers
+dist/          # generated ≤176-line slots (gitignored) — do not edit
+viz/           # scrubbable sim explorer (static UI)
+reviews/       # architecture / risks / backlog
+publish.manifest.js  # slot map (sources → dist → upload names)
+publish.js           # build + upload CLI
 ```
 
-That uploads fighter + merchant CODE (including `fighter_core`, `merchant_plan`, `merchant_ops`). Saving does **not** restart running CODE — Stop/Run (or `load_code`) on each character after deploy.
 
-Do **not** paste the MCP token into chat or character CODE; rotate it in Mainframe if it leaks.
 
-Gearing (run separately at the upgrade NPC when you have gold): `warrior_upgrade.js`, `mage_upgrade.js`, `priest_upgrade.js`.
+## Run tests
 
-Keep the browser tab focused, or call `performance_trick()` once. Puppygirl already has a `stand0`.
-
-## Party plan
-
-**Jazwyn** (warrior) is party lead and tank: she invites the fighters, picks the ladder pack, pulls, taunts/charges/cleaves, and stands on the far side of the mob. **Sarene** and **Zarook** assist her target and hold **formation slots** relative to her facing (mage left-rear, priest right-rear). If the leader is missing/rip, they rally to the shared pack by walking (`smart_move`). No magiport.
-
-Shared logic lives in `fighter_core.js` (loaded by each class). See `FIGHTER_PLAN.md`.
-
-**puppygirl** (merchant) stays out of the combat party. On a ~5‑minute cycle she banks, parks the bag, combines compoundables (gold float reserved), clears the stand, then lists the most expensive unheld bank loot in town (`trade` 1–16). She mlucks passersby at level 40+. See `MERCHANT_PLAN.md`.
-
-### Commands (party chat — works from any fighter, including the speaker)
-
-| Command | Effect |
-| --- | --- |
-| `!hold` / `!resume` | Hold restock on Americas II / resume grind on Americas III |
-| `!hunt <mtype>` / `!grind` | Override pack / clear override |
-| `Let's kill X!` / `Back to the grind` | Same as hunt/grind (legacy) |
-
-Status sync: leader-only `~s h=0|1 f=<mtype|->` every ~20s on change (rate-limited with other party chat). Social Ding/Gratz stay other-only.
-
-Formation: mage/priest hold face-relative flank slots. Slot is **re-anchored only after the leader moves ≥70** from the last anchor (stops combat jitter).
-
-Merchant console still has `hold()` / `resume()` / `hunt()` / `grind()` (CM/PM dual-path).
-
-Hold survives reload via `localStorage`. On a potion run fighters bank non-pots first. Walking past puppygirl sends gold down to a 1k float.
-
-Everyone farms the **lowest member's** ladder pack (HP gates the pull). After death, remembered levels/HP are kept so town goos don't steal the pull.
-
-Other party chat: Ding / Gratz, potions (town rally), gear upgrade rally.
-
-## Ladder (from [data.js](https://adventure.land/data.js) XP, attack-gated)
-
-Commons only (no bosses / event nerfs). Early packs stay a bit early; spider+ delayed (scorpions were shredding ~45). HP gate uses `MAX_ATTACK_RATIO=0.24`.
-
-| Lowest level | Monster | XP | Attack |
-| ---: | --- | ---: | ---: |
-| 1–3 | `goo` | 100 | 5 |
-| 4–7 | `bee` | 400 | 16 |
-| 8–11 | `crab` | 500 | 24 |
-| 12–15 | `snake` | 960 | 24 |
-| 16–19 | `armadillo` | 1720 | 20 |
-| 20–23 | `arcticbee` | 1800 | 64 |
-| 24–27 | `porcupine` | 3200 | 16 |
-| 28–29 | `croc` | 3600 | 48 |
-| 30–31 | `tortoise` | 5200 | 36 |
-| 32–41 | `bat` | 8000 | 50 |
-| 42–49 | `spider` | 12000 | 80 |
-| 50–53 | `scorpion` | 20000 | 100 |
-| 54–59 | `boar` | 10800 | 240 |
-| 60–65 | `bigbird` | 30000 | 480 |
-| 66–71 | `gscorpion` | 48000 | 120 |
-| 72–77 | `wolf` | 48800 | 480 |
-| 78–90 | `dryad` | 60000 | 400 |
-
-## Tests
-
+```bash
+node tests/run.js
 ```
-node adventureland/tests/run.js
+
+
+
+## Publish (compress → Mainframe)
+
+Documented in `[PUBLISH.md](PUBLISH.md)`. Needs `.al_mcp_token` or `AL_MCP_TOKEN` for upload.
+
+```bash
+node publish.js --list              # slot map
+node publish.js --build             # src/ → dist/ only
+node publish.js --dry-run           # build + show upload plan
+node publish.js --test --upload     # suite, then compress + save_code
+node publish.js                     # compress + upload
 ```
+
+`node deploy_mcp.js` remains as a wrapper around `publish.js --upload` for older live scripts.
+
+After upload, **relink** characters — `save_code` does not restart CODE.
+
+## Monte Carlo (MVP)
+
+Seeded short farms with path-fail injection + intermittent merchant silence:
+
+```bash
+node tools/mc_mvp.js 20 1 120000
+```
+
+
+
+## Path / vision explorers
+
+Sim baseline (no auth) writes `data/path_bands.sim.json`:
+
+```bash
+node tools/explore_routes.js
+node tools/dump_sim_knobs.js   # vision.sim.json + reconnect.sim.json from sim/knobs.js
+```
+
+Live stubs (token required; measurement automation still TODO):
+
+```bash
+node tools/explore_live.js vision
+node tools/explore_live.js path
+```
+
+
+
+## Sim viz (browse + scrub)
+
+Record timelines from party scenarios, then open the explorer:
+
+```bash
+node tools/record_viz.js
+node viz/serve.js
+# → http://127.0.0.1:8765
+```
+
+**How logging works**
+
+1. `sim/trace.js` attaches to the world clock: samples positions (~every 2s sim time) and drains `game_log` / party say / CM / `change_server` into an event stream.
+2. `bootParty({ trace: { id, name, tags } })` enables recording for a run.
+3. `tools/record_viz.js` builds `viz/public/data/catalog.json` (all suite tests + tags + §6.6 mapping) and writes scrubbable JSON under `viz/public/data/traces/`.
+4. The UI browses coverage, opens a recorded trace, and scrubs the map + event log.
+
+Unit/comms tests show up in the catalog for coverage even without a timeline; party scenarios are the ones with scrub data.
+
+## Status
+
+Sim suite via `node tests/run.js` (scenarios cover resume/world, path-fail, mid-job reload, bee/goo, rejoin, bags, avoid, craft, gear score). Viz is GPU-light. Live explorers measured path + reconnect; vision ~175px low-confidence.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+TODO:  
+Complexity is mostly duplicated travel / lead / equip / combat dialects — not avoid geometry or party_state. Full board is in the canvas beside chat.
+
+Headline
+
+Debt clusters where the same job has multiple owners. Avoid steering, party_state, packs, publish compression, and pure score() are fine to leave alone.
+
+Priority cuts
+
+DELETE dead stallDone / openStall; thin meet rename-wrappers
+
+SIMPLIFY one goNpc + bank enter/exit (NPC travel copy-pasted ×4)
+
+MERGE sell-name sources (VENDOR_NPC / bank_clean / derive)
+
+MERGE one lead resolver into motion + combat (kill hardcoded Jazwyn in combat)
+
+MERGE one pickBestSlot for pendingBetter / equipPending / handleGearOffer
+
+SIMPLIFY move combat.js under sim/; fold live pots into fighter boot; trim al_api to semantic shims
+
+Contradiction matrix (same idea, two owners)
+
+Theme	Failure mode
+
+Junk policy
+
+park ≠ vendor ≠ ops dump lists
+
+Bank travel
+
+ensureAtBank vs gear bank vs delivery plaza
+
+Engage radius
+
+fighter 280 / avoid 180 / FORM 220–400
+
+Lead
+
+dynamic succession vs combat default Jazwyn
+
+Combat
+
+sim combat.js ≠ live slots/* ≠ live pots
+
+Keep
+
+merchant_avoid geometry · party_state · packs/safeMeet · sim storage/comms/invariants · publish compressor · score() without class gating
+
+Canvas: al-adversary-simplicity-pass — say if you want me to start on the high-confidence DELETE/SIMPLIFY items.
+
+Work through the priority cuts, verifying each diff adversarially before commiting.  Then let's walk through the contradition matrix, grill me on questions to come up with a cleaner design.
+
+Other todo:
+
+SPAM to fix on puppygirl:
+
+Ponty:list 316
+
+ponty:none
+
+Searching for path
+
+Path found!
+
+SPAM to fix on Jazwyn:
+
+Wrong weapon!

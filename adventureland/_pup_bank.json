@@ -1,0 +1,215 @@
+{
+  "success": true,
+  "source": "last_account_snapshot",
+  "observed_at": null,
+  "stale": false,
+  "mounted_character_id": null,
+  "gold": 1000,
+  "packs": {
+    "items0": [
+      {
+        "name": "ringsj",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 2,
+        "grace": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 1,
+        "grace": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "ascale",
+        "q": 1
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "wshoes",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "wshoes",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "shoes",
+        "level": 3
+      },
+      {
+        "name": "stramulet",
+        "level": 0
+      },
+      null,
+      {
+        "name": "wcap",
+        "level": 0
+      },
+      {
+        "name": "wbook0",
+        "level": 0
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "gem0",
+        "q": 8
+      },
+      {
+        "name": "seashell",
+        "q": 2
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "reefglass",
+        "q": 2
+      },
+      {
+        "name": "wshoes",
+        "level": 0
+      },
+      {
+        "name": "stramulet",
+        "level": 1,
+        "grace": 0.8
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "carrotsword",
+        "level": 0,
+        "grace": 0.4,
+        "p": "shiny"
+      },
+      {
+        "name": "ringsj",
+        "level": 0
+      },
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "staff",
+        "level": 3
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      },
+      {
+        "name": "hpbelt",
+        "level": 0
+      }
+    ],
+    "items1": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      {
+        "name": "hpamulet",
+        "level": 0
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  }
+}

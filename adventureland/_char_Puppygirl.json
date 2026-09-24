@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "map": "main",
+  "x": 56,
+  "y": -120,
+  "gold": 0,
+  "hp": 588,
+  "mp": 490,
+  "server": "US III",
+  "game_connected": true,
+  "rip": false,
+  "moving": false,
+  "items": [],
+  "pot_h": 0,
+  "pot_m": 0
+}

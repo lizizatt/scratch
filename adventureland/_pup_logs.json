@@ -1,0 +1,807 @@
+{
+  "success": true,
+  "active": false,
+  "retention_days": 30,
+  "logs": [
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:46.746Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:46.806Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:46.806Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:49.212Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:49.527Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:49.532Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:49.534Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:49.534Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:51.536Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:51.931Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:51.934Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:51.937Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:51.937Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:54.026Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:54.410Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:54.419Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:54.429Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:54.429Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:56.755Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:57.137Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:57.143Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:57.146Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:57.146Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:59.205Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:59.545Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:59.550Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:59.558Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:35:59.558Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:01.948Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:02.342Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:02.344Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:02.347Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:02.347Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:04.360Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:04.749Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:04.756Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:04.761Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:04.761Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:06.774Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:07.155Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:07.158Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:07.161Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:07.165Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:09.312Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:09.557Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:09.559Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:09.562Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:09.562Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:11.968Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:12.373Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:12.376Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:12.381Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:12.382Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:14.554Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:14.772Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:14.787Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:14.793Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:14.793Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:16.806Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:17.206Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:17.209Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:17.212Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:17.212Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:19.580Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:19.969Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:19.972Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:19.975Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:19.975Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:21.172Z",
+      "level": "info",
+      "values": [
+        "gold_topup"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:21.176Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail hpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:21.180Z",
+      "level": "info",
+      "values": [
+        "dlv:send_fail mpot1"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:21.180Z",
+      "level": "info",
+      "values": [
+        "dlv:empty_send"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:21.561Z",
+      "level": "info",
+      "values": [
+        "dlv:job_ttl"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:36:51.182Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=0"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:37:51.237Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=0"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:37:56.445Z",
+      "level": "info",
+      "values": [
+        "dlv:active dlv_pots -> Sarene"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:38:23.178Z",
+      "level": "info",
+      "values": [
+        "dlv:have hpot1 200"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:38:23.178Z",
+      "level": "info",
+      "values": [
+        "dlv:have mpot1 200"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:39:00.248Z",
+      "level": "info",
+      "values": [
+        "dlv:send hpot1 id=p1788939471269_Sar"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:39:00.257Z",
+      "level": "info",
+      "values": [
+        "dlv:send mpot1 id=p1788939471269_Sar"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:39:00.307Z",
+      "level": "info",
+      "values": [
+        "dlv:loot_done n=0"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:39:00.307Z",
+      "level": "info",
+      "values": [
+        "dlv:done id=p1788939471269_Sar"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:39:00.309Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-3823"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:39:50.943Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-3704"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:40:50.999Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-3571"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:41:51.044Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-3448"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:42:51.084Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-3333"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:43:51.165Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-3225"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:44:51.250Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-3124"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:45:50.931Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-3030"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:46:50.984Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-2941"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:47:51.043Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-2857"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:48:51.104Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-2778"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:49:51.145Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-2702"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:50:51.201Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-2631"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:51:51.260Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-2564"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:51:53.328Z",
+      "level": "info",
+      "values": [
+        "dlv:cancel"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:51:53.673Z",
+      "level": "info",
+      "values": [
+        "dlv:active dlv_pots -> Zarook"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:58:06.106Z",
+      "level": "info",
+      "values": [
+        "dlv:vendor_path_fail"
+      ]
+    },
+    {
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:58:06.106Z",
+      "level": "info",
+      "values": [
+        "metrics kpm=0 gpm=-2210"
+      ]
+    }
+  ]
+}

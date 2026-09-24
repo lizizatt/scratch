@@ -1,0 +1,1521 @@
+{
+  "success": true,
+  "contract": {
+    "version": 7,
+    "billing": "auto_renewing_prepaid",
+    "shells_per_period": 1,
+    "period_minutes": 60,
+    "renewal_minutes_by_active_characters": [
+      {
+        "characters": 1,
+        "minutes": 60
+      },
+      {
+        "characters": 2,
+        "minutes": 50
+      },
+      {
+        "characters": 3,
+        "minutes": 45
+      },
+      {
+        "characters": 4,
+        "minutes": 40
+      }
+    ],
+    "renewal_character_count": "sampled_at_renewal_boundary",
+    "free_time": "optional_shared_steam_hours_used_before_shells",
+    "initial_charge": "before_start_when_no_paid_time_remains",
+    "renewal": "automatic_while_assignment_is_running",
+    "stop_conditions": [
+      "explicit_disconnect",
+      "not_enough_shells_at_renewal"
+    ],
+    "restart_persistence": [
+      "http_service",
+      "mainframe_controller",
+      "host",
+      "microvm"
+    ],
+    "code_started_workers": {
+      "max_included": 3,
+      "max_characters_per_machine": 4,
+      "billing": "included_with_group_root",
+      "renewal_duration": "based_on_active_group_size_at_the_next_renewal",
+      "root_stop": "stops_all_included_workers",
+      "child_stop": "stops_only_that_worker",
+      "direct_mainframe_links": "separately_billed_dedicated_microvms",
+      "containment": "separate_worker_identities_and_limits_inside_one_microvm",
+      "shared_cpu": "one_fixed_microvm_cpu_budget",
+      "shared_guest_memory_mib": 192,
+      "dynamic_host_memory_cap_mib": [
+        192,
+        224,
+        240,
+        256
+      ]
+    },
+    "code_log_retention_days": 30,
+    "mainframe_event_retention_days": 30,
+    "disconnected_time_counts": true,
+    "traffic": "requested_actions_not_confirmation",
+    "observation": "authenticated_game_server_events",
+    "movement": "confirmed_position_and_map_changes_only",
+    "stuck": "stationary_for_15s_with_10_recent_move_requests"
+  },
+  "shells": 0,
+  "character": "Puppygirl",
+  "character_id": "CH_q7h90Mhg5era0mD5DBIMAKFcLp9xe",
+  "profile": {
+    "source": "last_account_snapshot",
+    "synchronized_at": "2026-09-09T15:18:56.596Z",
+    "name": "Puppygirl",
+    "class": "merchant",
+    "level": 30,
+    "xp": 63132,
+    "server": null,
+    "online": false,
+    "map": "main",
+    "x": 381.5,
+    "y": 1718,
+    "rip": false,
+    "hp": 401,
+    "mp": 490,
+    "gold": 1906730,
+    "inventory_slots": 42,
+    "inventory_items": 36,
+    "equipment": {
+      "amulet": null,
+      "helmet": null,
+      "mainhand": null,
+      "ring1": null,
+      "ring2": null,
+      "shoes": null,
+      "trade1": {
+        "level": 0,
+        "name": "dexamulet",
+        "oo": "Jazwyn",
+        "price": 30000,
+        "rid": "zGKg"
+      },
+      "trade10": null,
+      "trade11": null,
+      "trade12": null,
+      "trade13": null,
+      "trade14": null,
+      "trade15": null,
+      "trade16": null,
+      "trade2": {
+        "level": 0,
+        "name": "rednose",
+        "oo": "Sarene",
+        "price": 32000,
+        "rid": "I9i4",
+        "src": "scnd"
+      },
+      "trade3": {
+        "level": 0,
+        "name": "rednose",
+        "oo": "Zarook",
+        "price": 32000,
+        "rid": "rTBW",
+        "src": "scnd"
+      },
+      "trade4": {
+        "level": 0,
+        "name": "wshoes",
+        "oo": "Zarook",
+        "price": 24200,
+        "rid": "MTiX",
+        "src": "scnd"
+      },
+      "trade5": {
+        "level": 0,
+        "name": "wshoes",
+        "oo": "Sarene",
+        "price": 24200,
+        "rid": "hHKi"
+      },
+      "trade6": {
+        "level": 0,
+        "name": "wshoes",
+        "oo": "Sarene",
+        "price": 24200,
+        "rid": "N7xa"
+      },
+      "trade7": {
+        "level": 0,
+        "name": "strearring",
+        "oo": "Jazwyn",
+        "price": 38000,
+        "rid": "HVLA"
+      },
+      "trade8": {
+        "level": 0,
+        "name": "wcap",
+        "oo": "Sarene",
+        "price": 6400,
+        "rid": "Gyql"
+      },
+      "trade9": null
+    },
+    "inventory": [
+      {
+        "gift": 1,
+        "name": "hpot0",
+        "oo": "Puppygirl",
+        "q": 1250
+      },
+      {
+        "gift": 1,
+        "name": "mpot0",
+        "q": 916
+      },
+      {
+        "name": "stand0",
+        "oo": "Puppygirl"
+      },
+      {
+        "name": "marketparcel",
+        "oo": "Puppygirl",
+        "q": 5
+      },
+      {
+        "name": "scroll0",
+        "oo": "Puppygirl",
+        "q": 52
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Zarook"
+      },
+      {
+        "name": "ascale",
+        "oo": "Puppygirl",
+        "q": 8
+      },
+      {
+        "level": 0,
+        "name": "wcap",
+        "oo": "Jazwyn"
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Sarene"
+      },
+      {
+        "name": "anniversarygift",
+        "oo": "Puppygirl",
+        "q": 14
+      },
+      {
+        "name": "gem0",
+        "oo": "Puppygirl",
+        "q": 1
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "wcap",
+        "oo": "Zarook"
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Zarook"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Zarook"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Zarook"
+      },
+      {
+        "level": 0,
+        "name": "hpamulet",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Zarook"
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "hpamulet",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Zarook"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Jazwyn"
+      },
+      {
+        "level": 0,
+        "name": "hpamulet",
+        "oo": "Jazwyn"
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "hpamulet",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "hpamulet",
+        "oo": "Jazwyn"
+      },
+      {
+        "level": 0,
+        "name": "hpamulet",
+        "oo": "Jazwyn"
+      },
+      {
+        "level": 0,
+        "name": "hpamulet",
+        "oo": "Jazwyn"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "hpbelt",
+        "oo": "Sarene"
+      },
+      {
+        "level": 0,
+        "name": "ringsj",
+        "oo": "Jazwyn"
+      },
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "conditions": {
+      "newcomersblessing": {
+        "f": "Sarene",
+        "ms": 1797754
+      }
+    },
+    "quests": {},
+    "progress": {
+      "achievements": {},
+      "acx": {},
+      "ap": {},
+      "cgrace": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "dt": {
+        "fishing": "2026-09-03T08:11:35.537Z",
+        "massexchange": "2026-09-03T08:11:35.537Z",
+        "massexchangepp": "2026-09-03T08:11:35.537Z",
+        "massproduction": "2026-09-03T08:11:35.537Z",
+        "massproductionpp": "2026-09-03T08:11:35.537Z",
+        "mcourage": "2026-09-03T08:11:35.537Z",
+        "mfrenzy": "2026-09-03T08:11:35.537Z",
+        "mining": "2026-09-03T08:11:35.537Z",
+        "mluck": "2026-09-03T08:11:35.537Z",
+        "throw": "2026-09-03T08:11:35.537Z"
+      },
+      "entries": [
+        [
+          "USIII",
+          "Tue Sep 08 2026 02:20:22 GMT+0000 (Coordinated Universal Time)"
+        ]
+      ],
+      "first": false,
+      "history": [
+        {
+          "amount": 90,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 107,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 107,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 107,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 73,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 73,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 73,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 117,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 117,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 117,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 40,
+          "to": "Jazwyn"
+        },
+        {
+          "amount": 123,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 123,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 123,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 39,
+          "to": "Sarene"
+        },
+        {
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 200,
+          "to": "Zarook"
+        },
+        {
+          "amount": 99,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 99,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 99,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 1662,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 150,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 30124,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 2107,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 31529,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 68,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 68,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 33478,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "from": "Jazwyn",
+          "item": "gem0",
+          "level": null,
+          "name": "item",
+          "q": 1
+        },
+        {
+          "from": "Jazwyn",
+          "item": "ringsj",
+          "level": 0,
+          "name": "item",
+          "q": 1
+        },
+        {
+          "amount": 69,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 53,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 122,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 53,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 46,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 46,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 46,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 60,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 60,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 60,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 66,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 66,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 66,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 45,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 45,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 45,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 54,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 54,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 54,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 53,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 53,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 53,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 420,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 420,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 420,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "item": "hpot1",
+          "level": null,
+          "name": "item",
+          "q": 5,
+          "to": "Jazwyn"
+        },
+        {
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 42,
+          "to": "Jazwyn"
+        },
+        {
+          "amount": 54,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 54,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 54,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 42,
+          "to": "Sarene"
+        },
+        {
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 200,
+          "to": "Zarook"
+        },
+        {
+          "amount": 40,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 40,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 40,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 6262,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 63,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 17740,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "from": "Zarook",
+          "item": "wshoes",
+          "level": 0,
+          "name": "item",
+          "q": 1
+        },
+        {
+          "amount": 70,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 55,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 1024,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 12627,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 63,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 18952,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 65,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 65,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 65,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 63,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 63,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 63,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 39,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 39,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 39,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 56,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 56,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 56,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 33,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 33,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 33,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 79,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 79,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 79,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "amount": 46,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 46,
+          "from": "Jazwyn",
+          "name": "gold"
+        },
+        {
+          "amount": 46,
+          "from": "Sarene",
+          "name": "gold"
+        },
+        {
+          "item": "hpot1",
+          "level": null,
+          "name": "item",
+          "q": 5,
+          "to": "Jazwyn"
+        },
+        {
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 41,
+          "to": "Jazwyn"
+        },
+        {
+          "item": "mpot1",
+          "level": null,
+          "name": "item",
+          "q": 43,
+          "to": "Sarene"
+        },
+        {
+          "amount": 58,
+          "from": "Zarook",
+          "name": "gold"
+        },
+        {
+          "amount": 58,
+          "from": "Jazwyn",
+          "name": "gold"
+        }
+      ],
+      "home": "USII",
+      "item_num": 11,
+      "merrit_receipt": {
+        "at": 1788944885198,
+        "character": "CH_q7h90Mhg5era0mD5DBIMAKFcLp9xe",
+        "id": "TMhIOhg9TEC0xgEMLWnmduHdPIeLrEkZ",
+        "item": "marketparcel",
+        "name": "Puppygirl",
+        "quantity": 1,
+        "reason": "Your shop stayed stocked for two minutes and left the neighbors room.",
+        "shells": 0
+      },
+      "minutes": 5527,
+      "ograce": 0,
+      "stand": false,
+      "stats": {
+        "exchanges": {
+          "armorbox": 1,
+          "gem0": 3
+        },
+        "monsters": {},
+        "monsters_diff": {}
+      },
+      "steam_id": "76561198002404349",
+      "trade_history": [
+        [
+          "sell",
+          "EVQL",
+          {
+            "name": "gem0",
+            "price": 228000,
+            "q": 1,
+            "rid": "frXk"
+          },
+          228000
+        ],
+        [
+          "sell",
+          "EVQL",
+          {
+            "name": "spiderkey",
+            "price": 47500,
+            "q": 1,
+            "rid": "TInH"
+          },
+          47500
+        ],
+        [
+          "sell",
+          "acePriest",
+          {
+            "level": 0,
+            "name": "wshoes",
+            "price": 22990,
+            "q": 2,
+            "rid": "ZgNv"
+          },
+          45980
+        ],
+        [
+          "buy",
+          "Chrisque",
+          {
+            "name": "gem0",
+            "price": 288000,
+            "q": 1,
+            "rid": "Pf3E"
+          },
+          288000
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "name": "stormfeather",
+            "price": 1710,
+            "q": 9,
+            "rid": "COg8"
+          },
+          15390
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 19,
+            "rid": "XPCy"
+          },
+          18050
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "gift": 1,
+            "level": 0,
+            "name": "helmet",
+            "price": 3040,
+            "q": 1,
+            "rid": "pKnL"
+          },
+          3040
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "level": 0,
+            "name": "spear",
+            "price": 68400,
+            "q": 1,
+            "rid": "HdTR"
+          },
+          68400
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "level": 0,
+            "name": "t2bow",
+            "price": 74100,
+            "q": 1,
+            "rid": "RxwZ"
+          },
+          74100
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "gift": 1,
+            "level": 0,
+            "name": "staff",
+            "price": 11780,
+            "q": 1,
+            "rid": "SQni"
+          },
+          11780
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "level": 0,
+            "name": "stinger",
+            "price": 15200,
+            "q": 1,
+            "rid": "w44y"
+          },
+          15200
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "name": "cscroll1",
+            "price": 228000,
+            "q": 4,
+            "rid": "zsVt"
+          },
+          912000
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "name": "elixirluck",
+            "price": 228000,
+            "q": 1,
+            "rid": "J5NG"
+          },
+          228000
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "name": "vitscroll",
+            "price": 7600,
+            "q": 3,
+            "rid": "tBMQ"
+          },
+          22800
+        ],
+        [
+          "sell",
+          "Dystopics",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 1,
+            "rid": "BNv6"
+          },
+          950
+        ],
+        [
+          "sell",
+          "Loro",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 1,
+            "rid": "U8Bm"
+          },
+          950
+        ],
+        [
+          "sell",
+          "Astrali",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 14,
+            "rid": "JbHo"
+          },
+          13300
+        ],
+        [
+          "sell",
+          "Chika",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 11,
+            "rid": "COcb"
+          },
+          10450
+        ],
+        [
+          "sell",
+          "CrownMerch",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 3,
+            "rid": "dZTn"
+          },
+          2850
+        ],
+        [
+          "sell",
+          "Chika",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 2,
+            "rid": "vGEw"
+          },
+          1900
+        ],
+        [
+          "sell",
+          "monsterror",
+          {
+            "level": 0,
+            "name": "wattire",
+            "price": 11400,
+            "q": 1,
+            "rid": "a0xg"
+          },
+          11400
+        ],
+        [
+          "sell",
+          "monsterror",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 4,
+            "rid": "pntA"
+          },
+          3800
+        ],
+        [
+          "sell",
+          "antimony",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 1,
+            "rid": "Z5bi"
+          },
+          950
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "name": "gem0",
+            "price": 228000,
+            "q": 2,
+            "rid": "xLkt"
+          },
+          456000
+        ],
+        [
+          "sell",
+          "MuaBan",
+          {
+            "name": "bwing",
+            "price": 114,
+            "q": 10,
+            "rid": "oT2d"
+          },
+          1140
+        ],
+        [
+          "sell",
+          "Urielmer",
+          {
+            "level": 1,
+            "name": "wattire",
+            "price": 11400,
+            "q": 2,
+            "rid": "vNBs"
+          },
+          22800
+        ],
+        [
+          "sell",
+          "Urielmer",
+          {
+            "level": 0,
+            "name": "wattire",
+            "price": 11400,
+            "q": 1,
+            "rid": "CTCx"
+          },
+          11400
+        ],
+        [
+          "sell",
+          "Urielmer",
+          {
+            "level": 0,
+            "name": "wgloves",
+            "price": 6460,
+            "q": 4,
+            "rid": "smMI"
+          },
+          25840
+        ],
+        [
+          "sell",
+          "CrownMerch",
+          {
+            "name": "bwing",
+            "price": 114,
+            "q": 2,
+            "rid": "NiHq"
+          },
+          228
+        ],
+        [
+          "sell",
+          "CrownMerch",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 17,
+            "rid": "bAbl"
+          },
+          16150
+        ],
+        [
+          "sell",
+          "buffett",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 5,
+            "rid": "ld40"
+          },
+          4750
+        ],
+        [
+          "sell",
+          "CrownMerch",
+          {
+            "name": "scroll0",
+            "price": 950,
+            "q": 15,
+            "rid": "UR8N"
+          },
+          14250
+        ],
+        [
+          "sell",
+          "Urielwar",
+          {
+            "level": 1,
+            "name": "wattire",
+            "price": 11400,
+            "q": 1,
+            "rid": "OEo6"
+          },
+          11400
+        ],
+        [
+          "sell",
+          "Selka",
+          {
+            "level": 0,
+            "name": "wgloves",
+            "price": 6460,
+            "q": 2,
+            "rid": "ye93"
+          },
+          12920
+        ],
+        [
+          "sell",
+          "DeathShadow",
+          {
+            "name": "bwing",
+            "price": 114,
+            "q": 3,
+            "rid": "sINa"
+          },
+          342
+        ],
+        [
+          "sell",
+          "Legslost",
+          {
+            "level": 3,
+            "name": "wcap",
+            "price": 6080,
+            "q": 1,
+            "rid": "TtJT"
+          },
+          6080
+        ],
+        [
+          "sell",
+          "Legslost",
+          {
+            "level": 3,
+            "name": "wshoes",
+            "price": 22990,
+            "q": 1,
+            "rid": "Om89"
+          },
+          22990
+        ],
+        [
+          "sell",
+          "Legslost",
+          {
+            "gift": 1,
+            "level": 4,
+            "name": "helmet",
+            "price": 3040,
+            "q": 1,
+            "rid": "T6Rv"
+          },
+          3040
+        ],
+        [
+          "sell",
+          "Koro",
+          {
+            "level": 3,
+            "name": "wshoes",
+            "price": 22990,
+            "q": 1,
+            "rid": "Qmhf"
+          },
+          22990
+        ],
+        [
+          "sell",
+          "GoldMajesty",
+          {
+            "level": 0,
+            "name": "dexearring",
+            "price": 38000,
+            "q": 1,
+            "rid": "xFPH"
+          },
+          38000
+        ]
+      ],
+      "u_level": 0,
+      "ugrace": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "xcx": []
+    }
+  },
+  "access": {
+    "active": false,
+    "access_until": "2026-09-09T08:25:20.534Z",
+    "remaining_seconds": 0,
+    "billing_source": null,
+    "shells_per_period": 1,
+    "period_minutes": 60,
+    "active_characters": 1,
+    "renewal_minutes_by_characters": [
+      {
+        "characters": 1,
+        "minutes": 60
+      },
+      {
+        "characters": 2,
+        "minutes": 50
+      },
+      {
+        "characters": 3,
+        "minutes": 45
+      },
+      {
+        "characters": 4,
+        "minutes": 40
+      }
+    ],
+    "auto_renew": false,
+    "next_charge_at": null
+  },
+  "assignment": {
+    "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+    "character": "Puppygirl",
+    "character_id": "CH_q7h90Mhg5era0mD5DBIMAKFcLp9xe",
+    "code_slot": "CH_q7h90Mhg5era0mD5DBIMAKFcLp9xe",
+    "server": "US III",
+    "desired_state": "stopped",
+    "stop_reason": "explicit_disconnect",
+    "last_failure": null,
+    "mainframe_event": {
+      "id": "78f4ac126bfa87213b0f77f835eefdd0",
+      "assignment_id": "c4beae5b4d9f236e58adf7814b5289ed",
+      "at": "2026-09-09T07:58:08.887Z",
+      "level": "info",
+      "code": "worker_stopped",
+      "message": "Mainframe stopped this Worker.",
+      "detail": "assignment_removed"
+    },
+    "mainframe_error": {
+      "id": "e99e0e27ee0297247cc280f90b826ec7",
+      "assignment_id": "848b63e70afa69f45bf02be164bcb3e1",
+      "at": "2026-09-07T22:47:12.127Z",
+      "level": "error",
+      "code": "worker_restart",
+      "message": "Worker stopped unexpectedly. Mainframe will restart it.",
+      "detail": null
+    },
+    "revision": 144,
+    "execution": "dedicated_microvm",
+    "billing_mode": "dedicated",
+    "included_with": null,
+    "worker_slot": 1
+  },
+  "available": true,
+  "runtime": null,
+  "free_time": {
+    "granted_hours": 250,
+    "used_hours": 234,
+    "remaining_hours": 16,
+    "period_minutes": 60,
+    "renewal_minutes_by_characters": [
+      {
+        "characters": 1,
+        "minutes": 60
+      },
+      {
+        "characters": 2,
+        "minutes": 50
+      },
+      {
+        "characters": 3,
+        "minutes": 45
+      },
+      {
+        "characters": 4,
+        "minutes": 40
+      }
+    ],
+    "shared_by": "steam_account"
+  }
+}
