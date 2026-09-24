@@ -397,6 +397,7 @@ export class SimulatedHostEngine implements HostEngine {
       }
       case "refresh-samples":
       case "trigger-sample-pad":
+      case "release-sample-pad":
         return reject(`${command.type} requires the host sample service`);
       case "set-synth-parameter": {
         const instrument = this.state.synth.instruments.find(({ id }) => id === this.state.synth.selectedId);
@@ -471,6 +472,8 @@ export class SimulatedHostEngine implements HostEngine {
         break;
       case "export-mp3":
         return reject("MP3 export is not available in the simulated engine");
+      case "export-loop-sample":
+        return reject("Loop sample export requires the host sample service");
     }
 
     this.state.revision += 1;

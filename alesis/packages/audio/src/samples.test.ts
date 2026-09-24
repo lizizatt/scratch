@@ -7,6 +7,7 @@ import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import type { ChildProcess } from "node:child_process";
 import { SAMPLE_MAX_FILE_BYTES, SAMPLE_PAGE_SIZE, SampleLibrary, SampleMixer, SamplePlayer } from "./samples.js";
+import { stereoFloatToDualMonoS16 } from "./index.js";
 
 const hasFfmpeg = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
 const encoderList = hasFfmpeg ? spawnSync("ffmpeg", ["-hide_banner", "-encoders"], { encoding: "utf8" }) : null;
@@ -203,6 +204,59 @@ describe("SampleMixer", () => {
     expect(mixer.render(1)).toEqual(new Float32Array([0, 0]));
     expect(mixer.activeVoiceCount).toBe(0);
   });
+
+  it("fades every retrigger of one pad to zero without changing another pad", () => {
+    const mixer = new SampleMixer();
+    mixer.setPage([
+      fixtureSample("held", Array(600).fill(0.2).flatMap(() => [0.2, 0.2])),
+      fixtureSample("other", Array(600).fill(0.25).flatMap(() => [0.25, 0.25])),
+    ]);
+    mixer.trigger(0, 127);
+    mixer.render(12);
+    mixer.trigger(0, 127);
+    mixer.trigger(1, 127);
+
+    expect(mixer.release(0)).toBe(true);
+    expect(mixer.release(0)).toBe(false);
+    const fade = mixer.render(240);
+    expect(fade[0]).toBeCloseTo(0.2 + 0.2 + 0.25, 6);
+    expect(fade.at(-2)).toBeCloseTo(0.25, 6);
+    expect(fade.at(-1)).toBeCloseTo(0.25, 6);
+    expect(mixer.activeVoiceCount).toBe(1);
+    expect(mixer.render(1)).toEqual(new Float32Array([0.25, 0.25]));
+  });
+
+  it("keeps a newly triggered voice full-level while an earlier trigger fades", () => {
+    const mixer = new SampleMixer();
+    mixer.setPage([fixtureSample("pad", Array(400).fill(0.5).flatMap(() => [0.5, 0.5]))]);
+    mixer.trigger(0, 127);
+    mixer.render(4);
+    mixer.release(0);
+    const startOfFade = mixer.render(40);
+    mixer.trigger(0, 127);
+    const retriggered = mixer.render(1);
+
+    expect(startOfFade[0]).toBeCloseTo(0.5, 6);
+    expect(retriggered[0]).toBeGreaterThan(0.9);
+    expect(mixer.activeVoiceCount).toBe(2);
+  });
+
+  it("ignores invalid releases and clears fade state on panic and page changes", () => {
+    const mixer = new SampleMixer();
+    mixer.setPage([fixtureSample("one", Array(300).fill(0.4).flatMap(() => [0.4, 0.4]))]);
+    expect(mixer.release(-1)).toBe(false);
+    expect(mixer.release(8)).toBe(false);
+    expect(mixer.release(Number.NaN)).toBe(false);
+    mixer.trigger(0, 127);
+    expect(mixer.release(0)).toBe(true);
+    mixer.panic();
+    mixer.trigger(0, 127);
+    expect(mixer.render(1)).toEqual(new Float32Array([0.4, 0.4]));
+    mixer.release(0);
+    mixer.setPage([fixtureSample("two", [0.2, 0.2])]);
+    mixer.trigger(0, 127);
+    expect(mixer.render(1)).toEqual(new Float32Array([0.2, 0.2]));
+  });
 });
 
 describe("SampleLibrary", () => {
@@ -222,6 +276,11 @@ describe("SampleLibrary", () => {
       }
       mkdirSync(join(root, "nested"));
       writeFileSync(join(root, "nested", "i.mp3"), "nested");
+      const stagingDirectory = join(root, ".alesis-loop-sample-incomplete");
+      mkdirSync(stagingDirectory);
+      writeFileSync(join(stagingDirectory, "sample.part"), "partial export");
+      mkdirSync(join(stagingDirectory, "nested"));
+      writeFileSync(join(stagingDirectory, "nested", "corrupt.mp3"), "corrupt partial export");
       writeFileSync(join(outside, "escape.mp3"), "outside");
       symlinkSync(join(outside, "escape.mp3"), join(root, "escape.mp3"));
 
@@ -415,6 +474,238 @@ describe("SamplePlayer", () => {
       replacement.emit("exit", 0, null);
       await closing;
       vi.useRealTimers();
+    }
+  });
+
+  it("keeps exact PCM flowing when 10 ms pump callbacks arrive every 11 ms", async () => {
+    const callbacks: Array<() => void> = [];
+    let requestedIntervalMs = 0;
+    let monotonicMs = 0;
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval").mockImplementation(((callback: (...args: unknown[]) => void, delay?: number) => {
+      requestedIntervalMs = delay ?? 0;
+      callbacks.push(() => callback());
+      return {} as NodeJS.Timeout;
+    }) as typeof globalThis.setInterval);
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval").mockImplementation(() => {});
+    const child = fixtureChild();
+    const player = new SamplePlayer("default", {
+      spawnProcess: vi.fn(() => child) as unknown as (typeof import("node:child_process"))["spawn"],
+      monotonicNow: () => monotonicMs,
+    });
+    const pcmChunks: Buffer[] = [];
+    let suppliedFrames = 0;
+    let consumerQueueFrames = 0;
+    let underrunFrames = 0;
+    const toneFrames = 3 * 48_000;
+    const tone = new Float32Array(toneFrames * 2);
+    for (let frame = 0; frame < toneFrames; frame += 1) {
+      const value = 0.08 * Math.sin(2 * Math.PI * 440 * frame / 48_000);
+      tone[frame * 2] = value;
+      tone[frame * 2 + 1] = value;
+    }
+    child.stdin.on("data", (chunk: Buffer) => {
+      expect(chunk.length % 4).toBe(0);
+      pcmChunks.push(Buffer.from(chunk));
+      suppliedFrames += chunk.length / 4;
+      consumerQueueFrames += chunk.length / 4;
+    });
+    player.setPage([{ id: "continuous-tone", name: "continuous-tone", samples: tone }]);
+    player.trigger(0, 127);
+
+    try {
+      const starting = player.start();
+      child.emit("spawn");
+      await starting;
+      expect(callbacks).toHaveLength(1);
+      expect(requestedIntervalMs).toBe(10);
+      expect(suppliedFrames).toBe(20 * 48);
+
+      let elapsedMs = 0;
+      const delayedCallbackMs = 11;
+      for (let callback = 0; callback < 200; callback += 1) {
+        elapsedMs += delayedCallbackMs;
+        monotonicMs = elapsedMs;
+        const demandFrames = Math.floor(elapsedMs * 48) - Math.floor((elapsedMs - delayedCallbackMs) * 48);
+        const consumedFrames = Math.min(consumerQueueFrames, demandFrames);
+        consumerQueueFrames -= consumedFrames;
+        underrunFrames += demandFrames - consumedFrames;
+        callbacks[0]!();
+      }
+
+      expect(elapsedMs).toBeGreaterThanOrEqual(2_000);
+      expect(suppliedFrames).toBe(20 * 48 + elapsedMs * 48);
+      expect(underrunFrames).toBe(0);
+      expect(consumerQueueFrames).toBe(20 * 48);
+
+      const reference = new SampleMixer();
+      reference.setPage([{ id: "continuous-tone", name: "continuous-tone", samples: tone }]);
+      reference.trigger(0, 127);
+      const expectedPcm = stereoFloatToDualMonoS16(reference.render(suppliedFrames));
+      expect(Buffer.concat(pcmChunks)).toEqual(expectedPcm);
+    } finally {
+      const closing = player.close();
+      child.emit("exit", 0, null);
+      await closing;
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+    }
+  });
+
+  it("rebases after a one-second stall without flooding the accepted downstream queue", async () => {
+    const callbacks: Array<() => void> = [];
+    let monotonicMs = 0;
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval").mockImplementation(((callback: (...args: unknown[]) => void) => {
+      callbacks.push(() => callback());
+      return {} as NodeJS.Timeout;
+    }) as typeof globalThis.setInterval);
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval").mockImplementation(() => {});
+    const child = fixtureChild();
+    const pcmChunks: Buffer[] = [];
+    let downstreamQueueFrames = 0;
+    child.stdin.on("data", (chunk: Buffer) => {
+      pcmChunks.push(Buffer.from(chunk));
+      downstreamQueueFrames += chunk.length / 4;
+    });
+    const tone = new Float32Array(3 * 48_000 * 2);
+    tone.fill(0.1);
+    const player = new SamplePlayer("default", {
+      spawnProcess: vi.fn(() => child) as unknown as (typeof import("node:child_process"))["spawn"],
+      monotonicNow: () => monotonicMs,
+    });
+    let consumedThroughFrames = 0;
+    let underrunFrames = 0;
+    const consumeToNow = (): void => {
+      const targetFrames = Math.floor(monotonicMs * 48);
+      const demandFrames = targetFrames - consumedThroughFrames;
+      consumedThroughFrames = targetFrames;
+      const consumedFrames = Math.min(downstreamQueueFrames, demandFrames);
+      downstreamQueueFrames -= consumedFrames;
+      underrunFrames += demandFrames - consumedFrames;
+    };
+
+    player.setPage([fixtureSample("tone", Array.from(tone))]);
+    player.trigger(0, 127);
+    try {
+      const starting = player.start();
+      child.emit("spawn");
+      await starting;
+      expect(downstreamQueueFrames).toBe(960);
+      expect(child.stdin.writableLength).toBe(0);
+
+      monotonicMs = 1_000;
+      consumeToNow();
+      callbacks[0]!();
+      expect(downstreamQueueFrames).toBe(960);
+      expect(underrunFrames).toBe(48_000 - 960);
+
+      for (let tick = 0; tick < 100; tick += 1) {
+        monotonicMs += 10;
+        consumeToNow();
+        callbacks[0]!();
+        expect(downstreamQueueFrames).toBe(960);
+        expect(child.stdin.writableLength).toBe(0);
+      }
+      expect(underrunFrames).toBe(48_000 - 960);
+      expect(downstreamQueueFrames).toBe(960);
+
+      const suppliedFrames = pcmChunks.reduce((frames, chunk) => frames + chunk.length / 4, 0);
+      const reference = new SampleMixer();
+      reference.setPage([fixtureSample("tone", Array.from(tone))]);
+      reference.trigger(0, 127);
+      expect(Buffer.concat(pcmChunks)).toEqual(stereoFloatToDualMonoS16(reference.render(suppliedFrames)));
+    } finally {
+      const closing = player.close();
+      child.emit("exit", 0, null);
+      await closing;
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+    }
+  });
+
+  it("bounds catch-up writes and pauses while stdin reports backpressure", async () => {
+    const callbacks: Array<() => void> = [];
+    let monotonicMs = 0;
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval").mockImplementation(((callback: (...args: unknown[]) => void) => {
+      callbacks.push(() => callback());
+      return {} as NodeJS.Timeout;
+    }) as typeof globalThis.setInterval);
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval").mockImplementation(() => {});
+    const child = fixtureChild();
+    child.stdin.on("data", () => {});
+    const originalWrite = child.stdin.write.bind(child.stdin);
+    const writes: Buffer[] = [];
+    let returnFalse = true;
+    const write = vi.spyOn(child.stdin, "write").mockImplementation(((chunk: Buffer | string) => {
+      const buffer = Buffer.isBuffer(chunk) ? Buffer.from(chunk) : Buffer.from(chunk);
+      writes.push(buffer);
+      originalWrite(buffer);
+      return !returnFalse;
+    }) as typeof child.stdin.write);
+    const player = new SamplePlayer("default", {
+      spawnProcess: vi.fn(() => child) as unknown as (typeof import("node:child_process"))["spawn"],
+      monotonicNow: () => monotonicMs,
+    });
+
+    try {
+      const starting = player.start();
+      child.emit("spawn");
+      await starting;
+      expect(writes).toHaveLength(1);
+      expect(writes[0]!.length / 4).toBe(960);
+
+      monotonicMs = 10_000;
+      callbacks[0]!();
+      monotonicMs = 20_000;
+      callbacks[0]!();
+      expect(writes).toHaveLength(1);
+
+      returnFalse = false;
+      child.stdin.emit("drain");
+      expect(writes).toHaveLength(2);
+      expect(writes[1]!.length / 4).toBe(960);
+
+      monotonicMs += 10;
+      callbacks[0]!();
+      expect(writes).toHaveLength(3);
+      expect(writes[2]!.length / 4).toBe(480);
+
+      returnFalse = true;
+      monotonicMs += 10;
+      callbacks[0]!();
+      expect(writes).toHaveLength(4);
+      expect(writes[3]!.length / 4).toBe(480);
+      monotonicMs += 1_000;
+      callbacks[0]!();
+      expect(writes).toHaveLength(4);
+
+      returnFalse = false;
+      child.stdin.emit("drain");
+      expect(writes).toHaveLength(5);
+      expect(writes[4]!.length / 4).toBe(960);
+      returnFalse = true;
+      monotonicMs += 10;
+      callbacks[0]!();
+      expect(writes).toHaveLength(6);
+      expect(writes[5]!.length / 4).toBe(480);
+      expect(writes.every((chunk) => chunk.length % 4 === 0 && chunk.length / 4 <= 960)).toBe(true);
+
+      const closing = player.close();
+      child.emit("exit", 0, null);
+      await closing;
+      expect(child.stdin.listenerCount("drain")).toBe(0);
+      const writesAtClose = writes.length;
+      monotonicMs += 10;
+      callbacks[0]!();
+      expect(writes).toHaveLength(writesAtClose);
+    } finally {
+      if (player) {
+        const closing = player.close();
+        child.emit("exit", 0, null);
+        await closing;
+      }
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      write.mockRestore();
     }
   });
 });

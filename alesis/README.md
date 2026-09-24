@@ -15,7 +15,7 @@ The Linux host owns MIDI, synthesis, transport, loops, and audio output. Browser
 - Staged quantization at 1/4, 1/8, 1/16, or 1/32 resolution.
 - A silent previous-staged recovery slot that expires after one cycle.
 - Beat-aligned waveform intensity summaries and a monitor-only metronome.
-- Named MP3 export of every promoted take plus a merged mix.
+- Named MP3 export of every promoted take plus a merged mix, and single-cycle loop sample export to the live sample library.
 
 PCM loop capture and session persistence are not implemented.
 Live sample-pad triggers are not included in loop capture or MP3 exports. The
@@ -26,6 +26,14 @@ See [Sample pads](docs/SAMPLE_PADS.md) for configuring a sample library, making
 synthetic test pages, the Vortex Program Change setup, and sample limits.
 
 Use the save control in the Loops toolbar to choose a folder name. The host writes every promoted take, including muted takes, to `~/alesis_recordings/<name>/track-01.mp3`, `track-02.mp3`, and so on, with the combined result at `mix.mp3`. Existing folders are never overwritten.
+
+The separate **Export loop to sample library** control renders one currently
+playing loop cycle (up to 30 seconds) from audible loop layers and an enabled
+drum pattern into the configured sample library with one tap and no name entry.
+The host assigns a rising numbered filename and refreshes the Pads catalog; it
+does not change pad mode or navigation target. See
+[Sample pads](docs/SAMPLE_PADS.md#loop-sample-export) for naming, counter
+storage, included sources, and exclusions.
 
 ## Run
 
@@ -82,6 +90,15 @@ npm run typecheck
 npm run build
 npm run test:e2e
 npm run test:audio
+```
+
+The loop-sample browser test runs only when `SAMPLE_LIBRARY_DIR` is set in the
+Playwright process environment. Use a fresh isolated directory and a dedicated
+`PORT` so Playwright starts its own demo server with that library setting; the
+test removes only the exact MP3 filenames returned by its own exports.
+
+```sh
+SAMPLE_LIBRARY_DIR="$(mktemp -d)" PORT=8878 npm run test:e2e
 ```
 
 `test:audio` is the legacy workstation sink-monitor check and requires Linux,

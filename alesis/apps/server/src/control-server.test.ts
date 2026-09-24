@@ -242,12 +242,275 @@ describe("control server", () => {
     socket.close();
   });
 
-  it("does not hold Stop behind a long-running export", async () => {
+  it("releases only this connection's held sample pads after its socket closes", async () => {
+    engine = new SimulatedHostEngine();
+    const executed: Array<{ type: string; pad?: number }> = [];
+    const executeCommand = vi.fn(async (command) => {
+      executed.push(command);
+      const snapshot = engine!.snapshot();
+      return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const first = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const second = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const firstInbox = new MessageInbox(first);
+    const secondInbox = new MessageInbox(second);
+    await Promise.all([firstInbox.next(), secondInbox.next()]);
+
+    first.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "81361514-75b5-41a5-bde4-58fb2b58628f", command: { type: "trigger-sample-pad", pad: 2, velocity: 100 } }));
+    second.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "ad18d67b-a3c0-47b9-9daf-bbc411cab62a", command: { type: "trigger-sample-pad", pad: 5, velocity: 100 } }));
+    await Promise.all([
+      collectUntil(firstInbox, (message) => message.type === "command-result"),
+      collectUntil(secondInbox, (message) => message.type === "command-result"),
+    ]);
+
+    await closeSocket(first);
+    await vi.waitFor(() => expect(executed).toHaveLength(3));
+    expect(executed).toEqual([
+      { type: "trigger-sample-pad", pad: 2, velocity: 100 },
+      { type: "trigger-sample-pad", pad: 5, velocity: 100 },
+      { type: "release-sample-pad", pad: 2 },
+    ]);
+    await closeSocket(second);
+    await server.close();
+    server = undefined;
+
+    expect(executed).toEqual([
+      { type: "trigger-sample-pad", pad: 2, velocity: 100 },
+      { type: "trigger-sample-pad", pad: 5, velocity: 100 },
+      { type: "release-sample-pad", pad: 2 },
+      { type: "release-sample-pad", pad: 5 },
+    ]);
+  });
+
+  it("does not release a stale hold after a sample-page reset reuses the pad", async () => {
+    engine = new SimulatedHostEngine();
+    await engine.execute({ type: "set-pad-navigation-target", target: "sample-pages" });
+    engine.setSamplePage(0, 2, Array(8).fill(null));
+    engine.setSampleLibraryStatus("ready");
+    const executed: Array<{ type: string; pad?: number }> = [];
+    const executeCommand = vi.fn(async (command) => {
+      executed.push(command);
+      if (command.type === "select-pad-program") {
+        engine!.setSamplePage(command.program, 2, Array(8).fill(null));
+        engine!.setSampleLibraryStatus("loading");
+      }
+      const snapshot = engine!.snapshot();
+      return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const oldSocket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const oldInbox = new MessageInbox(oldSocket);
+    await oldInbox.next();
+    oldSocket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "00b14344-1484-40f1-b13d-b68e67a95ba4", command: { type: "trigger-sample-pad", pad: 3, velocity: 100 } }));
+    await collectUntil(oldInbox, (message) => message.type === "command-result");
+
+    await server.submit({ type: "select-pad-program", program: 1 });
+
+    const newSocket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const newInbox = new MessageInbox(newSocket);
+    await newInbox.next();
+    newSocket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "574b63c7-e800-4f5a-8a31-68cbd0507468", command: { type: "trigger-sample-pad", pad: 3, velocity: 100 } }));
+    await collectUntil(newInbox, (message) => message.type === "command-result");
+
+    await closeSocket(oldSocket);
+    await server.submit({ type: "stop" });
+    expect(executed.some(({ type }) => type === "release-sample-pad")).toBe(false);
+    await closeSocket(newSocket);
+    await server.close();
+    server = undefined;
+
+    expect(executed.at(-1)).toEqual({ type: "release-sample-pad", pad: 3 });
+    expect(executed.filter(({ type }) => type === "release-sample-pad")).toHaveLength(1);
+  });
+
+  it("invalidates held sample pads on explicit panic without a snapshot change", async () => {
+    engine = new SimulatedHostEngine();
+    const executed: Array<{ type: string; pad?: number }> = [];
+    const executeCommand = vi.fn(async (command) => {
+      executed.push(command);
+      const snapshot = engine!.snapshot();
+      return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const oldSocket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const oldInbox = new MessageInbox(oldSocket);
+    await oldInbox.next();
+    oldSocket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "0bd75930-44e5-45f5-a4dc-1f08c0e0a159", command: { type: "trigger-sample-pad", pad: 2, velocity: 100 } }));
+    await collectUntil(oldInbox, (message) => message.type === "command-result");
+
+    server.invalidateSamplePadHolds();
+
+    const newSocket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const newInbox = new MessageInbox(newSocket);
+    await newInbox.next();
+    newSocket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "f42315f1-f0aa-4d91-b0cf-73eac4347545", command: { type: "trigger-sample-pad", pad: 2, velocity: 100 } }));
+    await collectUntil(newInbox, (message) => message.type === "command-result");
+
+    await closeSocket(oldSocket);
+    await server.submit({ type: "stop" });
+    expect(executed.filter(({ type }) => type === "release-sample-pad")).toHaveLength(0);
+    await closeSocket(newSocket);
+    await server.close();
+    server = undefined;
+
+    expect(executed.at(-1)).toEqual({ type: "release-sample-pad", pad: 2 });
+    expect(executed.filter(({ type }) => type === "release-sample-pad")).toHaveLength(1);
+  });
+
+  it("keeps legitimate held pads across unrelated voice navigation", async () => {
+    engine = new SimulatedHostEngine({ soundFontPresets: [
+      { id: "0:0", bank: 0, program: 0, name: "A" },
+      { id: "0:1", bank: 0, program: 1, name: "B" },
+    ] });
+    const executed: Array<{ type: string; pad?: number }> = [];
+    const executeCommand = vi.fn(async (command) => {
+      executed.push(command);
+      if (command.type === "trigger-sample-pad") {
+        const snapshot = engine!.snapshot();
+        return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+      }
+      const result = await engine!.execute(command);
+      return result;
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "061a7ed7-2cd6-4cff-9b87-1b9324141a6c", command: { type: "trigger-sample-pad", pad: 5, velocity: 100 } }));
+    await collectUntil(inbox, (message) => message.type === "command-result");
+
+    await server.submit({ type: "step-pad-navigation", direction: 1 });
+    await closeSocket(socket);
+    await server.close();
+    server = undefined;
+
+    expect(executed.at(-1)).toEqual({ type: "release-sample-pad", pad: 5 });
+  });
+
+  it("queues held-sample cleanup behind a trigger already executing when the socket closes", async () => {
+    engine = new SimulatedHostEngine();
+    let releaseTrigger!: () => void;
+    const triggerGate = new Promise<void>((resolve) => { releaseTrigger = resolve; });
+    const executed: string[] = [];
+    const executeCommand = vi.fn(async (command) => {
+      executed.push(command.type);
+      if (command.type === "trigger-sample-pad") await triggerGate;
+      const snapshot = engine!.snapshot();
+      return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "9077504c-c6f0-4598-814f-6465422d449b", command: { type: "trigger-sample-pad", pad: 3, velocity: 100 } }));
+    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledTimes(1));
+
+    await closeSocket(socket);
+    releaseTrigger();
+    await server.close();
+    server = undefined;
+
+    expect(executed).toEqual(["trigger-sample-pad", "release-sample-pad"]);
+  });
+
+  it("does not treat cached or in-flight duplicate sample triggers as another connection's hold", async () => {
+    engine = new SimulatedHostEngine();
+    let releaseTrigger!: () => void;
+    const triggerGate = new Promise<void>((resolve) => { releaseTrigger = resolve; });
+    const executed: Array<{ type: string; pad?: number }> = [];
+    const executeCommand = vi.fn(async (command) => {
+      executed.push(command);
+      if (command.type === "trigger-sample-pad") await triggerGate;
+      const snapshot = engine!.snapshot();
+      return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const owner = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const duplicate = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const ownerInbox = new MessageInbox(owner);
+    const duplicateInbox = new MessageInbox(duplicate);
+    await Promise.all([ownerInbox.next(), duplicateInbox.next()]);
+    const envelope = { protocolVersion: PROTOCOL_VERSION, commandId: "4251d071-af9e-4a7f-aa1a-0fb0f95533a2", command: { type: "trigger-sample-pad", pad: 4, velocity: 100 } };
+    owner.send(JSON.stringify(envelope));
+    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledTimes(1));
+    duplicate.send(JSON.stringify(envelope));
+    await closeSocket(duplicate);
+    releaseTrigger();
+    await collectUntil(ownerInbox, (message) => message.type === "command-result");
+    await server.close();
+    server = undefined;
+
+    expect(executed).toEqual([
+      { type: "trigger-sample-pad", pad: 4, velocity: 100 },
+      { type: "release-sample-pad", pad: 4 },
+    ]);
+    owner.terminate();
+  });
+
+  it("does not release a pad twice after a normal sample release", async () => {
+    engine = new SimulatedHostEngine();
+    const executed: string[] = [];
+    const executeCommand = vi.fn(async (command) => {
+      executed.push(command.type);
+      const snapshot = engine!.snapshot();
+      return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "36f93c0b-dfc5-40cf-8c78-7d9ab41be662", command: { type: "trigger-sample-pad", pad: 6, velocity: 100 } }));
+    await collectUntil(inbox, (message) => message.type === "command-result");
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "3acbd3da-a56d-4d96-91aa-6d2e7423917c", command: { type: "release-sample-pad", pad: 6 } }));
+    await collectUntil(inbox, (message) => message.type === "command-result");
+    await closeSocket(socket);
+    await server.close();
+    server = undefined;
+
+    expect(executed).toEqual(["trigger-sample-pad", "release-sample-pad"]);
+  });
+
+  it("waits for held-sample cleanup when the server itself closes", async () => {
+    engine = new SimulatedHostEngine();
+    const cleanupStarted = deferred<void>();
+    let finishCleanup!: () => void;
+    const cleanupGate = new Promise<void>((resolve) => { finishCleanup = resolve; });
+    const executed: string[] = [];
+    const executeCommand = vi.fn(async (command) => {
+      executed.push(command.type);
+      if (command.type === "release-sample-pad") {
+        cleanupStarted.resolve();
+        await cleanupGate;
+      }
+      const snapshot = engine!.snapshot();
+      return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "cdf6c890-7648-4213-b0df-91f510d488e8", command: { type: "trigger-sample-pad", pad: 1, velocity: 100 } }));
+    await collectUntil(inbox, (message) => message.type === "command-result");
+
+    let closed = false;
+    const closing = server.close().then(() => { closed = true; });
+    await cleanupStarted.promise;
+    expect(closed).toBe(false);
+    finishCleanup();
+    await closing;
+    server = undefined;
+
+    expect(closed).toBe(true);
+    expect(executed).toEqual(["trigger-sample-pad", "release-sample-pad"]);
+  });
+
+  it.each(["export-mp3", "export-loop-sample"] as const)("does not hold Stop behind a long-running %s", async (exportType) => {
     engine = new SimulatedHostEngine();
     let releaseExport!: () => void;
     const exportGate = new Promise<void>((resolve) => { releaseExport = resolve; });
     const executeCommand = vi.fn(async (command) => {
-      if (command.type === "export-mp3") {
+      if (command.type === "export-mp3" || command.type === "export-loop-sample") {
         await exportGate;
         const snapshot = engine!.snapshot();
         return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
@@ -259,7 +522,7 @@ describe("control server", () => {
     const inbox = new MessageInbox(socket);
     await inbox.next();
 
-    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "2030495e-26db-46d2-8283-8f01c3310fac", command: { type: "export-mp3", name: "Session" } }));
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "2030495e-26db-46d2-8283-8f01c3310fac", command: { type: exportType, name: "Session" } }));
     socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "4f05d5d7-99b8-49c0-a116-c437f61620fd", command: { type: "stop" } }));
     const firstResult = (await collectUntil(inbox, (message) => message.type === "command-result")).at(-1);
 
@@ -391,4 +654,17 @@ async function collectCommandResults(inbox: MessageInbox, count: number): Promis
     if (message.type === "command-result") results.push(message);
   }
   return results;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function closeSocket(socket: WebSocket): Promise<void> {
+  return new Promise((resolve) => {
+    socket.once("close", () => resolve());
+    socket.close();
+  });
 }

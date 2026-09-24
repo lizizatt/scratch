@@ -51,6 +51,8 @@ describe("control protocol", () => {
     expect(envelope({ type: "trigger-sample-pad", pad: 7, velocity: 1 })).toBe(true);
     expect(envelope({ type: "trigger-sample-pad", pad: 8, velocity: 1 })).toBe(false);
     expect(envelope({ type: "trigger-sample-pad", pad: 0, velocity: 0 })).toBe(false);
+    expect(envelope({ type: "release-sample-pad", pad: 7 })).toBe(true);
+    expect(envelope({ type: "release-sample-pad", pad: 8 })).toBe(false);
   });
 
   it("rejects unsafe or incompatible network values", () => {
@@ -74,6 +76,9 @@ describe("control protocol", () => {
   it("accepts safe export folder names and rejects path traversal", () => {
     expect(commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "export-mp3", name: "Friday Jam 01" } }).success).toBe(true);
     expect(commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "export-mp3", name: "../escape" } }).success).toBe(false);
+    expect(commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "export-loop-sample", name: "Friday Jam 01" } }).success).toBe(true);
+    expect(commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "export-loop-sample", name: "../escape" } }).success).toBe(false);
+    expect(commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "export-loop-sample" } }).success).toBe(true);
   });
 
   it("bounds waveform summaries", () => {

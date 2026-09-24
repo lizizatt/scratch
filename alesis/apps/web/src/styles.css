@@ -96,6 +96,15 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .loop-pane { padding: max(12px,env(safe-area-inset-top)) 3vw 8px; }
 .loop-toolbar { height: 44px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
 .loop-toolbar > .icon-button { justify-self: end; }
+.export-actions { min-width: 0; display: flex; align-items: center; justify-self: end; gap: 2px; }
+.sample-export-hint { max-width: 190px; color: var(--dim); font-size: 8px; line-height: 1.3; text-align: right; }
+.sample-export-feedback { max-width: min(520px,88vw); position: fixed; z-index: 26; left: 3vw; bottom: max(60px,calc(env(safe-area-inset-bottom) + 58px)); padding: 8px 10px; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 6px; background: rgb(0 8 16 / 96%); font-size: 10px; line-height: 1.4; }
+.sample-export-feedback.success { color: var(--ice); }
+.sample-export-feedback.warning { color: #ffd166; }
+.sample-export-feedback.error { color: var(--danger); }
+.sample-export-feedback.pending { color: var(--cyan); }
+.sample-export-button.exporting { width: auto; max-width: min(190px,32vw); padding: 0 9px; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 1; white-space: nowrap; }
+.sample-export-button.exporting span { overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
 .transport-controls { display: flex; gap: 7px; }
 .transport-status { color: var(--dim); font-size: 11px; text-transform: uppercase; }
 .icon-button { width: 40px; height: 36px; display: grid; place-items: center; padding: 0; border-color: transparent; background: transparent; }
@@ -163,6 +172,7 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
   .quantization-select { width: 94px; height: 28px; font-size: 9px; }
 }
 @media (max-width:700px) and (orientation:landscape) {
+  .sample-export-hint { max-width: 80px; }
   .pads-pane { padding-inline: 3vw; }
   .pads-heading { gap: 8px; }
   .pad-settings { gap: 5px; }
@@ -175,5 +185,12 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
   .synth-module { grid-template-columns:repeat(6,1fr); }
   .effects-rack { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
   .take-row { grid-template-columns:20px minmax(100px,1fr) 70px 32px 32px; gap:5px; }
+}
+@media (max-width:480px) and (orientation:landscape) {
+  .loop-toolbar { grid-template-columns: minmax(0,1fr) auto; }
+  .transport-status { display: none; }
+  .transport-controls { gap: 3px; }
+  .transport-controls .icon-button, .export-actions .icon-button { width: 32px; height: 31px; }
+  .sample-export-hint { max-width: 72px; font-size: 7px; }
 }
 @media (prefers-reduced-motion:reduce) { * { animation-duration:.01ms !important; animation-iteration-count:1 !important; } }

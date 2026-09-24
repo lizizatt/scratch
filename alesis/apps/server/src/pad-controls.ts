@@ -4,6 +4,7 @@ import type { EngineCommand } from "@alesis/protocol";
 export interface SamplePadControls {
   selectPage(pageIndex: number): Promise<{ accepted: boolean; error?: string }>;
   trigger(pad: number, velocity: number): boolean;
+  release(pad: number): boolean;
   panic(): void;
 }
 
@@ -89,6 +90,19 @@ export function executeSamplePadTrigger(
     return resultFromSnapshot(snapshot, false, "Sample pads are only available in sample mode");
   }
   return samplePads.trigger(command.pad, command.velocity)
+    ? resultFromSnapshot(engine.snapshot(), true)
+    : resultFromSnapshot(engine.snapshot(), false, "Sample pad is not loaded");
+}
+
+export function executeSamplePadRelease(
+  command: Extract<EngineCommand, { type: "release-sample-pad" }>,
+  { engine, samplePads }: Pick<PadControlDependencies, "engine" | "samplePads">,
+): EngineResult {
+  const snapshot = engine.snapshot();
+  if (snapshot.pads.mode !== "samples") {
+    return resultFromSnapshot(snapshot, false, "Sample pads are only available in sample mode");
+  }
+  return samplePads.release(command.pad)
     ? resultFromSnapshot(engine.snapshot(), true)
     : resultFromSnapshot(engine.snapshot(), false, "Sample pad is not loaded");
 }

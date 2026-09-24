@@ -5,9 +5,12 @@ import {
   type EngineCommand,
   type EngineSnapshot,
   type Readiness,
+  type ServerMessage,
 } from "@alesis/protocol";
 
 export type ConnectionState = "connecting" | "connected" | "disconnected";
+type CommandResult = Extract<ServerMessage, { type: "command-result" }>;
+type CommandResultHandler = (result: CommandResult | null) => void;
 
 export function useControlSocket(): {
   snapshot: EngineSnapshot | null;
@@ -15,7 +18,7 @@ export function useControlSocket(): {
   connection: ConnectionState;
   lastError: string | null;
   lastMessage: string | null;
-  send: (command: EngineCommand) => string | null;
+  send: (command: EngineCommand, onResult?: CommandResultHandler) => string | null;
 } {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
@@ -23,6 +26,7 @@ export function useControlSocket(): {
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const pendingResultsRef = useRef(new Map<string, CommandResultHandler>());
 
   useEffect(() => {
     let disposed = false;
@@ -55,11 +59,22 @@ export function useControlSocket(): {
           setSnapshot((current) => current ? { ...current, ...update } : current);
           setReadiness(parsed.data.readiness);
         }
-        if (parsed.data.type === "command-result" && !parsed.data.accepted) setLastError(parsed.data.error ?? "Command rejected");
-        if (parsed.data.type === "command-result" && parsed.data.accepted && parsed.data.message) setLastMessage(parsed.data.message);
+        if (parsed.data.type === "command-result") {
+          const handler = pendingResultsRef.current.get(parsed.data.commandId);
+          if (handler) {
+            pendingResultsRef.current.delete(parsed.data.commandId);
+            handler(parsed.data);
+          }
+          if (!parsed.data.accepted) setLastError(parsed.data.error ?? "Command rejected");
+          if (parsed.data.accepted && parsed.data.message) setLastMessage(parsed.data.message);
+        }
       });
       socket.addEventListener("close", () => {
         if (socketRef.current === socket) socketRef.current = null;
+        for (const [commandId, handler] of pendingResultsRef.current) {
+          pendingResultsRef.current.delete(commandId);
+          handler(null);
+        }
         if (disposed) return;
         setConnection("disconnected");
         retry += 1;
@@ -76,13 +91,14 @@ export function useControlSocket(): {
     };
   }, []);
 
-  const send = (command: EngineCommand): string | null => {
+  const send = (command: EngineCommand, onResult?: CommandResultHandler): string | null => {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       setLastError("Host is not connected");
       return null;
     }
     const commandId = crypto.randomUUID();
+    if (onResult) pendingResultsRef.current.set(commandId, onResult);
     setLastError(null);
     setLastMessage(null);
     socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId, command }));

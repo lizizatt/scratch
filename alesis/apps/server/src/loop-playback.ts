@@ -1,6 +1,7 @@
 import type { AudioOutput } from "@alesis/audio";
 import type { MidiEvent } from "@alesis/engine";
 import type { EngineSnapshot, QuantizationMode, Take } from "@alesis/protocol";
+import { isMappedDrumPadRelease } from "./sample-pads.js";
 
 export interface RecordedMidiEvent {
   position: number;
@@ -136,6 +137,18 @@ export class MidiLoopScheduler {
     }));
   }
 
+  captureRecordings(snapshot: EngineSnapshot, takeIds: readonly string[]): Map<string, RecordedMidiEvent[]> {
+    this.advanceRecordingCycle(snapshot);
+    const staged = snapshot.capture.staged;
+    if (staged && this.rawRecordings.has(staged.id)
+      && this.appliedQuantization.get(staged.id) !== snapshot.capture.quantization) {
+      const totalBeats = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
+      this.recordings.set(staged.id, quantizeRecording(this.rawRecordings.get(staged.id)!, snapshot.capture.quantization, totalBeats));
+      this.appliedQuantization.set(staged.id, snapshot.capture.quantization);
+    }
+    return this.exportRecordings(takeIds);
+  }
+
   private advanceRecordingCycle(snapshot: EngineSnapshot): void {
     if (this.recordingCycle === null) {
       this.recordingCycle = snapshot.transport.cycle;
@@ -169,7 +182,7 @@ export class MidiLoopScheduler {
 
   private dispatch(takeId: string, channel: number, level: number, event: MidiEvent): void {
     const remapped = remapMidiEvent(event, channel, level);
-    this.output.dispatchMidi(remapped);
+    if (!isMappedDrumPadRelease(remapped)) this.output.dispatchMidi(remapped);
     if (remapped.type === "note-on" && remapped.velocity > 0) {
       this.activeNotes.set(`${takeId}:${event.channel}:${remapped.note}`, { takeId, channel, note: remapped.note });
     } else if (remapped.type === "note-off" || (remapped.type === "note-on" && remapped.velocity === 0)) {
@@ -188,7 +201,8 @@ export class MidiLoopScheduler {
   private releaseInactiveNotes(audibleTakeIds: Set<string>): void {
     for (const [key, note] of this.activeNotes) {
       if (audibleTakeIds.has(note.takeId)) continue;
-      this.output.dispatchMidi({ type: "note-off", channel: note.channel, note: note.note });
+      const release = { type: "note-off" as const, channel: note.channel, note: note.note };
+      if (!isMappedDrumPadRelease(release)) this.output.dispatchMidi(release);
       this.activeNotes.delete(key);
     }
     for (const [key, bend] of this.activeBends) {
@@ -207,7 +221,8 @@ export class MidiLoopScheduler {
 
   private releaseAllNotes(): void {
     for (const note of this.activeNotes.values()) {
-      this.output.dispatchMidi({ type: "note-off", channel: note.channel, note: note.note });
+      const release = { type: "note-off" as const, channel: note.channel, note: note.note };
+      if (!isMappedDrumPadRelease(release)) this.output.dispatchMidi(release);
     }
     this.activeNotes.clear();
     for (const channel of new Set([...this.activeBends.values()].map(({ channel }) => channel))) {

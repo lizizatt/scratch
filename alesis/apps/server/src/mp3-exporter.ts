@@ -1,10 +1,12 @@
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeMidi, type MidiEvent as FileMidiEvent } from "midi-file";
 import { NeonPressureSynth, type NeonPressureParameters } from "@alesis/audio";
 import { exportNameSchema, type EngineSnapshot, type Take } from "@alesis/protocol";
+import { isMappedDrumPadRelease } from "./sample-pads.js";
 import type { RecordedMidiEvent } from "./loop-playback.js";
 
 export interface ExportRequest {
@@ -38,44 +40,10 @@ export async function exportMp3Session(request: ExportRequest): Promise<ExportRe
     const tracks: string[] = [];
     for (const [index, take] of request.snapshot.promoted.entries()) {
       const baseName = `track-${String(index + 1).padStart(2, "0")}`;
-      const midiPath = join(temporaryDirectory, `${baseName}.mid`);
-      const wavPath = join(temporaryDirectory, `${baseName}.wav`);
       const mp3Path = join(directory, `${baseName}.mp3`);
       const recording = request.recordings.get(take.id)!;
-      await writeFile(midiPath, recordingToMidi(recording, take, request.snapshot));
-      const percussion = recording.filter(({ event }) => event.channel === 9);
-      const melodic = recording.filter(({ event }) => event.channel !== 9);
-      if (request.snapshot.synth.selectedId === "subtractive") {
-        const neonPath = join(temporaryDirectory, `${baseName}-neon.wav`);
-        await writeFile(neonPath, renderNeonWav(recording, take, request.snapshot));
-        if (percussion.length > 0 && request.percussionSoundFontPath) {
-          const percussionMidiPath = join(temporaryDirectory, `${baseName}-percussion.mid`);
-          const percussionPath = join(temporaryDirectory, `${baseName}-percussion.wav`);
-          await writeFile(percussionMidiPath, recordingToMidi(percussion, take, request.snapshot));
-          await renderSoundFontMidi(percussionMidiPath, percussionPath, request.percussionSoundFontPath, undefined, request.snapshot);
-          await mixWav([neonPath, percussionPath], wavPath);
-        } else {
-          await writeFile(wavPath, await readFile(neonPath));
-        }
-      } else {
-        if (percussion.length > 0 && request.percussionSoundFontPath) {
-          const percussionMidiPath = join(temporaryDirectory, `${baseName}-percussion.mid`);
-          const percussionPath = join(temporaryDirectory, `${baseName}-percussion.wav`);
-          await writeFile(percussionMidiPath, recordingToMidi(percussion, take, request.snapshot));
-          await renderSoundFontMidi(percussionMidiPath, percussionPath, request.percussionSoundFontPath, undefined, request.snapshot);
-          if (melodic.length > 0) {
-            const melodicMidiPath = join(temporaryDirectory, `${baseName}-melodic.mid`);
-            const melodicPath = join(temporaryDirectory, `${baseName}-melodic.wav`);
-            await writeFile(melodicMidiPath, recordingToMidi(melodic, take, request.snapshot));
-            await renderSoundFontMidi(melodicMidiPath, melodicPath, request.soundFontPath, undefined, request.snapshot);
-            await mixWav([melodicPath, percussionPath], wavPath);
-          } else {
-            await writeFile(wavPath, await readFile(percussionPath));
-          }
-        } else {
-          await renderSoundFontMidi(midiPath, wavPath, request.soundFontPath, undefined, request.snapshot);
-        }
-      }
+      await renderTakeWav({ recording, take, snapshot: request.snapshot, temporaryDirectory, baseName, soundFontPath: request.soundFontPath, ...(request.percussionSoundFontPath ? { percussionSoundFontPath: request.percussionSoundFontPath } : {}) });
+      const wavPath = join(temporaryDirectory, `${baseName}.wav`);
       await encodeMp3(wavPath, mp3Path);
       tracks.push(mp3Path);
     }
@@ -90,21 +58,89 @@ export async function exportMp3Session(request: ExportRequest): Promise<ExportRe
   }
 }
 
-function renderNeonWav(recording: RecordedMidiEvent[], take: Take, snapshot: EngineSnapshot): Buffer {
+export interface TakeWavRenderRequest {
+  recording: RecordedMidiEvent[];
+  take: Take;
+  snapshot: EngineSnapshot;
+  temporaryDirectory: string;
+  baseName: string;
+  soundFontPath?: string;
+  percussionSoundFontPath?: string;
+}
+
+export async function renderTakeWav(request: TakeWavRenderRequest): Promise<string> {
+  const { recording, take, snapshot, temporaryDirectory, baseName, soundFontPath, percussionSoundFontPath } = request;
+  const midiPath = join(temporaryDirectory, `${baseName}.mid`);
+  const wavPath = join(temporaryDirectory, `${baseName}.wav`);
+  await writeFile(midiPath, (snapshot.synth.selectedId === "soundfont" ? recordingToSoundFontMidi : recordingToMidi)(recording, take, snapshot));
+  const percussion = recording.filter(({ event }) => event.channel === 9);
+  const melodic = recording.filter(({ event }) => event.channel !== 9);
+  if (snapshot.synth.selectedId === "subtractive") {
+    const neonPath = join(temporaryDirectory, `${baseName}-neon.wav`);
+    await writeFile(neonPath, await renderNeonWav(recording, take, snapshot));
+    if (percussion.length > 0 && percussionSoundFontPath) {
+      const percussionMidiPath = join(temporaryDirectory, `${baseName}-percussion.mid`);
+      const percussionPath = join(temporaryDirectory, `${baseName}-percussion.wav`);
+      await writeFile(percussionMidiPath, recordingToSoundFontMidi(percussion, take, snapshot));
+      await renderSoundFontMidi(percussionMidiPath, percussionPath, percussionSoundFontPath, undefined, snapshot);
+      await mixWav([neonPath, percussionPath], wavPath);
+    } else {
+      await writeFile(wavPath, await readFile(neonPath));
+    }
+    return wavPath;
+  }
+  if (percussion.length > 0 && percussionSoundFontPath) {
+    const percussionMidiPath = join(temporaryDirectory, `${baseName}-percussion.mid`);
+    const percussionPath = join(temporaryDirectory, `${baseName}-percussion.wav`);
+    await writeFile(percussionMidiPath, recordingToSoundFontMidi(percussion, take, snapshot));
+    await renderSoundFontMidi(percussionMidiPath, percussionPath, percussionSoundFontPath, undefined, snapshot);
+    if (melodic.length > 0) {
+      if (!soundFontPath) throw new Error("Melodic SoundFont export requires a SoundFont file");
+      const melodicMidiPath = join(temporaryDirectory, `${baseName}-melodic.mid`);
+      const melodicPath = join(temporaryDirectory, `${baseName}-melodic.wav`);
+      await writeFile(melodicMidiPath, recordingToSoundFontMidi(melodic, take, snapshot));
+      await renderSoundFontMidi(melodicMidiPath, melodicPath, soundFontPath, undefined, snapshot);
+      await mixWav([melodicPath, percussionPath], wavPath);
+    } else {
+      await writeFile(wavPath, await readFile(percussionPath));
+    }
+    return wavPath;
+  }
+  if (!soundFontPath) throw new Error("SoundFont export requires a SoundFont file");
+  await renderSoundFontMidi(midiPath, wavPath, soundFontPath, undefined, snapshot);
+  return wavPath;
+}
+
+const NEON_RENDER_CHUNK_FRAMES = 480;
+
+export async function renderNeonWav(recording: RecordedMidiEvent[], take: Take, snapshot: EngineSnapshot): Promise<Buffer> {
   const sampleRate = 48_000;
   const cycleSeconds = 60 / snapshot.settings.bpm * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
   const frameCount = Math.round(cycleSeconds * sampleRate);
   const synth = new NeonPressureSynth(sampleRate, snapshot.synth.parameterValues as unknown as Partial<NeonPressureParameters>);
   const output = new Float32Array(frameCount * 2);
+  const events = [...recording].sort((left, right) => left.position - right.position);
+  let eventIndex = 0;
   let frame = 0;
-  for (const { position, event } of [...recording].sort((left, right) => left.position - right.position)) {
-    if (event.channel === 9) continue;
-    const eventFrame = Math.max(frame, Math.min(frameCount, Math.round(position * frameCount)));
-    output.set(synth.render(eventFrame - frame), frame * 2);
-    frame = eventFrame;
-    synth.dispatchMidi(event.type === "note-on" ? { ...event, velocity: Math.round(event.velocity * take.level) } : event);
+  while (frame < frameCount) {
+    while (eventIndex < events.length) {
+      const { position, event } = events[eventIndex]!;
+      const eventFrame = Math.max(frame, Math.min(frameCount, Math.round(position * frameCount)));
+      if (eventFrame > frame) break;
+      if (event.channel !== 9) {
+        synth.dispatchMidi(event.type === "note-on" ? { ...event, velocity: Math.round(event.velocity * take.level) } : event);
+      }
+      eventIndex += 1;
+    }
+
+    const nextEventFrame = eventIndex < events.length
+      ? Math.max(frame, Math.min(frameCount, Math.round(events[eventIndex]!.position * frameCount)))
+      : frameCount;
+    const chunkEnd = Math.min(frame + NEON_RENDER_CHUNK_FRAMES, nextEventFrame, frameCount);
+    output.set(synth.render(chunkEnd - frame), frame * 2);
+    frame = chunkEnd;
+    if (frame < frameCount) await yieldToEventLoop();
   }
-  output.set(synth.render(frameCount - frame), frame * 2);
   return encodePcm16Wav(output, sampleRate);
 }
 
@@ -175,6 +211,10 @@ export function recordingToMidi(recording: RecordedMidiEvent[], take: Take, snap
   return Uint8Array.from(writeMidi({ header: { format: 1, numTracks: encodedTracks.length + 1, ticksPerBeat }, tracks: [headerTrack, ...encodedTracks] }));
 }
 
+export function recordingToSoundFontMidi(recording: RecordedMidiEvent[], take: Take, snapshot: EngineSnapshot): Uint8Array {
+  return recordingToMidi(recording.filter(({ event }) => !isMappedDrumPadRelease(event)), take, snapshot);
+}
+
 async function renderSoundFontMidi(midiPath: string, wavPath: string, soundFontPath: string, percussionSoundFontPath: string | undefined, snapshot: EngineSnapshot): Promise<void> {
   const params = snapshot.synth.parameterValues;
   const args = [
@@ -196,8 +236,17 @@ async function renderSoundFontMidi(midiPath: string, wavPath: string, soundFontP
   await run("fluidsynth", args);
 }
 
-async function encodeMp3(wavPath: string, mp3Path: string): Promise<void> {
-  await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", wavPath, "-codec:a", "libmp3lame", "-q:a", "2", mp3Path]);
+export async function mixWavsToCycle(inputs: string[], output: string, frameCount: number): Promise<void> {
+  const filters = inputs.map((_, index) => `[${index}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=end_sample=${frameCount}[a${index}]`);
+  const streams = inputs.map((_, index) => `[a${index}]`).join("");
+  filters.push(`${streams}amix=inputs=${inputs.length}:duration=longest:normalize=0:dropout_transition=0,pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1,atrim=end_sample=${frameCount},asetpts=N/SR/TB[out]`);
+  const args = inputs.flatMap((input) => ["-i", input]);
+  args.push("-filter_complex", filters.join(";"), "-map", "[out]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", output);
+  await run("ffmpeg", ["-nostdin", "-hide_banner", "-loglevel", "error", ...args]);
+}
+
+export async function encodeMp3(wavPath: string, mp3Path: string): Promise<void> {
+  await run("ffmpeg", ["-nostdin", "-hide_banner", "-loglevel", "error", "-i", wavPath, "-map", "0:a:0", "-ar", "48000", "-ac", "2", "-codec:a", "libmp3lame", "-q:a", "2", "-write_xing", "1", "-f", "mp3", mp3Path]);
 }
 
 async function mixMp3(inputs: string[], output: string): Promise<void> {
@@ -238,8 +287,21 @@ function run(command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stderr = "";
-    child.stderr.on("data", (chunk) => { stderr += String(chunk); });
-    child.once("error", reject);
-    child.once("exit", (code) => code === 0 ? resolve() : reject(new Error(`${command} exited ${code}: ${stderr.trim()}`)));
+    let childError: Error | null = null;
+    let timedOut = false;
+    const timeoutMs = 120_000;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+    child.stderr.on("data", (chunk) => { stderr = `${stderr}${String(chunk)}`.slice(-8_192); });
+    child.once("error", (error) => { childError = error; });
+    child.once("close", (code, signal) => {
+      clearTimeout(timeout);
+      if (timedOut) return reject(new Error(`${command} timed out after ${timeoutMs} ms`));
+      if (childError) return reject(childError);
+      if (code !== 0) return reject(new Error(`${command} exited ${signal ?? code}: ${stderr.trim()}`));
+      resolve();
+    });
   });
 }

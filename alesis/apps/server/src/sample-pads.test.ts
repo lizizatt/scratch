@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { SamplePadService, samplePadInput, type DecodedSample, type SampleDescriptor, type SampleLibraryLike, type SamplePlayerLike } from "./sample-pads.js";
+import { isMappedDrumPadRelease, padMidiInput, SamplePadService, type DecodedSample, type SampleDescriptor, type SampleLibraryLike, type SamplePlayerLike } from "./sample-pads.js";
 
 function decoded(id: string, name = id): DecodedSample {
   return { id, name, samples: new Float32Array([0, 0.5]) };
@@ -27,6 +27,7 @@ function mockPlayer(): SamplePlayerLike & { starts: number; pages: number; hits:
     async start() { this.starts += 1; },
     setPage() { this.pages += 1; },
     trigger(pad, velocity) { this.hits.push([pad, velocity]); },
+    release: vi.fn(() => true),
     panic: vi.fn(),
     close: vi.fn(async () => {}),
   };
@@ -42,7 +43,8 @@ describe("sample pad service", () => {
   it("scans and decodes in simulated mode, publishes eight safe pad descriptors, and previews loaded pads", async () => {
     const states: Array<{ status: string; page: Array<{ id: string; name: string; pad: number } | null> }> = [];
     const library = fixtureLibrary();
-    const service = new SamplePadService(library, (state) => states.push({ status: state.status, page: state.page }));
+    const player = mockPlayer();
+    const service = new SamplePadService(library, (state) => states.push({ status: state.status, page: state.page }), () => player);
 
     expect((await service.refresh()).accepted).toBe(true);
     expect(service.snapshot()).toMatchObject({ status: "ready", pageCount: 2, page: [
@@ -59,6 +61,8 @@ describe("sample pad service", () => {
     expect(service.trigger(3, 127)).toBe(true);
     expect(service.trigger(7, 100)).toBe(true);
     expect(service.trigger(8, 100)).toBe(false);
+    expect(service.release(3)).toBe(true);
+    expect(player.release).toHaveBeenCalledWith(3);
     expect((await service.selectPage(1)).accepted).toBe(true);
     expect(service.snapshot().page).toEqual([
       { id: "sample-8", name: "Sample 8", pad: 0 }, null, null, null, null, null, null, null,
@@ -277,13 +281,21 @@ describe("sample pad service", () => {
   });
 });
 
-describe("sample pad MIDI matching", () => {
-  it("consumes only channel 10 notes 36 through 43 and triggers only positive note-ons", () => {
-    expect(samplePadInput({ type: "note-on", channel: 9, note: 36, velocity: 90 })).toEqual({ consumed: true, pad: 0, velocity: 90 });
-    expect(samplePadInput({ type: "note-off", channel: 9, note: 43 })).toEqual({ consumed: true });
-    expect(samplePadInput({ type: "note-on", channel: 9, note: 43, velocity: 0 })).toEqual({ consumed: true });
-    expect(samplePadInput({ type: "note-on", channel: 8, note: 36, velocity: 90 })).toEqual({ consumed: false });
-    expect(samplePadInput({ type: "note-on", channel: 9, note: 44, velocity: 90 })).toEqual({ consumed: false });
-    expect(samplePadInput({ type: "pitch-bend", channel: 9 })).toEqual({ consumed: false });
+describe("mapped pad MIDI routing", () => {
+  it("normalizes sample note-offs and velocity-zero note-ons to pad releases", () => {
+    expect(padMidiInput({ type: "note-on", channel: 9, note: 36, velocity: 90 }, "samples")).toEqual({ kind: "trigger-sample", pad: 0, velocity: 90 });
+    expect(padMidiInput({ type: "note-off", channel: 9, note: 43 }, "samples")).toEqual({ kind: "release-sample", pad: 7 });
+    expect(padMidiInput({ type: "note-on", channel: 9, note: 43, velocity: 0 }, "samples")).toEqual({ kind: "release-sample", pad: 7 });
+  });
+
+  it("routes only the configured physical drum notes as one-shot hits and releases", () => {
+    expect(padMidiInput({ type: "note-on", channel: 9, note: 38, velocity: 90 }, "drums")).toEqual({ kind: "drum-hit", note: 38, velocity: 90 });
+    const release = { type: "note-off", channel: 9, note: 38 } as const;
+    expect(padMidiInput(release, "drums")).toEqual({ kind: "drum-release", note: 38 });
+    expect(isMappedDrumPadRelease(release)).toBe(true);
+    expect(isMappedDrumPadRelease({ type: "note-off", channel: 9, note: 44 })).toBe(false);
+    expect(padMidiInput({ type: "note-on", channel: 8, note: 36, velocity: 90 }, "samples")).toBeNull();
+    expect(padMidiInput({ type: "note-on", channel: 9, note: 44, velocity: 90 }, "drums")).toBeNull();
+    expect(padMidiInput({ type: "pitch-bend", channel: 9, value: 0 }, "drums")).toBeNull();
   });
 });

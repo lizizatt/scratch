@@ -42,12 +42,17 @@ export class DrumPatternScheduler {
     const key = `${snapshot.transport.cycle}:${step}`;
     if (key === this.lastStepKey) return [];
     this.lastStepKey = key;
-    if (snapshot.drums.volume <= 0) return [];
-    const measureSteps = snapshot.settings.beatsPerMeasure * 4;
-    const measureStep = step % measureSteps;
-    const patternStep = Math.floor(measureStep * 16 / measureSteps);
-    return patterns[snapshot.drums.pattern]
-      .filter((hit) => hit.step === patternStep)
-      .map(({ note, strength }) => ({ note, velocity: Math.max(1, Math.min(127, Math.round(127 * snapshot.drums.volume * strength))) }));
+    return drumPatternAtStep(snapshot, step);
   }
+}
+
+export function drumPatternAtStep(snapshot: Pick<EngineSnapshot, "settings" | "drums">, step: number): DrumHit[] {
+  const totalSteps = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures * 4;
+  if (!snapshot.drums.enabled || snapshot.drums.volume <= 0 || !Number.isInteger(step) || step < 0 || step >= totalSteps) return [];
+  const measureSteps = snapshot.settings.beatsPerMeasure * 4;
+  const measureStep = step % measureSteps;
+  const patternStep = Math.floor(measureStep * 16 / measureSteps);
+  return patterns[snapshot.drums.pattern]
+    .filter((hit) => hit.step === patternStep)
+    .map(({ note, strength }) => ({ note, velocity: Math.max(1, Math.min(127, Math.round(127 * snapshot.drums.volume * strength))) }));
 }

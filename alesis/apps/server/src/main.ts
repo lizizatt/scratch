@@ -1,22 +1,24 @@
 import { SimulatedHostEngine, type EngineResult, type MidiEvent } from "@alesis/engine";
 import { discoverCm108AudioDevice, discoverSoundFontPresets, discoverSoundFonts, FluidSynthOutput, SampleLibrary, SamplePlayer, SilentAudioOutput, type AlsaAudioDevice, type AudioOutput } from "@alesis/audio";
 import { AlsaSequencerMidiSource, discoverVortexSequencerPort, SoftwareVortex, type AlsaSequencerPort, type MidiInputEvent, type MidiSource } from "@alesis/midi";
-import type { DrumKit, EngineCommand, Readiness, SoundFontPreset } from "@alesis/protocol";
+import type { DrumKit, EngineCommand, EngineSnapshot, Readiness, SoundFontPreset } from "@alesis/protocol";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createControlServer } from "./control-server.js";
+import { createControlServer, type ControlServer } from "./control-server.js";
 import { MidiArpeggiator } from "./arpeggiator.js";
 import { DrumPatternScheduler } from "./drum-patterns.js";
 import { MidiLoopScheduler } from "./loop-playback.js";
 import { MetronomeScheduler } from "./metronome.js";
 import { exportMp3Session } from "./mp3-exporter.js";
+import { exportLoopSample } from "./loop-sample-exporter.js";
+import { createLoopSampleExportService } from "./loop-sample-service.js";
 import { applyVelocityCurve, PerformanceRouter } from "./performance-router.js";
 import { DeviceHotplugCoordinator } from "./hotplug.js";
-import { disconnectSamplePlayer, DrumPadNoteTracker, executePadMode, executePadNavigation, executeSamplePadTrigger } from "./pad-controls.js";
+import { disconnectSamplePlayer, DrumPadNoteTracker, executePadMode, executePadNavigation, executeSamplePadRelease, executeSamplePadTrigger } from "./pad-controls.js";
 import { defaultSettingsCachePath, loadSettingsCache, restoreSettingsCache, saveSettingsCache, settingsCacheFromSnapshot } from "./settings-cache.js";
-import { SamplePadService, samplePadInput } from "./sample-pads.js";
+import { padMidiInput, SamplePadService } from "./sample-pads.js";
 
 let soundFonts = discoverSoundFonts();
 const defaultSoundFont = soundFonts.find(({ name }) => name.toLowerCase() === "sth") ?? null;
@@ -91,7 +93,8 @@ const readiness: Readiness = {
       : { ready: false, reason: "Vortex Wireless 2 was not found" },
 };
 const loops = new MidiLoopScheduler(audio);
-const sampleLibrary = new SampleLibrary(process.env.SAMPLE_LIBRARY_DIR ?? join(homedir(), ".local/share/alesis/samples"));
+const sampleRoot = process.env.SAMPLE_LIBRARY_DIR ?? join(homedir(), ".local/share/alesis/samples");
+const sampleLibrary = new SampleLibrary(sampleRoot);
 let samplePads: SamplePadService;
 samplePads = new SamplePadService(sampleLibrary, (state) => {
   engine.setSamplePage(state.pageIndex, state.pageCount, state.page);
@@ -109,6 +112,12 @@ const dispatchPerformance = (event: MidiEvent): void => {
   engine.markCaptureActivity();
   loops.record(event, engine.snapshot());
   audio.dispatchMidi(event);
+};
+const dispatchDrumPadEvent = (event: MidiEvent, playAudio: boolean): void => {
+  engine.dispatchMidi(event);
+  engine.markCaptureActivity();
+  loops.record(event, engine.snapshot());
+  if (playAudio) audio.dispatchMidi(event);
 };
 interface ScheduledPerformanceEvent {
   timeout: ReturnType<typeof setTimeout>;
@@ -168,15 +177,25 @@ const handleMidi = (event: MidiInputEvent): void => {
     handleProgramChange(event.program);
     return;
   }
-  const samplePad = samplePadInput(event);
-  if (engine.snapshot().pads.mode === "samples" && samplePad.consumed) {
-    if (samplePad.pad !== undefined && samplePad.velocity !== undefined) samplePads.trigger(samplePad.pad, samplePad.velocity);
+  const padInput = padMidiInput(event, engine.snapshot().pads.mode);
+  if (padInput?.kind === "trigger-sample") {
+    samplePads.trigger(padInput.pad, padInput.velocity);
+    return;
+  }
+  if (padInput?.kind === "release-sample") {
+    samplePads.release(padInput.pad);
+    return;
+  }
+  if (padInput?.kind === "drum-hit" || padInput?.kind === "drum-release") {
+    advanceTransportClock();
+    const curvedEvent = applyVelocityCurve(event, engine.snapshot().settings.velocityCurve);
+    drumPadNotes.observe(curvedEvent);
+    dispatchDrumPadEvent(curvedEvent, padInput.kind === "drum-hit");
     return;
   }
   advanceTransportClock();
   const curvedEvent = applyVelocityCurve(event, engine.snapshot().settings.velocityCurve);
   engine.dispatchMidi(curvedEvent);
-  if (engine.snapshot().pads.mode === "drums") drumPadNotes.observe(curvedEvent);
   for (const routedEvent of performanceRouter.route(curvedEvent)) {
     for (const outputEvent of arpeggiator.handle(routedEvent)) dispatchPerformance(outputEvent);
   }
@@ -238,16 +257,79 @@ const restoreAudioSelection = async (snapshot: ReturnType<typeof engine.snapshot
     console.error(`Unable to roll back SoundFont selection: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
+let controlServer: ControlServer | undefined;
+const captureLoopSample = (_name?: string) => {
+  const snapshot = engine.snapshot();
+  if (snapshot.transport.state !== "playing") throw new Error("Transport must be playing to export a loop sample");
+  const durationSeconds = 60 / snapshot.settings.bpm * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
+  if (durationSeconds > 30) throw new Error("Loop arrangement must be 30 seconds or shorter");
+
+  const staged = !snapshot.monitorOnly
+    && snapshot.capture.stagedAudible
+    && snapshot.capture.staged !== null
+    && !snapshot.capture.staged.muted
+    && snapshot.capture.staged.level > 0
+    ? snapshot.capture.staged
+    : null;
+  const promoted = snapshot.monitorOnly
+    ? []
+    : snapshot.promoted.filter((take) => !take.muted && take.level > 0);
+  const includeDrums = snapshot.drums.enabled && snapshot.drums.volume > 0;
+  if (!staged && promoted.length === 0 && !includeDrums) throw new Error("No audible loop content to export");
+
+  const recordingIds = [...(staged ? [staged.id] : []), ...promoted.map(({ id }) => id)];
+  const recordings = loops.captureRecordings(snapshot, recordingIds);
+  const renderSnapshot: EngineSnapshot = structuredClone(snapshot);
+  renderSnapshot.capture.staged = staged ? structuredClone(staged) : null;
+  renderSnapshot.capture.previousStaged = null;
+  renderSnapshot.capture.stagedAudible = staged !== null;
+  renderSnapshot.capture.currentWaveform = [];
+  renderSnapshot.capture.hasCurrentEvents = false;
+  renderSnapshot.promoted = structuredClone(promoted);
+  renderSnapshot.monitorOnly = false;
+  renderSnapshot.settings.metronomeEnabled = false;
+  if (!includeDrums) renderSnapshot.drums.enabled = false;
+
+  const selectedSoundFont = snapshot.synth.selectedId === "soundfont" && snapshot.synth.selectedSoundFontId
+    ? soundFontsById.get(snapshot.synth.selectedSoundFontId)
+    : undefined;
+  return {
+    snapshot: renderSnapshot,
+    recordings,
+    ...(selectedSoundFont ? { soundFontPath: selectedSoundFont.path } : {}),
+    ...(percussionSoundFontPath ? { percussionSoundFontPath } : {}),
+  };
+};
+const loopSampleExport = createLoopSampleExportService({
+  capture: captureLoopSample,
+  render: ({ name, snapshot, recordings, sampleRoot: root, soundFontPath, percussionSoundFontPath: percussionPath }) => exportLoopSample({
+    ...(name === undefined ? {} : { name }),
+    snapshot,
+    recordings,
+    sampleRoot: root,
+    ...(soundFontPath === undefined ? {} : { soundFontPath }),
+    ...(percussionPath === undefined ? {} : { percussionSoundFontPath: percussionPath }),
+  }),
+  async refreshSamples() {
+    if (!controlServer) {
+      const snapshot = engine.snapshot();
+      return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: "Control server is unavailable" };
+    }
+    return controlServer.submit({ type: "refresh-samples" });
+  },
+  sampleRoot,
+  resultState: () => {
+    const snapshot = engine.snapshot();
+    return { revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
+  },
+});
 const executeCommand = async (command: EngineCommand): Promise<EngineResult> => {
   if (command.type === "set-pad-mode") return executePadMode(command, {
     engine,
     samplePads,
     audio,
     panicDrumNotes() {
-      drumPadNotes.panic((event) => {
-        engine.dispatchMidi(event);
-        for (const routedEvent of performanceRouter.route(event)) dispatchPerformance(routedEvent);
-      });
+      drumPadNotes.panic((event) => dispatchDrumPadEvent(event, false));
     },
   });
   if (command.type === "set-pad-navigation-target") return engine.execute(command);
@@ -262,6 +344,7 @@ const executeCommand = async (command: EngineCommand): Promise<EngineResult> => 
   if (command.type === "trigger-sample-pad") {
     return executeSamplePadTrigger(command, { engine, samplePads });
   }
+  if (command.type === "release-sample-pad") return executeSamplePadRelease(command, { engine, samplePads });
   if (command.type === "export-mp3") {
     const snapshot = engine.snapshot();
     const soundFont = snapshot.synth.selectedSoundFontId ? soundFontsById.get(snapshot.synth.selectedSoundFontId) : defaultSoundFont;
@@ -281,6 +364,7 @@ const executeCommand = async (command: EngineCommand): Promise<EngineResult> => 
       return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: `Unable to export MP3: ${error instanceof Error ? error.message : String(error)}` };
     }
   }
+  if (command.type === "export-loop-sample") return loopSampleExport.execute(command.name);
   if (command.type === "configure-arpeggiator") {
     invalidateScheduledPerformance();
     const result = await engine.execute(command);
@@ -465,15 +549,17 @@ const executeAndPersist = async (command: EngineCommand) => {
   return result;
 };
 const host = process.env.HOST ?? "127.0.0.1";
-const server = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeAndPersist, host, readiness);
+controlServer = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeAndPersist, host, readiness);
 handleProgramChange = (program) => {
-  void server.submit({ type: "select-pad-program", program })
+  void controlServer!.submit({ type: "select-pad-program", program })
     .catch((error) => console.error(`Unable to apply MIDI Program Change: ${error instanceof Error ? error.message : String(error)}`));
 };
 const panic = (): void => {
+  controlServer?.invalidateSamplePadHolds();
   invalidateScheduledPerformance();
   for (const event of arpeggiator.panic()) audio.dispatchMidi(event);
   performanceRouter.panic();
+  drumPadNotes.panic((event) => dispatchDrumPadEvent(event, false));
   samplePads.panic();
   audio.panic();
 };
@@ -576,7 +662,7 @@ const midiDemoStart = softwareMidi && process.env.SOFTWARE_VORTEX_DEMO === "1"
   ? setTimeout(startMidiDemo, Number(process.env.SOFTWARE_VORTEX_DEMO_DELAY_MS ?? 0))
   : undefined;
 
-console.log(`Alesis control server listening on http://${host}:${server.port}`);
+console.log(`Alesis control server listening on http://${host}:${controlServer!.port}`);
 console.log(`MIDI input: ${midi ? `${midi.name} (${midi.id})` : "unavailable"}`);
 console.log(`Audio output: ${audio.name} (${audio.id})`);
 console.log(`SoundFont: ${defaultSoundFont?.name ?? "none"}${defaultSoundFont ? ` (${defaultSoundFont.path})` : ""}`);
@@ -592,7 +678,7 @@ async function shutdown(): Promise<void> {
   await midi?.close();
   await samplePads.close();
   await audio.close();
-  await server.close();
+  await controlServer?.close();
   await engine.dispose();
 }
 

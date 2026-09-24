@@ -1,4 +1,5 @@
-import type { SamplePad } from "@alesis/protocol";
+import type { MidiEvent } from "@alesis/engine";
+import type { PadMode, SamplePad } from "@alesis/protocol";
 
 export interface SampleDescriptor {
   id: string;
@@ -23,6 +24,7 @@ export interface SamplePlayerLike {
   start(): Promise<void>;
   setPage(samples: readonly (DecodedSample | null)[]): void;
   trigger(pad: number, velocity: number): void;
+  release(pad: number): boolean;
   panic(): void;
   close(): Promise<void>;
 }
@@ -136,6 +138,12 @@ export class SamplePadService {
     return true;
   }
 
+  release(pad: number): boolean {
+    if (!Number.isInteger(pad) || pad < 0 || pad > 7) return false;
+    this.player?.release(pad);
+    return true;
+  }
+
   panic(): void {
     this.player?.panic();
   }
@@ -218,13 +226,32 @@ export class SamplePadService {
   }
 }
 
-export function samplePadInput(event: { type: string; channel?: number; note?: number; velocity?: number }): { consumed: boolean; pad?: number; velocity?: number } {
-  if ((event.type !== "note-on" && event.type !== "note-off") || event.channel !== 9 || event.note === undefined || event.note < 36 || event.note > 43) {
-    return { consumed: false };
+export type PadMidiAction =
+  | { kind: "trigger-sample"; pad: number; velocity: number }
+  | { kind: "release-sample"; pad: number }
+  | { kind: "drum-hit"; note: number; velocity: number }
+  | { kind: "drum-release"; note: number };
+
+export function padMidiInput(event: MidiEvent, mode: PadMode): PadMidiAction | null {
+  if (!isMappedPadNote(event)) return null;
+  const releasing = event.type === "note-off" || event.type === "note-on" && event.velocity === 0;
+  const pad = event.note - 36;
+  if (mode === "samples") {
+    return releasing ? { kind: "release-sample", pad } : { kind: "trigger-sample", pad, velocity: event.velocity };
   }
-  return event.type === "note-on" && event.velocity !== undefined && event.velocity > 0
-    ? { consumed: true, pad: event.note - 36, velocity: event.velocity }
-    : { consumed: true };
+  return releasing
+    ? { kind: "drum-release", note: event.note }
+    : { kind: "drum-hit", note: event.note, velocity: event.velocity };
+}
+
+export function isMappedDrumPadRelease(event: MidiEvent): boolean {
+  return event.type === "note-off" && isMappedPadNote(event)
+    || event.type === "note-on" && event.velocity === 0 && isMappedPadNote(event);
+}
+
+function isMappedPadNote(event: MidiEvent): event is Extract<MidiEvent, { type: "note-on" | "note-off" }> {
+  return (event.type === "note-on" || event.type === "note-off")
+    && event.channel === 9 && event.note >= 36 && event.note <= 43;
 }
 
 function pageDescriptors(samples: readonly (DecodedSample | null)[]): SamplePad[] {

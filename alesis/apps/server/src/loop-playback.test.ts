@@ -229,6 +229,31 @@ describe("MidiLoopScheduler", () => {
     expect(scheduler.exportRecordings([stagedId]).get(stagedId)?.[0]?.position).toBe(0);
   });
 
+  it("synchronizes completed staged recording quantization during capture without dispatching playback", async () => {
+    const engine = new SimulatedHostEngine();
+    const output = fakeOutput();
+    const scheduler = new MidiLoopScheduler(output);
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+    engine.advance(0.26);
+    scheduler.record({ type: "note-on", channel: 0, note: 60, velocity: 100 }, engine.snapshot());
+    engine.advance(0.04);
+    scheduler.record({ type: "note-off", channel: 0, note: 60 }, engine.snapshot());
+    engine.advance(1.7);
+    scheduler.update(engine.snapshot());
+    await engine.execute({ type: "set-quantization", mode: "1/4" });
+    output.dispatchMidi.mockClear();
+    const snapshot = engine.snapshot();
+    const stagedId = snapshot.capture.staged!.id;
+    const captured = scheduler.captureRecordings(snapshot, [stagedId]);
+
+    expect(captured.get(stagedId)).toEqual([
+      { position: 0.25, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
+      { position: 0.5, event: { type: "note-off", channel: 0, note: 60 } },
+    ]);
+    expect(output.dispatchMidi).not.toHaveBeenCalled();
+  });
+
   it("retains the completed cycle when a generated event arrives before the rollover update", async () => {
     const engine = new SimulatedHostEngine();
     const scheduler = new MidiLoopScheduler(fakeOutput());
@@ -268,6 +293,30 @@ describe("MidiLoopScheduler", () => {
     engine.advance(0.5);
     scheduler.update(engine.snapshot());
     expect(output.dispatchMidi).toHaveBeenLastCalledWith({ type: "note-off", channel: 1, note: 60 });
+  });
+
+  it("keeps mapped one-shot drum tails on loop playback but preserves other channel-10 releases", async () => {
+    const engine = new SimulatedHostEngine();
+    const output = fakeOutput();
+    const scheduler = new MidiLoopScheduler(output);
+    await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "play" });
+    scheduler.record({ type: "note-on", channel: 9, note: 36, velocity: 100 }, engine.snapshot());
+    engine.advance(0.5);
+    scheduler.record({ type: "note-off", channel: 9, note: 36 }, engine.snapshot());
+    scheduler.record({ type: "note-on", channel: 9, note: 44, velocity: 100 }, engine.snapshot());
+    scheduler.record({ type: "note-off", channel: 9, note: 44 }, engine.snapshot());
+    engine.advance(1.5);
+    output.dispatchMidi.mockClear();
+    scheduler.update(engine.snapshot());
+
+    engine.advance(0.5);
+    scheduler.update(engine.snapshot());
+
+    expect(output.dispatchMidi).toHaveBeenCalledWith({ type: "note-on", channel: 9, note: 36, velocity: 80 });
+    expect(output.dispatchMidi).not.toHaveBeenCalledWith({ type: "note-off", channel: 9, note: 36 });
+    expect(output.dispatchMidi).toHaveBeenCalledWith({ type: "note-off", channel: 9, note: 44 });
+    await engine.dispose();
   });
 
   it("preserves promoted playback and releases it immediately when muted", async () => {

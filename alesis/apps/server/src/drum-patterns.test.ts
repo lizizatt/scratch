@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SimulatedHostEngine } from "@alesis/engine";
-import { DrumPatternScheduler } from "./drum-patterns.js";
+import { drumPatternAtStep, DrumPatternScheduler } from "./drum-patterns.js";
 
 describe("DrumPatternScheduler", () => {
   it("emits four-on-floor hits once per transport step", async () => {
@@ -79,5 +79,18 @@ describe("DrumPatternScheduler", () => {
     expect(drums.update(engine.snapshot())).toEqual([]);
     await engine.execute({ type: "configure-drums", settings: { volume: 1 } });
     expect(new DrumPatternScheduler().update(engine.snapshot()).every(({ velocity }) => velocity <= 127)).toBe(true);
+  });
+
+  it("renders a deterministic pattern hit directly for an isolated cycle step", async () => {
+    const engine = new SimulatedHostEngine();
+    await engine.execute({ type: "configure", settings: { beatsPerMeasure: 4, loopMeasures: 1 } });
+    await engine.execute({ type: "configure-drums", settings: { enabled: true, pattern: "four-on-floor", volume: 0.8 } });
+
+    expect(drumPatternAtStep(engine.snapshot(), 0)).toEqual([
+      { note: 36, velocity: 102 },
+      { note: 42, velocity: 76 },
+    ]);
+    expect(drumPatternAtStep(engine.snapshot(), 0)).toEqual(drumPatternAtStep(engine.snapshot(), 0));
+    expect(drumPatternAtStep(engine.snapshot(), 16)).toEqual([]);
   });
 });

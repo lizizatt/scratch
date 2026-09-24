@@ -17,6 +17,15 @@ describe("SimulatedHostEngine", () => {
     expect(result.revision).toBe(engine.snapshot().revision);
   });
 
+  it("rejects loop sample export without the host sample service", async () => {
+    const engine = new SimulatedHostEngine();
+
+    await expect(engine.execute({ type: "export-loop-sample" })).resolves.toMatchObject({
+      accepted: false,
+      error: "Loop sample export requires the host sample service",
+    });
+  });
+
   it("does not publish unchanged snapshots while transport is stopped", () => {
     const engine = new SimulatedHostEngine();
     let snapshots = 0;

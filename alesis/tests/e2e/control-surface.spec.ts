@@ -1,13 +1,109 @@
 import { expect, test } from "@playwright/test";
-import { rm, stat } from "node:fs/promises";
+import { rm, stat, unlink } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 const exportDirectories = new Set<string>();
+const sampleExports = new Map<string, Set<string>>();
+
+type SampleCommand = { type: "trigger-sample-pad"; pad: number; velocity: number } | { type: "release-sample-pad"; pad: number };
+
+function observeSampleCommands(page: import("@playwright/test").Page): SampleCommand[] {
+  const commands: SampleCommand[] = [];
+  page.on("websocket", (socket) => {
+    if (!socket.url().endsWith("/control")) return;
+    socket.on("framesent", ({ payload }) => {
+      try {
+        const command = JSON.parse(String(payload)).command as SampleCommand | undefined;
+        if (command?.type === "trigger-sample-pad" || command?.type === "release-sample-pad") commands.push(command);
+      } catch {
+        // Ignore non-command WebSocket frames.
+      }
+    });
+  });
+  return commands;
+}
+
+function sampleCommandCount(commands: SampleCommand[], type: SampleCommand["type"], pad: number): number {
+  return commands.filter((command) => command.type === type && command.pad === pad).length;
+}
+
+function observeControlCommandResults(page: import("@playwright/test").Page) {
+  const pending: Array<{
+    expected: Record<string, unknown>;
+    commandId?: string;
+    resolve: (result: { accepted: boolean; error?: string }) => void;
+  }> = [];
+  const results = new Map<string, { accepted: boolean; error?: string }>();
+
+  page.on("websocket", (socket) => {
+    if (!socket.url().endsWith("/control")) return;
+    socket.on("framesent", ({ payload }) => {
+      try {
+        const envelope = JSON.parse(String(payload)) as { commandId?: string; command?: Record<string, unknown> };
+        if (!envelope.commandId || !envelope.command) return;
+        const request = pending.find(({ commandId, expected }) => !commandId &&
+          Object.entries(expected).every(([key, value]) => envelope.command![key] === value));
+        if (!request) return;
+        request.commandId = envelope.commandId;
+        const result = results.get(envelope.commandId);
+        if (result) request.resolve(result);
+      } catch {
+        // Ignore non-command WebSocket frames.
+      }
+    });
+    socket.on("framereceived", ({ payload }) => {
+      try {
+        const message = JSON.parse(String(payload)) as { type?: string; commandId?: string; accepted?: boolean; error?: string };
+        if (message.type !== "command-result" || !message.commandId || typeof message.accepted !== "boolean") return;
+        const result = { accepted: message.accepted, error: message.error };
+        results.set(message.commandId, result);
+        pending.find((request) => request.commandId === message.commandId)?.resolve(result);
+      } catch {
+        // Ignore non-result WebSocket frames.
+      }
+    });
+  });
+
+  return async (expected: Record<string, unknown>, action: () => Promise<unknown>): Promise<void> => {
+    let resolve!: (result: { accepted: boolean; error?: string }) => void;
+    const resultPromise = new Promise<{ accepted: boolean; error?: string }>((done) => { resolve = done; });
+    const request = { expected, resolve };
+    pending.push(request);
+    try {
+      await action();
+      const result = await resultPromise;
+      expect(result.accepted, result.error ?? `Command rejected: ${JSON.stringify(expected)}`).toBe(true);
+    } finally {
+      const index = pending.indexOf(request);
+      if (index >= 0) pending.splice(index, 1);
+    }
+  };
+}
+
+async function showLoadedSamplePads(page: import("@playwright/test").Page): Promise<void> {
+  const awaitCommandResult = observeControlCommandResults(page);
+  await page.goto("/");
+  await expect(page.getByText(/connected \/\/ rev/i)).toBeVisible();
+  await page.getByRole("button", { name: "Pads" }).click();
+  await awaitCommandResult({ type: "set-pad-mode", mode: "samples" }, () => page.getByLabel("Pad mode").selectOption("samples"));
+  await awaitCommandResult({ type: "set-pad-navigation-target", target: "sample-pages" }, () => page.getByLabel("Pad navigation target").selectOption("sample-pages"));
+  await awaitCommandResult({ type: "select-pad-program", program: 0 }, () => page.getByLabel("Current pad navigation entry").selectOption("0"));
+  await expect(page.locator(".sample-state[role='status']")).toContainText("samples loaded on this page");
+}
 
 test.afterEach(async () => {
   await Promise.all([...exportDirectories].map((directory) => rm(directory, { recursive: true, force: true })));
   exportDirectories.clear();
+  await Promise.all([...sampleExports].flatMap(([directory, filenames]) =>
+    [...filenames].map(async (filename) => {
+      try {
+        await unlink(join(directory, filename));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    })));
+  sampleExports.clear();
 });
 
 test("runs the application bundle advertised by the current server", async ({ page, request }) => {
@@ -60,11 +156,17 @@ test("connects every selected pane to the host without viewport overflow", async
   await page.getByLabel("Arpeggiator octaves").fill("2");
   await expect(page.getByLabel("Arpeggiator octaves")).toHaveValue("2");
   const latch = page.getByLabel("Arpeggiator latch");
-  if (await latch.isChecked()) await latch.click();
+  if (await latch.isChecked()) {
+    await latch.click();
+    await expect(latch).not.toBeChecked();
+  }
   await latch.click();
   await expect(latch).toBeChecked();
   const enabled = page.getByLabel("Arpeggiator enabled");
-  if (await enabled.isChecked()) await enabled.click();
+  if (await enabled.isChecked()) {
+    await enabled.click();
+    await expect(enabled).not.toBeChecked();
+  }
   await enabled.click();
   await expect(enabled).toBeChecked();
   await page.getByText("Drums", { exact: true }).click();
@@ -216,6 +318,141 @@ test("refreshes sample pads, disables empty slots, and pages available libraries
   await expect(page.getByText(/SAMPLE_LIBRARY_DIR/)).toBeVisible();
 });
 
+test("releases sample pads through captured pointer, cancel, lost capture, and click input", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const commands = observeSampleCommands(page);
+  await showLoadedSamplePads(page);
+  const pad = page.getByRole("button", { name: "Pad 1 — Synthetic Tone 01" });
+  const bounds = await pad.boundingBox();
+  expect(bounds).not.toBeNull();
+  const x = bounds!.x + bounds!.width / 2;
+  const y = bounds!.y + bounds!.height / 2;
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(1);
+  await page.mouse.move(4, 4);
+  expect(sampleCommandCount(commands, "release-sample-pad", 0)).toBe(0);
+  await page.mouse.up();
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(1);
+
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(2);
+  await pad.dispatchEvent("pointercancel", { bubbles: true, pointerId: 1, pointerType: "mouse" });
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(2);
+  await pad.dispatchEvent("lostpointercapture", { bubbles: true, pointerId: 1, pointerType: "mouse" });
+  await page.mouse.up();
+  expect(sampleCommandCount(commands, "release-sample-pad", 0)).toBe(2);
+
+  await pad.click();
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(3);
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(3);
+  expect(commands.filter((command) => command.type === "trigger-sample-pad" && command.pad === 0)).toHaveLength(3);
+});
+
+test("releases Enter and Space holds once despite repeated keydown and synthesized clicks", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const commands = observeSampleCommands(page);
+  await showLoadedSamplePads(page);
+  const pad = page.getByRole("button", { name: "Pad 1 — Synthetic Tone 01" });
+
+  await expect(pad).toBeEnabled();
+  await pad.press("Enter");
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(1);
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(1);
+  await pad.focus();
+  await expect(pad).toBeFocused();
+  await page.keyboard.down("Enter");
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(2);
+  await page.keyboard.down("Enter");
+  expect(sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(2);
+  await page.keyboard.up("Enter");
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(2);
+
+  await page.keyboard.down("Space");
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(3);
+  await page.keyboard.down("Space");
+  expect(sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(3);
+  await page.keyboard.up("Space");
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(3);
+  await page.waitForTimeout(100);
+  expect(commands.filter((command) => command.type === "trigger-sample-pad" && command.pad === 0)).toHaveLength(3);
+  expect(commands.filter((command) => command.type === "release-sample-pad" && command.pad === 0)).toHaveLength(3);
+});
+
+test("cleans up held samples on mode/page/loading transitions, pane exit, and window blur", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const commands = observeSampleCommands(page);
+  await showLoadedSamplePads(page);
+  const mode = page.getByLabel("Pad mode");
+  const target = page.getByLabel("Pad navigation target");
+  await target.selectOption("sample-pages");
+  const pad = page.getByRole("button", { name: "Pad 1 — Synthetic Tone 01" });
+
+  const bounds = await pad.boundingBox();
+  expect(bounds).not.toBeNull();
+  const x = bounds!.x + bounds!.width / 2;
+  const y = bounds!.y + bounds!.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(1);
+  await mode.selectOption("drums");
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(1);
+  await page.mouse.up();
+
+  await mode.selectOption("samples");
+  await expect(page.locator(".sample-state[role='status']")).toContainText("samples loaded on this page");
+  const entry = page.getByLabel("Current pad navigation entry");
+  const pageOneBounds = await page.getByRole("button", { name: "Pad 1 — Synthetic Tone 01" }).boundingBox();
+  expect(pageOneBounds).not.toBeNull();
+  await page.mouse.move(pageOneBounds!.x + pageOneBounds!.width / 2, pageOneBounds!.y + pageOneBounds!.height / 2);
+  await page.mouse.down();
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(2);
+  await entry.selectOption("1");
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(2);
+  await page.mouse.up();
+  await expect(page.locator(".sample-state[role='status']")).toContainText("samples loaded on this page");
+
+  const secondPagePad = page.getByRole("button", { name: "Pad 1 — Synthetic Tone 09" });
+  const secondPageBounds = await secondPagePad.boundingBox();
+  expect(secondPageBounds).not.toBeNull();
+  await page.mouse.move(secondPageBounds!.x + secondPageBounds!.width / 2, secondPageBounds!.y + secondPageBounds!.height / 2);
+  await page.mouse.down();
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(3);
+  await page.getByRole("button", { name: "Refresh samples" }).evaluate((button: HTMLButtonElement) => button.click());
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(3);
+  await page.mouse.up();
+  await expect(page.locator(".sample-state[role='status']")).toContainText("samples loaded on this page");
+  await entry.selectOption("0");
+  await expect(page.locator(".sample-state[role='status']")).toContainText("samples loaded on this page");
+
+  const refreshedPad = page.getByRole("button", { name: "Pad 1 — Synthetic Tone 01" });
+  await refreshedPad.press("Enter");
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(4);
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(4);
+  await refreshedPad.focus();
+  await page.keyboard.down("Enter");
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(5);
+  await page.getByRole("button", { name: "Loops" }).evaluate((button: HTMLButtonElement) => button.click());
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(5);
+  await page.keyboard.up("Enter");
+
+  await page.getByRole("button", { name: "Pads" }).click();
+  await expect(page.locator(".sample-state[role='status']")).toContainText("samples loaded on this page");
+  const reenteredPad = page.getByRole("button", { name: "Pad 1 — Synthetic Tone 01" });
+  await reenteredPad.press("Enter");
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(6);
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(6);
+  await reenteredPad.focus();
+  await page.keyboard.down("Space");
+  await expect.poll(() => sampleCommandCount(commands, "trigger-sample-pad", 0)).toBe(7);
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expect.poll(() => sampleCommandCount(commands, "release-sample-pad", 0)).toBe(7);
+  await page.keyboard.up("Space");
+  expect(commands.filter((command) => command.type === "release-sample-pad" && command.pad === 0)).toHaveLength(7);
+});
+
 test("edits BPM locally and confirms only on commit", async ({ page }, testInfo) => {
   let dialogs = 0;
   page.on("dialog", async (dialog) => {
@@ -278,4 +515,102 @@ test("edits BPM locally and confirms only on commit", async ({ page }, testInfo)
   await expect(page.getByText(/connected \/\/ rev/i)).toBeVisible();
   await page.waitForTimeout(300);
   await expect(bpm).toHaveValue("240");
+});
+
+test("keeps loop export feedback across pane switches and finds it in Pads", async ({ page }) => {
+  const configuredLibrary = process.env.SAMPLE_LIBRARY_DIR?.trim();
+  test.skip(!configuredLibrary, "Run e2e with a fresh isolated SAMPLE_LIBRARY_DIR parent.");
+  const sampleRoot = resolve(configuredLibrary!);
+  expect((await stat(sampleRoot)).isDirectory()).toBe(true);
+  let names = sampleExports.get(sampleRoot);
+  if (!names) {
+    names = new Set<string>();
+    sampleExports.set(sampleRoot, names);
+  }
+
+  let dialogs = 0;
+  page.on("dialog", async (dialog) => {
+    dialogs += 1;
+    await dialog.accept();
+  });
+  await page.goto("/");
+  await expect(page.getByText(/connected \/\/ rev/i)).toBeVisible();
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+
+  await page.getByRole("button", { name: "Options" }).click();
+  const countIn = page.getByLabel("Count-in");
+  if (await countIn.isChecked()) await countIn.click();
+  for (const [label, value] of [["BPM", "120"], ["Beats per measure", "4"], ["Loop measures", "1"]] as const) {
+    const input = page.getByLabel(label);
+    await input.fill(value);
+    await input.press("Tab");
+  }
+
+  await page.getByRole("button", { name: "Synth" }).click();
+  await page.getByText("Drums", { exact: true }).click();
+  const drumsEnabled = page.getByLabel("Drums enabled");
+  if (await drumsEnabled.isChecked()) await drumsEnabled.click();
+  await page.getByRole("button", { name: "Loops" }).click();
+  const monitorOnly = page.getByRole("button", { name: "Monitor only" });
+  if (await monitorOnly.getAttribute("aria-pressed") === "true") await monitorOnly.click();
+  const sampleExportButton = page.getByRole("button", { name: "Export loop to sample library" });
+  await expect(sampleExportButton).toBeDisabled();
+  await expect(page.locator(".sample-export-hint")).toContainText("Start playback");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Promote staged take" })).toBeEnabled({ timeout: 10_000 });
+  const stagedAudibility = page.getByRole("button", { name: /^(Mute|Unmute) staged take$/ });
+  if (await stagedAudibility.getAttribute("aria-label") === "Unmute staged take") await stagedAudibility.click();
+  await expect(sampleExportButton).toBeEnabled();
+
+  const exportedFilenames: string[] = [];
+  for (let exportIndex = 0; exportIndex < 2; exportIndex += 1) {
+    if (exportIndex > 0) {
+      await page.getByRole("button", { name: "Play", exact: true }).click();
+      await expect(sampleExportButton).toBeEnabled();
+    }
+    await expect(page.getByLabel("Sample name")).toHaveCount(0);
+    await sampleExportButton.click();
+    await expect(page.getByRole("button", { name: "Exporting…" })).toBeDisabled();
+
+    await page.getByRole("button", { name: "Pads" }).click();
+    await expect(page.getByRole("region", { name: "Pad controls" })).toBeVisible();
+    await page.getByRole("button", { name: "Loops" }).click();
+    await expect(page.getByRole("button", { name: "Exporting…" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Stop", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Stop", exact: true }).click();
+    const feedback = page.locator(".sample-export-feedback");
+    await expect(feedback).toContainText("Saved ", { timeout: 30_000 });
+    const message = (await feedback.textContent())?.trim() ?? "";
+    const savedFile = message.match(/^Saved ([^/\\]+\.mp3)(?:\. Warning:.*| to the sample library\.)$/);
+    expect(savedFile, `Expected a generated MP3 filename in export feedback: ${message}`).not.toBeNull();
+    const filename = savedFile![1]!;
+    expect(basename(filename)).toBe(filename);
+    expect(exportedFilenames).not.toContain(filename);
+    exportedFilenames.push(filename);
+    names!.add(filename);
+    await expect(page.locator(".transport-status")).toContainText("stopped");
+
+    await page.getByRole("button", { name: "Pads" }).click();
+    await page.getByLabel("Pad mode").selectOption("samples");
+    await page.getByLabel("Pad navigation target").selectOption("sample-pages");
+    const refreshSamples = page.getByRole("button", { name: "Refresh samples" });
+    await expect(refreshSamples).toBeEnabled();
+    await refreshSamples.click();
+    const entry = page.getByLabel("Current pad navigation entry");
+    const exportedSample = filename.replace(/\.mp3$/i, "");
+    await expect.poll(async () => {
+      const pageCount = await entry.locator("option").count();
+      for (let index = 0; index < pageCount; index += 1) {
+        await entry.selectOption(String(index));
+        await expect(entry).toHaveValue(String(index));
+        await expect(page.locator(".sample-state[role='status']")).toContainText("samples loaded on this page");
+        if (await page.locator(".sample-pad-name").getByText(exportedSample, { exact: true }).count() > 0) return true;
+      }
+      return false;
+    }, { timeout: 30_000 }).toBe(true);
+    await expect(feedback).toContainText(filename);
+    if (exportIndex === 0) await page.getByRole("button", { name: "Loops" }).click();
+  }
+  expect(exportedFilenames).toHaveLength(2);
+  await expect(page.locator(".sample-export-feedback")).toContainText(exportedFilenames[1]!);
 });

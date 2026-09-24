@@ -29,6 +29,17 @@ const SAMPLE_RATE = 48_000;
 const CHANNELS = 2;
 const FLOAT_BYTES = 4;
 const FFMPEG_TIMEOUT_MS = 30_000;
+const SAMPLE_PUMP_INTERVAL_MS = 10;
+const SAMPLE_LOOKAHEAD_MS = 20;
+const SAMPLE_MAX_CATCH_UP_MS = 30;
+const SAMPLE_PCM_BYTES_PER_FRAME = 4;
+const SAMPLE_LOOKAHEAD_FRAMES = SAMPLE_RATE * SAMPLE_LOOKAHEAD_MS / 1_000;
+const SAMPLE_MAX_CATCH_UP_FRAMES = SAMPLE_RATE * SAMPLE_MAX_CATCH_UP_MS / 1_000;
+const SAMPLE_RELEASE_FRAMES = SAMPLE_RATE * 5 / 1_000;
+// Bounds Node's pending writes, not PCM already buffered by the OS pipe or ALSA.
+const SAMPLE_MAX_QUEUED_PCM_BYTES = SAMPLE_LOOKAHEAD_FRAMES * SAMPLE_PCM_BYTES_PER_FRAME;
+// This reserved prefix contains in-progress loop exports and is never part of the sample catalogue.
+const LOOP_SAMPLE_STAGING_PREFIX = ".alesis-loop-sample-";
 
 export class SampleLibrary {
   private sampleDescriptors: SampleDescriptor[] = [];
@@ -140,6 +151,7 @@ async function collectMp3Files(rootPath: string): Promise<Array<{ path: string; 
     for (const entry of entries) {
       const candidate = resolve(directory, entry.name);
       if (entry.isDirectory()) {
+        if (entry.name.startsWith(LOOP_SAMPLE_STAGING_PREFIX)) continue;
         await visit(candidate);
         continue;
       }
@@ -272,9 +284,11 @@ function errorMessage(error: unknown): string {
 
 interface SampleVoice {
   readonly sample: DecodedSample;
+  readonly pad: number;
   readonly gain: number;
   readonly startedAt: number;
   frame: number;
+  releaseFrame: number | null;
 }
 
 export class SampleMixer {
@@ -307,7 +321,18 @@ export class SampleMixer {
       }
       this.voices.splice(oldestIndex, 1);
     }
-    this.voices.push({ sample, gain: Math.max(0, Math.min(1, velocity / 127)), startedAt: this.sequence++, frame: 0 });
+    this.voices.push({ sample, pad, gain: Math.max(0, Math.min(1, velocity / 127)), startedAt: this.sequence++, frame: 0, releaseFrame: null });
+  }
+
+  release(pad: number): boolean {
+    if (!Number.isFinite(pad) || !Number.isInteger(pad) || pad < 0 || pad >= SAMPLE_PAGE_SIZE) return false;
+    let released = false;
+    for (const voice of this.voices) {
+      if (voice.pad !== pad || voice.releaseFrame !== null) continue;
+      voice.releaseFrame = 0;
+      released = true;
+    }
+    return released;
   }
 
   render(frameCount: number): Float32Array {
@@ -315,7 +340,7 @@ export class SampleMixer {
     const output = new Float32Array(frameCount * CHANNELS);
     if (frameCount === 0 || this.voices.length === 0) return output;
 
-    if (this.voices.length === 1) {
+    if (this.voices.length === 1 && this.voices[0]!.releaseFrame === null) {
       const voice = this.voices[0]!;
       const samples = voice.sample.samples;
       const framesToRender = Math.min(frameCount, Math.floor(samples.length / CHANNELS) - voice.frame);
@@ -335,6 +360,27 @@ export class SampleMixer {
       return output;
     }
 
+    if (this.voices.length === 1) {
+      const voice = this.voices[0]!;
+      const samples = voice.sample.samples;
+      let framesToRender = Math.min(frameCount, Math.floor(samples.length / CHANNELS) - voice.frame);
+      for (let frame = 0; frame < framesToRender; frame += 1) {
+        const offset = (voice.frame + frame) * CHANNELS;
+        const gain = voice.gain * releaseGain(voice.releaseFrame!);
+        output[frame * CHANNELS] = clampSample(samples[offset]!) * gain;
+        output[frame * CHANNELS + 1] = clampSample(samples[offset + 1]!) * gain;
+        voice.releaseFrame = voice.releaseFrame! + 1;
+        if (voice.releaseFrame >= SAMPLE_RELEASE_FRAMES) {
+          this.voices.length = 0;
+          framesToRender = frame + 1;
+          break;
+        }
+      }
+      voice.frame += framesToRender;
+      if (framesToRender < frameCount) this.voices.length = 0;
+      return output;
+    }
+
     for (let frame = 0; frame < frameCount; frame += 1) {
       let left = 0;
       let right = 0;
@@ -347,9 +393,14 @@ export class SampleMixer {
         }
         const sampleLeft = voice.sample.samples[offset]!;
         const sampleRight = voice.sample.samples[offset + 1]!;
-        left += (Number.isFinite(sampleLeft) ? Math.max(-1, Math.min(1, sampleLeft)) : 0) * voice.gain;
-        right += (Number.isFinite(sampleRight) ? Math.max(-1, Math.min(1, sampleRight)) : 0) * voice.gain;
+        const gain = voice.gain * (voice.releaseFrame === null ? 1 : releaseGain(voice.releaseFrame));
+        left += clampSample(sampleLeft) * gain;
+        right += clampSample(sampleRight) * gain;
         voice.frame += 1;
+        if (voice.releaseFrame !== null) {
+          voice.releaseFrame += 1;
+          if (voice.releaseFrame >= SAMPLE_RELEASE_FRAMES) this.voices.splice(index, 1);
+        }
       }
       output[frame * CHANNELS] = Math.max(-1, Math.min(1, left));
       output[frame * CHANNELS + 1] = Math.max(-1, Math.min(1, right));
@@ -362,15 +413,25 @@ export class SampleMixer {
   }
 }
 
+function releaseGain(frame: number): number {
+  return Math.max(0, (SAMPLE_RELEASE_FRAMES - 1 - frame) / (SAMPLE_RELEASE_FRAMES - 1));
+}
+
+function clampSample(value: number): number {
+  return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
+}
+
 export interface SamplePlayerOptions {
   onError?: (message: string) => void;
   spawnProcess?: typeof spawn;
+  monotonicNow?: () => number;
 }
 
 export class SamplePlayer {
   private readonly mixer = new SampleMixer(32);
   private child: ChildProcess | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private stopCurrentPump: (() => void) | null = null;
   private starting: Promise<void> | null = null;
   private closing = false;
 
@@ -387,6 +448,7 @@ export class SamplePlayer {
     child.stderr?.resume();
     let reportedFailure = false;
     let childTimer: ReturnType<typeof setInterval> | null = null;
+    let childDrain: (() => void) | null = null;
     const report = (message: string): void => {
       if (reportedFailure) return;
       reportedFailure = true;
@@ -394,8 +456,11 @@ export class SamplePlayer {
     };
     const stopPump = (): void => {
       if (childTimer) clearInterval(childTimer);
+      if (childDrain) child.stdin?.off("drain", childDrain);
       if (this.timer === childTimer) this.timer = null;
+      if (this.stopCurrentPump === stopPump) this.stopCurrentPump = null;
       childTimer = null;
+      childDrain = null;
     };
     child.stdin?.on("error", (error) => {
       stopPump();
@@ -420,11 +485,43 @@ export class SamplePlayer {
           rejectPromise(new Error("aplay exited while starting sample playback"));
           return;
         }
-        childTimer = setInterval(() => {
+        const now = this.options.monotonicNow ?? (() => performance.now());
+        let startedAt = now();
+        let acceptedFrames = 0;
+        let blockedByBackpressure = false;
+        const pump = (): void => {
           const input = child.stdin;
-          if (this.child !== child || !input?.writable || input.writableLength > 48_000) return;
-          input.write(stereoFloatToDualMonoS16(this.mixer.render(480)));
-        }, 10);
+          if (this.child !== child || !input?.writable || blockedByBackpressure) return;
+          const nowMs = now();
+          const elapsedFrames = Math.max(0, Math.floor((nowMs - startedAt) * SAMPLE_RATE / 1_000));
+          let frameDebt = elapsedFrames + SAMPLE_LOOKAHEAD_FRAMES - acceptedFrames;
+          if (frameDebt > SAMPLE_MAX_CATCH_UP_FRAMES) {
+            startedAt = nowMs - acceptedFrames * 1_000 / SAMPLE_RATE;
+            frameDebt = SAMPLE_LOOKAHEAD_FRAMES;
+          }
+          const queuedRoom = Math.floor(Math.max(0, SAMPLE_MAX_QUEUED_PCM_BYTES - input.writableLength) / SAMPLE_PCM_BYTES_PER_FRAME);
+          const frameCount = Math.min(frameDebt, SAMPLE_MAX_CATCH_UP_FRAMES, queuedRoom);
+          if (frameCount === 0) return;
+          const pcm = stereoFloatToDualMonoS16(this.mixer.render(frameCount));
+          const accepted = input.write(pcm);
+          acceptedFrames += pcm.length / SAMPLE_PCM_BYTES_PER_FRAME;
+          if (!accepted) {
+            blockedByBackpressure = true;
+          }
+        };
+        childDrain = (): void => {
+          blockedByBackpressure = false;
+          pump();
+        };
+        child.stdin?.on("drain", childDrain);
+        if (child.stdin) {
+          const startupPcm = stereoFloatToDualMonoS16(this.mixer.render(SAMPLE_LOOKAHEAD_FRAMES));
+          const accepted = child.stdin.write(startupPcm);
+          acceptedFrames += startupPcm.length / SAMPLE_PCM_BYTES_PER_FRAME;
+          if (!accepted) blockedByBackpressure = true;
+        }
+        this.stopCurrentPump = stopPump;
+        childTimer = setInterval(pump, SAMPLE_PUMP_INTERVAL_MS);
         this.timer = childTimer;
         resolvePromise();
       };
@@ -458,6 +555,10 @@ export class SamplePlayer {
     this.mixer.trigger(pad, velocity);
   }
 
+  release(pad: number): boolean {
+    return this.mixer.release(pad);
+  }
+
   panic(): void {
     this.mixer.panic();
   }
@@ -465,6 +566,7 @@ export class SamplePlayer {
   async close(): Promise<void> {
     this.closing = true;
     this.mixer.panic();
+    this.stopCurrentPump?.();
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     const child = this.child;

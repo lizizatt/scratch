@@ -14,7 +14,13 @@ import sirv from "sirv";
 export interface ControlServer {
   readonly port: number;
   submit(command: EngineCommand): Promise<EngineResult>;
+  invalidateSamplePadHolds(): void;
   close(): Promise<void>;
+}
+
+interface ConnectionState {
+  heldSamplePads: Set<number>;
+  cleanup: Promise<void> | null;
 }
 
 const readyForDevelopment: Readiness = {
@@ -36,6 +42,7 @@ export async function createControlServer(
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control" });
   const results = new Map<string, ServerMessage>();
   const inFlight = new Map<string, Promise<ServerMessage>>();
+  const connections = new Set<ConnectionState>();
   let commandTail = Promise.resolve();
   const enqueueCommand = <T>(execute: () => Promise<T>): Promise<T> => {
     const pending = commandTail.then(execute, execute);
@@ -45,6 +52,17 @@ export async function createControlServer(
   let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
   let snapshotPending = false;
   let latestSnapshot = engine.snapshot();
+  let sampleHoldGeneration = 0;
+  let previousPadResetState = {
+    mode: latestSnapshot.pads.mode,
+    samplePageIndex: latestSnapshot.pads.samplePageIndex,
+    sampleLibraryStatus: latestSnapshot.pads.sampleLibraryStatus,
+  };
+
+  const invalidateSamplePadHolds = (): void => {
+    sampleHoldGeneration += 1;
+    for (const connection of connections) connection.heldSamplePads.clear();
+  };
 
   const broadcastSnapshotNow = (): void => {
     const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage);
@@ -74,9 +92,24 @@ export async function createControlServer(
       broadcastSnapshotUpdateNow();
     }, 1000 / 30);
   };
-  const unsubscribe = engine.subscribe(scheduleSnapshot);
+  const unsubscribe = engine.subscribe((snapshot) => {
+    const pads = snapshot.pads;
+    if (
+      pads.mode !== previousPadResetState.mode
+      || pads.samplePageIndex !== previousPadResetState.samplePageIndex
+      || (pads.sampleLibraryStatus === "loading" && previousPadResetState.sampleLibraryStatus !== "loading")
+    ) invalidateSamplePadHolds();
+    previousPadResetState = {
+      mode: pads.mode,
+      samplePageIndex: pads.samplePageIndex,
+      sampleLibraryStatus: pads.sampleLibraryStatus,
+    };
+    scheduleSnapshot(snapshot);
+  });
 
   webSocketServer.on("connection", (socket) => {
+    const connection: ConnectionState = { heldSamplePads: new Set<number>(), cleanup: null };
+    connections.add(connection);
     socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage));
     socket.on("message", async (data) => {
       const envelope = parseEnvelope(data.toString());
@@ -93,8 +126,18 @@ export async function createControlServer(
 
       let pending = inFlight.get(envelope.commandId);
       if (!pending) {
-        const execute = () => executeEnvelope(envelope, engine, executeCommand, readiness);
-        if (envelope.command.type === "export-mp3") {
+        const execute = async () => {
+          const holdGeneration = sampleHoldGeneration;
+          const message = await executeEnvelope(envelope, engine, executeTrackedCommand, readiness);
+          if (message.type === "command-result" && message.accepted) {
+            if (envelope.command.type === "trigger-sample-pad" && holdGeneration === sampleHoldGeneration) {
+              connection.heldSamplePads.add(envelope.command.pad);
+            }
+            if (envelope.command.type === "release-sample-pad") connection.heldSamplePads.delete(envelope.command.pad);
+          }
+          return message;
+        };
+        if (envelope.command.type === "export-mp3" || envelope.command.type === "export-loop-sample") {
           pending = commandTail.then(execute, execute);
         } else {
           pending = enqueueCommand(execute);
@@ -108,9 +151,49 @@ export async function createControlServer(
       const message = await pending;
       snapshotPending = false;
       broadcastSnapshotNow();
-      socket.send(JSON.stringify(message));
+      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+    });
+    socket.on("close", () => {
+      void queueConnectionCleanup(connection);
     });
   });
+
+  const executeTrackedCommand = async (command: EngineCommand): Promise<EngineResult> => {
+    const before = engine.snapshot();
+    const result = await executeCommand(command);
+    if (result.accepted) {
+      const after = engine.snapshot();
+      const samplePageNavigation = (command.type === "select-pad-program" || command.type === "step-pad-navigation")
+        && before.pads.navigationTarget === "sample-pages"
+        && (
+          before.pads.samplePageIndex !== after.pads.samplePageIndex
+          || (before.pads.sampleLibraryStatus !== "loading" && after.pads.sampleLibraryStatus === "loading")
+        );
+      if (
+        command.type === "refresh-samples"
+        || (command.type === "set-pad-mode" && before.pads.mode !== after.pads.mode)
+        || samplePageNavigation
+      ) invalidateSamplePadHolds();
+    }
+    return result;
+  };
+
+  const queueConnectionCleanup = (connection: ConnectionState): Promise<void> => {
+    if (connection.cleanup) return connection.cleanup;
+    connection.cleanup = enqueueCommand(async () => {
+      const pads = [...connection.heldSamplePads];
+      connection.heldSamplePads.clear();
+      for (const pad of pads) {
+        try {
+          await executeCommand({ type: "release-sample-pad", pad });
+        } catch {
+          // Continue releasing other pads even if one cleanup command fails.
+        }
+      }
+    });
+    void connection.cleanup.then(() => connections.delete(connection), () => connections.delete(connection));
+    return connection.cleanup;
+  };
 
   await new Promise<void>((resolve, reject) => {
     httpServer.once("error", reject);
@@ -120,14 +203,20 @@ export async function createControlServer(
   return {
     port: (httpServer.address() as AddressInfo).port,
     submit(command) {
-      const execute = () => executeCommand(command);
-      return command.type === "export-mp3" ? commandTail.then(execute, execute) : enqueueCommand(execute);
+      const execute = () => executeTrackedCommand(command);
+      return command.type === "export-mp3" || command.type === "export-loop-sample"
+        ? commandTail.then(execute, execute)
+        : enqueueCommand(execute);
     },
+    invalidateSamplePadHolds,
     async close() {
       unsubscribe();
       if (snapshotTimer) clearTimeout(snapshotTimer);
+      const connectionCleanups = [...connections].map(queueConnectionCleanup);
       for (const client of webSocketServer.clients) client.terminate();
       await closeWebSocketServer(webSocketServer);
+      await Promise.all(connectionCleanups);
+      await commandTail;
       await closeHttpServer(httpServer);
     },
   };

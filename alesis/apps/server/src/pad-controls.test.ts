@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SimulatedHostEngine } from "@alesis/engine";
 import type { EngineCommand } from "@alesis/protocol";
 import { SamplePadService, type SampleDescriptor, type SampleLibraryLike, type SamplePlayerLike } from "./sample-pads.js";
-import { disconnectSamplePlayer, DrumPadNoteTracker, executePadMode, executePadNavigation, executeSamplePadTrigger } from "./pad-controls.js";
+import { disconnectSamplePlayer, DrumPadNoteTracker, executePadMode, executePadNavigation, executeSamplePadRelease, executeSamplePadTrigger } from "./pad-controls.js";
 import { loadSettingsCache, restoreSettingsCache, saveSettingsCache, settingsCacheFromSnapshot } from "./settings-cache.js";
 
 const temporaryDirectories: string[] = [];
@@ -48,6 +48,7 @@ function mockPlayer(): SamplePlayerLike {
     start: vi.fn(async () => {}),
     setPage() {},
     trigger() {},
+    release: vi.fn(() => true),
     panic() {},
     close: vi.fn(async () => {}),
   };
@@ -155,7 +156,7 @@ describe("pad host controls", () => {
 
   it("rejects browser sample triggers in drum mode and dispatches only in sample mode", async () => {
     const engine = new SimulatedHostEngine();
-    const samplePads = { selectPage: vi.fn(async () => ({ accepted: true })), panic: vi.fn(), trigger: vi.fn(() => true) };
+    const samplePads = { selectPage: vi.fn(async () => ({ accepted: true })), panic: vi.fn(), trigger: vi.fn(() => true), release: vi.fn(() => true) };
     const command = { type: "trigger-sample-pad", pad: 0, velocity: 100 } as const;
 
     expect(executeSamplePadTrigger(command, { engine, samplePads })).toMatchObject({ accepted: false, error: "Sample pads are only available in sample mode" });
@@ -163,6 +164,10 @@ describe("pad host controls", () => {
     await engine.execute({ type: "set-pad-mode", mode: "samples" });
     expect(executeSamplePadTrigger(command, { engine, samplePads }).accepted).toBe(true);
     expect(samplePads.trigger).toHaveBeenCalledWith(0, 100);
+    expect(executeSamplePadRelease({ type: "release-sample-pad", pad: 0 }, { engine, samplePads }).accepted).toBe(true);
+    expect(samplePads.release).toHaveBeenCalledWith(0);
+    await engine.execute({ type: "set-pad-mode", mode: "drums" });
+    expect(executeSamplePadRelease({ type: "release-sample-pad", pad: 0 }, { engine, samplePads })).toMatchObject({ accepted: false });
     await engine.dispose();
   });
 
@@ -189,7 +194,7 @@ describe("pad host controls", () => {
 
   it("panics samples when leaving sample mode and releases held drum-pad notes when entering it", async () => {
     const engine = new SimulatedHostEngine();
-    const samplePads = { selectPage: vi.fn(async () => ({ accepted: true })), panic: vi.fn(), trigger: vi.fn(() => true) };
+    const samplePads = { selectPage: vi.fn(async () => ({ accepted: true })), panic: vi.fn(), trigger: vi.fn(() => true), release: vi.fn(() => true) };
     const audio = navigationAudio();
     await engine.execute({ type: "set-pad-mode", mode: "samples" });
     await executePadMode({ type: "set-pad-mode", mode: "drums" }, { engine, samplePads, audio });

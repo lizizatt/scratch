@@ -2,12 +2,15 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import toneMidi from "@tonejs/midi";
 import { parseMidi } from "midi-file";
 import { describe, expect, it } from "vitest";
+import { NeonPressureSynth, type NeonPressureParameters } from "@alesis/audio";
 import { SimulatedHostEngine } from "@alesis/engine";
+import type { Take } from "@alesis/protocol";
 import type { RecordedMidiEvent } from "./loop-playback.js";
-import { exportMp3Session, recordingToMidi } from "./mp3-exporter.js";
+import { exportMp3Session, recordingToMidi, recordingToSoundFontMidi, renderNeonWav } from "./mp3-exporter.js";
 
 const { Midi } = toneMidi;
 
@@ -41,6 +44,41 @@ const melodicRecording: RecordedMidiEvent[] = [
   { position: 0.5, event: { type: "control-change", channel: 0, controller: 64, value: 0 } },
 ];
 
+function renderNeonWavSynchronously(recording: RecordedMidiEvent[], take: Take, snapshot: ReturnType<typeof exportSnapshot>): Buffer {
+  const sampleRate = 48_000;
+  const frameCount = Math.round(60 / snapshot.settings.bpm * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures * sampleRate);
+  const synth = new NeonPressureSynth(sampleRate, snapshot.synth.parameterValues as unknown as Partial<NeonPressureParameters>);
+  const output = new Float32Array(frameCount * 2);
+  let frame = 0;
+  for (const { position, event } of [...recording].sort((left, right) => left.position - right.position)) {
+    if (event.channel === 9) continue;
+    const eventFrame = Math.max(frame, Math.min(frameCount, Math.round(position * frameCount)));
+    output.set(synth.render(eventFrame - frame), frame * 2);
+    frame = eventFrame;
+    synth.dispatchMidi(event.type === "note-on" ? { ...event, velocity: Math.round(event.velocity * take.level) } : event);
+  }
+  output.set(synth.render(frameCount - frame), frame * 2);
+
+  const wav = Buffer.alloc(44 + output.length * 2);
+  wav.write("RIFF", 0);
+  wav.writeUInt32LE(36 + output.length * 2, 4);
+  wav.write("WAVEfmt ", 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(2, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * 4, 28);
+  wav.writeUInt16LE(4, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write("data", 36);
+  wav.writeUInt32LE(output.length * 2, 40);
+  for (let index = 0; index < output.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, output[index]!));
+    wav.writeInt16LE(Math.round(sample < 0 ? sample * 32_768 : sample * 32_767), 44 + index * 2);
+  }
+  return wav;
+}
+
 describe("MP3 exporter", () => {
   it("rejects incomplete and existing export destinations", async () => {
     const outputRoot = await mkdtemp(join(tmpdir(), "alesis-recordings-errors-"));
@@ -70,6 +108,33 @@ describe("MP3 exporter", () => {
     expect(midi.tracks.find(({ channel }) => channel === 0)?.controlChanges[64]?.[0]?.value).toBe(1);
     expect(midi.tracks.find(({ channel }) => channel === 0)?.pitchBends.some(({ value }) => Math.abs(value - 0.5) < 0.005)).toBe(true);
     expect(midi.tracks.find(({ channel }) => channel === 9)?.notes[0]).toMatchObject({ midi: 36 });
+  });
+
+  it("suppresses only mapped channel-10 note releases in SoundFont render MIDI", () => {
+    const snapshot = exportSnapshot();
+    const recording: RecordedMidiEvent[] = Array.from({ length: 8 }, (_, pad) => [
+      { position: 0, event: { type: "note-on" as const, channel: 9, note: 36 + pad, velocity: 100 } },
+      { position: 0.1, event: { type: "note-off" as const, channel: 9, note: 36 + pad } },
+    ]).flat();
+    recording.push(
+      { position: 0.2, event: { type: "note-on", channel: 9, note: 44, velocity: 100 } },
+      { position: 0.3, event: { type: "note-off", channel: 9, note: 44 } },
+      { position: 0.4, event: { type: "note-on", channel: 0, note: 36, velocity: 100 } },
+      { position: 0.5, event: { type: "note-off", channel: 0, note: 36 } },
+      { position: 0.6, event: { type: "note-on", channel: 0, note: 38, velocity: 0 } },
+    );
+
+    const rendered = parseMidi(recordingToSoundFontMidi(recording, snapshot.promoted[0]!, snapshot));
+    const general = parseMidi(recordingToMidi(recording, snapshot.promoted[0]!, snapshot));
+    const noteReleases = (midi: ReturnType<typeof parseMidi>) => midi.tracks.flat().filter((event) => event.type === "noteOff");
+
+    expect(noteReleases(rendered)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ channel: 9, noteNumber: 44 }),
+      expect.objectContaining({ channel: 0, noteNumber: 36 }),
+      expect.objectContaining({ channel: 0, noteNumber: 38 }),
+    ]));
+    expect(noteReleases(rendered).some((event) => event.type === "noteOff" && event.channel === 9 && event.noteNumber >= 36 && event.noteNumber <= 43)).toBe(false);
+    expect(noteReleases(general)).toHaveLength(11);
   });
 
   it("orders a 14-bit SoundFont bank before program and note events", () => {
@@ -141,6 +206,31 @@ describe("MP3 exporter", () => {
       { type: "noteOff", deltaTime: 1 },
     ]);
   });
+
+  it("yields during long Neon rendering without changing PCM or MIDI sample offsets", async () => {
+    const snapshot = exportSnapshot();
+    snapshot.synth.selectedId = "subtractive";
+    snapshot.synth.parameterValues = { attack: 0.01, release: 0.2, cutoff: 6_300, resonance: 0.2 };
+    snapshot.settings.loopMeasures = 6;
+    const take = { ...snapshot.promoted[0]!, level: 0.73 };
+    const recording: RecordedMidiEvent[] = [
+      { position: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 110 } },
+      { position: 480 / (12 * 48_000), event: { type: "pitch-bend", channel: 0, value: 0.4 } },
+      { position: 0.25, event: { type: "note-off", channel: 0, note: 60 } },
+    ];
+    let completed = false;
+    let callbackRanBeforeCompletion = false;
+    const callback = yieldToEventLoop().then(() => { callbackRanBeforeCompletion = !completed; });
+    const rendering = renderNeonWav(recording, take, snapshot).then((wav) => {
+      completed = true;
+      return wav;
+    });
+
+    const [actual] = await Promise.all([rendering, callback]);
+
+    expect(callbackRanBeforeCompletion).toBe(true);
+    expect(actual).toEqual(renderNeonWavSynchronously(recording, take, snapshot));
+  }, 60_000);
 
   it("renders a melodic Neon session to MP3 without a SoundFont fixture", async () => {
     const outputRoot = await mkdtemp(join(tmpdir(), "alesis-neon-export-test-"));

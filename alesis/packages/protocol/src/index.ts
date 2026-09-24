@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 4 as const;
+export const PROTOCOL_VERSION = 5 as const;
 
 const waveformSchema = z.array(z.number().min(-1).max(1)).max(256);
 const takeIdSchema = z.string().min(1).max(128);
@@ -181,6 +181,7 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("step-pad-navigation"), direction: z.union([z.literal(-1), z.literal(1)]) }),
   z.object({ type: z.literal("refresh-samples") }),
   z.object({ type: z.literal("trigger-sample-pad"), pad: z.number().int().min(0).max(7), velocity: z.number().int().min(1).max(127) }),
+  z.object({ type: z.literal("release-sample-pad"), pad: z.number().int().min(0).max(7) }),
   z.object({ type: z.literal("set-synth-parameter"), parameterId: z.string().min(1), value: z.number() }),
   z.object({ type: z.literal("configure-arpeggiator"), settings: arpeggiatorSchema.partial() }),
   z.object({ type: z.literal("configure-drums"), settings: drumSettingsSchema.partial() }),
@@ -193,6 +194,7 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("delete-take"), takeId: takeIdSchema }),
   z.object({ type: z.literal("undo-delete") }),
   z.object({ type: z.literal("export-mp3"), name: exportNameSchema }),
+  z.object({ type: z.literal("export-loop-sample"), name: exportNameSchema.optional() }),
 ]);
 
 export const commandEnvelopeSchema = z.object({

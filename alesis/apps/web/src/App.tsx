@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   Download,
   Drum,
@@ -16,14 +16,45 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import type { EngineCommand, EngineSnapshot, Settings as EngineSettings, Take } from "@alesis/protocol";
-import { useControlSocket } from "./use-control-socket";
+import type { EngineCommand, EngineSnapshot, ServerMessage, Settings as EngineSettings, Take } from "@alesis/protocol";
+import { useControlSocket, type ConnectionState } from "./use-control-socket";
 
 type Pane = "settings" | "synth" | "pads" | "loops";
 
 export function App() {
   const { snapshot, readiness, connection, lastError, lastMessage, send } = useControlSocket();
   const [pane, setPane] = useState<Pane>("loops");
+  const [sampleExport, setSampleExport] = useState<SampleExportState>({
+    pending: false,
+    feedback: null,
+  });
+  const sampleExportPendingRef = useRef(false);
+
+  const triggerSampleExport = (): void => {
+    if (sampleExportPendingRef.current) return;
+    sampleExportPendingRef.current = true;
+    setSampleExport((current) => ({ ...current, pending: true, feedback: null }));
+    const commandId = send({ type: "export-loop-sample" }, (result) => {
+      sampleExportPendingRef.current = false;
+      setSampleExport((current) => ({
+        ...current,
+        pending: false,
+        feedback: result === null
+          ? { kind: "warning", message: "Outcome unknown: connection lost before confirmation. Check the sample library before retrying." }
+          : result.accepted
+            ? { kind: result.message?.includes("Warning:") ? "warning" : "success", message: result.message ?? "Loop sample exported." }
+            : { kind: "error", message: result.error ?? "Loop sample export failed." },
+      }));
+    });
+    if (!commandId) {
+      sampleExportPendingRef.current = false;
+      setSampleExport((current) => ({
+        ...current,
+        pending: false,
+        feedback: { kind: "error", message: "Host is not connected. The export was not started." },
+      }));
+    }
+  };
 
   if (!snapshot) {
     return <main className="boot"><span className={`connection-dot ${connection}`} /> CONNECTING TO HOST ENGINE</main>;
@@ -36,12 +67,14 @@ export function App() {
     <main className="app-shell">
       <div className="connection-line"><span className={`connection-dot ${connection}`} /> {connection} // rev {snapshot.revision} // MIDI {snapshot.engine.midiEventsReceived}{snapshot.engine.lastMidiEvent ? ` ${snapshot.engine.lastMidiEvent}` : ""}</div>
       {failures.length > 0 && <div className="readiness-line" role="alert"><strong>NOT READY</strong>{failures.map(([name, dependency]) => <span key={name}>{name}: {dependency.reason ?? "Unavailable"}</span>)}</div>}
-      {lastError && <div className="error-line" role="alert">{lastError}</div>}
-      {lastMessage && <div className="success-line" role="status">{lastMessage}</div>}
+      {lastError && lastError !== sampleExport.feedback?.message && <div className="error-line" role="alert">{lastError}</div>}
+      {lastMessage && lastMessage !== sampleExport.feedback?.message && <div className="success-line" role="status">{lastMessage}</div>}
+      {sampleExport.pending && <div className="sample-export-feedback pending" role="status">Exporting loop to sample library…</div>}
+      {!sampleExport.pending && sampleExport.feedback && <div className={`sample-export-feedback ${sampleExport.feedback.kind}`} role={sampleExport.feedback.kind === "error" ? "alert" : "status"}>{sampleExport.feedback.message}</div>}
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
-      {pane === "pads" && <PadsPane snapshot={snapshot} send={send} />}
-      {pane === "loops" && <LoopPane snapshot={snapshot} send={send} />}
+      {pane === "pads" && <PadsPane snapshot={snapshot} send={send} connection={connection} />}
+      {pane === "loops" && <LoopPane snapshot={snapshot} send={send} sampleExport={sampleExport} triggerSampleExport={triggerSampleExport} />}
       <nav className="app-nav" aria-label="Application sections">
         <NavButton active={pane === "settings"} label="Options" onClick={() => setPane("settings")}><Settings /></NavButton>
         <NavButton active={pane === "synth"} label="Synth" onClick={() => setPane("synth")}><Music2 /></NavButton>
@@ -204,7 +237,7 @@ function SynthPane({ snapshot, send }: PaneProps) {
   );
 }
 
-function PadsPane({ snapshot, send }: PaneProps) {
+function PadsPane({ snapshot, send, connection }: PaneProps & { connection: ConnectionState }) {
   const pads = snapshot.pads;
   const currentBank = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId)?.bank ?? 0;
   const voices = snapshot.synth.soundFontPresets
@@ -219,6 +252,50 @@ function PadsPane({ snapshot, send }: PaneProps) {
   const targetLabel = pads.navigationTarget === "voices" ? "voice" : pads.navigationTarget === "drum-kits" ? "drum kit" : "sample page";
   const sampleStatus = pads.sampleLibraryStatus;
   const samplePads = pads.samplePage;
+  const heldInputs = useRef(new Map<string, number>());
+  const sendRef = useRef(send);
+  const connectionRef = useRef(connection);
+  sendRef.current = send;
+  connectionRef.current = connection;
+  const releaseInput = (source: string): void => {
+    const pad = heldInputs.current.get(source);
+    if (pad === undefined) return;
+    heldInputs.current.delete(source);
+    if ([...heldInputs.current.values()].includes(pad)) return;
+    if (connectionRef.current === "connected") sendRef.current({ type: "release-sample-pad", pad });
+  };
+  const releaseAllInputs = (): void => {
+    const padsToRelease = new Set(heldInputs.current.values());
+    heldInputs.current.clear();
+    if (connectionRef.current === "connected") {
+      for (const pad of padsToRelease) sendRef.current({ type: "release-sample-pad", pad });
+    }
+  };
+  const beginInput = (source: string, pad: number, event: React.SyntheticEvent<HTMLButtonElement>): void => {
+    if (heldInputs.current.has(source)) return;
+    if (!sendRef.current({ type: "trigger-sample-pad", pad, velocity: 100 })) return;
+    heldInputs.current.set(source, pad);
+    event.preventDefault();
+  };
+
+  useEffect(() => {
+    const onWindowBlur = (): void => releaseAllInputs();
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === "hidden") releaseAllInputs();
+    };
+    const onWindowKeyUp = (event: KeyboardEvent): void => {
+      if (event.code === "Space" || event.code === "Enter") releaseInput(`key:${event.code}`);
+    };
+    window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("keyup", onWindowKeyUp);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("keyup", onWindowKeyUp);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      releaseAllInputs();
+    };
+  }, [pads.mode, pads.samplePageIndex, pads.sampleLibraryStatus, connection]);
 
   return (
     <section className="pane pads-pane" aria-label="Pad controls">
@@ -276,7 +353,29 @@ function PadsPane({ snapshot, send }: PaneProps) {
           {samplePads.map((sample, index) => {
             const enabled = pads.mode === "samples" && sampleStatus === "ready" && sample !== null;
             const name = sample?.name ?? "Empty slot";
-            return <button className={`sample-pad ${enabled ? "loaded" : ""}`} type="button" key={index} aria-label={`Pad ${index + 1} — ${name}`} disabled={!enabled} onClick={() => send({ type: "trigger-sample-pad", pad: index, velocity: 100 })}>
+            return <button
+              className={`sample-pad ${enabled ? "loaded" : ""}`}
+              type="button"
+              key={index}
+              aria-label={`Pad ${index + 1} — ${name}`}
+              disabled={!enabled}
+              onPointerDown={(event) => {
+                if (event.pointerType === "mouse" && event.button !== 0) return;
+                try { event.currentTarget.setPointerCapture(event.pointerId); } catch {}
+                beginInput(`pointer:${event.pointerId}`, index, event);
+              }}
+              onPointerUp={(event) => releaseInput(`pointer:${event.pointerId}`)}
+              onPointerCancel={(event) => releaseInput(`pointer:${event.pointerId}`)}
+              onLostPointerCapture={(event) => releaseInput(`pointer:${event.pointerId}`)}
+              onKeyDown={(event) => {
+                if ((event.code !== "Space" && event.code !== "Enter") || event.repeat) return;
+                beginInput(`key:${event.code}`, index, event);
+              }}
+              onKeyUp={(event) => {
+                if (event.code === "Space" || event.code === "Enter") releaseInput(`key:${event.code}`);
+              }}
+              onBlur={releaseAllInputs}
+            >
               <span className="sample-pad-number">{String(index + 1).padStart(2, "0")}</span>
               <span className="sample-pad-name">{name}</span>
             </button>;
@@ -295,9 +394,25 @@ function PadsPane({ snapshot, send }: PaneProps) {
   );
 }
 
-function LoopPane({ snapshot, send }: PaneProps) {
+function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PaneProps & {
+  sampleExport: SampleExportState;
+  triggerSampleExport: () => void;
+}) {
   const isPlaying = snapshot.transport.state !== "stopped";
   const beatCount = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
+  const cycleSeconds = 60 / snapshot.settings.bpm * beatCount;
+  const hasAudibleLoopLayer = !snapshot.monitorOnly && (
+    Boolean(snapshot.capture.staged && snapshot.capture.stagedAudible && snapshot.capture.staged.level > 0)
+    || snapshot.promoted.some((take) => !take.muted && take.level > 0)
+  );
+  const hasAudibleDrumPattern = snapshot.drums.enabled && snapshot.drums.volume > 0;
+  const sampleExportDisabledReason = snapshot.transport.state !== "playing"
+    ? "Start playback to export one full loop cycle."
+    : cycleSeconds > 30
+      ? "Loop cycle must be 30 seconds or shorter."
+      : !hasAudibleLoopLayer && !hasAudibleDrumPattern
+        ? "Add an audible staged/promoted take or enable a nonzero drum pattern."
+        : null;
   const [saving, setSaving] = useState(false);
   const [exportName, setExportName] = useState("");
   const saveExport = (): void => {
@@ -316,7 +431,13 @@ function LoopPane({ snapshot, send }: PaneProps) {
           <IconButton label={snapshot.settings.metronomeEnabled ? "Mute metronome" : "Unmute metronome"} active={snapshot.settings.metronomeEnabled} pressed={snapshot.settings.metronomeEnabled} onClick={() => send({ type: "configure", settings: { metronomeEnabled: !snapshot.settings.metronomeEnabled } })}>{snapshot.settings.metronomeEnabled ? <Volume2 /> : <VolumeX />}</IconButton>
         </div>
         <div className="transport-status">{snapshot.transport.state} // cycle {String(snapshot.transport.cycle + 1).padStart(2, "0")}</div>
-        <IconButton label="Save promoted tracks as MP3 files" disabled={snapshot.promoted.length === 0} onClick={() => setSaving(true)}><Download /></IconButton>
+        <div className="export-actions">
+          <span className="sample-export-hint" aria-live="polite">{sampleExportDisabledReason ?? `${cycleSeconds.toFixed(1)}s loop cycle`}</span>
+          <button className={`icon-button sample-export-button ${sampleExport.pending ? "exporting" : ""}`} type="button" aria-label={sampleExport.pending ? "Exporting…" : "Export loop to sample library"} title={sampleExport.pending ? "Exporting…" : "Export loop to sample library"} disabled={sampleExportDisabledReason !== null || sampleExport.pending} onClick={triggerSampleExport}>
+            <Music2 />{sampleExport.pending && <span>Exporting…</span>}
+          </button>
+          <IconButton label="Save promoted tracks as MP3 files" disabled={snapshot.promoted.length === 0} onClick={() => setSaving(true)}><Download /></IconButton>
+        </div>
       </header>
 
       {saving && <div className="dialog-backdrop" onMouseDown={() => setSaving(false)}>
@@ -416,6 +537,11 @@ function formatParameter(value: number, unit: string): string {
 
 type NumberField = "bpm" | "beatsPerMeasure" | "loopMeasures" | "metronomeVolume";
 type NumberDraft = Record<NumberField, string>;
+type SampleExportFeedback = { kind: "success" | "warning" | "error"; message: string };
+interface SampleExportState {
+  pending: boolean;
+  feedback: SampleExportFeedback | null;
+}
 
 function numberDraftFrom(settings: EngineSettings): NumberDraft {
   return {
@@ -430,6 +556,7 @@ function displayNumber(value: number, scale = 1): string {
   return String(value / scale);
 }
 
-type SendCommand = (command: EngineCommand) => string | null;
+type CommandResult = Extract<ServerMessage, { type: "command-result" }>;
+type SendCommand = (command: EngineCommand, onResult?: (result: CommandResult | null) => void) => string | null;
 interface PaneProps { snapshot: EngineSnapshot; send: SendCommand }
 interface ButtonProps { active?: boolean; label: string; onClick: () => void; children: React.ReactNode }
