@@ -1,0 +1,52 @@
+# Illustrative values, not measured specifications of your paddleboard.
+mass_kg = 110.0 # board + rider + battery + motors
+length_m = 3.2
+width_m = 0.85
+thickness_m = 0.18
+com_height_m = 0.20 # loaded center of mass above hull midplane, assumed fixed rider
+waterplane_factor = 0.72 # effective rectangular waterplane / length*width
+water_density_kg_m3 = 1025.0
+roll_inertia_kg_m2 = 25.0
+pitch_inertia_kg_m2 = 90.0
+yaw_inertia_kg_m2 = 95.0
+thruster_arm_m = 0.5 # centerline to each thruster
+thruster_x_m = -0.6 # body +X forward; zero at center, negative aft
+max_thrust_n = 44.482216152605 # 10 lbf per motor; estimated, symmetric forward/reverse
+motor_time_constant_s = 0.2
+# Passive housing drag: dimensionless Cd, provisional capsule approximation.
+# Acts at each mount even with motors off; set both to zero for a bare-hull comparison.
+motor_axial_drag_coefficient = 0.2
+motor_crossflow_drag_coefficient = 1.0
+
+# Hull translation: F = -linear*v - quadratic*v*abs(v), v relative to water.
+# Linear units N*s/m, quadratic units N*s^2/m^2.
+surge_linear_drag = 30.0 # provisional ~1.7 kn top speed, not measured drag
+surge_quadratic_drag = 80.0
+sway_linear_drag = 35.0
+sway_quadratic_drag = 90.0
+heave_linear_drag = 1000.0
+heave_quadratic_drag = 500.0
+# Supplemental rotation damping, in addition to hull/motor force moments.
+# Uses rad/s: N*m*s and N*m*s^2 respectively.
+roll_linear_drag = 20.0
+pitch_linear_drag = 80.0
+yaw_linear_drag = 25.0
+yaw_quadratic_drag = 35.0
+
+# Primary crest-to-trough height; a second crossing train is 35% as high.
+wave_height_m = 0.3 # set to zero for calm-water comparisons
+wave_period_s = 2.4
+wave_direction_deg = 110.0 # propagation TOWARD, clockwise from north
+
+timestep_s = 0.01
+sensor_hz = 10.0
+gps_noise_m = 0.03
+heading_noise_deg = 0.2
+velocity_noise_mps = 0.01
+yaw_rate_noise_deg_s = 0.05
+origin_latitude_deg = 37.8 # arbitrary synthetic GPS origin
+origin_longitude_deg = -122.4
+initial_heading_deg = 0.0
+current_east_mps = 0.0
+current_north_mps = 0.0
+seed = 7

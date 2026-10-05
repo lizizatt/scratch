@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c171c">
+  <title>HMS Jazzy · Simulation helm</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/scene.bundle.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#helm">Skip to helm controls</a>
+  <div class="app-shell">
+    <header class="masthead">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">J<span>≈</span></span>
+        <div><p class="eyebrow">THE SIMULATION DECK</p><h1>HMS Jazzy<span class="title-dot">.</span></h1></div>
+      </div>
+      <div class="header-meta">
+        <span class="simulation-badge">SIMULATION ONLY</span>
+        <div class="connection" id="connection" data-status="connecting">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="connection-label" role="status" aria-live="polite">Connecting to helm…</span>
+        </div>
+        <button id="reconnect" class="button small" type="button" hidden>Reconnect</button>
+      </div>
+    </header>
+
+    <div id="error-banner" class="notice error-notice" role="alert" hidden></div>
+    <div id="safety-banner" class="notice" role="status" aria-live="polite" hidden></div>
+    <noscript><p class="notice">JavaScript is required for the chart and helm. No commands are sent while it is disabled.</p></noscript>
+
+    <main class="deck">
+      <section class="chart-column" aria-label="Navigation overview">
+        <div class="instrument-strip panel" aria-label="Sampled navigation instruments">
+          <div class="instrument"><span class="eyebrow">HEADING</span><div><span id="heading" class="big-number">—</span><span class="unit">°</span></div><span id="heading-cardinal" class="instrument-detail">Awaiting navigation</span></div>
+          <div class="instrument"><span class="eyebrow">GROUND SPEED</span><div><span id="speed" class="big-number">—</span><span class="unit">m/s</span></div><span class="instrument-detail"><span id="speed-knots">—</span> kn</span></div>
+          <div class="instrument"><span class="eyebrow">YAW RATE</span><div><span id="yaw" class="big-number">—</span><span class="unit">°/s</span></div><span class="instrument-detail">Clockwise positive</span></div>
+        </div>
+
+        <section class="panel scene-panel" aria-labelledby="scene-title">
+          <div class="panel-heading"><div><p class="eyebrow">ON THE WATER</p><h2 id="scene-title">6DOF · wave tank</h2></div><span class="small-tag" id="scene-state">WAITING FOR STATE</span></div>
+          <div class="scene-stage"><canvas id="scene" aria-label="3D simulated board and wave surface. Drag to orbit, scroll to zoom." role="img"></canvas></div>
+          <div class="attitude-strip" aria-label="Ground truth attitude"><span>Roll <strong id="truth-roll">—</strong></span><span>Pitch <strong id="truth-pitch">—</strong></span><span>COM elevation <strong id="truth-up">—</strong></span></div>
+          <p id="scene-help" class="panel-note">Drag to orbit · scroll to zoom · orange marks the bow. Track the gold crosses and bright 3.2 m squares as they pass under the boat; faint divisions are 0.64 m. These references stay fixed east/north and rise with the waves, rather than drifting with the water. The camera follows the boat. Attitude readouts are ground truth, not sensor samples.</p>
+        </section>
+
+        <div class="design-grid">
+          <section class="panel" aria-labelledby="mount-title">
+            <div class="panel-heading"><h2 id="mount-title">Thruster layout</h2><span class="small-tag">SYMMETRIC PAIR</span></div>
+            <svg id="mount-preview" viewBox="0 0 280 220" role="img" aria-label="Draft symmetric thruster mounting layout. Bow points right; faded markers show the active mounts.">
+              <line x1="15" y1="110" x2="265" y2="110" stroke="#3a5057" stroke-dasharray="3 5"/>
+              <ellipse id="mount-hull" cx="140" cy="110" rx="72" ry="19" fill="#e8e4d4"/>
+              <text x="225" y="114" fill="#a5b6b7" font-size="10">BOW →</text>
+              <line id="mount-beam" stroke="#73d7c2" stroke-width="2"/>
+              <circle id="mount-active-port" r="7" fill="none" stroke="#e8e4d4" opacity=".5"/>
+              <circle id="mount-active-starboard" r="7" fill="none" stroke="#e8e4d4" opacity=".5"/>
+              <rect id="mount-port" width="16" height="8" rx="3" fill="#f26c65"/>
+              <rect id="mount-starboard" width="16" height="8" rx="3" fill="#57d7af"/>
+            </svg>
+            <form id="mount-form"><fieldset id="mount-controls" disabled>
+              <legend class="sr-only">Symmetric motor mounting</legend>
+              <div class="form-grid"><div><label for="mount-x">Fore / aft <span>m from center</span></label><input id="mount-x" type="number" min="-1.6" max="1.6" step="0.05" value="-0.6" required></div><div><label for="mount-spacing">Full motor spacing <span>m</span></label><input id="mount-spacing" type="number" min="0.1" max="4" step="0.05" value="1" required></div></div>
+              <button type="submit" class="button full-width">Apply mounts &amp; reset</button>
+            </fieldset></form>
+            <p class="panel-note">Negative = aft, positive = forward. Edits are a draft; faded circles are active mounts. Apply resets pose, sea settings, and controls. Housing drag follows the mounts and can turn the boat in a cross-current. Inertia and bracket drag are not recomputed.</p>
+            <p class="current-readout" id="mount-readout">Awaiting configuration</p>
+            <div class="panel-heading"><h2>Motor strength</h2><span class="small-tag">EACH MOTOR</span></div>
+            <form id="motor-strength-form"><fieldset id="motor-strength-controls" disabled>
+              <legend class="sr-only">Shared maximum motor thrust</legend>
+              <div class="form-grid"><div><label for="motor-strength">Maximum thrust <span>lbf per motor</span></label><input id="motor-strength" type="number" min="0" step="any" value="10" required></div><p class="panel-note">Same strength on both sides, forward and reverse. No upper cap.</p></div>
+              <button type="submit" class="button full-width">Apply strength &amp; neutral</button>
+            </fieldset></form>
+            <p class="panel-note">Cuts thrust and cancels autopilot, but keeps pose, motion, and sea state. Strength survives Reset and mount changes; reconnect reloads file defaults.</p>
+            <p class="current-readout" id="motor-strength-readout">Awaiting motor strength</p>
+          </section>
+          <section class="panel" aria-labelledby="waves-title">
+            <div class="panel-heading"><h2 id="waves-title">Wave conditions</h2><span class="small-tag">IDEALIZED CHOP</span></div>
+            <form id="waves-form"><fieldset id="waves-controls" disabled>
+              <legend class="sr-only">Wave conditions</legend>
+              <div class="form-grid"><div><label for="wave-height">Primary height <span>m crest to trough</span></label><input id="wave-height" type="number" min="0" step="any" value="0.3" required></div><div><label for="wave-period">Period <span>s, greater than zero</span></label><input id="wave-period" type="number" min="0" step="any" value="2.4" required></div><div><label for="wave-direction">Travel toward <span>° true</span></label><input id="wave-direction" type="number" min="0" max="359.99" step="any" value="110" required></div></div>
+              <button type="submit" class="button full-width">Apply waves</button>
+              <button type="button" id="calm-water" class="button full-width">Calm water</button>
+            </fieldset></form>
+            <p class="panel-note">Adds a smaller crossing wave train. Height is not significant wave height. Water motion drives heave, roll, pitch, and drift; exposed propellers lose thrust. Changes apply immediately and may cause a transient.</p>
+            <p class="panel-note">No height, period, or steepness caps. Extreme waves or periods near/below the physics timestep can be inaccurate or unstable; these are not validated sea conditions.</p>
+            <p class="current-readout" id="wave-readout">Awaiting sea state</p>
+            <p class="panel-note fidelity-note">At the default 10 lbf per motor, provisional drag targets ~1.7 kn in calm water; a 2 kn head current carries the board backward. Increasing motor strength changes that balance. This is not a calibrated sea-keeping model.</p>
+          </section>
+        </div>
+
+        <section class="chart-panel panel" aria-labelledby="chart-title">
+          <div class="panel-heading chart-heading">
+            <div><p class="eyebrow">LOCAL WATERS</p><h2 id="chart-title">MuJoCo physics · 2D chart</h2></div>
+            <span class="small-tag">NORTH UP</span>
+          </div>
+          <div class="chart-stage" id="chart-stage">
+            <canvas id="chart" role="img" aria-label="North-up chart of simulated ground truth: board position, heading, twin thrusters, trail, and the home origin."></canvas>
+            <div class="chart-empty" id="chart-empty"><span class="empty-icon" aria-hidden="true">⌖</span><strong>Waiting for the water</strong><span>The chart starts with real simulator state.</span></div>
+            <div class="chart-state" id="chart-state" hidden>PAUSED</div>
+            <div class="chart-tools" aria-label="Chart view controls">
+              <button type="button" class="button small active" id="follow" aria-pressed="true">Follow board</button>
+              <button type="button" class="button icon-button" id="home-view" aria-label="Center chart on home origin" title="Center on home">⌖</button>
+              <div class="zoom-group"><button type="button" id="zoom-out" class="button icon-button" aria-label="Zoom out">−</button><button type="button" id="zoom-in" class="button icon-button" aria-label="Zoom in">+</button></div>
+            </div>
+          </div>
+          <div class="chart-footer">
+            <div class="legend"><span><i class="legend-line teal"></i>Truth trail</span><span><i class="legend-dot coral"></i>Home / 0, 0</span></div>
+            <span id="grid-label">Metric grid</span>
+          </div>
+        </section>
+
+        <section class="telemetry panel" aria-labelledby="telemetry-title">
+          <div class="panel-heading"><h2 id="telemetry-title">Navigation sample</h2><span class="small-tag" id="sensor-rate">GPS / IMU</span></div>
+          <dl class="telemetry-grid">
+            <div><dt>Latitude</dt><dd id="latitude">—</dd></div>
+            <div><dt>Longitude</dt><dd id="longitude">—</dd></div>
+            <div><dt>Course over ground</dt><dd id="course">—</dd></div>
+            <div><dt>East / north</dt><dd id="position">—</dd></div>
+            <div><dt>Sample time</dt><dd id="sample-time">—</dd></div>
+            <div><dt>Simulation time</dt><dd id="sim-time">—</dd></div>
+          </dl>
+          <p class="panel-note">Navigation instruments use sampled telemetry. The chart and 3D attitude use ground truth; the waypoint guidance line starts at the sampled position.</p>
+        </section>
+      </section>
+
+      <aside class="helm-column" id="helm" aria-label="Helm controls" tabindex="-1">
+        <section class="panel helm-panel" aria-labelledby="helm-title">
+          <div class="panel-heading"><div><p class="eyebrow">TWIN ELECTRIC DRIVE</p><h2 id="helm-title">Take the helm</h2></div><span class="mode-tag" id="mode">OFFLINE</span></div>
+          <fieldset id="manual-controls" disabled>
+            <legend class="sr-only">Independent reversible thruster controls</legend>
+            <div class="throttle-block port-block">
+              <div class="control-label"><label for="port">Port <span>Left</span></label><output for="port" id="port-value">0%</output></div>
+              <input type="range" id="port" min="-100" max="100" step="1" value="0" aria-describedby="throttle-help">
+              <div class="range-labels" aria-hidden="true"><span>−100 reverse</span><span>0</span><span>forward +100</span></div>
+            </div>
+            <div class="throttle-block starboard-block">
+              <div class="control-label"><label for="starboard">Starboard <span>Right</span></label><output for="starboard" id="starboard-value">0%</output></div>
+              <input type="range" id="starboard" min="-100" max="100" step="1" value="0" aria-describedby="throttle-help">
+              <div class="range-labels" aria-hidden="true"><span>−100 reverse</span><span>0</span><span>forward +100</span></div>
+            </div>
+          </fieldset>
+          <p class="panel-note" id="throttle-help">Reversible, independent thrust. Manual input overrides either autopilot mode.</p>
+          <div class="force-strip"><div><span>PORT FORCE</span><strong id="port-force">—</strong></div><div><span>STARBOARD FORCE</span><strong id="starboard-force">—</strong></div></div>
+          <div class="transport-controls"><button type="button" class="button stop-button" id="stop" disabled><span aria-hidden="true">■</span> Neutral <kbd>Space</kbd></button><button type="button" class="button" id="pause" disabled>Pause</button><button type="button" class="button" id="reset" disabled>Reset</button></div>
+          <p class="keyboard-title">HOLD TO STEER <span>50% keyboard thrust</span></p>
+          <div class="keyboard-guide"><span><kbd>W</kbd><kbd>S</kbd> Ahead / astern</span><span><kbd>A</kbd><kbd>D</kbd> Turn left / right</span><span><kbd>Q</kbd><kbd>E</kbd> Port / starboard</span><span><kbd>R</kbd> Reset</span></div>
+          <p class="panel-note">Release steering keys to stop keyboard thrust. Leaving this tab neutralizes both drives.</p>
+        </section>
+
+        <section class="panel" aria-labelledby="heading-title">
+          <div class="panel-heading"><h2 id="heading-title">Heading hold</h2><span class="small-tag warm">Demo controller</span></div>
+          <form id="heading-form">
+            <fieldset id="heading-controls" disabled>
+              <legend class="sr-only">Demo heading controller</legend>
+              <div class="form-grid"><div><label for="target-heading">Target heading <span>° true</span></label><input id="target-heading" name="heading" type="number" min="0" max="360" step="any" value="0" required></div><div><label for="cruise-throttle">Cruise throttle <span>%</span></label><input id="cruise-throttle" name="throttle" type="number" min="-100" max="100" step="any" value="30" required></div></div>
+              <button class="button primary full-width" type="submit">Engage heading hold <span aria-hidden="true">↗</span></button>
+            </fieldset>
+          </form>
+          <p class="panel-note">A demonstration controller, not a navigation system. Neutral cancels heading hold.</p>
+        </section>
+
+        <section class="panel" aria-labelledby="waypoint-title">
+          <div class="panel-heading"><h2 id="waypoint-title">Go to waypoint</h2><span class="small-tag warm">Demo controller</span></div>
+          <form id="waypoint-form">
+            <fieldset id="waypoint-controls" disabled>
+              <legend class="sr-only">Waypoint destination</legend>
+              <div class="form-grid">
+                <div><label for="waypoint-east">Target east <span>m from home</span></label><input id="waypoint-east" type="number" min="-10000" max="10000" step="any" value="20" required></div>
+                <div><label for="waypoint-north">Target north <span>m from home</span></label><input id="waypoint-north" type="number" min="-10000" max="10000" step="any" value="20" required></div>
+                <div><label for="waypoint-throttle">Motor limit <span>%</span></label><input id="waypoint-throttle" type="number" min="1" max="100" step="any" value="50" required></div>
+                <div><label for="waypoint-radius">Arrival radius <span>m</span></label><input id="waypoint-radius" type="number" min="0.5" max="20" step="any" value="1.5" required></div>
+              </div>
+              <button class="button primary full-width" type="submit">Go to waypoint</button>
+            </fieldset>
+          </form>
+          <p class="panel-note">Click the chart or enter coordinates to draft a target, then press Go. Coordinates are relative to home, not the board. Arrival cuts thrust; it does not hold position.</p>
+          <p id="waypoint-draft" class="panel-note">Draft: 20 m east / 20 m north · not engaged</p>
+          <p id="waypoint-status" class="current-readout" role="status">No active waypoint</p>
+        </section>
+
+        <section class="panel" aria-labelledby="current-title">
+          <div class="panel-heading"><h2 id="current-title">Water current</h2><span class="small-tag">ENU · m/s</span></div>
+          <form id="current-form">
+            <fieldset id="current-controls" disabled>
+              <legend class="sr-only">Environmental current</legend>
+              <div class="form-grid"><div><label for="current-east">East <span>m/s</span></label><input id="current-east" name="east" type="number" min="-3" max="3" step="any" value="0" required></div><div><label for="current-north">North <span>m/s</span></label><input id="current-north" name="north" type="number" min="-3" max="3" step="any" value="0" required></div></div>
+              <button class="button full-width" type="submit">Apply current</button>
+            </fieldset>
+          </form>
+          <p class="current-readout">Applied current <strong id="current-readout">—</strong></p>
+          <p class="panel-note">2 knots ≈ 1.03 m/s. Current direction is the direction the water moves.</p>
+        </section>
+      </aside>
+    </main>
+    <footer class="page-footer"><span><i class="footer-dot" aria-hidden="true"></i> 6DOF wave simulation · not a calibrated vessel model</span><span id="vessel-spec">No hardware connections</span></footer>
+  </div>
+</body>
+</html>
