@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { engineSnapshotSchema } from "@alesis/protocol";
 import { SimulatedHostEngine } from "./index.js";
 
 async function captureOneCycle(engine: SimulatedHostEngine): Promise<void> {
@@ -222,6 +223,87 @@ describe("SimulatedHostEngine", () => {
     expect(engine.snapshot().capture.quantization).toBe("off");
     expect((await engine.execute({ type: "set-quantization", mode: "1/16" })).accepted).toBe(true);
     expect(engine.snapshot().capture.quantization).toBe("1/16");
+  });
+
+  it.each([90, 137])("publishes elapsed-seconds-preserving progress immediately at %i BPM", async (bpm) => {
+    const engine = new SimulatedHostEngine();
+    expect((await engine.execute({ type: "configure", settings: { bpm: 120, countInEnabled: false, loopMeasures: 1 } })).accepted).toBe(true);
+    expect((await engine.execute({ type: "play" })).accepted).toBe(true);
+    engine.advance(0.187);
+    const published: ReturnType<typeof engine.snapshot>[] = [];
+    const unsubscribe = engine.subscribe((snapshot) => published.push(snapshot));
+    published.length = 0;
+
+    const result = await engine.execute({ type: "configure", settings: { bpm } });
+    expect(result.accepted).toBe(true);
+    expect(published).toHaveLength(1);
+    expect(published[0]!.transport.progress).toBeCloseTo(0.187 / (240 / bpm), 10);
+    expect(published[0]!.revision).toBe(result.revision);
+    engine.advance(0);
+    expect(engine.snapshot().transport).toEqual(published[0]!.transport);
+    engine.advance(0.013);
+    expect(engine.snapshot().transport.progress).toBeCloseTo(0.2 / (240 / bpm), 10);
+    unsubscribe();
+  });
+
+  it.each([
+    { settings: { bpm: 240 }, elapsed: 3, duration: 2, cycles: 1 },
+    { settings: { loopMeasures: 1 }, elapsed: 3, duration: 2, cycles: 1 },
+    { settings: { beatsPerMeasure: 2 }, elapsed: 3, duration: 2, cycles: 1 },
+    { settings: { loopMeasures: 1 }, elapsed: 2, duration: 2, cycles: 1 },
+    { settings: { beatsPerMeasure: 1, loopMeasures: 1 }, elapsed: 3.25, duration: 0.5, cycles: 6 },
+  ])("normalizes shortened timing $settings with elapsed $elapsed before publishing", async ({ settings, elapsed, duration, cycles }) => {
+    const engine = new SimulatedHostEngine();
+    expect((await engine.execute({ type: "configure", settings: { bpm: 120, countInEnabled: false, loopMeasures: 2 } })).accepted).toBe(true);
+    expect((await engine.execute({ type: "play" })).accepted).toBe(true);
+    engine.dispatchMidi({ type: "note-on", channel: 0, note: 60, velocity: 100 });
+    engine.advance(elapsed);
+    expect(engine.snapshot().capture.staged).toBeNull();
+    const published: ReturnType<typeof engine.snapshot>[] = [];
+    const unsubscribe = engine.subscribe((snapshot) => published.push(snapshot));
+    published.length = 0;
+
+    const result = await engine.execute({ type: "configure", settings });
+    expect(result).toMatchObject({ accepted: true, appliedCycle: cycles });
+    expect(published).toHaveLength(1);
+    const snapshot = published[0]!;
+    expect(engineSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    expect(snapshot.transport.cycle).toBe(cycles);
+    expect(snapshot.transport.progress).toBeCloseTo((elapsed - cycles * duration) / duration, 10);
+    expect(snapshot.capture.staged).toMatchObject({ cycle: cycles - 1 });
+    if (cycles > 1) expect(snapshot.capture.previousStaged).toMatchObject({ cycle: cycles - 2 });
+    expect(snapshot.capture.hasCurrentEvents).toBe(false);
+    if (snapshot.transport.progress > 0) expect(snapshot.capture.currentWaveform[0]).toBeGreaterThan(0);
+    expect(snapshot.revision).toBe(result.revision);
+    engine.advance(0);
+    expect(engine.snapshot()).toEqual(snapshot);
+    engine.advance(0.01);
+    expect(engine.snapshot().transport.progress).toBeCloseTo((elapsed - cycles * duration + 0.01) / duration, 10);
+    unsubscribe();
+  });
+
+  it.each([90, 240])("updates count-in progress at %i BPM without changing its remaining seconds", async (bpm) => {
+    const engine = new SimulatedHostEngine();
+    expect((await engine.execute({ type: "configure", settings: { bpm: 120, countInEnabled: true } })).accepted).toBe(true);
+    expect((await engine.execute({ type: "play" })).accepted).toBe(true);
+    engine.advance(0.5); // 1.5 seconds remain, even when the new measure is shorter.
+    expect((await engine.execute({ type: "configure", settings: { bpm } })).accepted).toBe(true);
+    const snapshot = engine.snapshot();
+    expect(snapshot.transport).toMatchObject({ state: "counting-in", progress: Math.max(0, 1 - 1.5 / (240 / bpm)) });
+    expect(engineSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    engine.advance(0);
+    expect(engine.snapshot().transport).toEqual(snapshot.transport);
+    engine.advance(1.5);
+    expect(engine.snapshot().transport).toMatchObject({ state: "playing", progress: 0 });
+  });
+
+  it("keeps clearAudio's reset instead of rolling elapsed time into the shorter duration", async () => {
+    const engine = new SimulatedHostEngine();
+    await captureOneCycle(engine);
+    engine.advance(1.75);
+    expect((await engine.execute({ type: "configure", settings: { bpm: 240 }, clearAudio: true })).accepted).toBe(true);
+    expect(engine.snapshot().transport).toEqual({ state: "playing", cycle: 0, progress: 0 });
+    expect(engine.snapshot().capture).toMatchObject({ staged: null, previousStaged: null, currentWaveform: [], hasCurrentEvents: false });
   });
 
   it("keeps an overwritten staged take for one cycle and allows recovery promotion", async () => {

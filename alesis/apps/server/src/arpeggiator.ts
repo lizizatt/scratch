@@ -27,7 +27,7 @@ export interface ScheduledMidiEvent {
   delaySeconds: number;
 }
 
-const rateBeats: Record<ArpeggiatorRate, number> = {
+export const rateBeats: Record<ArpeggiatorRate, number> = {
   "1/4": 1,
   "1/8": 0.5,
   "1/16": 0.25,
@@ -91,13 +91,7 @@ export class MidiArpeggiator {
 
   advanceScheduled(seconds: number, bpm: number): ScheduledMidiEvent[] {
     if (!this.config.enabled) return [];
-    if (this.idleSeconds !== null) {
-      this.idleSeconds += seconds;
-      if (this.idleSeconds >= idleResetSeconds - 1e-9) {
-        this.resetSequence();
-        this.idleSeconds = null;
-      }
-    }
+    this.advanceIdle(seconds);
     const events: ScheduledMidiEvent[] = [];
     let remaining = seconds;
     while (remaining >= 0) {
@@ -111,30 +105,11 @@ export class MidiArpeggiator {
       remaining -= elapsed;
 
       if (this.active && this.active.timeToOff <= 1e-9) {
-        events.push({
-          event: { type: "note-off", channel: this.active.channel, note: this.active.note },
-          delaySeconds: seconds - remaining,
-        });
-        this.active = null;
+        for (const event of this.releaseStep()) events.push({ event, delaySeconds: seconds - remaining });
       }
       if (this.held.size > 0 && this.timeToStep <= 1e-9) {
-        if (this.active) {
-          events.push({
-            event: { type: "note-off", channel: this.active.channel, note: this.active.note },
-            delaySeconds: seconds - remaining,
-          });
-          this.active = null;
-        }
-        const note = this.nextNote();
-        if (note) {
-          events.push({
-            event: { type: "note-on", channel: note.channel, note: note.note, velocity: note.velocity },
-            delaySeconds: seconds - remaining,
-          });
-          const interval = this.stepDuration(bpm);
-          this.active = { channel: note.channel, note: note.note, timeToOff: interval * this.config.gate };
-          this.timeToStep = interval;
-          this.step += 1;
+        for (const event of this.stepNow(this.stepDuration(bpm))) {
+          events.push({ event, delaySeconds: seconds - remaining });
         }
       }
       if (elapsed === remaining && remaining === 0) break;
@@ -143,9 +118,43 @@ export class MidiArpeggiator {
     return events;
   }
 
-  flush(): MidiEvent[] {
+  get hasHeldNotes(): boolean {
+    return this.held.size > 0;
+  }
+
+  /** Advance only the idle reset, without selecting any future notes. */
+  advanceIdle(seconds: number): void {
+    if (this.idleSeconds !== null) {
+      this.idleSeconds += seconds;
+      if (this.idleSeconds >= idleResetSeconds - 1e-9) {
+        this.resetSequence();
+        this.idleSeconds = null;
+      }
+    }
+  }
+
+  /** Select from the current chord at a delivered deadline; the caller owns gate timing. */
+  stepNow(intervalSeconds: number): MidiEvent[] {
+    if (!this.config.enabled) return [];
+    const events = this.releaseStep();
+    const note = this.nextNote();
+    if (note) {
+      events.push({ type: "note-on", channel: note.channel, note: note.note, velocity: note.velocity });
+      this.active = { channel: note.channel, note: note.note, timeToOff: intervalSeconds * this.config.gate };
+      this.timeToStep = intervalSeconds;
+      this.step += 1;
+    }
+    return events;
+  }
+
+  releaseStep(): MidiEvent[] {
     const events = this.active ? [{ type: "note-off" as const, channel: this.active.channel, note: this.active.note }] : [];
     this.active = null;
+    return events;
+  }
+
+  flush(): MidiEvent[] {
+    const events = this.releaseStep();
     this.resetSequence();
     return events;
   }
@@ -189,7 +198,7 @@ export class MidiArpeggiator {
     return Array.from({ length: this.config.octaves }, (_, octave) => base.map((note) => ({ ...note, note: transposeMidi(note.note, octave) }))).flat();
   }
 
-  private stepDuration(bpm: number): number {
+  stepDuration(bpm: number): number {
     const base = 60 / bpm * rateBeats[this.config.rate];
     return base * (this.step % 2 === 0 ? 1 + this.config.swing : 1 - this.config.swing);
   }

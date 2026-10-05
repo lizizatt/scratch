@@ -93,6 +93,44 @@ describe("PerformanceRouter", () => {
     ]);
   });
 
+  it("applies held pitch bend to a note started on a new channel", () => {
+    const router = new PerformanceRouter();
+    router.route({ type: "note-on", channel: 1, note: 60, velocity: 100 });
+    router.route({ type: "pitch-bend", channel: 0, value: 0.5 });
+
+    expect(router.route({ type: "note-on", channel: 2, note: 67, velocity: 100 })).toEqual([
+      { type: "pitch-bend", channel: 2, value: 0.5 },
+      { type: "note-on", channel: 2, note: 67, velocity: 100 },
+    ]);
+  });
+
+  it("updates held pitch bend when a previously bent channel starts another note", () => {
+    const router = new PerformanceRouter();
+    router.route({ type: "note-on", channel: 1, note: 60, velocity: 100 });
+    router.route({ type: "pitch-bend", channel: 0, value: 0.5 });
+    router.route({ type: "note-off", channel: 1, note: 60 });
+    router.route({ type: "note-on", channel: 2, note: 64, velocity: 100 });
+    router.route({ type: "pitch-bend", channel: 0, value: 0.25 });
+
+    expect(router.route({ type: "note-on", channel: 1, note: 67, velocity: 100 })).toEqual([
+      { type: "pitch-bend", channel: 1, value: 0.25 },
+      { type: "note-on", channel: 1, note: 67, velocity: 100 },
+    ]);
+  });
+
+  it("catches up both sustain and pitch bend on a single new channel", () => {
+    const router = new PerformanceRouter();
+    router.route({ type: "note-on", channel: 1, note: 60, velocity: 100 });
+    router.route({ type: "control-change", channel: 0, controller: 64, value: 127 });
+    router.route({ type: "pitch-bend", channel: 0, value: -0.25 });
+
+    expect(router.route({ type: "note-on", channel: 2, note: 64, velocity: 100 })).toEqual([
+      { type: "control-change", channel: 2, controller: 64, value: 127 },
+      { type: "pitch-bend", channel: 2, value: -0.25 },
+      { type: "note-on", channel: 2, note: 64, velocity: 100 },
+    ]);
+  });
+
   it("forgets held-note routing on lifecycle panic", () => {
     const router = new PerformanceRouter();
     router.route({ type: "note-on", channel: 3, note: 67, velocity: 100 });

@@ -7,16 +7,19 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createControlServer, type ControlServer } from "./control-server.js";
-import { MidiArpeggiator } from "./arpeggiator.js";
-import { DrumPatternScheduler } from "./drum-patterns.js";
+import { createAudioHealthObserver } from "./audio-health.js";
+import { createRendererControllerRestorer, panicRendererInput } from "./renderer-controllers.js";
+import { TransportPlayback } from "./transport-playback.js";
 import { MidiLoopScheduler } from "./loop-playback.js";
+import { executeLoopCommand } from "./loop-commands.js";
+import { exportLoopSession, importLoopSession, prepareSessionAudio, type LoopSessionHost } from "./loop-session.js";
 import { MetronomeScheduler } from "./metronome.js";
 import { exportMp3Session } from "./mp3-exporter.js";
 import { exportLoopSample } from "./loop-sample-exporter.js";
 import { createLoopSampleExportService } from "./loop-sample-service.js";
 import { applyVelocityCurve, PerformanceRouter } from "./performance-router.js";
 import { DeviceHotplugCoordinator } from "./hotplug.js";
-import { disconnectSamplePlayer, DrumPadNoteTracker, executePadMode, executePadNavigation, executeSamplePadRelease, executeSamplePadTrigger } from "./pad-controls.js";
+import { disconnectSamplePlayer, DrumPadNoteTracker, executePadMode, executePadNavigation, executeSamplePadRelease, executeSamplePadTrigger, HardwareProgramChangeNavigationMapper } from "./pad-controls.js";
 import { defaultSettingsCachePath, loadSettingsCache, restoreSettingsCache, saveSettingsCache, settingsCacheFromSnapshot } from "./settings-cache.js";
 import { padMidiInput, SamplePadService } from "./sample-pads.js";
 
@@ -63,17 +66,19 @@ const audioDevice = discoveredAudioDevice ?? {
   cardId: "Device",
   pcm: "alesis_cm108",
 };
-const audio: AudioOutput = simulatedAudioMode || !defaultSoundFont || soundFontReason
+const initialAudio: AudioOutput = simulatedAudioMode || !defaultSoundFont || soundFontReason
   ? new SilentAudioOutput()
   : new FluidSynthOutput({
       device: audioDevice,
       soundFontPath: defaultSoundFont.path,
       ...(percussionSoundFontPath ? { percussionSoundFontPath } : {}),
-      healthObserver(ready, reason) {
+      controllerResetObserver: createRendererControllerRestorer(() => audio === initialAudio, () => loops),
+      healthObserver: createAudioHealthObserver(() => audio === initialAudio, (ready, reason) => {
         readiness.synth = ready ? { ready: true, identity: "FluidSynth" } : { ready: false, reason: reason ?? "Audio renderer stopped" };
         void engine.execute({ type: "configure", settings: {} });
-      },
+      }),
     });
+let audio: AudioOutput = initialAudio;
 const readiness: Readiness = {
   soundFont: soundFontReason
     ? { ready: false, reason: soundFontReason }
@@ -92,7 +97,15 @@ const readiness: Readiness = {
       ? { ready: true, identity: `${discoveredMidiPort.name} (${discoveredMidiPort.id})` }
       : { ready: false, reason: "Vortex Wireless 2 was not found" },
 };
-const loops = new MidiLoopScheduler(audio);
+// Schedulers follow the current renderer across an atomic loop-session replacement.
+const currentAudio = new Proxy({} as AudioOutput, {
+  get(_target, property) {
+    const value = Reflect.get(audio, property);
+    return typeof value === "function" ? value.bind(audio) : value;
+  },
+});
+const loops = new MidiLoopScheduler(currentAudio);
+let importingSession = false;
 const sampleRoot = process.env.SAMPLE_LIBRARY_DIR ?? join(homedir(), ".local/share/alesis/samples");
 const sampleLibrary = new SampleLibrary(sampleRoot);
 let samplePads: SamplePadService;
@@ -104,13 +117,11 @@ samplePads = new SamplePadService(sampleLibrary, (state) => {
       onError: (message) => samplePads.reportPlaybackError(message),
     }) : null
   : undefined);
-const arpeggiator = new MidiArpeggiator(engine.snapshot().arpeggiator);
 const performanceRouter = new PerformanceRouter();
 const drumPadNotes = new DrumPadNoteTracker();
-const drums = new DrumPatternScheduler();
-const dispatchPerformance = (event: MidiEvent): void => {
+const dispatchPerformance = (event: MidiEvent, endsAtCycleBoundary = false): void => {
   engine.markCaptureActivity();
-  loops.record(event, engine.snapshot());
+  loops.record(event, engine.snapshot(), endsAtCycleBoundary);
   audio.dispatchMidi(event);
 };
 const dispatchDrumPadEvent = (event: MidiEvent, playAudio: boolean): void => {
@@ -119,59 +130,14 @@ const dispatchDrumPadEvent = (event: MidiEvent, playAudio: boolean): void => {
   loops.record(event, engine.snapshot());
   if (playAudio) audio.dispatchMidi(event);
 };
-interface ScheduledPerformanceEvent {
-  timeout: ReturnType<typeof setTimeout>;
-  event: MidiEvent;
-}
-const scheduledPerformance = new Set<ScheduledPerformanceEvent>();
-const soundingArpeggioNotes = new Map<string, { channel: number; note: number }>();
-const dispatchArpeggio = (event: MidiEvent): void => {
+const dispatchArpeggio = (event: MidiEvent, endsAtCycleBoundary = false): void => {
   advanceTransportClock();
-  const key = "note" in event ? `${event.channel}:${event.note}` : null;
-  if (event.type === "note-on" && event.velocity > 0) soundingArpeggioNotes.set(key!, event);
-  if (key && (event.type === "note-off" || event.type === "note-on" && event.velocity === 0)) soundingArpeggioNotes.delete(key);
-  dispatchPerformance(event);
+  dispatchPerformance(event, endsAtCycleBoundary);
 };
 let handleProgramChange: (program: number) => void = () => {};
-const schedulePerformance = (event: MidiEvent, delaySeconds: number): void => {
-  if (delaySeconds <= 1e-9) {
-    dispatchArpeggio(event);
-    return;
-  }
-  const scheduled: ScheduledPerformanceEvent = {
-    event,
-    timeout: setTimeout(() => {
-      scheduledPerformance.delete(scheduled);
-      dispatchArpeggio(event);
-    }, delaySeconds * 1000),
-  };
-  scheduledPerformance.add(scheduled);
-};
-const invalidateScheduledPerformance = (): void => {
-  for (const scheduled of scheduledPerformance) clearTimeout(scheduled.timeout);
-  scheduledPerformance.clear();
-  for (const note of soundingArpeggioNotes.values()) dispatchPerformance({ type: "note-off", channel: note.channel, note: note.note });
-  soundingArpeggioNotes.clear();
-};
-let lastTransportTime = performance.now();
-let lastSchedulerTime = lastTransportTime;
-let arpeggioHorizonTime = lastTransportTime;
-const advanceTransportClock = (): number => {
-  const now = performance.now();
-  const elapsedSeconds = Math.max(0, (now - lastTransportTime) / 1000);
-  lastTransportTime = now;
-  engine.advance(elapsedSeconds);
-  return elapsedSeconds;
-};
-const scheduleArpeggioLookahead = (now: number, bpm: number): void => {
-  const targetHorizon = now + 50;
-  const windowSeconds = Math.max(0, (targetHorizon - arpeggioHorizonTime) / 1000);
-  for (const { event, delaySeconds } of arpeggiator.advanceScheduled(windowSeconds, bpm)) {
-    const eventTime = arpeggioHorizonTime + delaySeconds * 1000;
-    schedulePerformance(event, Math.max(0, (eventTime - now) / 1000));
-  }
-  arpeggioHorizonTime = targetHorizon;
-};
+const hardwareProgramChangeNavigation = new HardwareProgramChangeNavigationMapper();
+const advanceTransportClock = (): number => playback.advance();
+const playback = new TransportPlayback(engine, currentAudio, dispatchArpeggio, undefined, loops);
 const handleMidi = (event: MidiInputEvent): void => {
   if (event.type === "program-change") {
     handleProgramChange(event.program);
@@ -197,7 +163,7 @@ const handleMidi = (event: MidiInputEvent): void => {
   const curvedEvent = applyVelocityCurve(event, engine.snapshot().settings.velocityCurve);
   engine.dispatchMidi(curvedEvent);
   for (const routedEvent of performanceRouter.route(curvedEvent)) {
-    for (const outputEvent of arpeggiator.handle(routedEvent)) dispatchPerformance(outputEvent);
+    playback.handle(routedEvent);
   }
 };
 let disconnectMidi = (): void => {};
@@ -260,7 +226,6 @@ const restoreAudioSelection = async (snapshot: ReturnType<typeof engine.snapshot
 let controlServer: ControlServer | undefined;
 const captureLoopSample = (_name?: string) => {
   const snapshot = engine.snapshot();
-  if (snapshot.transport.state !== "playing") throw new Error("Transport must be playing to export a loop sample");
   const durationSeconds = 60 / snapshot.settings.bpm * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
   if (durationSeconds > 30) throw new Error("Loop arrangement must be 30 seconds or shorter");
 
@@ -323,7 +288,60 @@ const loopSampleExport = createLoopSampleExportService({
     return { revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
   },
 });
+const loopSessionHost: LoopSessionHost = {
+  engine, loops,
+  percussionSoundFontId: percussionSoundFontPath ? "fluidr3-gm-sf2" : null,
+  inspectPresets(id) {
+    const font = soundFontsById.get(id);
+    if (!font) throw new Error(`Missing SoundFont: ${id}`);
+    return discoverSoundFontPresets(font.path);
+  },
+  prepareAudio(session) {
+    return prepareSessionAudio(session, () => {
+      if (simulatedAudioMode) return new SilentAudioOutput();
+      if (!discoveredAudioDevice) throw new Error("Audio device is unavailable; session was not replaced");
+      const fontId = session.synth.soundFont?.id ?? engine.snapshot().synth.selectedSoundFontId;
+      const font = fontId ? soundFontsById.get(fontId) : null;
+      if (!font) throw new Error("Native renderer requires an installed SoundFont");
+      const candidate: AudioOutput = new FluidSynthOutput({
+        device: discoveredAudioDevice,
+        soundFontPath: font.path,
+        ...(percussionSoundFontPath ? { percussionSoundFontPath } : {}),
+        controllerResetObserver: createRendererControllerRestorer(() => audio === candidate, () => loops),
+        healthObserver: createAudioHealthObserver(() => audio === candidate, (ready, reason) => {
+          readiness.synth = ready ? { ready: true, identity: "FluidSynth" } : { ready: false, reason: reason ?? "Audio renderer stopped" };
+          void engine.execute({ type: "configure", settings: {} });
+        }),
+      });
+      return candidate;
+    }, (candidate) => {
+      const previous = audio;
+      audio = candidate;
+      // Preparation completed; close the retired renderer without delaying the commit.
+      void previous.close().catch((error) => console.error(`Unable to close retired renderer: ${String(error)}`));
+      readiness.synth = { ready: true, identity: simulatedAudioMode ? "Simulated output (development mode)" : "FluidSynth" };
+    });
+  },
+};
 const executeCommand = async (command: EngineCommand): Promise<EngineResult> => {
+  if (command.type === "play" || command.type === "stop" || command.type === "configure" || command.type === "configure-arpeggiator") {
+    advanceTransportClock();
+  }
+  if (command.type === "export-loop-session") return exportLoopSession(loopSessionHost);
+  if (command.type === "import-loop-session") {
+    if (hotplugBusy) throw new Error("Audio/MIDI reconnection is in progress; retry loading the session");
+    importingSession = true;
+    playback.suspend();
+    try {
+      const result = await importLoopSession(command.sessionJson, loopSessionHost);
+      performanceRouter.panic();
+      drumPadNotes.panic(() => {});
+      return result;
+    } finally {
+      importingSession = false;
+      playback.resume();
+    }
+  }
   if (command.type === "set-pad-mode") return executePadMode(command, {
     engine,
     samplePads,
@@ -366,12 +384,7 @@ const executeCommand = async (command: EngineCommand): Promise<EngineResult> => 
   }
   if (command.type === "export-loop-sample") return loopSampleExport.execute(command.name);
   if (command.type === "configure-arpeggiator") {
-    invalidateScheduledPerformance();
-    const result = await engine.execute(command);
-    if (!result.accepted) return result;
-    const settings = engine.snapshot().arpeggiator;
-    for (const event of arpeggiator.configure(settings)) dispatchPerformance(event);
-    return result;
+    return engine.execute(command);
   }
   if (command.type === "select-synth") {
     const before = engine.snapshot();
@@ -490,26 +503,7 @@ const executeCommand = async (command: EngineCommand): Promise<EngineResult> => 
       };
     }
   }
-  if (command.type === "configure") {
-    const snapshot = engine.snapshot();
-    const timingChanged = command.settings.bpm !== undefined && command.settings.bpm !== snapshot.settings.bpm
-      || command.settings.beatsPerMeasure !== undefined && command.settings.beatsPerMeasure !== snapshot.settings.beatsPerMeasure
-      || command.settings.loopMeasures !== undefined && command.settings.loopMeasures !== snapshot.settings.loopMeasures;
-    if (timingChanged && loops.hasCurrentRecording() && !command.clearAudio) {
-      return {
-        accepted: false,
-        revision: snapshot.revision,
-        appliedCycle: snapshot.transport.cycle,
-        error: "Timing changes require clearAudio while a capture is in progress",
-      };
-    }
-  }
-  const result = await engine.execute(command);
-  if (result.accepted && command.type === "configure" && command.clearAudio) loops.clearRecordings();
-  if (result.accepted && command.type === "stop") loops.discardCurrentRecording();
-  if (result.accepted && command.type === "delete-take") loops.markDeleted(command.takeId);
-  if (result.accepted && command.type === "undo-delete") loops.restoreDeleted();
-  return result;
+  return executeLoopCommand(command, engine, loops, playback);
 };
 
 const settingsCachePath = defaultSettingsCachePath();
@@ -522,6 +516,7 @@ if (cachedSettings) {
   }
 }
 const persistentCommandTypes = new Set<EngineCommand["type"]>([
+  "import-loop-session",
   "configure",
   "select-synth",
   "select-soundfont",
@@ -551,18 +546,20 @@ const executeAndPersist = async (command: EngineCommand) => {
 const host = process.env.HOST ?? "127.0.0.1";
 controlServer = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeAndPersist, host, readiness);
 handleProgramChange = (program) => {
-  void controlServer!.submit({ type: "select-pad-program", program })
+  const generation = hardwareProgramChangeNavigation.generation;
+  void controlServer!.submit(() => hardwareProgramChangeNavigation.commandForProgramChange(program, engine.snapshot(), generation)?.command ?? null)
+    .then((result) => {
+      if (result && !result.accepted) console.error(`Rejected MIDI Program Change ${program}: ${result.error ?? "command was not accepted"}`);
+    })
     .catch((error) => console.error(`Unable to apply MIDI Program Change: ${error instanceof Error ? error.message : String(error)}`));
 };
-const panic = (): void => {
+const panic = (): void => panicRendererInput(engine.snapshot(), loops, () => {
+  playback.panic();
   controlServer?.invalidateSamplePadHolds();
-  invalidateScheduledPerformance();
-  for (const event of arpeggiator.panic()) audio.dispatchMidi(event);
   performanceRouter.panic();
   drumPadNotes.panic((event) => dispatchDrumPadEvent(event, false));
   samplePads.panic();
-  audio.panic();
-};
+}, audio);
 const hotplug = new DeviceHotplugCoordinator({ audio: audioStarted, midi: midiConnected }, {
   panic,
   async stopTransport() {
@@ -591,12 +588,14 @@ const hotplug = new DeviceHotplugCoordinator({ audio: audioStarted, midi: midiCo
     }
   },
   async disconnectMidi() {
+    hardwareProgramChangeNavigation.reset();
     disconnectMidi();
     await midi?.close();
     midi = null;
     midiConnected = false;
   },
   async reconnectMidi() {
+    hardwareProgramChangeNavigation.reset();
     discoveredMidiPort = discoverVortexSequencerPort();
     return discoveredMidiPort ? connectMidi(new AlsaSequencerMidiSource(discoveredMidiPort)) : false;
   },
@@ -616,7 +615,7 @@ const hotplug = new DeviceHotplugCoordinator({ audio: audioStarted, midi: midiCo
 });
 let hotplugBusy = false;
 const hotplugTimer = simulatedAudioMode && softwareMidiMode ? undefined : setInterval(() => {
-  if (hotplugBusy) return;
+  if (hotplugBusy || importingSession) return;
   hotplugBusy = true;
   const detectedAudio = simulatedAudioMode || discoverCm108AudioDevice() !== null;
   const detectedMidi = softwareMidiMode || discoverVortexSequencerPort() !== null;
@@ -624,22 +623,11 @@ const hotplugTimer = simulatedAudioMode && softwareMidiMode ? undefined : setInt
     .catch((error) => console.error(`Hotplug reconciliation failed: ${error instanceof Error ? error.message : String(error)}`))
     .finally(() => { hotplugBusy = false; });
 }, 1000);
-const metronome = new MetronomeScheduler(audio);
+const metronome = new MetronomeScheduler(currentAudio);
 const timer = setInterval(() => {
-  const now = performance.now();
-  const schedulerElapsedSeconds = Math.max(0, (now - lastSchedulerTime) / 1000);
-  lastSchedulerTime = now;
+  if (importingSession) return;
   advanceTransportClock();
   const snapshot = engine.snapshot();
-  if (schedulerElapsedSeconds > 0.1) {
-    invalidateScheduledPerformance();
-    for (const event of arpeggiator.flush()) audio.dispatchMidi(event);
-    arpeggioHorizonTime = now;
-  } else {
-    scheduleArpeggioLookahead(now, snapshot.settings.bpm);
-  }
-  for (const hit of drums.update(snapshot)) audio.playDrum(hit.note, hit.velocity);
-  loops.update(snapshot);
   metronome.update(snapshot);
 }, 50);
 let demoNoteOn = false;
@@ -668,6 +656,7 @@ console.log(`Audio output: ${audio.name} (${audio.id})`);
 console.log(`SoundFont: ${defaultSoundFont?.name ?? "none"}${defaultSoundFont ? ` (${defaultSoundFont.path})` : ""}`);
 
 async function shutdown(): Promise<void> {
+  playback.dispose();
   clearInterval(timer);
   if (hotplugTimer) clearInterval(hotplugTimer);
   if (midiDemoStart) clearTimeout(midiDemoStart);

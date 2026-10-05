@@ -1,6 +1,6 @@
 import type { AudioOutput } from "@alesis/audio";
 import type { MidiEvent } from "@alesis/engine";
-import type { EngineSnapshot, QuantizationMode, Take } from "@alesis/protocol";
+import type { EngineSnapshot, LoopSession, QuantizationMode, SessionTake, Take } from "@alesis/protocol";
 import { isMappedDrumPadRelease } from "./sample-pads.js";
 
 export interface RecordedMidiEvent {
@@ -29,6 +29,10 @@ export class MidiLoopScheduler {
   private retainedDeletedTakeId: string | null = null;
   private currentRecording: RecordedMidiEvent[] = [];
   private heldRecordingNotes = new Map<string, Extract<MidiEvent, { type: "note-on" }>>();
+  private recordingControllers = new Map<string, MidiEvent>();
+  private initializedRecordingChannels = new Set<number>();
+  private capturedControllerKeys = new Set<string>();
+  private carriedRecordingNotes = new Map<string, RecordedMidiEvent>();
   private recordingCycle: number | null = null;
   private playbackCycle: number | null = null;
   private playbackPosition = -1;
@@ -39,13 +43,43 @@ export class MidiLoopScheduler {
 
   constructor(private readonly output: AudioOutput) {}
 
-  record(event: MidiEvent, snapshot: EngineSnapshot): void {
-    if (snapshot.transport.state !== "playing") return;
-    this.advanceRecordingCycle(snapshot);
-    this.currentRecording.push({ position: snapshot.transport.progress, event: structuredClone(event) });
+  /** Next event or rollover on the authoritative cycle, including a newly audible opening. */
+  nextPlaybackPosition(snapshot: EngineSnapshot): number {
+    if (snapshot.transport.state !== "playing") return Infinity;
+    if (this.playbackCycle !== snapshot.transport.cycle) return 0;
+    let next = 1;
+    for (const { take } of this.audibleTakes(snapshot)) {
+      for (const recorded of this.recordings.get(take.id) ?? []) {
+        if (recorded.position > this.playbackPosition) next = Math.min(next, recorded.position);
+      }
+    }
+    return next;
+  }
+
+  record(event: MidiEvent, snapshot: EngineSnapshot, endsAtCycleBoundary = false): void {
+    if (snapshot.transport.state === "playing") this.advanceRecordingCycle(snapshot);
+    // This is delivered/routed state, including controls heard before Play/count-in.
+    if (event.type === "pitch-bend" || event.type === "control-change" && event.controller === 64) {
+      const key = `${event.channel}:${event.type}`;
+      if (event.type === "pitch-bend" ? event.value === 0 : event.value < 64) this.recordingControllers.delete(key);
+      else this.recordingControllers.set(key, structuredClone(event));
+      if (snapshot.transport.state === "playing") this.capturedControllerKeys.add(key);
+    }
     const noteKey = "note" in event ? `${event.channel}:${event.note}` : null;
+    const release = event.type === "note-off" || event.type === "note-on" && event.velocity === 0;
+    if (snapshot.transport.state !== "playing") return;
+    if (event.type === "note-on" && event.velocity > 0) this.initializeRecordingChannel(event.channel, snapshot.transport.progress);
+    const carried = noteKey ? this.carriedRecordingNotes.get(noteKey) : undefined;
+    // An exact-boundary gate belongs to the preceding cycle, which already has
+    // its terminal release. Do not turn its synthetic continuation into an attack.
+    if (release && carried && (endsAtCycleBoundary || snapshot.transport.progress < 1e-9)) {
+      this.currentRecording = this.currentRecording.filter((recorded) => recorded !== carried);
+    } else {
+      this.currentRecording.push({ position: snapshot.transport.progress, event: structuredClone(event) });
+    }
+    if (noteKey) this.carriedRecordingNotes.delete(noteKey);
     if (event.type === "note-on" && event.velocity > 0) this.heldRecordingNotes.set(noteKey!, structuredClone(event));
-    if (noteKey && (event.type === "note-off" || (event.type === "note-on" && event.velocity === 0))) this.heldRecordingNotes.delete(noteKey);
+    if (noteKey && release) this.heldRecordingNotes.delete(noteKey);
   }
 
   update(snapshot: EngineSnapshot): void {
@@ -54,9 +88,7 @@ export class MidiLoopScheduler {
       this.playbackCycle = null;
       this.playbackPosition = -1;
       if (snapshot.transport.state === "stopped") {
-        this.currentRecording = [];
-        this.heldRecordingNotes.clear();
-        this.recordingCycle = null;
+        this.discardCurrentRecording();
       }
       return;
     }
@@ -110,6 +142,9 @@ export class MidiLoopScheduler {
     this.takeChannels.clear();
     this.currentRecording = [];
     this.heldRecordingNotes.clear();
+    this.initializedRecordingChannels.clear();
+    this.capturedControllerKeys.clear();
+    this.carriedRecordingNotes.clear();
     this.recordingCycle = null;
     this.playbackCycle = null;
     this.playbackPosition = -1;
@@ -120,10 +155,25 @@ export class MidiLoopScheduler {
     return this.currentRecording.length > 0 || this.heldRecordingNotes.size > 0;
   }
 
+  /** Stop/clear discard captured audio, not controllers still applied live. */
   discardCurrentRecording(): void {
     this.currentRecording = [];
     this.heldRecordingNotes.clear();
+    this.initializedRecordingChannels.clear();
+    this.capturedControllerKeys.clear();
+    this.carriedRecordingNotes.clear();
     this.recordingCycle = null;
+  }
+
+  /** Explicit host panic or session replacement invalidates delivered input state. */
+  resetRecordingInput(): void {
+    this.recordingControllers.clear();
+    this.discardCurrentRecording();
+  }
+
+  /** Renderer replacement preserves physical holds; host panic clears them instead. */
+  reapplyInputControllers(): void {
+    for (const event of this.recordingControllers.values()) this.output.dispatchMidi(structuredClone(event));
   }
 
   storageStats(): { recordings: number; rawRecordings: number; channels: number } {
@@ -149,9 +199,53 @@ export class MidiLoopScheduler {
     return this.exportRecordings(takeIds);
   }
 
+  captureSessionTakes(snapshot: EngineSnapshot): Pick<LoopSession, "staged" | "previousStaged" | "promoted"> {
+    this.captureRecordings(snapshot, []);
+    const capture = (take: Take): SessionTake => {
+      const recording = this.recordings.get(take.id);
+      if (!recording) throw new Error(`Missing MIDI recording for take ${take.id}; session was not saved`);
+      return { take: structuredClone(take), recording: structuredClone(recording) };
+    };
+    const staged = snapshot.capture.staged;
+    const raw = staged ? this.rawRecordings.get(staged.id) : null;
+    if (staged && !raw) throw new Error(`Missing raw MIDI recording for staged take ${staged.id}`);
+    return {
+      staged: staged ? { ...capture(staged), rawRecording: structuredClone(raw!) } : null,
+      previousStaged: snapshot.capture.previousStaged ? capture(snapshot.capture.previousStaged) : null,
+      promoted: snapshot.promoted.map(capture),
+    };
+  }
+
+  prepareSessionRestore(session: LoopSession): () => void {
+    const recordings = new Map([session.staged, session.previousStaged, ...session.promoted]
+      .filter((take) => take !== null).map(({ take, recording }) => [take.id, structuredClone(recording)]));
+    const raw = new Map<string, RecordedMidiEvent[]>();
+    const applied = new Map<string, QuantizationMode>();
+    if (session.staged) {
+      raw.set(session.staged.take.id, structuredClone(session.staged.rawRecording));
+      applied.set(session.staged.take.id, session.quantization);
+    }
+    return () => {
+      // Host has stopped/panicked the old output; this commit performs no fallible I/O.
+      this.activeNotes.clear();
+      this.activeBends.clear();
+      this.activeSustains.clear();
+      this.recordings = recordings;
+      this.rawRecordings = raw;
+      this.appliedQuantization = applied;
+      this.takeChannels.clear();
+      this.resetRecordingInput();
+      this.playbackCycle = null;
+      this.playbackPosition = -1;
+      this.retainedDeletedTakeId = null;
+    };
+  }
+
   private advanceRecordingCycle(snapshot: EngineSnapshot): void {
+    if (snapshot.transport.state !== "playing") return;
     if (this.recordingCycle === null) {
       this.recordingCycle = snapshot.transport.cycle;
+      this.seedRecording();
       return;
     }
     if (snapshot.transport.cycle === this.recordingCycle) return;
@@ -167,8 +261,29 @@ export class MidiLoopScheduler {
       this.recordings.set(completedTake.id, quantizeRecording(rawRecording, snapshot.capture.quantization, totalBeats));
       this.appliedQuantization.set(completedTake.id, snapshot.capture.quantization);
     }
-    this.currentRecording = [...this.heldRecordingNotes.values()].map((event) => ({ position: 0, event: structuredClone(event) }));
+    this.seedRecording();
     this.recordingCycle = snapshot.transport.cycle;
+  }
+
+  private seedRecording(): void {
+    this.carriedRecordingNotes = new Map([...this.heldRecordingNotes].map(([key, event]) => [key, { position: 0, event: structuredClone(event) }]));
+    this.currentRecording = [];
+    this.initializedRecordingChannels.clear();
+    this.capturedControllerKeys.clear();
+    for (const { event } of this.carriedRecordingNotes.values()) this.initializeRecordingChannel(event.channel, 0);
+    this.currentRecording.push(...this.carriedRecordingNotes.values());
+  }
+
+  private initializeRecordingChannel(channel: number, position: number): void {
+    if (this.initializedRecordingChannels.has(channel)) return;
+    this.initializedRecordingChannels.add(channel);
+    // Melodic channels collapse onto one playback channel. An unused channel's
+    // remembered controls must not override the state of the actual performance.
+    for (const [key, event] of this.recordingControllers) {
+      if (event.channel !== channel || this.capturedControllerKeys.has(key)) continue;
+      this.currentRecording.push({ position: position < 1e-9 ? 0 : position, event: structuredClone(event) });
+      this.capturedControllerKeys.add(key);
+    }
   }
 
   private audibleTakes(snapshot: EngineSnapshot): AudibleTake[] {
@@ -277,13 +392,61 @@ export function remapMidiEvent(event: MidiEvent, channel: number, level: number)
 export function quantizeRecording(recording: RecordedMidiEvent[], mode: QuantizationMode, totalBeats: number): RecordedMidiEvent[] {
   if (mode === "off") return structuredClone(recording);
   const gridSize = totalBeats * subdivisionsPerBeat[mode];
-  const deduplicated = new Map<string, RecordedMidiEvent & { order: number }>();
+  type QuantizedEvent = RecordedMidiEvent & { order: number; attack?: number };
+  const candidates: QuantizedEvent[] = [];
+  const survivingAttacks = new Map<string, number>();
+  const activeNoteBins = new Map<string, { bin: number; order: number }>();
   recording.forEach(({ position, event }, order) => {
     const terminalRelease = position === 1 && (event.type === "note-off" || event.type === "note-on" && event.velocity === 0);
+    const absoluteBin = Math.round(position * gridSize);
+    let bin = terminalRelease ? gridSize : absoluteBin % gridSize;
+    let attack: number | undefined;
+    if (event.type === "note-on" && event.velocity > 0) {
+      attack = order;
+      activeNoteBins.set(`${event.channel}:${event.note}`, { bin: absoluteBin, order });
+      survivingAttacks.set(`${bin}:${eventIdentity(event)}`, order);
+    }
+    if (event.type === "note-off" || event.type === "note-on" && event.velocity === 0) {
+      const key = `${event.channel}:${event.note}`;
+      const onset = activeNoteBins.get(key);
+      if (onset !== undefined) {
+        attack = onset.order;
+        // Wrap the pair together: an end release stays at 1 unless its attack
+        // also crossed the seam. Keep ownership until losing pairs are removed.
+        bin = absoluteBin - (onset.bin >= gridSize ? gridSize : 0);
+        const attackBin = onset.bin % gridSize;
+        if (bin === attackBin || gridSize === 1 && !terminalRelease) {
+          bin = attackBin < gridSize - 1 ? attackBin + 1 : attackBin + 0.5;
+        }
+      }
+      activeNoteBins.delete(key);
+    }
+    candidates.push({ position: bin / gridSize, event: structuredClone(event), order, ...(attack === undefined ? {} : { attack }) });
+  });
+  const retained = new Set(survivingAttacks.values());
+  const deduplicated = new Map<string, QuantizedEvent>();
+  for (const item of candidates) {
+    if (item.attack !== undefined && !retained.has(item.attack)) continue;
+    const release = item.event.type === "note-off" || item.event.type === "note-on" && item.event.velocity === 0;
+    deduplicated.set(`${item.position}:${eventIdentity(item.event)}:${release}`, item);
+  }
+  const quantized = [...deduplicated.values()];
+  const attackOrder = (event: MidiEvent): number => event.type === "note-on" && event.velocity > 0 ? 1 : 0;
+  return quantized
+    // A prior gate ending on a new attack's bin must release before that attack.
+    .sort((left, right) => left.position - right.position || attackOrder(left.event) - attackOrder(right.event) || left.order - right.order)
+    .map(({ position, event }) => ({ position, event }));
+}
+
+/** Exact v1 pre-pair-quantizer representation; validation only, never new capture. */
+export function matchesLegacyQuantization(recording: RecordedMidiEvent[], raw: RecordedMidiEvent[], mode: QuantizationMode, totalBeats: number): boolean {
+  if (mode === "off") return JSON.stringify(recording) === JSON.stringify(raw);
+  const gridSize = totalBeats * subdivisionsPerBeat[mode];
+  const deduplicated = new Map<string, RecordedMidiEvent & { order: number }>();
+  raw.forEach(({ position, event }, order) => {
+    const terminalRelease = position === 1 && (event.type === "note-off" || event.type === "note-on" && event.velocity === 0);
     const bin = terminalRelease ? gridSize : Math.round(position * gridSize) % gridSize;
-    const quantized = bin / gridSize;
-    const key = `${bin}:${eventIdentity(event)}`;
-    deduplicated.set(key, { position: quantized, event: structuredClone(event), order });
+    deduplicated.set(`${bin}:${eventIdentity(event)}`, { position: bin / gridSize, event: structuredClone(event), order });
   });
   const quantized = [...deduplicated.values()];
   const activeNoteBins = new Map<string, number>();
@@ -300,9 +463,9 @@ export function quantizeRecording(recording: RecordedMidiEvent[], mode: Quantiza
       activeNoteBins.delete(key);
     }
   }
-  return quantized
-    .sort((left, right) => left.position - right.position || left.order - right.order)
+  const legacy = quantized.sort((left, right) => left.position - right.position || left.order - right.order)
     .map(({ position, event }) => ({ position, event }));
+  return JSON.stringify(recording) === JSON.stringify(legacy);
 }
 
 function eventIdentity(event: MidiEvent): string {

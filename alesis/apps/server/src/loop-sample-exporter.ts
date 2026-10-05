@@ -1,7 +1,8 @@
-import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { exportNameSchema, type EngineSnapshot, type Take } from "@alesis/protocol";
-import { encodeMp3, mixWavsToCycle, renderTakeWav } from "./mp3-exporter.js";
+import { encodeSamplePcmMp3, mixWavsToCyclePcm, renderTakeWav } from "./mp3-exporter.js";
+import { sampleOnsetTrimFrame } from "./sample-onset.js";
 import type { RecordedMidiEvent } from "./loop-playback.js";
 import { drumPatternAtStep } from "./drum-patterns.js";
 import { publishLoopSample } from "./loop-sample-sequence.js";
@@ -35,14 +36,12 @@ export async function exportLoopSample(request: ExportLoopSampleRequest): Promis
     return recording ? [[id, structuredClone(recording)] as const] : [];
   }));
   const name = request.name === undefined ? undefined : exportNameSchema.parse(request.name);
-  if (snapshot.transport.state !== "playing") throw new Error("Loop sample export requires the transport to be playing");
 
   const cycleSeconds = 60 / snapshot.settings.bpm * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
   if (!Number.isFinite(cycleSeconds) || cycleSeconds <= 0 || cycleSeconds > MAX_DURATION_SECONDS) {
     throw new Error(`Loop sample duration must be greater than zero and at most ${MAX_DURATION_SECONDS} seconds`);
   }
   const frameCount = Math.round(cycleSeconds * SAMPLE_RATE);
-  const durationSeconds = frameCount / SAMPLE_RATE;
   const layers: Array<{ take: Take; recording: RecordedMidiEvent[] }> = [];
   for (const take of takes) {
     const recording = sourceRecordings.get(take.id);
@@ -96,10 +95,14 @@ export async function exportLoopSample(request: ExportLoopSampleRequest): Promis
       wavPaths.push(wavPath);
     }
 
-    const mixedWavPath = join(temporaryDirectory, "cycle.wav");
-    await mixWavsToCycle(wavPaths, mixedWavPath, frameCount);
+    const mixedPcmPath = join(temporaryDirectory, "cycle.pcm");
+    await mixWavsToCyclePcm(wavPaths, mixedPcmPath, frameCount);
+    const pcm = await readFile(mixedPcmPath);
+    if (pcm.length !== frameCount * 4) throw new Error("Unexpected rendered sample frame count");
+    const startFrame = sampleOnsetTrimFrame(pcm);
+    const durationSeconds = (frameCount - startFrame) / SAMPLE_RATE;
     const stagedMp3Path = join(temporaryDirectory, "sample.part");
-    await encodeMp3(mixedWavPath, stagedMp3Path);
+    await encodeSamplePcmMp3(mixedPcmPath, stagedMp3Path, startFrame);
     const file = await stat(stagedMp3Path);
     if (file.size > MAX_FILE_BYTES) throw new Error(`Encoded sample exceeds ${MAX_FILE_BYTES} byte limit`);
 

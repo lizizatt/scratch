@@ -554,8 +554,8 @@ test("keeps loop export feedback across pane switches and finds it in Pads", asy
   const monitorOnly = page.getByRole("button", { name: "Monitor only" });
   if (await monitorOnly.getAttribute("aria-pressed") === "true") await monitorOnly.click();
   const sampleExportButton = page.getByRole("button", { name: "Export loop to sample library" });
-  await expect(sampleExportButton).toBeDisabled();
-  await expect(page.locator(".sample-export-hint")).toContainText("Start playback");
+  // Completed takes may remain from earlier captures; stopped transport alone is not a gate.
+  await expect(page.locator(".sample-export-hint")).not.toContainText("Start playback");
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "Promote staged take" })).toBeEnabled({ timeout: 10_000 });
   const stagedAudibility = page.getByRole("button", { name: /^(Mute|Unmute) staged take$/ });

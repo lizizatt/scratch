@@ -103,6 +103,8 @@ export interface FluidSynthOptions {
   percussionSoundFontPath?: string;
   commandObserver?: (command: string) => void;
   healthObserver?: (ready: boolean, reason?: string) => void;
+  /** After an internal controller reset; explicit host panic/close do not notify. */
+  controllerResetObserver?: () => void;
 }
 
 export const fluidSynthStdio: ["pipe", "pipe", "pipe"] = ["pipe", "pipe", "pipe"];
@@ -312,6 +314,7 @@ export class FluidSynthOutput implements AudioOutput {
     drainFluidSynthStdout(child.stdout);
     this.applySoundFontParameters();
     this.panic();
+    this.options.controllerResetObserver?.();
   }
 
   panic(): void {
@@ -390,16 +393,20 @@ export class FluidSynthOutput implements AudioOutput {
 
   async selectSynth(synthId: string): Promise<void> {
     if (synthId === this.selectedSynthId) return;
-    if (synthId === "subtractive") {
-      this.writeCommand("reset");
-      await this.neonOutput.start();
-    } else if (synthId === "soundfont") {
-      await this.neonOutput.close();
-      this.writeCommand("reset");
-    } else {
-      throw new Error(`Unknown synth: ${synthId}`);
+    if (synthId !== "subtractive" && synthId !== "soundfont") throw new Error(`Unknown synth: ${synthId}`);
+    try {
+      if (synthId === "subtractive") {
+        this.writeCommand("reset");
+        await this.neonOutput.start();
+      } else {
+        await this.neonOutput.close();
+        this.writeCommand("reset");
+      }
+      this.selectedSynthId = synthId;
+    } finally {
+      // A failed switch can also have reset the previous renderer.
+      this.options.controllerResetObserver?.();
     }
-    this.selectedSynthId = synthId;
   }
 
   setSynthParameter(synthId: string, parameterId: string, value: number): void {
@@ -603,6 +610,7 @@ export function fluidSynthArguments(deviceId: string, soundFontPath: string, gai
     "-c", "2",
     "-o", "midi.autoconnect=0",
     "-o", `synth.gain=${gain}`,
+    "-o", "synth.chorus.active=0",
     soundFontPath,
   ];
   if (percussionSoundFontPath) args.push(percussionSoundFontPath);
@@ -624,8 +632,9 @@ export function midiEventToFluidCommand(event: MidiEvent): string | null {
 
 export function metronomeCommands(accent: boolean, volume: number): { noteOn: string; noteOff: string } | null {
   if (volume <= 0) return null;
-  const note = accent ? 76 : 77;
-  const velocity = Math.max(1, Math.min(127, Math.round(Math.sqrt(volume) * 127)));
+  // GM side stick: a short click, with the downbeat accented by velocity.
+  const note = 37;
+  const velocity = Math.max(1, Math.min(127, Math.round(volume * (accent ? 127 : 90))));
   return { noteOn: `noteon 15 ${note} ${velocity}`, noteOff: `noteoff 15 ${note}` };
 }
 

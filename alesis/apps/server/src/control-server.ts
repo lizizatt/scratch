@@ -1,8 +1,10 @@
 import { createServer, type Server as HttpServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import type { EngineResult, HostEngine } from "@alesis/engine";
 import {
   commandEnvelopeSchema,
+  LOOP_SESSION_MAX_BYTES,
   type CommandEnvelope,
   type EngineCommand,
   type Readiness,
@@ -14,6 +16,7 @@ import sirv from "sirv";
 export interface ControlServer {
   readonly port: number;
   submit(command: EngineCommand): Promise<EngineResult>;
+  submit(commandFactory: () => EngineCommand | null): Promise<EngineResult | null>;
   invalidateSamplePadHolds(): void;
   close(): Promise<void>;
 }
@@ -39,10 +42,11 @@ export async function createControlServer(
   readiness: Readiness = readyForDevelopment,
 ): Promise<ControlServer> {
   const httpServer = createHttpServer(staticDirectory, readiness);
-  const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control" });
+  const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control", maxPayload: LOOP_SESSION_MAX_BYTES * 6 + 1024 });
   const results = new Map<string, ServerMessage>();
   const inFlight = new Map<string, Promise<ServerMessage>>();
   const connections = new Set<ConnectionState>();
+  let pendingSessionCommands = 0;
   let commandTail = Promise.resolve();
   const enqueueCommand = <T>(execute: () => Promise<T>): Promise<T> => {
     const pending = commandTail.then(execute, execute);
@@ -108,6 +112,8 @@ export async function createControlServer(
   });
 
   webSocketServer.on("connection", (socket) => {
+    const connectionId = randomUUID();
+    socket.on("error", () => { /* Payload-limit/protocol errors close only this connection. */ });
     const connection: ConnectionState = { heldSamplePads: new Set<number>(), cleanup: null };
     connections.add(connection);
     socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage));
@@ -118,14 +124,25 @@ export async function createControlServer(
         return;
       }
 
-      const cached = results.get(envelope.commandId);
+      const sessionCommand = envelope.command.type === "export-loop-session" || envelope.command.type === "import-loop-session";
+      const resultKey = sessionCommand ? `${connectionId}:${envelope.commandId}` : envelope.commandId;
+      const cached = results.get(resultKey);
       if (cached) {
         socket.send(JSON.stringify(cached));
         return;
       }
 
-      let pending = inFlight.get(envelope.commandId);
+      let pending = inFlight.get(resultKey);
       if (!pending) {
+        if (sessionCommand && pendingSessionCommands >= 4) {
+          const snapshot = engine.snapshot();
+          socket.send(JSON.stringify(commandResult(envelope, {
+            accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle,
+            error: "Too many pending loop-session transfers; wait and retry",
+          })));
+          return;
+        }
+        if (sessionCommand) pendingSessionCommands += 1;
         const execute = async () => {
           const holdGeneration = sampleHoldGeneration;
           const message = await executeEnvelope(envelope, engine, executeTrackedCommand, readiness);
@@ -142,11 +159,17 @@ export async function createControlServer(
         } else {
           pending = enqueueCommand(execute);
         }
-        inFlight.set(envelope.commandId, pending);
+        inFlight.set(resultKey, pending);
         void pending.then((message) => {
-          results.set(envelope.commandId, message);
+          const cachedMessage: ServerMessage = message.type === "command-result" && message.sessionJson !== undefined
+            ? { type: "command-result", commandId: message.commandId, revision: message.revision, appliedCycle: message.appliedCycle, accepted: false, error: "Session download already sent. Save again to download a new copy." }
+            : message;
+          results.set(resultKey, cachedMessage);
           if (results.size > 512) results.delete(results.keys().next().value!);
-        }).finally(() => inFlight.delete(envelope.commandId));
+        }).finally(() => {
+          inFlight.delete(resultKey);
+          if (sessionCommand) pendingSessionCommands -= 1;
+        });
       }
       const message = await pending;
       snapshotPending = false;
@@ -160,6 +183,9 @@ export async function createControlServer(
 
   const executeTrackedCommand = async (command: EngineCommand): Promise<EngineResult> => {
     const before = engine.snapshot();
+    if ((command.type === "import-loop-session" || command.type === "export-loop-session") && before.transport.state !== "stopped") {
+      return { accepted: false, revision: before.revision, appliedCycle: before.transport.cycle, error: "Stop transport before saving or loading a loop session" };
+    }
     const result = await executeCommand(command);
     if (result.accepted) {
       const after = engine.snapshot();
@@ -200,14 +226,24 @@ export async function createControlServer(
     httpServer.listen(port, host, resolve);
   });
 
+  function submit(command: EngineCommand): Promise<EngineResult>;
+  function submit(commandFactory: () => EngineCommand | null): Promise<EngineResult | null>;
+  function submit(commandOrFactory: EngineCommand | (() => EngineCommand | null)): Promise<EngineResult | null> {
+    if (typeof commandOrFactory === "function") {
+      return enqueueCommand(async () => {
+        const command = commandOrFactory();
+        return command ? executeTrackedCommand(command) : null;
+      });
+    }
+    const execute = () => executeTrackedCommand(commandOrFactory);
+    return commandOrFactory.type === "export-mp3" || commandOrFactory.type === "export-loop-sample"
+      ? commandTail.then(execute, execute)
+      : enqueueCommand(execute);
+  }
+
   return {
     port: (httpServer.address() as AddressInfo).port,
-    submit(command) {
-      const execute = () => executeTrackedCommand(command);
-      return command.type === "export-mp3" || command.type === "export-loop-sample"
-        ? commandTail.then(execute, execute)
-        : enqueueCommand(execute);
-    },
+    submit,
     invalidateSamplePadHolds,
     async close() {
       unsubscribe();
@@ -297,6 +333,7 @@ function commandResult(envelope: CommandEnvelope, result: EngineResult): ServerM
     ...base,
     ...(result.error === undefined ? {} : { error: result.error }),
     ...(result.message === undefined ? {} : { message: result.message }),
+    ...(result.sessionJson === undefined ? {} : { sessionJson: result.sessionJson }),
   };
 }
 

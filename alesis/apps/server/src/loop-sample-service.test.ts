@@ -1,5 +1,11 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { SampleLibrary, SilentAudioOutput } from "@alesis/audio";
 import { describe, expect, it, vi } from "vitest";
 import { SimulatedHostEngine } from "@alesis/engine";
+import { MidiLoopScheduler } from "./loop-playback.js";
+import { exportLoopSample } from "./loop-sample-exporter.js";
 import { createLoopSampleExportService, type LoopSampleCapture } from "./loop-sample-service.js";
 
 function captureFixture(): LoopSampleCapture {
@@ -28,6 +34,84 @@ function dependencies(overrides: Partial<Parameters<typeof createLoopSampleExpor
 }
 
 describe("loop sample export service", () => {
+  it.each(["stopped", "counting-in"] as const)("publishes completed MIDI while %s, excluding the discarded partial take and preserving transport", async (state) => {
+    const root = await mkdtemp(join(tmpdir(), "alesis-stopped-sample-service-"));
+    const library = new SampleLibrary(root);
+    const engine = new SimulatedHostEngine();
+    const output = new SilentAudioOutput();
+    const dispatch = vi.spyOn(output, "dispatchMidi");
+    const scheduler = new MidiLoopScheduler(output);
+    try {
+      await engine.execute({ type: "configure", settings: { countInEnabled: false, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+      await engine.execute({ type: "select-synth", synthId: "subtractive" });
+      await engine.execute({ type: "play" });
+      const noteOn = { type: "note-on", channel: 0, note: 60, velocity: 112 } as const;
+      scheduler.record(noteOn, engine.snapshot());
+      engine.dispatchMidi(noteOn);
+      engine.advance(1);
+      const noteOff = { type: "note-off", channel: 0, note: 60 } as const;
+      scheduler.record(noteOff, engine.snapshot());
+      engine.dispatchMidi(noteOff);
+      engine.advance(1);
+      scheduler.update(engine.snapshot());
+      engine.advance(0.5);
+      const partial = { type: "note-on", channel: 0, note: 99, velocity: 127 } as const;
+      scheduler.record(partial, engine.snapshot());
+      engine.dispatchMidi(partial);
+      expect(scheduler.hasCurrentRecording()).toBe(true);
+
+      // Match the host's Stop boundary: finalize completed MIDI, then discard the partial cycle.
+      scheduler.captureRecordings(engine.snapshot(), []);
+      await engine.execute({ type: "stop" });
+      scheduler.discardCurrentRecording();
+      scheduler.update(engine.snapshot());
+      await engine.execute({ type: "set-quantization", mode: "1/4" });
+      if (state === "counting-in") {
+        await engine.execute({ type: "configure", settings: { countInEnabled: true } });
+        await engine.execute({ type: "play" });
+        engine.advance(0.5);
+        scheduler.update(engine.snapshot());
+      }
+      const before = engine.snapshot();
+      expect(before.transport.state).toBe(state);
+      const stagedId = before.capture.staged!.id;
+      const render = vi.fn(exportLoopSample);
+      dispatch.mockClear();
+      const service = createLoopSampleExportService({
+        capture: () => {
+          const snapshot = engine.snapshot();
+          return { snapshot, recordings: scheduler.captureRecordings(snapshot, [stagedId]) };
+        },
+        render,
+        sampleRoot: root,
+        refreshSamples: async () => {
+          await library.scan();
+          return { accepted: true, revision: before.revision, appliedCycle: before.transport.cycle };
+        },
+        resultState: () => ({ revision: engine.snapshot().revision, appliedCycle: engine.snapshot().transport.cycle }),
+      });
+
+      const result = await service.execute();
+
+      expect(result).toMatchObject({ accepted: true, message: "Saved Loop 0001.mp3 to the sample library." });
+      expect((await render.mock.results[0]!.value).durationSeconds).toBe(2);
+      expect(render.mock.calls[0]![0].recordings.get(stagedId)).toEqual([
+        { position: 0, event: noteOn }, { position: 0.5, event: noteOff },
+      ]);
+      const decoded = (await library.loadPage(0))[0]!;
+      expect(decoded.samples.length).toBe(2 * 48_000 * 2);
+      expect(decoded.samples.some((sample) => Math.abs(sample) > 0.001)).toBe(true);
+      expect(engine.snapshot()).toEqual(before);
+      expect(scheduler.hasCurrentRecording()).toBe(false);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(service.busy()).toBe(false);
+    } finally {
+      await engine.dispose();
+      await library.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it("renders a defensive capture, refreshes after commit, and reports only the filename", async () => {
     const deps = dependencies();
     const service = createLoopSampleExportService(deps);
@@ -130,10 +214,10 @@ describe("loop sample export service", () => {
   });
 
   it("does not refresh the catalog when capture or rendering fails", async () => {
-    const deps = dependencies({ capture: vi.fn(() => { throw new Error("not playing"); }) });
+    const deps = dependencies({ capture: vi.fn(() => { throw new Error("No audible loop content to export"); }) });
     const service = createLoopSampleExportService(deps);
 
-    await expect(service.execute("Invalid")).resolves.toMatchObject({ accepted: false, error: "Unable to export loop sample: not playing" });
+    await expect(service.execute("Invalid")).resolves.toMatchObject({ accepted: false, error: "Unable to export loop sample: No audible loop content to export" });
     expect(deps.render).not.toHaveBeenCalled();
     expect(deps.refreshSamples).not.toHaveBeenCalled();
     expect(service.busy()).toBe(false);

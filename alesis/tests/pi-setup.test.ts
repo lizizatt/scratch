@@ -5,6 +5,13 @@ import { fileURLToPath } from "node:url";
 const deployPath = (name: string): string => fileURLToPath(new URL(`../deploy/${name}`, import.meta.url));
 
 describe("Pi deployment", () => {
+  it("pins dmix wakeup alignment without enlarging the latency buffer", async () => {
+    const config = await readFile(deployPath("asoundrc"), "utf8");
+    expect(config).toMatch(/type dmix\s+(?:#[^\n]*\n\s*)*hw_ptr_alignment rounddown/);
+    expect(config).toContain("period_size 512");
+    expect(config).toContain("buffer_size 1024");
+  });
+
   it("installs and enables silent services without starting them during setup", async () => {
     const setup = await readFile(deployPath("setup-pi.sh"), "utf8");
 

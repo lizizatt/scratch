@@ -17,7 +17,8 @@ The Linux host owns MIDI, synthesis, transport, loops, and audio output. Browser
 - Beat-aligned waveform intensity summaries and a monitor-only metronome.
 - Named MP3 export of every promoted take plus a merged mix, and single-cycle loop sample export to the live sample library.
 
-PCM loop capture and session persistence are not implemented.
+Editable MIDI loops can be saved and loaded as [loop sessions](docs/LOOP_SESSIONS.md).
+PCM loop capture is not implemented.
 Live sample-pad triggers are not included in loop capture or MP3 exports. The
 sample-pad controls show host/controller state only; the host cannot write the
 Vortex's onboard display, and host UI changes do not synchronize that display.
@@ -27,8 +28,8 @@ synthetic test pages, the Vortex Program Change setup, and sample limits.
 
 Use the save control in the Loops toolbar to choose a folder name. The host writes every promoted take, including muted takes, to `~/alesis_recordings/<name>/track-01.mp3`, `track-02.mp3`, and so on, with the combined result at `mix.mp3`. Existing folders are never overwritten.
 
-The separate **Export loop to sample library** control renders one currently
-playing loop cycle (up to 30 seconds) from audible loop layers and an enabled
+The separate **Export loop to sample library** control renders one
+loop cycle (up to 30 seconds), whether stopped or playing, from audible completed loop layers and an enabled
 drum pattern into the configured sample library with one tap and no name entry.
 The host assigns a rising numbered filename and refreshes the Pads catalog; it
 does not change pad mode or navigation target. See
@@ -44,6 +45,14 @@ npm start
 ```
 
 Open `http://127.0.0.1:8787`.
+
+The Pi kiosk uses an **800×480 logical landscape viewport at scale 1**: its
+480×800 HDMI panel is rotated 90° by labwc. Use 800×480 at 100% browser zoom
+for local demos. The `alesis-kiosk` Playwright project uses this exact size
+with touch enabled, alongside phone and tablet coverage. Each pane scrolls
+vertically behind floating navigation icons; bottom scroll padding lets every
+control move above the icons. Swipe up to reach later promoted takes, Undo,
+and lower settings.
 
 The server uses a connected Vortex automatically. Production readiness requires
 an exact `STH.sf2` discovered under `~/Downloads`, `/usr/share/sounds/sf2`, or
@@ -75,12 +84,25 @@ as separate explicit operations:
 deploy/pi-bridge.sh probe <username>@alesis.local
 deploy/pi-bridge.sh sync <username>@alesis.local
 deploy/pi-bridge.sh asset <username>@alesis.local
+deploy/pi-bridge.sh miku-asset <username>@alesis.local
 ```
 
 `probe` runs read-only hardware diagnostics and never uses `sudo`. `sync` copies
 the checkout to `~/alesis` without dependencies and does not start it. `asset`
 verifies the known SHA-256 before and after copying `STH.sf2` to `~/Downloads`.
-No operation installs packages, starts services, or produces audio.
+`miku-asset` is an explicit optional copy that verifies
+`Vocaloid_Lah_Soundfont__Version_1.0_.sf2` before and after transfer to
+`~/Downloads` using `ALESIS_MIKU_SOUNDFONT_PATH` (defaulting to the same
+filename under local `~/Downloads`). No operation installs packages, starts
+services, or produces audio.
+
+For local Miku prep without deployment, keep the source sf2 outside git,
+place it at `~/Downloads/Vocaloid_Lah_Soundfont__Version_1.0_.sf2` (or set
+`ALESIS_MIKU_SOUNDFONT_PATH`), click **Refresh SoundFonts** in the UI, choose
+that SoundFont, and select preset `000-006 Miku (Soft)` (bank 0, program 6).
+
+The separate [Miku Sustain](docs/MIKU_SUSTAIN.md) variation of the FNF font
+adds crossfaded vowel loops for held notes while keeping the original intact.
 
 ## Validate
 

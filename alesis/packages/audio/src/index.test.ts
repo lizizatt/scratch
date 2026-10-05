@@ -81,8 +81,16 @@ describe("FluidSynth output", () => {
       "-c", "2",
       "-o", "midi.autoconnect=0",
       "-o", "synth.gain=0.25",
+      "-o", "synth.chorus.active=0",
       "/sounds/gm.sf2",
     ]);
+  });
+
+  it("disables host chorus while leaving SoundFont preset selection intact", () => {
+    const args = fluidSynthArguments("alesis_cm108", "/sounds/gm.sf2", 0.25, "/sounds/drums.sf2");
+
+    expect(args).toContain("synth.chorus.active=0");
+    expect(args.slice(-2)).toEqual(["/sounds/gm.sf2", "/sounds/drums.sf2"]);
   });
 
   it("converts stereo float samples to clipped 16-bit dual mono", () => {
@@ -143,8 +151,9 @@ describe("FluidSynth output", () => {
   });
 
   it("maps metronome accents and level to short bank-agnostic notes", () => {
-    expect(metronomeCommands(true, 1)).toEqual({ noteOn: "noteon 15 76 127", noteOff: "noteoff 15 76" });
-    expect(metronomeCommands(false, 0.25)).toEqual({ noteOn: "noteon 15 77 64", noteOff: "noteoff 15 77" });
+    expect(metronomeCommands(true, 1)).toEqual({ noteOn: "noteon 15 37 127", noteOff: "noteoff 15 37" });
+    expect(metronomeCommands(true, 0.25)).toEqual({ noteOn: "noteon 15 37 32", noteOff: "noteoff 15 37" });
+    expect(metronomeCommands(false, 0.25)).toEqual({ noteOn: "noteon 15 37 23", noteOff: "noteoff 15 37" });
     expect(metronomeCommands(false, 0)).toBeNull();
   });
 
@@ -216,7 +225,7 @@ describe("FluidSynth output", () => {
     output.selectDrumKit(128, 7);
     output.playMetronome(true, 1);
 
-    expect(commands).toEqual(["select 9 2 128 7", "noteon 15 76 127"]);
+    expect(commands).toEqual(["select 9 2 128 7", "noteon 15 37 127"]);
     expect(() => output.selectDrumKit(16_384, 0)).toThrow(/out of range/);
   });
 

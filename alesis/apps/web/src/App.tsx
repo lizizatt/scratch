@@ -17,6 +17,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import type { EngineCommand, EngineSnapshot, ServerMessage, Settings as EngineSettings, Take } from "@alesis/protocol";
+import { LOOP_SESSION_MAX_BYTES, parseLoopSession } from "@alesis/protocol";
 import { useControlSocket, type ConnectionState } from "./use-control-socket";
 
 type Pane = "settings" | "synth" | "pads" | "loops";
@@ -66,11 +67,13 @@ export function App() {
   return (
     <main className="app-shell">
       <div className="connection-line"><span className={`connection-dot ${connection}`} /> {connection} // rev {snapshot.revision} // MIDI {snapshot.engine.midiEventsReceived}{snapshot.engine.lastMidiEvent ? ` ${snapshot.engine.lastMidiEvent}` : ""}</div>
-      {failures.length > 0 && <div className="readiness-line" role="alert"><strong>NOT READY</strong>{failures.map(([name, dependency]) => <span key={name}>{name}: {dependency.reason ?? "Unavailable"}</span>)}</div>}
-      {lastError && lastError !== sampleExport.feedback?.message && <div className="error-line" role="alert">{lastError}</div>}
-      {lastMessage && lastMessage !== sampleExport.feedback?.message && <div className="success-line" role="status">{lastMessage}</div>}
-      {sampleExport.pending && <div className="sample-export-feedback pending" role="status">Exporting loop to sample library…</div>}
-      {!sampleExport.pending && sampleExport.feedback && <div className={`sample-export-feedback ${sampleExport.feedback.kind}`} role={sampleExport.feedback.kind === "error" ? "alert" : "status"}>{sampleExport.feedback.message}</div>}
+      <div className="app-notices">
+        {failures.length > 0 && <div className="readiness-line" role="alert"><strong>NOT READY</strong>{failures.map(([name, dependency]) => <span key={name}>{name}: {dependency.reason ?? "Unavailable"}</span>)}</div>}
+        {lastError && lastError !== sampleExport.feedback?.message && <div className="error-line" role="alert">{lastError}</div>}
+        {lastMessage && lastMessage !== sampleExport.feedback?.message && <div className="success-line" role="status">{lastMessage}</div>}
+        {sampleExport.pending && <div className="sample-export-feedback pending" role="status">Exporting loop to sample library…</div>}
+        {!sampleExport.pending && sampleExport.feedback && <div className={`sample-export-feedback ${sampleExport.feedback.kind}`} role={sampleExport.feedback.kind === "error" ? "alert" : "status"}>{sampleExport.feedback.message}</div>}
+      </div>
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
       {pane === "pads" && <PadsPane snapshot={snapshot} send={send} connection={connection} />}
@@ -406,13 +409,11 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
     || snapshot.promoted.some((take) => !take.muted && take.level > 0)
   );
   const hasAudibleDrumPattern = snapshot.drums.enabled && snapshot.drums.volume > 0;
-  const sampleExportDisabledReason = snapshot.transport.state !== "playing"
-    ? "Start playback to export one full loop cycle."
-    : cycleSeconds > 30
-      ? "Loop cycle must be 30 seconds or shorter."
-      : !hasAudibleLoopLayer && !hasAudibleDrumPattern
-        ? "Add an audible staged/promoted take or enable a nonzero drum pattern."
-        : null;
+  const sampleExportDisabledReason = cycleSeconds > 30
+    ? "Loop cycle must be 30 seconds or shorter."
+    : !hasAudibleLoopLayer && !hasAudibleDrumPattern
+      ? "Add an audible staged/promoted take or enable a nonzero drum pattern."
+      : null;
   const [saving, setSaving] = useState(false);
   const [exportName, setExportName] = useState("");
   const saveExport = (): void => {
@@ -440,9 +441,11 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
         </div>
       </header>
 
+      <LoopSessionControls snapshot={snapshot} send={send} />
+
       {saving && <div className="dialog-backdrop" onMouseDown={() => setSaving(false)}>
         <form className="save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveExport(); }}>
-          <h2 id="save-title">Save MP3 session</h2>
+          <h2 id="save-title">Save MP3 audio</h2>
           <label>Folder name<input autoFocus required maxLength={80} pattern="[A-Za-z0-9][-A-Za-z0-9 _]*" value={exportName} onChange={(event) => setExportName(event.target.value)} /></label>
           <div className="dialog-actions"><button type="button" onClick={() => setSaving(false)}>Cancel</button><button type="submit">Save</button></div>
         </form>
@@ -488,6 +491,84 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
       {snapshot.canUndoDelete && <button className="undo-button" type="button" onClick={() => send({ type: "undo-delete" })}><RotateCcw /> Undo delete</button>}
     </section>
   );
+}
+
+function LoopSessionControls({ snapshot, send }: PaneProps) {
+  const input = useRef<HTMLInputElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const busy = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [upload, setUpload] = useState<{ name: string; json: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ error: boolean; text: string } | null>(null);
+  const stopped = snapshot.transport.state === "stopped";
+  useEffect(() => {
+    if (upload) dialog.current?.showModal();
+    else dialog.current?.close();
+  }, [upload]);
+  const execute = (command: EngineCommand): void => {
+    if (busy.current) return;
+    busy.current = true;
+    setPending(true);
+    setFeedback(null);
+    const id = send(command, (result) => {
+      busy.current = false;
+      setPending(false);
+      if (!result?.accepted) {
+        setFeedback({ error: true, text: result?.error ?? "Connection lost before confirmation. Check the host state before retrying." });
+        return;
+      }
+      if (result.sessionJson !== undefined) {
+        const url = URL.createObjectURL(new Blob([result.sessionJson], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `alesis-loop-session-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      setFeedback({ error: false, text: result.sessionJson !== undefined ? "Loop session downloaded." : "Loop session loaded. Transport remains stopped." });
+    });
+    if (!id) {
+      busy.current = false;
+      setPending(false);
+      setFeedback({ error: true, text: "Host is not connected." });
+    }
+  };
+  const chooseFile = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    setFeedback(null);
+    try {
+      if (file.size > LOOP_SESSION_MAX_BYTES) throw new Error("Loop session exceeds the 4 MiB file limit");
+      const session = parseLoopSession(await file.text());
+      setUpload({ name: file.name, json: JSON.stringify(session) });
+    } catch (error) {
+      setFeedback({ error: true, text: error instanceof Error ? error.message : String(error) });
+    }
+  };
+  return <>
+    <div className="session-toolbar" role="toolbar" aria-label="Editable loop sessions">
+      <button type="button" disabled={!stopped || pending} onClick={() => execute({ type: "export-loop-session" })}>Save loop session</button>
+      <button type="button" disabled={!stopped || pending} onClick={() => input.current?.click()}>Load loop session</button>
+      <input ref={input} type="file" hidden accept=".json,application/json" aria-label="Loop session JSON file" onChange={(event) => { void chooseFile(event); }} />
+      <span>{pending ? "Working…" : "Stop first · Completed takes only · MP3 is not editable"}</span>
+    </div>
+    {feedback && <div className={`session-feedback ${feedback.error ? "error" : "success"}`} role={feedback.error ? "alert" : "status"}>{feedback.text}</div>}
+    <dialog ref={dialog} className="save-dialog session-dialog" aria-labelledby="load-session-title" onCancel={() => setUpload(null)}>
+      <h2 id="load-session-title">Replace completed takes?</h2>
+      <p>Load {upload?.name} and replace all current completed takes and musical settings? This cannot be undone.</p>
+      <p>Partial captures and delete-undo history are not included. SoundFonts must already be installed. Transport will remain stopped.</p>
+      <div className="dialog-actions">
+        <button type="button" autoFocus onClick={() => setUpload(null)}>Cancel</button>
+        <button type="button" disabled={!stopped || pending} onClick={() => {
+          if (upload) execute({ type: "import-loop-session", sessionJson: upload.json });
+          setUpload(null);
+        }}>Replace completed takes</button>
+      </div>
+    </dialog>
+  </>;
 }
 
 function TakeRow({ take, index, beatCount, beatsPerMeasure, send }: { take: Take; index: number; beatCount: number; beatsPerMeasure: number; send: SendCommand }) {

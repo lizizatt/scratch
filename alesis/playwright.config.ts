@@ -36,6 +36,8 @@ export default defineConfig({
     },
   },
   projects: [
+    // Pi HDMI panel: 480x800, Wayland transform 90, scale 1.
+    { name: "alesis-kiosk", use: { ...devices["Desktop Chrome"], viewport: { width: 800, height: 480 }, screen: { width: 800, height: 480 }, deviceScaleFactor: 1, hasTouch: true } },
     { name: "landscape-phone", use: { ...devices["Desktop Chrome"], viewport: { width: 844, height: 390 } } },
     { name: "landscape-tablet", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
   ],

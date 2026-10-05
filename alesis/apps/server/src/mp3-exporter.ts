@@ -236,13 +236,22 @@ async function renderSoundFontMidi(midiPath: string, wavPath: string, soundFontP
   await run("fluidsynth", args);
 }
 
-export async function mixWavsToCycle(inputs: string[], output: string, frameCount: number): Promise<void> {
+export async function mixWavsToCyclePcm(inputs: string[], output: string, frameCount: number): Promise<void> {
   const filters = inputs.map((_, index) => `[${index}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=end_sample=${frameCount}[a${index}]`);
   const streams = inputs.map((_, index) => `[a${index}]`).join("");
   filters.push(`${streams}amix=inputs=${inputs.length}:duration=longest:normalize=0:dropout_transition=0,pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1,atrim=end_sample=${frameCount},asetpts=N/SR/TB[out]`);
   const args = inputs.flatMap((input) => ["-i", input]);
-  args.push("-filter_complex", filters.join(";"), "-map", "[out]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", output);
+  args.push("-filter_complex", filters.join(";"), "-map", "[out]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", "-f", "s16le", output);
   await run("ffmpeg", ["-nostdin", "-hide_banner", "-loglevel", "error", ...args]);
+}
+
+export async function encodeSamplePcmMp3(pcmPath: string, mp3Path: string, startFrame: number): Promise<void> {
+  await run("ffmpeg", [
+    "-nostdin", "-hide_banner", "-loglevel", "error",
+    "-f", "s16le", "-ar", "48000", "-ac", "2", "-i", pcmPath, "-map", "0:a:0",
+    "-af", `atrim=start_sample=${startFrame},asetpts=N/SR/TB`,
+    "-codec:a", "libmp3lame", "-q:a", "2", "-write_xing", "1", "-f", "mp3", mp3Path,
+  ]);
 }
 
 export async function encodeMp3(wavPath: string, mp3Path: string): Promise<void> {
