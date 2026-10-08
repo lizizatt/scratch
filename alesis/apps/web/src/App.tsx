@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   Download,
+  Pencil,
   Drum,
   Headphones,
   Music2,
@@ -16,8 +17,8 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import type { EngineCommand, EngineSnapshot, ServerMessage, Settings as EngineSettings, Take } from "@alesis/protocol";
-import { LOOP_SESSION_MAX_BYTES, parseLoopSession } from "@alesis/protocol";
+import type { EngineCommand, EngineSnapshot, ServerMessage, Settings as EngineSettings, Take, PadAction } from "@alesis/protocol";
+import { assignedPadAction, LOOP_SESSION_MAX_BYTES, parseLoopSession } from "@alesis/protocol";
 import { useControlSocket, type ConnectionState } from "./use-control-socket";
 
 type Pane = "settings" | "synth" | "pads" | "loops";
@@ -150,6 +151,7 @@ function SettingsPane({ snapshot, send }: PaneProps) {
         <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateSelection("midiInputId")}><option value={draft.midiInputId}>{draft.midiInputId.startsWith("alsa") ? "Vortex Wireless 2" : "Software Vortex"}</option></select></Setting>
         <Setting label="Output device"><select aria-label="Output device" value={draft.audioOutputId} onChange={updateSelection("audioOutputId")}><option value={draft.audioOutputId}>{draft.audioOutputId.startsWith("alsa:") ? "CM108 USB audio" : "Simulated output"}</option></select></Setting>
         <Setting label="Key response"><select aria-label="Key response" value={draft.velocityCurve} onChange={updateSelection("velocityCurve")}><option value="linear">Linear</option><option value="responsive">Responsive</option><option value="strong">Strong</option><option value="fixed">Fixed 127</option></select></Setting>
+        <Setting label="Minimum impact velocity"><select aria-label="Minimum impact velocity" value={snapshot.settings.minimumVelocity} onChange={(event) => send({ type: "configure", settings: { minimumVelocity: Number(event.target.value) } })}>{Array.from({ length: 127 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}{index === 0 ? " (unchanged)" : ""}</option>)}</select></Setting>
         <Setting label="Metronome"><input aria-label="Metronome" type="checkbox" checked={draft.metronomeEnabled} onChange={updateBoolean("metronomeEnabled")} /></Setting>
         <Setting label="Click volume"><input aria-label="Click volume" type="range" min="0" max="100" value={numberDraft.metronomeVolume} onChange={setNumber("metronomeVolume")} onBlur={commitNumber("metronomeVolume", 0.01)} /></Setting>
         <Setting label="Count-in"><input aria-label="Count-in" type="checkbox" checked={draft.countInEnabled} onChange={updateBoolean("countInEnabled")} /></Setting>
@@ -242,6 +244,9 @@ function SynthPane({ snapshot, send }: PaneProps) {
 
 function PadsPane({ snapshot, send, connection }: PaneProps & { connection: ConnectionState }) {
   const pads = snapshot.pads;
+  const [editingPad, setEditingPad] = useState<number | null>(null);
+  const assignmentKey = JSON.stringify(pads.assignments);
+  useEffect(() => setEditingPad(null), [pads.mode, pads.samplePageIndex, connection]);
   const currentBank = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId)?.bank ?? 0;
   const voices = snapshot.synth.soundFontPresets
     .filter(({ bank }) => bank === currentBank)
@@ -298,7 +303,7 @@ function PadsPane({ snapshot, send, connection }: PaneProps & { connection: Conn
       document.removeEventListener("visibilitychange", onVisibilityChange);
       releaseAllInputs();
     };
-  }, [pads.mode, pads.samplePageIndex, pads.sampleLibraryStatus, connection]);
+  }, [pads.mode, pads.samplePageIndex, pads.sampleLibraryStatus, assignmentKey, connection]);
 
   return (
     <section className="pane pads-pane" aria-label="Pad controls">
@@ -344,7 +349,7 @@ function PadsPane({ snapshot, send, connection }: PaneProps & { connection: Conn
       <section className="sample-bank" aria-label="Sample pads">
         <div className="sample-bank-heading">
           <div>
-            <span className="lane-label">{pads.mode === "samples" ? "Live sample triggers" : "Sample triggers inactive in drum mode"}</span>
+            <span className="lane-label">{pads.mode === "samples" ? "Live sample triggers" : "Live drum pads"} · Page {pads.samplePageIndex + 1}</span>
             {sampleStatus === "loading" && <span className="sample-state" role="status">Loading sample library…</span>}
             {sampleStatus === "error" && <span className="sample-state sample-error" role="alert">Sample library error: {pads.sampleLibraryError ?? "Unable to load samples"}</span>}
             {sampleStatus === "ready" && pads.samplePageCount === 0 && <span className="sample-state" role="status">No MP3 samples found. Add files to the configured folder, then refresh.</span>}
@@ -354,12 +359,16 @@ function PadsPane({ snapshot, send, connection }: PaneProps & { connection: Conn
         </div>
         <div className="sample-pad-grid">
           {samplePads.map((sample, index) => {
-            const enabled = pads.mode === "samples" && sampleStatus === "ready" && sample !== null;
-            const name = sample?.name ?? "Empty slot";
-            return <button
+            const action = assignedPadAction(pads, index);
+            const isSample = action?.kind === "sample" || !action && pads.mode === "samples";
+            const available = sampleStatus === "ready" && sample !== null;
+            const enabled = connection === "connected" && (!isSample || available);
+            const name = action?.kind === "control" ? padActionLabel(action)
+              : action?.kind === "sample" ? `${pads.sampleCatalog.find(({ id }) => id === action.sampleId)?.name ?? "Missing sample"}${available ? "" : " — Unavailable"}`
+                : pads.mode === "drums" ? `Drum note ${36 + index}` : sample?.name ?? "Empty slot";
+            return <div className="sample-pad-cell" key={index}><button
               className={`sample-pad ${enabled ? "loaded" : ""}`}
               type="button"
-              key={index}
               aria-label={`Pad ${index + 1} — ${name}`}
               disabled={!enabled}
               onPointerDown={(event) => {
@@ -381,7 +390,7 @@ function PadsPane({ snapshot, send, connection }: PaneProps & { connection: Conn
             >
               <span className="sample-pad-number">{String(index + 1).padStart(2, "0")}</span>
               <span className="sample-pad-name">{name}</span>
-            </button>;
+            </button><button type="button" className="pad-edit" aria-label={`Edit pad ${index + 1}`} disabled={connection !== "connected"} onClick={() => { releaseAllInputs(); setEditingPad(index); }}><Pencil aria-hidden="true" /></button></div>;
           })}
         </div>
         <p className="sample-folder-note">Set <code>SAMPLE_LIBRARY_DIR</code> on the host to use another folder (default <code>~/.local/share/alesis/samples</code>); add MP3 files, then refresh. See sample-pad help for format limits.</p>
@@ -393,8 +402,69 @@ function PadsPane({ snapshot, send, connection }: PaneProps & { connection: Conn
         <p>Selecting an entry under <strong>Voices</strong> changes the selected SoundFont voice. It does not switch synthesizers; if Neon is selected, Neon stays active.</p>
         <p>Physical sample pads use MIDI channel 10 (wire channel 9), notes 36–43. Live sample triggers are not included in loop capture or MP3 exports.</p>
       </details>
+      {editingPad !== null && <PadEditor snapshot={snapshot} send={send} pad={editingPad} close={() => setEditingPad(null)} />}
     </section>
   );
+}
+
+const controlNames = { transport: "Transport", drums: "Configured drums", metronome: "Metronome", arpeggiator: "Arpeggiator" } as const;
+function padOperationLabel(target: keyof typeof controlNames, operation: "toggle" | "on" | "off"): string {
+  if (target === "metronome") return operation === "toggle" ? "Toggle mute / unmute" : operation === "on" ? "Unmute" : "Mute";
+  if (target === "arpeggiator") return operation === "toggle" ? "Toggle enable / disable" : operation === "on" ? "Enable" : "Disable";
+  return operation === "toggle" ? "Toggle start / stop" : operation === "on" ? "Start" : "Stop";
+}
+function padActionLabel(action: Extract<PadAction, { kind: "control" }>): string {
+  return `${controlNames[action.target]} — ${padOperationLabel(action.target, action.operation)}`;
+}
+
+function PadEditor({ snapshot, send, pad, close }: PaneProps & { pad: number; close(): void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const initial = assignedPadAction(snapshot.pads, pad);
+  const [kind, setKind] = useState<"default" | "sample" | "control">(initial?.kind ?? "default");
+  const [sampleId, setSampleId] = useState(initial?.kind === "sample" ? initial.sampleId : snapshot.pads.sampleCatalog[0]?.id ?? "");
+  const [target, setTarget] = useState<keyof typeof controlNames>(initial?.kind === "control" ? initial.target : "transport");
+  const [operation, setOperation] = useState<"toggle" | "on" | "off">(initial?.kind === "control" ? initial.operation : "toggle");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    dialog.current?.showModal();
+    return () => { dialog.current?.close(); opener?.focus(); };
+  }, []);
+  const save = (action: PadAction | null): void => {
+    setPending(true);
+    setError(null);
+    const id = send({ type: "configure-pad", mode: snapshot.pads.mode, page: snapshot.pads.samplePageIndex, pad, action }, (result) => {
+      setPending(false);
+      if (result?.accepted) close();
+      else setError(result?.error ?? "Connection lost. Check the assignment before retrying.");
+    });
+    if (!id) { setPending(false); setError("Host is not connected."); }
+  };
+  const sampleExists = snapshot.pads.sampleCatalog.some(({ id }) => id === sampleId);
+  return <dialog ref={dialog} className="save-dialog pad-editor" aria-labelledby="pad-editor-title" onCancel={(event) => { event.preventDefault(); close(); }}>
+    <form onSubmit={(event) => { event.preventDefault(); save(kind === "default" ? null : kind === "sample" ? { kind, sampleId } : { kind, target, operation }); }}>
+      <h2 id="pad-editor-title">Edit pad {pad + 1}</h2>
+      <p>{snapshot.pads.mode === "drums" ? "Drums" : "Samples"} mode · Page {snapshot.pads.samplePageIndex + 1}. Runs on ordinary press, not long press.</p>
+      <fieldset disabled={pending}>
+        <label>Pad action<select autoFocus aria-label="Pad action" value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
+          <option value="default">Default {snapshot.pads.mode === "drums" ? "drum note" : "sample slot"}</option>
+          <option value="sample">Sample / saved loop MP3</option><option value="control">Control</option>
+        </select></label>
+        {kind === "sample" && <><label>Sample / saved loop MP3<select aria-label="Sample / saved loop MP3" value={sampleId} onChange={(event) => setSampleId(event.target.value)}>
+          {!sampleExists && <option value={sampleId}>{sampleId ? "Assigned sample unavailable" : "No samples available"}</option>}
+          {snapshot.pads.sampleCatalog.map((sample) => <option key={sample.id} value={sample.id}>{sample.name}</option>)}
+        </select></label><p>Hold to play; release to fade out. Only saved library MP3s (up to 30 seconds), not current MIDI takes.</p></>}
+        {kind === "control" && <><label>Control<select aria-label="Control" value={target} onChange={(event) => setTarget(event.target.value as typeof target)}>
+          {Object.entries(controlNames).map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+        </select></label><label>On press<select aria-label="On press" value={operation} onChange={(event) => setOperation(event.target.value as typeof operation)}>
+          {(["toggle", "on", "off"] as const).map((value) => <option key={value} value={value}>{padOperationLabel(target, value)}</option>)}
+        </select></label><p>{target === "drums" ? "Enables or disables the configured pattern. Drums sound only while transport is playing; this does not start transport." : "Runs once per press. Release does not reverse the action."}</p></>}
+      </fieldset>
+      {error && <p role="alert">{error}</p>}
+      <div className="dialog-actions"><button type="button" disabled={pending} onClick={() => save(null)}>Reset to default</button><button type="button" onClick={close}>Cancel</button><button type="submit" disabled={pending || kind === "sample" && !sampleExists}>{pending ? "Saving…" : "Save"}</button></div>
+    </form>
+  </dialog>;
 }
 
 function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PaneProps & {
@@ -443,6 +513,18 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
 
       <LoopSessionControls snapshot={snapshot} send={send} />
 
+      <div className="loop-start-controls" aria-label="Loop start controls">
+        <label><input aria-label="Overdub staged loop" type="checkbox" checked={snapshot.capture.overdub} onChange={(event) => send({ type: "set-overdub", enabled: event.target.checked })} /> Overdub staged loop</label>
+        <label>Loop start <select aria-label="Loop start beat" value={snapshot.capture.loopStart} onChange={(event) => send({ type: "set-loop-start", position: Number(event.target.value) })}>
+          {Array.from({ length: beatCount }, (_, beat) => <option key={beat} value={beat / beatCount}>Beat {beat + 1}</option>)}
+          {Math.abs(snapshot.capture.loopStart * beatCount - Math.round(snapshot.capture.loopStart * beatCount)) > 1e-8 && <option value={snapshot.capture.loopStart}>Custom ({(snapshot.capture.loopStart * beatCount + 1).toFixed(2)})</option>}
+        </select></label>
+        <button type="button" disabled={snapshot.transport.state !== "playing"} onClick={() => send({ type: "set-loop-start", position: ((snapshot.transport.origin + snapshot.transport.progress) % 1) })}>Set start here</button>
+        <button type="button" onClick={() => send({ type: "set-loop-start", position: 0 })}>Reset start</button>
+        <span>Applies on next Play and exports; playback continues unchanged.</span>
+      </div>
+      {snapshot.capture.error && <p role="alert">{snapshot.capture.error}</p>}
+
       {saving && <div className="dialog-backdrop" onMouseDown={() => setSaving(false)}>
         <form className="save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveExport(); }}>
           <h2 id="save-title">Save MP3 audio</h2>
@@ -454,12 +536,12 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
       <div className="signal-stack">
         <section className="current-capture">
           <span className="lane-label">Current capture // live</span>
-          <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} live progress={snapshot.transport.progress} />
+          <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} live progress={snapshot.transport.state === "stopped" ? snapshot.capture.loopStart : (snapshot.transport.origin + snapshot.transport.progress) % 1} />
         </section>
         <section className="staged-capture">
           <div className="staging-lane">
             <span className="lane-label">Staged // {snapshot.capture.quantization === "off" ? "raw timing" : `quantized ${snapshot.capture.quantization}`}</span>
-            <Waveform samples={snapshot.capture.staged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} emptyLabel="Waiting for rollover" />
+            <Waveform samples={snapshot.capture.staged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="Waiting for rollover" />
           </div>
           <div className="take-actions">
             <select className="quantization-select" aria-label="Staged quantization" value={snapshot.capture.quantization} onChange={(event) => send({ type: "set-quantization", mode: event.target.value as EngineSnapshot["capture"]["quantization"] })}>
@@ -475,8 +557,8 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
         </section>
         <section className="previous-staged-capture">
           <div className="staging-lane">
-            <span className="lane-label">Previous staged // expires at rollover</span>
-            <Waveform samples={snapshot.capture.previousStaged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} emptyLabel="No displaced take" />
+            <span className="lane-label">Previous staged // {snapshot.capture.overdub ? "held during overdub" : "expires at rollover"}</span>
+            <Waveform samples={snapshot.capture.previousStaged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="No displaced take" />
           </div>
           <div className="take-actions">
             <IconButton label="Promote previous staged take" disabled={!snapshot.capture.previousStaged} onClick={() => send({ type: "promote-previous-staged" })}><Plus /></IconButton>
@@ -485,7 +567,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
         <div className="divider" />
         <section className="promoted-list" aria-label="Promoted takes">
           {snapshot.promoted.length === 0 && <div className="empty-list">PROMOTED TAKES APPEAR HERE</div>}
-          {snapshot.promoted.map((take, index) => <TakeRow key={take.id} take={take} index={index} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} send={send} />)}
+          {snapshot.promoted.map((take, index) => <TakeRow key={take.id} take={take} index={index} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} send={send} />)}
         </section>
       </div>
       {snapshot.canUndoDelete && <button className="undo-button" type="button" onClick={() => send({ type: "undo-delete" })}><RotateCcw /> Undo delete</button>}
@@ -571,11 +653,11 @@ function LoopSessionControls({ snapshot, send }: PaneProps) {
   </>;
 }
 
-function TakeRow({ take, index, beatCount, beatsPerMeasure, send }: { take: Take; index: number; beatCount: number; beatsPerMeasure: number; send: SendCommand }) {
+function TakeRow({ take, index, beatCount, beatsPerMeasure, loopStart, send }: { take: Take; index: number; beatCount: number; beatsPerMeasure: number; loopStart: number; send: SendCommand }) {
   return (
     <article className="take-row">
       <span className="take-number">{String(index + 1).padStart(2, "0")}</span>
-      <Waveform samples={take.waveform} beatCount={beatCount} beatsPerMeasure={beatsPerMeasure} />
+      <Waveform samples={take.waveform} beatCount={beatCount} beatsPerMeasure={beatsPerMeasure} loopStart={loopStart} />
       <label className="level-control">LEVEL<input aria-label={`Level take ${index + 1}`} type="range" min="0" max="100" value={take.level * 100} onChange={(event) => send({ type: "set-take-level", takeId: take.id, level: Number(event.target.value) / 100 })} /></label>
       <IconButton label={take.muted ? `Unmute take ${index + 1}` : `Mute take ${index + 1}`} active={!take.muted} pressed={!take.muted} onClick={() => send({ type: "set-take-muted", takeId: take.id, muted: !take.muted })}>{take.muted ? <VolumeX /> : <Volume2 />}</IconButton>
       <IconButton label={`Delete take ${index + 1}`} danger onClick={() => send({ type: "delete-take", takeId: take.id })}><Trash2 /></IconButton>
@@ -583,7 +665,7 @@ function TakeRow({ take, index, beatCount, beatsPerMeasure, send }: { take: Take
   );
 }
 
-function Waveform({ samples, beatCount, beatsPerMeasure, live = false, progress, emptyLabel }: { samples: number[]; beatCount: number; beatsPerMeasure: number; live?: boolean; progress?: number; emptyLabel?: string }) {
+function Waveform({ samples, beatCount, beatsPerMeasure, loopStart, live = false, progress, emptyLabel }: { samples: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; live?: boolean; progress?: number; emptyLabel?: string }) {
   const amplitudes = samples.map((sample) => Math.abs(sample));
   return (
     <div className={`waveform ${live ? "live" : ""}`}>
@@ -594,6 +676,7 @@ function Waveform({ samples, beatCount, beatsPerMeasure, live = false, progress,
         const x = amplitudes.length === 1 ? 50 : index / (amplitudes.length - 1) * 100;
         return <line className="intensity-sample" key={index} x1={x} x2={x} y1={50 - sample * 44} y2={50 + sample * 44} />;
       })}</svg> : <span>{emptyLabel}</span>}
+      <i className="loop-start-marker" aria-hidden="true" style={{ left: `${loopStart * 100}%` }} />
       {progress !== undefined && <i className="playhead" style={{ left: `${progress * 100}%` }} />}
     </div>
   );

@@ -8,6 +8,7 @@ import { NeonPressureSynth, type NeonPressureParameters } from "@alesis/audio";
 import { exportNameSchema, type EngineSnapshot, type Take } from "@alesis/protocol";
 import { isMappedDrumPadRelease } from "./sample-pads.js";
 import type { RecordedMidiEvent } from "./loop-playback.js";
+import { rotateRecording } from "./circular-recording.js";
 
 export interface ExportRequest {
   name: string;
@@ -119,7 +120,7 @@ export async function renderNeonWav(recording: RecordedMidiEvent[], take: Take, 
   const frameCount = Math.round(cycleSeconds * sampleRate);
   const synth = new NeonPressureSynth(sampleRate, snapshot.synth.parameterValues as unknown as Partial<NeonPressureParameters>);
   const output = new Float32Array(frameCount * 2);
-  const events = [...recording].sort((left, right) => left.position - right.position);
+  const events = rotateRecording(recording, snapshot.capture.loopStart).sort((left, right) => left.position - right.position);
   let eventIndex = 0;
   let frame = 0;
   while (frame < frameCount) {
@@ -172,7 +173,7 @@ export function recordingToMidi(recording: RecordedMidiEvent[], take: Take, snap
     return track;
   };
 
-  for (const { position, event } of recording) {
+  for (const { position, event } of rotateRecording(recording, snapshot.capture.loopStart)) {
     let tick = Math.max(0, Math.min(totalTicks, Math.round(position * totalTicks)));
     const track = trackFor(event.channel);
     if (event.type === "note-on" && event.velocity > 0) {

@@ -17,6 +17,57 @@ host's absolute catalog index. Selecting an entry under **Voices** changes the
 selected SoundFont voice but does not switch synthesizers; if Neon is selected,
 Neon stays active.
 
+## Edit an ordinary pad press
+
+Every displayed pad has a separate pencil button, including empty slots and
+drum-mode pads. It opens **Edit pad** without playing audio. Choose:
+
+- **Default**: the mode's normal drum note or the sample at that page's slot.
+- **Sample / saved loop MP3**: any MP3 in the host sample library, including
+  exported loops. Hold to play, release to fade. Current MIDI takes and loop
+  session JSON files are not samples and are not offered here.
+- **Control**: Transport, Configured drums, Metronome, or Arpeggiator. Each has
+  a toggle and explicit start/stop, mute/unmute, or enable/disable choices.
+
+Controls run once on ordinary press, not long press. Releasing, cancelling a
+hold, or disconnecting does not reverse a control action. Transport start uses
+the normal readiness/count-in path; stop uses normal recording cleanup.
+Even a rejected acknowledgement keeps the control latched until release: a
+settings-write failure can occur after the action has already taken effect.
+Configured drums start/stop enables/disables the selected pattern; it does not
+start transport. The pattern sounds only while transport is playing.
+Metronome mute/unmute changes its enabled state without changing click volume.
+
+**Save** waits for the host acknowledgement and settings write. **Reset to
+default** removes the override. Assignments are sparse and independent for each
+mode, sample-page index, and pad (0–7 internally). Voice/kit navigation does not
+move assignments; sample-page navigation selects another bank of assignments.
+The same mapping handles on-screen pads and hardware channel 10 notes 36–43.
+Host settings retain assignments across restarts; browser storage is not used.
+Loop-session import/export does not replace these host pad settings.
+
+Explicit samples use an opaque SHA-256 identity derived from the exact
+library-relative filename, not its sorted slot or a collision-prone display
+name. Adding/reordering other files cannot change an explicit assignment.
+Renaming/moving/deleting an assigned file makes it unavailable until the same
+relative filename returns or the pad is reassigned. No other sample is silently
+substituted. Default slots intentionally follow library ordering. Assigned
+pages remain reachable if the library shrinks, including control-only pages.
+
+The picker receives the full bounded catalog (ID and display name only), never
+host paths. The host verifies IDs against its scan, validates canonical paths
+within the library, and decodes the selected eight slots on edit/page/mode
+changes, never on an ordinary press. Unreadable/oversized assigned samples stay
+assigned and display **Unavailable**. Page memory limits can also make a slot
+unavailable. Refresh after repairing an asset.
+
+The dialog uses native modal focus management, Escape/Cancel, and a scrollable
+layout for the 800×480 touch display. Editing releases this browser's held
+pads; applying changes, changing mode/page, or refreshing the library resets
+held playback and invalidates queued hardware controls from the old mapping.
+An edit overlapping an audio-reconnect refresh supersedes that refresh so old
+slot audio cannot be installed under the new assignment.
+
 ## Configure a user library
 
 The host recursively scans for `.mp3` files under:
@@ -29,7 +80,8 @@ To use another directory, set `SAMPLE_LIBRARY_DIR` in the environment used to
 start the host. Put MP3 files in that directory (subdirectories are scanned
 too), then use **Refresh samples** in the Pads section. The browser reports
 loading, ready/empty, and scan/decode/playback errors. An empty library still
-shows all eight numbered slots, disabled, and explains where to put files.
+shows all eight numbered slots; default sample triggers are disabled but their
+edit buttons remain available for assigning controls.
 
 For local UI testing, generate ten synthetic MP3 tones into an explicit
 directory, then point the host at that directory before starting it:
@@ -105,7 +157,10 @@ written. This action does not change **Pad mode** or the **+ / − target**.
   focus loss, leaving the Pads pane, and page/mode changes release held samples.
 - Only `.mp3` files are discovered. Each file is limited to 32 MiB and 30
   seconds. A page contains up to eight samples and decoded page data is bounded
-  to 64 MiB. Samples are decoded to 48 kHz stereo for playback.
+  to 64 MiB. Samples are decoded to 48 kHz stereo for playback. The catalog is
+  limited to 4,096 files / 512 pages; an oversized scan reports an error instead
+  of exposing a silently truncated picker. There are at most 8,192 overrides
+  across the two modes. Page zero is editable with an empty library.
 - Sample playback allows up to 32 simultaneous voices; a new trigger replaces
   the oldest voice when that limit is reached.
 - The physical Vortex sample-pad profile uses MIDI channel 10 (wire channel 9),
@@ -121,9 +176,11 @@ written. This action does not change **Pad mode** or the **+ / − target**.
 - The software sample-pad buttons trigger the same live sample service and do
   not require a connected Vortex. Physical input/output readiness is separate
   from the displayed sample-library status. Browser-held triggers are released
-  when their WebSocket disconnects; releases are global per pad, so releasing a
-  pad from one client also releases any voices currently sounding on that pad
-  from another client.
+  when their WebSocket disconnects. Holds are tracked by connection or hardware
+  source; a release from a different source cannot cancel them. If several
+  sources hold the same sample pad, its overlapping voices fade only when the
+  last owner releases. Repeated sample attacks still retrigger; repeated control
+  attacks from an already-held source do not execute again.
 
 The controller setup references are the [Alesis setup guide](https://support.alesis.com/support/solutions/articles/69000865912-alesis-vortex-wireless-2-setup-guide)
 and [Vortex Wireless 2 Editor user guide](https://www.alesis.com/rscdn/1856/documents/Vortex%20Wireless%202%20Editor%20-%20User%20Guide%20-%20v1.0.pdf).

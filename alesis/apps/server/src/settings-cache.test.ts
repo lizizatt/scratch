@@ -18,6 +18,52 @@ function configuredEngine(): SimulatedHostEngine {
 }
 
 describe("settings cache", () => {
+  it("boots legacy caches without resetting musical settings and persists the new velocity floor", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "alesis-velocity-settings-"));
+    try {
+      const path = join(directory, "settings.json");
+      const source = configuredEngine();
+      await source.execute({ type: "configure", settings: { bpm: 137, velocityCurve: "responsive", minimumVelocity: 72 } });
+      await saveSettingsCache(path, settingsCacheFromSnapshot(source.snapshot()));
+      const target = configuredEngine();
+      await restoreSettingsCache((await loadSettingsCache(path))!, (command) => target.execute(command));
+      expect(target.snapshot().settings).toMatchObject({ bpm: 137, velocityCurve: "responsive", minimumVelocity: 72 });
+      const legacy = settingsCacheFromSnapshot(source.snapshot());
+      delete (legacy.settings as Partial<typeof legacy.settings>).minimumVelocity;
+      await writeFile(path, JSON.stringify(legacy));
+      await restoreSettingsCache((await loadSettingsCache(path))!, (command) => target.execute(command));
+      expect(target.snapshot().settings).toMatchObject({ bpm: 137, velocityCurve: "responsive", minimumVelocity: 1 });
+      expect(target.snapshot().capture.overdub).toBe(false);
+      expect(target.snapshot().transport.state).toBe("stopped");
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it("round-trips sparse assignments and restores missing assets without substituting or dropping settings", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "alesis-pad-settings-"));
+    try {
+      const engine = configuredEngine();
+      engine.setSampleCatalog([{ id: "saved-loop", name: "Loop 0001" }]);
+      expect((await engine.execute({ type: "configure-pad", mode: "samples", page: 0, pad: 7, action: { kind: "sample", sampleId: "saved-loop" } })).accepted).toBe(true);
+      expect((await engine.execute({ type: "configure-pad", mode: "drums", page: 0, pad: 0, action: { kind: "control", target: "transport", operation: "toggle" } })).accepted).toBe(true);
+      const path = join(directory, "settings.json");
+      await saveSettingsCache(path, settingsCacheFromSnapshot(engine.snapshot()));
+      const saved = (await loadSettingsCache(path))!;
+      const restarted = configuredEngine();
+      restarted.restorePadAssignments(saved.pads.assignments);
+      await restoreSettingsCache(saved, (command) => restarted.execute(command));
+      expect(restarted.snapshot().pads.assignments).toEqual(engine.snapshot().pads.assignments);
+      expect(restarted.snapshot().pads.sampleCatalog).toEqual([]);
+      expect((await restarted.execute({ type: "configure-pad", mode: "samples", page: 0, pad: 7, action: null })).accepted).toBe(true);
+      expect(restarted.snapshot().pads.assignments).toHaveLength(1);
+      expect((await restarted.execute({ type: "configure-pad", mode: "samples", page: 0, pad: 0, action: { kind: "sample", sampleId: "unknown" } })).accepted).toBe(false);
+      expect((await restarted.execute({ type: "configure-pad", mode: "samples", page: 1, pad: 0, action: null })).accepted).toBe(false);
+      const legacy = settingsCacheFromSnapshot(engine.snapshot());
+      delete (legacy.pads as Partial<typeof legacy.pads>).assignments;
+      await writeFile(path, JSON.stringify(legacy));
+      expect((await loadSettingsCache(path))?.pads.assignments).toEqual([]);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
   it("atomically saves and loads only persistent user settings", async () => {
     const directory = await mkdtemp(join(tmpdir(), "alesis-settings-cache-"));
     const path = join(directory, "settings-v1.json");
@@ -86,6 +132,7 @@ describe("settings cache", () => {
 
       expect((await loadSettingsCache(path)?.then((cache) => cache?.pads))).toEqual({
         mode: "drums", navigationTarget: "voices", navigationIndex: 0, selectedDrumKitId: null, samplePageIndex: 0,
+        assignments: [],
       });
       expect(JSON.parse(await (await import("node:fs/promises")).readFile(path, "utf8"))).not.toHaveProperty("pads");
     } finally {

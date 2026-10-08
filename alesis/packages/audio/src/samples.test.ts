@@ -13,6 +13,22 @@ const hasFfmpeg = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status 
 const encoderList = hasFfmpeg ? spawnSync("ffmpeg", ["-hide_banner", "-encoders"], { encoding: "utf8" }) : null;
 const canGenerateMp3 = Boolean(encoderList?.status === 0 && `${encoderList.stdout}${encoderList.stderr}`.includes("libmp3lame"));
 
+it("keeps sample IDs stable when a colliding filename sorts before an existing file", async () => {
+  const root = mkdtempSync(join(tmpdir(), "alesis-stable-sample-"));
+  const library = new SampleLibrary(root);
+  try {
+    writeFileSync(join(root, "a-b.mp3"), "fixture");
+    const id = (await library.scan())[0]!.id;
+    writeFileSync(join(root, "a b.mp3"), "fixture");
+    const catalog = await library.scan();
+    expect(catalog.find(({ name }) => name === "a-b")!.id).toBe(id);
+    expect(new Set(catalog.map(({ id }) => id)).size).toBe(2);
+  } finally {
+    await library.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 function fixtureSample(id: string, values: number[]): { id: string; name: string; samples: Float32Array } {
   return { id, name: id, samples: new Float32Array(values) };
 }
@@ -421,6 +437,17 @@ describe("SampleLibrary", () => {
       mixer.trigger(0, 127);
       mixer.panic();
       expect(mixer.render(256)).toEqual(new Float32Array(512));
+
+      const assigned = await library.loadSlots([descriptors[9]!.id, descriptors[0]!.id, "missing", null, null, null, null, null]);
+      expect(assigned.map((sample) => sample?.name ?? null)).toEqual(["tone-09", "tone-00", null, null, null, null, null, null]);
+      mixer.setPage(assigned);
+      renderPad(0, 765);
+      renderPad(1, 180);
+      rmSync(join(root, "tone-00.mp3"));
+      symlinkSync("/dev/null", join(root, "tone-00.mp3"));
+      const unavailable = await library.loadSlots([descriptors[0]!.id, descriptors[9]!.id, null, null, null, null, null, null]);
+      expect(unavailable[0]).toBeNull();
+      expect(unavailable[1]?.name).toBe("tone-09");
     } finally {
       await library.close();
       rmSync(root, { recursive: true, force: true });

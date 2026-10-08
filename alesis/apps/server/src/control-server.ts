@@ -22,6 +22,7 @@ export interface ControlServer {
 }
 
 interface ConnectionState {
+  id: string;
   heldSamplePads: Set<number>;
   cleanup: Promise<void> | null;
 }
@@ -37,7 +38,7 @@ export async function createControlServer(
   engine: HostEngine,
   port = 0,
   staticDirectory?: string,
-  executeCommand: (command: EngineCommand) => Promise<EngineResult> = (command) => engine.execute(command),
+  executeCommand: (command: EngineCommand, source?: string) => Promise<EngineResult> = (command) => engine.execute(command),
   host = "127.0.0.1",
   readiness: Readiness = readyForDevelopment,
 ): Promise<ControlServer> {
@@ -114,7 +115,7 @@ export async function createControlServer(
   webSocketServer.on("connection", (socket) => {
     const connectionId = randomUUID();
     socket.on("error", () => { /* Payload-limit/protocol errors close only this connection. */ });
-    const connection: ConnectionState = { heldSamplePads: new Set<number>(), cleanup: null };
+    const connection: ConnectionState = { id: connectionId, heldSamplePads: new Set<number>(), cleanup: null };
     connections.add(connection);
     socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage));
     socket.on("message", async (data) => {
@@ -145,12 +146,18 @@ export async function createControlServer(
         if (sessionCommand) pendingSessionCommands += 1;
         const execute = async () => {
           const holdGeneration = sampleHoldGeneration;
-          const message = await executeEnvelope(envelope, engine, executeTrackedCommand, readiness);
-          if (message.type === "command-result" && message.accepted) {
+          const message = await executeEnvelope(envelope, engine, (command) => {
+            if (command.type === "release-sample-pad" && !connection.heldSamplePads.has(command.pad)) {
+              const snapshot = engine.snapshot();
+              return Promise.resolve({ accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle });
+            }
+            return executeTrackedCommand(command, connection.id);
+          }, readiness);
+          if (message.type === "command-result") {
             if (envelope.command.type === "trigger-sample-pad" && holdGeneration === sampleHoldGeneration) {
               connection.heldSamplePads.add(envelope.command.pad);
             }
-            if (envelope.command.type === "release-sample-pad") connection.heldSamplePads.delete(envelope.command.pad);
+            if (message.accepted && envelope.command.type === "release-sample-pad") connection.heldSamplePads.delete(envelope.command.pad);
           }
           return message;
         };
@@ -181,12 +188,14 @@ export async function createControlServer(
     });
   });
 
-  const executeTrackedCommand = async (command: EngineCommand): Promise<EngineResult> => {
+  const executeTrackedCommand = async (command: EngineCommand, source?: string): Promise<EngineResult> => {
     const before = engine.snapshot();
     if ((command.type === "import-loop-session" || command.type === "export-loop-session") && before.transport.state !== "stopped") {
       return { accepted: false, revision: before.revision, appliedCycle: before.transport.cycle, error: "Stop transport before saving or loading a loop session" };
     }
-    const result = await executeCommand(command);
+    const result = command.type === "trigger-sample-pad" || command.type === "release-sample-pad"
+      ? await executeCommand(command, source)
+      : await executeCommand(command);
     if (result.accepted) {
       const after = engine.snapshot();
       const samplePageNavigation = (command.type === "select-pad-program" || command.type === "step-pad-navigation")
@@ -197,6 +206,7 @@ export async function createControlServer(
         );
       if (
         command.type === "refresh-samples"
+        || command.type === "configure-pad"
         || (command.type === "set-pad-mode" && before.pads.mode !== after.pads.mode)
         || samplePageNavigation
       ) invalidateSamplePadHolds();
@@ -211,7 +221,7 @@ export async function createControlServer(
       connection.heldSamplePads.clear();
       for (const pad of pads) {
         try {
-          await executeCommand({ type: "release-sample-pad", pad });
+          await executeCommand({ type: "release-sample-pad", pad }, connection.id);
         } catch {
           // Continue releasing other pads even if one cleanup command fails.
         }
@@ -232,7 +242,10 @@ export async function createControlServer(
     if (typeof commandOrFactory === "function") {
       return enqueueCommand(async () => {
         const command = commandOrFactory();
-        return command ? executeTrackedCommand(command) : null;
+        if (!command) return null;
+        const result = await executeTrackedCommand(command);
+        broadcastSnapshotNow();
+        return result;
       });
     }
     const execute = () => executeTrackedCommand(commandOrFactory);

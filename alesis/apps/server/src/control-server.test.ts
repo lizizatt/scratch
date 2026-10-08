@@ -3,7 +3,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SimulatedHostEngine } from "@alesis/engine";
-import { PROTOCOL_VERSION, serverMessageSchema, type ServerMessage } from "@alesis/protocol";
+import { PROTOCOL_VERSION, serverMessageSchema, type ServerMessage, type EngineCommand } from "@alesis/protocol";
+import { randomUUID } from "node:crypto";
+import { SilentAudioOutput } from "@alesis/audio";
+import { PadPerformance, padControlCommand } from "./pad-performance.js";
+import { MidiLoopScheduler } from "./loop-playback.js";
+import { executeLoopCommand } from "./loop-commands.js";
 import WebSocket from "ws";
 import { createControlServer, type ControlServer } from "./control-server.js";
 import { HardwareProgramChangeNavigationMapper } from "./pad-controls.js";
@@ -22,6 +27,110 @@ afterEach(async () => {
 });
 
 describe("control server", () => {
+  it("releases failed control presses and their disconnect ownership", async () => {
+    engine = new SimulatedHostEngine();
+    await engine.execute({ type: "configure-pad", mode: "drums", page: 0, pad: 0, action: { kind: "control", target: "metronome", operation: "toggle" } });
+    const control = vi.fn(async (action) => ({ ...await engine!.execute(padControlCommand(action, engine!.snapshot())), accepted: false, error: "Cannot save settings" }));
+    const pads = new PadPerformance({ snapshot: () => engine!.snapshot(), samples: { trigger: () => false, release: () => true, panic() {} }, drum() {}, control });
+    const release = vi.spyOn(pads, "release");
+    server = await createControlServer(engine, 0, undefined, async (command, source = "host") => {
+      if (command.type === "trigger-sample-pad") return pads.press(source, command.pad, command.velocity);
+      if (command.type === "release-sample-pad") return pads.release(source, command.pad);
+      return engine!.execute(command);
+    });
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    const send = async (command: EngineCommand) => {
+      socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: randomUUID(), command }));
+      return (await collectUntil(inbox, (message) => message.type === "command-result")).at(-1);
+    };
+    expect(await send({ type: "trigger-sample-pad", pad: 0, velocity: 100 })).toMatchObject({ accepted: false });
+    await send({ type: "trigger-sample-pad", pad: 0, velocity: 100 });
+    expect(control).toHaveBeenCalledTimes(1);
+    await send({ type: "release-sample-pad", pad: 0 });
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(await send({ type: "trigger-sample-pad", pad: 0, velocity: 100 })).toMatchObject({ accepted: false });
+    expect(control).toHaveBeenCalledTimes(2);
+    await closeSocket(socket);
+    await server.close();
+    server = undefined;
+    expect(release).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains another client's sample hold on disconnect and ignores stale/non-owner releases", async () => {
+    engine = new SimulatedHostEngine();
+    await engine.execute({ type: "set-pad-mode", mode: "samples" });
+    const samples = { trigger: vi.fn(() => true), release: vi.fn(() => true), panic: vi.fn() };
+    const pads = new PadPerformance({ snapshot: () => engine!.snapshot(), samples, drum() {}, control: async () => null });
+    server = await createControlServer(engine, 0, undefined, async (command, source = "host") => {
+      if (command.type === "trigger-sample-pad") return pads.press(source, command.pad, command.velocity);
+      if (command.type === "release-sample-pad") return pads.release(source, command.pad);
+      return engine!.execute(command);
+    });
+    const clients = [new WebSocket(`ws://127.0.0.1:${server.port}/control`), new WebSocket(`ws://127.0.0.1:${server.port}/control`)];
+    const inboxes = clients.map((socket) => new MessageInbox(socket));
+    await Promise.all(inboxes.map((inbox) => inbox.next()));
+    const send = async (client: number, command: EngineCommand) => {
+      clients[client]!.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: randomUUID(), command }));
+      return (await collectUntil(inboxes[client]!, (message) => message.type === "command-result")).at(-1);
+    };
+    await send(0, { type: "trigger-sample-pad", pad: 0, velocity: 100 });
+    await send(1, { type: "release-sample-pad", pad: 0 });
+    expect(samples.release).not.toHaveBeenCalled();
+    await send(1, { type: "trigger-sample-pad", pad: 0, velocity: 100 });
+    await closeSocket(clients[0]!);
+    await server.submit({ type: "configure", settings: {} });
+    expect(samples.release).not.toHaveBeenCalled();
+    await send(1, { type: "release-sample-pad", pad: 0 });
+    expect(samples.release).toHaveBeenCalledExactlyOnceWith(0);
+    await closeSocket(clients[1]!);
+  });
+
+  it("executes hardware and browser transport pads through queued stop cleanup, never toggling on disconnect", async () => {
+    engine = new SimulatedHostEngine();
+    await engine.execute({ type: "configure", settings: { countInEnabled: false } });
+    await engine.execute({ type: "configure-pad", mode: "drums", page: 0, pad: 0, action: { kind: "control", target: "transport", operation: "toggle" } });
+    const loops = new MidiLoopScheduler(new SilentAudioOutput());
+    const transaction = vi.fn();
+    let pads: PadPerformance;
+    const execute = async (command: EngineCommand, source = "host") => {
+      if (command.type === "trigger-sample-pad") return pads.press(source, command.pad, command.velocity);
+      if (command.type === "release-sample-pad") return pads.release(source, command.pad);
+      return executeLoopCommand(command, engine!, loops, { async transaction<T>(action: () => Promise<T>) { transaction(); return action(); } });
+    };
+    server = await createControlServer(engine, 0, undefined, execute);
+    pads = new PadPerformance({
+      snapshot: () => engine!.snapshot(), samples: { trigger: () => true, release: () => true, panic() {} }, drum() {},
+      control(action, valid, source) {
+        return source === "hardware" ? server!.submit(() => valid() ? padControlCommand(action, engine!.snapshot()) : null)
+          : execute(padControlCommand(action, engine!.snapshot()));
+      },
+    });
+    const first = pads.press("hardware", 0, 100);
+    pads.release("hardware", 0);
+    await first;
+    expect(engine.snapshot().transport.state).toBe("playing");
+    loops.record({ type: "note-on", channel: 0, note: 60, velocity: 100 }, engine.snapshot());
+    expect(loops.hasCurrentRecording()).toBe(true);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+    const envelope = { protocolVersion: PROTOCOL_VERSION, commandId: randomUUID(), command: { type: "trigger-sample-pad", pad: 0, velocity: 100 } };
+    socket.send(JSON.stringify(envelope));
+    expect((await collectUntil(inbox, (message) => message.type === "command-result")).at(-1)).toMatchObject({ accepted: true });
+    expect(engine.snapshot().transport.state).toBe("stopped");
+    expect(loops.hasCurrentRecording()).toBe(false);
+    expect(transaction).toHaveBeenCalledTimes(1);
+    socket.send(JSON.stringify(envelope));
+    await collectUntil(inbox, (message) => message.type === "command-result");
+    await closeSocket(socket);
+    await server.close();
+    server = undefined;
+    expect(engine.snapshot().transport.state).toBe("stopped");
+    expect(transaction).toHaveBeenCalledTimes(1);
+  });
+
   it("reports each failed readiness dependency independently", async () => {
     engine = new SimulatedHostEngine();
     server = await createControlServer(engine, 0, undefined, undefined, "127.0.0.1", {

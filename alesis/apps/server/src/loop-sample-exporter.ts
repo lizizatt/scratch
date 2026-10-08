@@ -99,7 +99,8 @@ export async function exportLoopSample(request: ExportLoopSampleRequest): Promis
     await mixWavsToCyclePcm(wavPaths, mixedPcmPath, frameCount);
     const pcm = await readFile(mixedPcmPath);
     if (pcm.length !== frameCount * 4) throw new Error("Unexpected rendered sample frame count");
-    const startFrame = sampleOnsetTrimFrame(pcm);
+    const onsetFrame = sampleOnsetTrimFrame(pcm);
+    const startFrame = snapshot.capture.loopStart === 0 ? onsetFrame : 0;
     const durationSeconds = (frameCount - startFrame) / SAMPLE_RATE;
     const stagedMp3Path = join(temporaryDirectory, "sample.part");
     await encodeSamplePcmMp3(mixedPcmPath, stagedMp3Path, startFrame);

@@ -28,6 +28,11 @@ export function transportBeatAnchor(snapshot: EngineSnapshot, time: number): Tra
   };
 }
 
+/** Generated grids follow the latched source origin, never an in-flight marker edit. */
+export function sourceOriginBeats(snapshot: EngineSnapshot): number {
+  return snapshot.transport.origin * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
+}
+
 export function beatAt(anchor: TransportBeatAnchor, time: number): number {
   return anchor.beat + Math.max(0, time - anchor.time) / anchor.beatMs;
 }

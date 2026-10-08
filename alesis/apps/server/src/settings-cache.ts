@@ -9,6 +9,7 @@ import {
   settingsSchema,
   padModeSchema,
   padNavigationTargetSchema,
+  padAssignmentsSchema,
   type EngineCommand,
   type EngineSnapshot,
 } from "@alesis/protocol";
@@ -19,6 +20,7 @@ const cachedSettingsSchema = settingsSchema.pick({
   beatsPerMeasure: true,
   loopMeasures: true,
   velocityCurve: true,
+  minimumVelocity: true,
   metronomeEnabled: true,
   metronomeVolume: true,
   countInEnabled: true,
@@ -30,6 +32,7 @@ const cachedPadsSchema = z.object({
   navigationIndex: z.number().int().nonnegative(),
   selectedDrumKitId: z.string().min(1).nullable(),
   samplePageIndex: z.number().int().nonnegative(),
+  assignments: padAssignmentsSchema.default([]),
 }).strict();
 
 const settingsCacheSchema = z.object({
@@ -55,6 +58,7 @@ const defaultCachedPads: SettingsCache["pads"] = {
   navigationIndex: 0,
   selectedDrumKitId: null,
   samplePageIndex: 0,
+  assignments: [],
 };
 
 export function defaultSettingsCachePath(environment = process.env): string {
@@ -82,6 +86,7 @@ export function settingsCacheFromSnapshot(snapshot: EngineSnapshot): SettingsCac
       navigationIndex: snapshot.pads.navigationIndex,
       selectedDrumKitId: snapshot.pads.selectedDrumKitId,
       samplePageIndex: snapshot.pads.samplePageIndex,
+      assignments: snapshot.pads.assignments,
     },
   };
 }

@@ -57,7 +57,7 @@ function snapshotAt(ms: number, bpm = 120, beatsPerMeasure = 4, loopMeasures = 1
   Object.assign(snapshot.settings, { bpm, beatsPerMeasure, loopMeasures, countInEnabled: false });
   snapshot.drums = { enabled: true, pattern: "four-on-floor", volume: 0.8 };
   const position = ms / (60_000 / bpm * beatsPerMeasure * loopMeasures);
-  snapshot.transport = { state: "playing", cycle: Math.floor(position), progress: position % 1 };
+  snapshot.transport = { state: "playing", cycle: Math.floor(position), progress: position % 1, origin: 0 };
   return snapshot;
 }
 

@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { MAX_SAMPLE_CATALOG } from "@alesis/protocol";
 import { realpath, readdir, stat } from "node:fs/promises";
 import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { ChildProcess, ChildProcessWithoutNullStreams } from "node:child_process";
@@ -76,17 +78,11 @@ export class SampleLibrary {
     }
 
     const files = await collectMp3Files(this.rootPath);
-    const usedIds = new Set<string>();
     this.sampleDescriptors = files.sort((a, b) => a.relativePath < b.relativePath ? -1 : a.relativePath > b.relativePath ? 1 : 0)
       .map(({ path, relativePath }) => {
-        const withoutExtension = relativePath.slice(0, -extname(relativePath).length);
-        const baseId = withoutExtension.replaceAll(sep, "/").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "sample";
-        let id = baseId;
-        let suffix = 2;
-        while (usedIds.has(id)) id = `${baseId}-${suffix++}`;
-        usedIds.add(id);
+        const id = `sample-${createHash("sha256").update(relativePath.split(sep).join("/")).digest("hex")}`;
         const filename = basename(path);
-        return { id, name: filename.slice(0, -extname(filename).length), path };
+        return { id, name: filename.slice(0, -extname(filename).length).slice(0, 256), path };
       });
     this.scanned = true;
     return this.descriptors.map((descriptor) => ({ ...descriptor }));
@@ -101,33 +97,54 @@ export class SampleLibrary {
     if (this.closed) throw new Error("Sample library is closed");
     if (!this.scanned) await this.scan();
     const page = this.sampleDescriptors.slice(pageIndex * SAMPLE_PAGE_SIZE, (pageIndex + 1) * SAMPLE_PAGE_SIZE);
+    return this.loadDescriptors(page, false);
+  }
+
+  async loadSlots(ids: readonly (string | null)[]): Promise<Array<DecodedSample | null>> {
+    if (ids.length !== SAMPLE_PAGE_SIZE) throw new Error("Expected eight sample slots");
+    if (this.closed) throw new Error("Sample library is closed");
+    if (!this.scanned) await this.scan();
+    const byId = new Map(this.sampleDescriptors.map((descriptor) => [descriptor.id, descriptor]));
+    return this.loadDescriptors(ids.map((id) => id === null ? null : byId.get(id) ?? null), true);
+  }
+
+  private async loadDescriptors(page: readonly (SampleDescriptor | null)[], tolerateUnavailable: boolean): Promise<Array<DecodedSample | null>> {
     const result: Array<DecodedSample | null> = Array(SAMPLE_PAGE_SIZE).fill(null);
     if (!page.length || !this.rootPath) return result;
 
     let pageBytes = 0;
-    const files: Array<{ descriptor: SampleDescriptor }> = [];
-    for (const descriptor of page) {
-      const safePath = await resolveInsideRoot(this.rootPath, descriptor.path);
-      const metadata = await stat(safePath);
-      if (!metadata.isFile()) throw new Error(`Sample is not a regular file: ${descriptor.name}`);
-      if (metadata.size > SAMPLE_MAX_FILE_BYTES) throw new Error(`Sample file exceeds ${SAMPLE_MAX_FILE_BYTES} byte limit: ${descriptor.name}`);
-      pageBytes += metadata.size;
-      if (pageBytes > this.maxPageBytes) throw new Error(`Sample page exceeds ${this.maxPageBytes} byte limit`);
-      files.push({ descriptor });
+    const files: Array<{ descriptor: SampleDescriptor; index: number }> = [];
+    for (const [index, descriptor] of page.entries()) {
+      if (!descriptor) continue;
+      try {
+        const safePath = await resolveInsideRoot(this.rootPath, descriptor.path);
+        const metadata = await stat(safePath);
+        if (!metadata.isFile()) throw new Error(`Sample is not a regular file: ${descriptor.name}`);
+        if (metadata.size > SAMPLE_MAX_FILE_BYTES) throw new Error(`Sample file exceeds ${SAMPLE_MAX_FILE_BYTES} byte limit: ${descriptor.name}`);
+        if (pageBytes + metadata.size > this.maxPageBytes) throw new Error(`Sample page exceeds ${this.maxPageBytes} byte limit`);
+        pageBytes += metadata.size;
+        files.push({ descriptor: { ...descriptor, path: safePath }, index });
+      } catch (error) {
+        if (!tolerateUnavailable) throw error;
+      }
     }
 
     let decodedPageBytes = 0;
-    for (let index = 0; index < files.length; index += 1) {
+    for (const { descriptor, index } of files) {
       if (this.closed) throw new Error("Sample library is closed");
-      const { descriptor } = files[index]!;
       const remainingBytes = this.maxPageBytes - decodedPageBytes;
-      if (remainingBytes <= 0) throw new Error(`Decoded sample page exceeds ${this.maxPageBytes} byte limit`);
+      if (remainingBytes <= 0) {
+        if (tolerateUnavailable) continue;
+        throw new Error(`Decoded sample page exceeds ${this.maxPageBytes} byte limit`);
+      }
       const decoding = decodeMp3(descriptor.path, descriptor.name, this.maxDurationSeconds, remainingBytes, this.decoderAbort.signal);
       this.activeDecodes.add(decoding);
       try {
         const samples = await decoding;
         decodedPageBytes += samples.byteLength;
         result[index] = { id: descriptor.id, name: descriptor.name, samples };
+      } catch (error) {
+        if (!tolerateUnavailable) throw error;
       } finally {
         this.activeDecodes.delete(decoding);
       }
@@ -161,6 +178,7 @@ async function collectMp3Files(rootPath: string): Promise<Array<{ path: string; 
         const path = await realpath(candidate);
         if (!isInside(rootPath, path) || !(await stat(path)).isFile()) continue;
         found.push({ path, relativePath: relative(rootPath, candidate) });
+        if (found.length > MAX_SAMPLE_CATALOG) throw new Error(`Sample catalog exceeds ${MAX_SAMPLE_CATALOG} files`);
       } catch (error) {
         if (!isMissing(error)) throw new Error(`Unable to inspect sample ${entry.name}: ${errorMessage(error)}`);
       }
