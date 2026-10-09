@@ -1,5 +1,5 @@
 import type { EngineResult, HostEngine, MidiEvent } from "@alesis/engine";
-import type { EngineCommand } from "@alesis/protocol";
+import type { EngineCommand, EngineSnapshot } from "@alesis/protocol";
 
 export interface SamplePadControls {
   selectPage(pageIndex: number): Promise<{ accepted: boolean; error?: string }>;
@@ -24,8 +24,71 @@ interface PadControlDependencies {
   panicDrumNotes?: () => void;
 }
 
+type PadNavigationCommand = Extract<EngineCommand, { type: "select-pad-program" | "step-pad-navigation" }>;
+
+export type HardwareProgramChangeMapping =
+  | { mode: "absolute" | "empty"; command: Extract<EngineCommand, { type: "select-pad-program" }> }
+  | { mode: "relative"; command: Extract<EngineCommand, { type: "step-pad-navigation" }> }
+  | { mode: "duplicate"; command: null };
+
+export class HardwareProgramChangeNavigationMapper {
+  private previous: { program: number; signature: string } | null = null;
+  private currentGeneration = 0;
+
+  get generation(): number {
+    return this.currentGeneration;
+  }
+
+  reset(): void {
+    this.previous = null;
+    this.currentGeneration += 1;
+  }
+
+  commandForProgramChange(program: number, snapshot: EngineSnapshot): HardwareProgramChangeMapping;
+  commandForProgramChange(program: number, snapshot: EngineSnapshot, generation: number): HardwareProgramChangeMapping | null;
+  commandForProgramChange(program: number, snapshot: EngineSnapshot, generation = this.currentGeneration): HardwareProgramChangeMapping | null {
+    if (generation !== this.currentGeneration) return null;
+    const signature = padNavigationCatalogSignature(snapshot);
+    const count = snapshot.pads.navigationCount;
+    const previous = this.previous?.signature === signature ? this.previous : null;
+    if (previous?.program === program) return { mode: "duplicate", command: null };
+
+    this.previous = { program, signature };
+    if (count === 0) return { mode: "empty", command: { type: "select-pad-program", program } };
+    if (previous) {
+      if ((previous.program + 1) % 128 === program) return { mode: "relative", command: { type: "step-pad-navigation", direction: 1 } };
+      if ((previous.program + 127) % 128 === program) return { mode: "relative", command: { type: "step-pad-navigation", direction: -1 } };
+    }
+    return { mode: "absolute", command: { type: "select-pad-program", program: program % count } };
+  }
+}
+
+function padNavigationCatalogSignature(snapshot: EngineSnapshot): string {
+  const target = snapshot.pads.navigationTarget;
+  if (target === "voices") {
+    const selected = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
+    const bank = selected?.bank ?? 0;
+    const soundFont = snapshot.synth.selectedSoundFontId ?? "";
+    const voices = snapshot.synth.soundFontPresets
+      .filter((preset) => preset.bank === bank)
+      .sort((left, right) => left.program - right.program || left.name.localeCompare(right.name))
+      .map(({ id, bank, program }) => `${id}:${bank}:${program}`)
+      .join(",");
+    return `${target}:${soundFont}:${bank}:${snapshot.pads.navigationCount}:${voices}`;
+  }
+  if (target === "drum-kits") {
+    const kits = snapshot.pads.drumKits
+      .slice()
+      .sort((left, right) => left.bank - right.bank || left.program - right.program || left.name.localeCompare(right.name))
+      .map(({ id, bank, program }) => `${id}:${bank}:${program}`)
+      .join(",");
+    return `${target}:${snapshot.pads.navigationCount}:${kits}`;
+  }
+  return `${target}:${snapshot.pads.navigationCount}`;
+}
+
 export async function executePadNavigation(
-  command: Extract<EngineCommand, { type: "select-pad-program" | "step-pad-navigation" }>,
+  command: PadNavigationCommand,
   { engine, samplePads, audio }: PadControlDependencies,
 ): Promise<EngineResult> {
   const before = engine.snapshot();

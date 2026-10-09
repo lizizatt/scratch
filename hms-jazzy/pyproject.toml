@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hms-jazzy"
+version = "0.1.0"
+description = "A MuJoCo twin-thruster paddleboard simulator and browser helm"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mujoco>=3.3,<4",
+    "numpy>=1.26,<3",
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.34,<1",
+    "pydantic>=2.10,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "httpx>=0.28,<1", "ruff>=0.11,<1", "build>=1.2,<2"]
+
+[project.scripts]
+hms-jazzy = "hms_jazzy.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hms_jazzy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

@@ -6,6 +6,7 @@ import { SimulatedHostEngine } from "@alesis/engine";
 import { PROTOCOL_VERSION, serverMessageSchema, type ServerMessage } from "@alesis/protocol";
 import WebSocket from "ws";
 import { createControlServer, type ControlServer } from "./control-server.js";
+import { HardwareProgramChangeNavigationMapper } from "./pad-controls.js";
 
 let server: ControlServer | undefined;
 let engine: SimulatedHostEngine | undefined;
@@ -187,6 +188,67 @@ describe("control server", () => {
     ]);
     expect(engine.snapshot().pads).toMatchObject({ selectedDrumKitId: "kit-a", navigationIndex: 0 });
     socket.close();
+  });
+
+  it("maps host-submitted MIDI selections after earlier queued mutations have executed", async () => {
+    engine = new SimulatedHostEngine({
+      soundFontPresets: Array.from({ length: 4 }, (_, index) => ({ id: `voice-${index}`, bank: 0, program: index, name: `Voice ${index}` })),
+      selectedSoundFontPresetId: "voice-0",
+    });
+    engine.setSamplePage(0, 3, Array(8).fill(null));
+    const mapper = new HardwareProgramChangeNavigationMapper();
+    await engine.execute(mapper.commandForProgramChange(1, engine.snapshot()).command!);
+
+    let releaseTarget!: () => void;
+    const targetGate = new Promise<void>((resolve) => { releaseTarget = resolve; });
+    const executeCommand = vi.fn(async (command) => {
+      if (command.type === "set-pad-navigation-target") await targetGate;
+      return engine!.execute(command);
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/control`);
+    const inbox = new MessageInbox(socket);
+    await inbox.next();
+
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "a305af6d-5f25-49b9-9469-8b937666d62b", command: { type: "set-pad-navigation-target", target: "sample-pages" } }));
+    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledWith({ type: "set-pad-navigation-target", target: "sample-pages" }));
+    const midiSelection = server.submit(() => mapper.commandForProgramChange(5, engine!.snapshot()).command);
+
+    releaseTarget();
+    await midiSelection;
+    await collectUntil(inbox, (message) => message.type === "command-result");
+
+    expect(engine.snapshot().pads).toMatchObject({ navigationTarget: "sample-pages", navigationIndex: 2, samplePageIndex: 2 });
+    socket.close();
+  });
+
+  it("drops queued MIDI selections captured before a hardware mapper reset", async () => {
+    engine = new SimulatedHostEngine({
+      soundFontPresets: Array.from({ length: 4 }, (_, index) => ({ id: `voice-${index}`, bank: 0, program: index, name: `Voice ${index}` })),
+      selectedSoundFontPresetId: "voice-0",
+    });
+    const mapper = new HardwareProgramChangeNavigationMapper();
+    let releaseBlocker!: () => void;
+    const blocker = new Promise<void>((resolve) => { releaseBlocker = resolve; });
+    const executeCommand = vi.fn(async (command) => {
+      if (command.type === "configure") await blocker;
+      return engine!.execute(command);
+    });
+    server = await createControlServer(engine, 0, undefined, executeCommand);
+
+    const blockingCommand = server.submit({ type: "configure", settings: { bpm: 96 } });
+    await vi.waitFor(() => expect(executeCommand).toHaveBeenCalledWith({ type: "configure", settings: { bpm: 96 } }));
+    const staleGeneration = mapper.generation;
+    const staleMidiSelection = server.submit(() => mapper.commandForProgramChange(1, engine!.snapshot(), staleGeneration)?.command ?? null);
+    mapper.reset();
+
+    releaseBlocker();
+    await blockingCommand;
+    await expect(staleMidiSelection).resolves.toBeNull();
+    const firstReconnectedSelection = await server.submit(() => mapper.commandForProgramChange(1, engine!.snapshot(), mapper.generation)?.command ?? null);
+
+    expect(firstReconnectedSelection?.accepted).toBe(true);
+    expect(engine.snapshot().pads.navigationIndex).toBe(1);
   });
 
   it("executes mutating commands in receive order", async () => {

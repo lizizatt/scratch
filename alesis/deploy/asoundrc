@@ -1,5 +1,7 @@
 pcm.alesis_cm108_dmix {
   type dmix
+  # Period-by-period wakeups; auto/no reproduced recurring xruns on CM108.
+  hw_ptr_alignment rounddown
   ipc_key 1095521619
   ipc_key_add_uid true
   slave {

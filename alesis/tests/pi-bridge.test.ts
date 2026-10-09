@@ -26,19 +26,71 @@ describe("Pi bridge", () => {
     expect(log).toContain("ssh -o BatchMode=yes -o ConnectTimeout=5 player@alesis.local aplay -l");
     expect(log).not.toContain("sudo");
   });
+
+  it("copies the verified Miku SoundFont to the canonical filename", async () => {
+    const fixture = await createFixture();
+    const mikuPath = join(fixture.homeDirectory, "Downloads", "Vocaloid_Lah_Soundfont__Version_1.0_.sf2");
+    await writeFile(mikuPath, "miku-fixture");
+
+    const result = await runBridge(["miku-asset", "player@alesis.local"], fixture, {
+      ALESIS_MIKU_SOUNDFONT_PATH: mikuPath,
+      LOCAL_SHA256: "92c7cf7b32bb67720f4f1ba1954e6fb01aba0925362e18f68a3ed123657121df",
+      REMOTE_SHA256: "92c7cf7b32bb67720f4f1ba1954e6fb01aba0925362e18f68a3ed123657121df",
+    });
+
+    expect(result.code).toBe(0);
+    const log = await readFile(fixture.logPath, "utf8");
+    expect(log).toContain(`sha256sum ${mikuPath}`);
+    expect(log).toContain("rsync --archive --human-readable --progress");
+    expect(log).toContain("player@alesis.local:Downloads/Vocaloid_Lah_Soundfont__Version_1.0_.sf2");
+    expect(log).toContain("ssh -o BatchMode=yes -o ConnectTimeout=5 player@alesis.local sha256sum Downloads/Vocaloid_Lah_Soundfont__Version_1.0_.sf2");
+  });
+
+  it("rejects miku-asset when the local checksum is wrong and skips transfer", async () => {
+    const fixture = await createFixture();
+    const mikuPath = join(fixture.homeDirectory, "Downloads", "Vocaloid_Lah_Soundfont__Version_1.0_.sf2");
+    await writeFile(mikuPath, "miku-fixture");
+
+    const result = await runBridge(["miku-asset", "player@alesis.local"], fixture, {
+      ALESIS_MIKU_SOUNDFONT_PATH: mikuPath,
+      LOCAL_SHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+      REMOTE_SHA256: "92c7cf7b32bb67720f4f1ba1954e6fb01aba0925362e18f68a3ed123657121df",
+    });
+
+    expect(result.code).toBe(64);
+    expect(result.stderr).toContain("checksum does not match the verified asset");
+    const log = await readFile(fixture.logPath, "utf8");
+    expect(log).not.toContain("rsync --archive --human-readable --progress");
+  });
 });
 
-async function createFixture(): Promise<{ binDirectory: string; logPath: string }> {
+async function createFixture(): Promise<{ binDirectory: string; logPath: string; homeDirectory: string }> {
   const root = await mkdtemp(join(tmpdir(), "alesis-pi-bridge-test-"));
   temporaryDirectories.add(root);
   const binDirectory = join(root, "bin");
   const logPath = join(root, "events.log");
-  await import("node:fs/promises").then(({ mkdir }) => mkdir(binDirectory));
+  const homeDirectory = join(root, "home");
+  await import("node:fs/promises").then(({ mkdir }) => Promise.all([
+    mkdir(binDirectory, { recursive: true }),
+    mkdir(join(homeDirectory, "Downloads"), { recursive: true }),
+  ]));
   await writeExecutable(join(binDirectory, "ssh"), `#!/usr/bin/env bash
 set -euo pipefail
 printf 'ssh %s\n' "$*" >> "$TEST_LOG"
+if [[ "$*" == *"sha256sum"* ]]; then
+  printf '%s  %s\n' "\${REMOTE_SHA256:-missing}" "\${*: -1}"
+fi
 `);
-  return { binDirectory, logPath };
+  await writeExecutable(join(binDirectory, "rsync"), `#!/usr/bin/env bash
+set -euo pipefail
+printf 'rsync %s\n' "$*" >> "$TEST_LOG"
+`);
+  await writeExecutable(join(binDirectory, "sha256sum"), `#!/usr/bin/env bash
+set -euo pipefail
+printf 'sha256sum %s\n' "$*" >> "$TEST_LOG"
+printf '%s  %s\n' "\${LOCAL_SHA256:-missing}" "$1"
+`);
+  return { binDirectory, logPath, homeDirectory };
 }
 
 async function writeExecutable(path: string, contents: string): Promise<void> {
@@ -46,10 +98,20 @@ async function writeExecutable(path: string, contents: string): Promise<void> {
   await chmod(path, 0o755);
 }
 
-function runBridge(args: string[], fixture: { binDirectory: string; logPath: string }): Promise<{ code: number | null; stderr: string }> {
+function runBridge(
+  args: string[],
+  fixture: { binDirectory: string; logPath: string; homeDirectory: string },
+  extraEnvironment: Record<string, string> = {},
+): Promise<{ code: number | null; stderr: string }> {
   return new Promise((resolve) => {
     const child = spawn(bridgePath, args, {
-      env: { ...process.env, PATH: `${fixture.binDirectory}:${process.env.PATH ?? ""}`, TEST_LOG: fixture.logPath },
+      env: {
+        ...process.env,
+        PATH: `${fixture.binDirectory}:${process.env.PATH ?? ""}`,
+        TEST_LOG: fixture.logPath,
+        HOME: fixture.homeDirectory,
+        ...extraEnvironment,
+      },
       stdio: ["ignore", "ignore", "pipe"],
     });
     let stderr = "";

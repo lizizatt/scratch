@@ -1,5 +1,6 @@
 import {
   PROTOCOL_VERSION,
+  MAX_PROMOTED_TAKES,
   engineSnapshotSchema,
   type EngineCommand,
   type EngineSnapshot,
@@ -11,14 +12,11 @@ import {
   type SoundFont,
   type SoundFontPreset,
   type Take,
+  type LoopSession,
+  type MidiEvent,
 } from "@alesis/protocol";
 
-export type MidiEvent =
-  | { type: "note-on"; channel: number; note: number; velocity: number }
-  | { type: "note-off"; channel: number; note: number }
-  | { type: "pitch-bend"; channel: number; value: number }
-  | { type: "control-change"; channel: number; controller: number; value: number }
-  | { type: "channel-pressure"; channel: number; value: number };
+export type { MidiEvent } from "@alesis/protocol";
 
 export interface EngineResult {
   accepted: boolean;
@@ -26,6 +24,7 @@ export interface EngineResult {
   appliedCycle: number;
   error?: string;
   message?: string;
+  sessionJson?: string;
 }
 
 export type EngineListener = (snapshot: EngineSnapshot) => void;
@@ -66,7 +65,7 @@ interface DeletedTake {
   index: number;
 }
 
-const maxPromotedTakes = 12;
+const maxPromotedTakes = MAX_PROMOTED_TAKES;
 
 export interface SimulatedHostEngineOptions {
   soundFonts?: SoundFont[];
@@ -141,6 +140,44 @@ export class SimulatedHostEngine implements HostEngine {
 
   snapshot(): EngineSnapshot {
     return structuredClone(this.state);
+  }
+
+  /** Host-only commit, after file/capability validation and audio preparation. */
+  restoreLoopSession(session: LoopSession, presets: SoundFontPreset[], commitResources: () => void): EngineResult {
+    if (this.state.transport.state !== "stopped") throw new Error("Stop transport before loading a loop session");
+    const next = this.snapshot();
+    next.settings = { ...next.settings, ...session.settings };
+    next.synth.selectedId = session.synth.selectedId;
+    next.synth.parameterValues = structuredClone(session.synth.parameterValues);
+    next.synth.selectedSoundFontId = session.synth.soundFont?.id ?? null;
+    next.synth.selectedSoundFontPresetId = session.synth.soundFont?.preset.id ?? null;
+    next.synth.soundFontPresets = structuredClone(presets);
+    next.pads.selectedDrumKitId = session.percussion?.kit.id ?? null;
+    next.drums = structuredClone(session.drums);
+    next.arpeggiator = structuredClone(session.arpeggiator);
+    next.monitorOnly = session.monitorOnly;
+    next.capture = {
+      currentWaveform: [], hasCurrentEvents: false,
+      staged: session.staged ? structuredClone(session.staged.take) : null,
+      previousStaged: session.previousStaged ? structuredClone(session.previousStaged.take) : null,
+      stagedAudible: session.stagedAudible, quantization: session.quantization,
+    };
+    next.promoted = session.promoted.map(({ take }) => structuredClone(take));
+    next.canUndoDelete = false;
+    next.transport = { state: "stopped", cycle: 0, progress: 0 };
+    next.revision += 1;
+    engineSnapshotSchema.parse(next);
+    // Install recordings before publishing their take IDs. No await may split this commit.
+    commitResources();
+    this.state = next;
+    this.deletedTake = null;
+    this.activeNotes.clear();
+    this.currentWaveform = emptyWaveform();
+    this.elapsedSeconds = 0;
+    this.countInSecondsRemaining = 0;
+    this.updatePadNavigation(false);
+    this.publish(false);
+    return { accepted: true, revision: next.revision, appliedCycle: 0, message: "Loop session loaded. Transport remains stopped." };
   }
 
   subscribe(listener: EngineListener): () => void {
@@ -264,23 +301,30 @@ export class SimulatedHostEngine implements HostEngine {
   advance(seconds: number): void {
     if (!Number.isFinite(seconds) || seconds < 0) throw new Error("advance requires nonnegative finite seconds");
     if (this.state.transport.state === "stopped") return;
+    this.advanceTransport(seconds);
+    this.publish(false);
+  }
+
+  private advanceTransport(seconds: number): void {
     if (this.state.transport.state === "counting-in") {
-      const countInDuration = this.measureDurationSeconds();
       const consumed = Math.min(seconds, this.countInSecondsRemaining);
       this.countInSecondsRemaining -= consumed;
       seconds -= consumed;
-      this.state.transport.progress = 1 - this.countInSecondsRemaining / countInDuration;
+      this.updateCountInProgress();
       if (this.countInSecondsRemaining === 0) {
         this.state.transport.state = "playing";
         this.state.transport.progress = 0;
       }
     }
-    if (this.state.transport.state !== "playing") {
-      this.publish(false);
-      return;
-    }
+    if (this.state.transport.state !== "playing") return;
 
     const duration = this.cycleDurationSeconds();
+    // Timing edits preserve elapsed seconds, which may now span several cycles.
+    if (this.elapsedSeconds >= duration) {
+      seconds += this.elapsedSeconds - duration;
+      this.elapsedSeconds = 0;
+      this.rollover();
+    }
     while (seconds > 0) {
       const remaining = duration - this.elapsedSeconds;
       const consumed = Math.min(seconds, remaining);
@@ -295,7 +339,11 @@ export class SimulatedHostEngine implements HostEngine {
     }
     this.state.transport.progress = this.elapsedSeconds / duration;
     this.state.capture.currentWaveform = [...this.currentWaveform];
-    this.publish(false);
+  }
+
+  private updateCountInProgress(): void {
+    // Preserve the countdown's remaining seconds even if the new measure is shorter.
+    this.state.transport.progress = Math.max(0, 1 - this.countInSecondsRemaining / this.measureDurationSeconds());
   }
 
   async dispose(): Promise<void> {
@@ -353,6 +401,10 @@ export class SimulatedHostEngine implements HostEngine {
         if (settings.metronomeEnabled !== undefined) this.state.settings.metronomeEnabled = settings.metronomeEnabled;
         if (settings.metronomeVolume !== undefined) this.state.settings.metronomeVolume = settings.metronomeVolume;
         if (settings.countInEnabled !== undefined) this.state.settings.countInEnabled = settings.countInEnabled;
+        if (timingChanged) {
+          if (this.state.transport.state === "counting-in") this.updateCountInProgress();
+          if (this.state.transport.state === "playing" && !command.clearAudio) this.advanceTransport(0);
+        }
         break;
       }
       case "select-synth": {
@@ -474,6 +526,9 @@ export class SimulatedHostEngine implements HostEngine {
         return reject("MP3 export is not available in the simulated engine");
       case "export-loop-sample":
         return reject("Loop sample export requires the host sample service");
+      case "export-loop-session":
+      case "import-loop-session":
+        return reject("Loop sessions require host orchestration");
     }
 
     this.state.revision += 1;

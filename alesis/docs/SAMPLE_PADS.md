@@ -6,11 +6,16 @@ triggers. Set **+ / − target** to **Voices**, **Drum kits**, or **Sample pages
 to choose what host navigation and incoming Program Change messages select.
 The position readout shows the one-based selection, its label, and the total
 number of entries. Host catalog indices are nonnegative safe integers and are
-not limited by the MIDI Program Change byte, so the entry selector and + / −
-buttons can navigate beyond index 127. Incoming MIDI Program Change messages
-remain limited to wire values 0–127. Selecting an entry under **Voices**
-changes the selected SoundFont voice but does not switch synthesizers; if Neon
-is selected, Neon stays active.
+not limited by the MIDI Program Change byte, so the entry selector and on-screen
++ / − buttons can navigate beyond index 127. The physical Vortex + / − controls
+send MIDI Program Change values 0–127: the first or non-adjacent value selects
+`value % entryCount`, adjacent values step by one entry, and `127 ↔ 0` also
+counts as an adjacent step so hardware browsing continues across both MIDI-byte
+and catalog boundaries. Repeated duplicate Program Change values are ignored.
+The Vortex on-board display still shows its physical preset number, not the
+host's absolute catalog index. Selecting an entry under **Voices** changes the
+selected SoundFont voice but does not switch synthesizers; if Neon is selected,
+Neon stays active.
 
 ## Configure a user library
 
@@ -44,9 +49,20 @@ must be set on the host process, not in the browser.
 In the Loops toolbar, **Export loop to sample library** is separate from
 **Save promoted tracks as MP3 files**. The latter writes each promoted take
 and a merged mix to a named recordings folder. Loop sample export instead
-renders one full cycle of the loop that is currently playing, with a maximum
-cycle duration of 30 seconds, as a single MP3 in the configured sample
-library.
+renders one full cycle from the completed loop sources, with a maximum cycle
+duration of 30 seconds, as a single MP3 in the configured sample library.
+Export works while stopped, playing, or counting in; it does not start, stop,
+or reset the transport.
+
+Before MP3 encoding, the host trims leading silence from the finished mix so
+the pad starts near the first sound, rather than waiting for its original beat
+position. Detection uses a conservative -80 dBFS threshold with 5 ms of pre-roll;
+onsets within the first 10 ms are left alone. Quiet attacks above that threshold,
+pauses between notes, relative layer timing, and the remaining audio through the
+cycle end are preserved. The resulting pad sample can be shorter than one cycle.
+An entirely silent render is rejected. Normal promoted-track/session exports
+keep their original timing. Existing sample files are not automatically rewritten;
+re-export a loop to make a trimmed copy.
 
 The export includes audible, unmuted promoted takes and an audible staged take
 (unless **Monitor only** is enabled), plus an enabled drum pattern with volume

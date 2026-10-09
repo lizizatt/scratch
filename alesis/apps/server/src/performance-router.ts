@@ -16,31 +16,41 @@ export class PerformanceRouter {
   private readonly sustainedChannels = new Set<number>();
   private lastNoteChannel: number | null = null;
   private sustainValue: number | null = null;
-  private readonly bentChannels = new Set<number>();
+  private bendValue: number | null = null;
+  private readonly bentChannels = new Map<number, number>();
 
   route(event: MidiEvent): MidiEvent[] {
     if (event.type === "note-on" && event.velocity > 0) {
       this.heldNotes.set(`${event.channel}:${event.note}`, event.channel);
       this.lastNoteChannel = event.channel;
+      // A note starting on a channel that hasn't seen the currently held sustain/bend
+      // must be caught up first, or it sounds unbent/undamped next to notes that have.
+      const catchUp: MidiEvent[] = [];
       if (this.sustainValue !== null && !this.sustainedChannels.has(event.channel)) {
         this.sustainedChannels.add(event.channel);
-        return [
-          { type: "control-change", channel: event.channel, controller: 64, value: this.sustainValue },
-          event,
-        ];
+        catchUp.push({ type: "control-change", channel: event.channel, controller: 64, value: this.sustainValue });
       }
+      if (this.bendValue !== null && this.bentChannels.get(event.channel) !== this.bendValue) {
+        this.bentChannels.set(event.channel, this.bendValue);
+        catchUp.push({ type: "pitch-bend", channel: event.channel, value: this.bendValue });
+      }
+      if (catchUp.length > 0) return [...catchUp, event];
     } else if (event.type === "note-off" || event.type === "note-on" && event.velocity === 0) {
       this.heldNotes.delete(`${event.channel}:${event.note}`);
     }
     if (event.type === "control-change" && event.controller === 64) return this.routeSustain(event);
     if (event.type !== "pitch-bend") return [event];
     if (event.value === 0 && this.bentChannels.size > 0) {
-      const channels = [...this.bentChannels];
+      const channels = [...this.bentChannels.keys()];
       this.bentChannels.clear();
+      this.bendValue = null;
       return channels.map((channel) => ({ ...event, channel }));
     }
     const routed = this.routeGlobalControl(event);
-    if (event.value !== 0) for (const routedEvent of routed) this.bentChannels.add(routedEvent.channel);
+    if (event.value !== 0) {
+      this.bendValue = event.value;
+      for (const routedEvent of routed) this.bentChannels.set(routedEvent.channel, event.value);
+    }
     return routed;
   }
 
@@ -72,6 +82,7 @@ export class PerformanceRouter {
     this.sustainedChannels.clear();
     this.lastNoteChannel = null;
     this.sustainValue = null;
+    this.bendValue = null;
     this.bentChannels.clear();
   }
 }

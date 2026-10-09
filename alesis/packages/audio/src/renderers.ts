@@ -7,6 +7,7 @@ import type { MidiEvent } from "@alesis/engine";
 export interface SoundFontRenderParameters {
   bank?: number;
   program?: number;
+  note?: number;
   gain?: number;
   velocity?: number;
   chorusSend?: number;
@@ -168,6 +169,7 @@ export async function renderSoundFontFixture(soundFontPath: string, parameters: 
   const values = {
     bank: parameters.bank ?? 0,
     program: parameters.program ?? 0,
+    note: Math.max(0, Math.min(127, Math.round(parameters.note ?? 60))),
     gain: parameters.gain ?? 0.72,
     velocity: parameters.velocity ?? 110,
     chorusSend: 0,
@@ -183,7 +185,7 @@ export async function renderSoundFontFixture(soundFontPath: string, parameters: 
   const midiPath = join(directory, "fixture.mid");
   const wavPath = join(directory, "render.wav");
   try {
-    await writeFile(midiPath, midiFixture(values.bank, values.program, values.velocity, values.chorusSend, values.reverbSend));
+    await writeFile(midiPath, midiFixture(values.bank, values.program, values.note, values.velocity, values.chorusSend, values.reverbSend));
     await run("fluidsynth", [
       "-ni", "-F", wavPath, "-r", "48000",
       "-o", "audio.file.format=s16",
@@ -237,15 +239,16 @@ function applyDrive(sample: number, drive: number): number {
   return Math.tanh(sample * amount) / Math.tanh(amount);
 }
 
-function midiFixture(bank: number, program: number, velocity: number, chorus: number, reverb: number): Buffer {
+function midiFixture(bank: number, program: number, note: number, velocity: number, chorus: number, reverb: number): Buffer {
+  const clampedNote = Math.max(0, Math.min(127, Math.round(note)));
   const track = Buffer.from([
     0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
     0x00, 0xb0, 0x00, Math.round(bank),
     0x00, 0xc0, Math.round(program),
     0x00, 0xb0, 0x5d, chorus > 0 ? 127 : 0,
     0x00, 0xb0, 0x5b, reverb > 0 ? 127 : 0,
-    0x00, 0x90, 0x3c, Math.max(1, Math.min(127, Math.round(velocity))),
-    0x83, 0x60, 0x80, 0x3c, 0x00,
+    0x00, 0x90, clampedNote, Math.max(1, Math.min(127, Math.round(velocity))),
+    0x83, 0x60, 0x80, clampedNote, 0x00,
     0x87, 0x40, 0xff, 0x2f, 0x00,
   ]);
   const header = Buffer.alloc(14);

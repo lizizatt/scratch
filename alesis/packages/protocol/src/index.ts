@@ -1,6 +1,22 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 5 as const;
+export const PROTOCOL_VERSION = 6 as const;
+
+export const LOOP_SESSION_MAX_BYTES = 4 * 1024 * 1024;
+export const LOOP_SESSION_MAX_EVENTS_PER_TAKE = 32_768;
+export const LOOP_SESSION_MAX_EVENTS = 100_000;
+export const MAX_PROMOTED_TAKES = 12;
+
+const midiByte = z.number().int().min(0).max(127);
+const midiChannel = z.number().int().min(0).max(15);
+export const midiEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("note-on"), channel: midiChannel, note: midiByte, velocity: midiByte }).strict(),
+  z.object({ type: z.literal("note-off"), channel: midiChannel, note: midiByte }).strict(),
+  z.object({ type: z.literal("pitch-bend"), channel: midiChannel, value: z.number().min(-1).max(1) }).strict(),
+  z.object({ type: z.literal("control-change"), channel: midiChannel, controller: midiByte, value: midiByte }).strict(),
+  z.object({ type: z.literal("channel-pressure"), channel: midiChannel, value: midiByte }).strict(),
+]);
+export type MidiEvent = z.infer<typeof midiEventSchema>;
 
 const waveformSchema = z.array(z.number().min(-1).max(1)).max(256);
 const takeIdSchema = z.string().min(1).max(128);
@@ -166,6 +182,52 @@ export const snapshotUpdateSchema = engineSnapshotSchema.pick({
   pads: true,
 });
 
+const recordingSchema = z.array(z.object({
+  position: z.number().min(0).max(1),
+  event: midiEventSchema,
+}).strict()).max(LOOP_SESSION_MAX_EVENTS_PER_TAKE).refine(
+  (events) => events.every((event, index) => index === 0 || event.position >= events[index - 1]!.position),
+  "Recording events must be ordered by position",
+);
+const sessionTakeSchema = z.object({
+  take: takeSchema.extend({ cycle: z.number().int().nonnegative().safe() }).strict(),
+  recording: recordingSchema,
+}).strict();
+export const loopSessionSchema = z.object({
+  format: z.literal("alesis-loop-session"),
+  version: z.literal(1),
+  settings: settingsSchema.omit({ midiInputId: true, audioOutputId: true }).strict(),
+  synth: z.object({
+    selectedId: z.string().min(1).max(128),
+    parameterValues: z.record(z.string().min(1).max(128), z.number().finite()).refine((values) => Object.keys(values).length <= 64, "Too many synth parameters"),
+    soundFont: soundFontSchema.extend({ preset: soundFontPresetSchema.strict() }).strict().nullable(),
+  }).strict(),
+  drums: drumSettingsSchema.strict(),
+  percussion: z.object({ soundFontId: z.string().min(1).max(128), kit: drumKitSchema.strict() }).strict().nullable(),
+  arpeggiator: arpeggiatorSchema.strict(),
+  monitorOnly: z.boolean(),
+  stagedAudible: z.boolean(),
+  quantization: quantizationModeSchema,
+  staged: sessionTakeSchema.extend({ rawRecording: recordingSchema }).strict().nullable(),
+  previousStaged: sessionTakeSchema.nullable(),
+  promoted: z.array(sessionTakeSchema).max(MAX_PROMOTED_TAKES),
+}).strict().superRefine((session, context) => {
+  const takes = [session.staged, session.previousStaged, ...session.promoted].filter((take) => take !== null);
+  if (new Set(takes.map(({ take }) => take.id)).size !== takes.length) context.addIssue({ code: "custom", message: "Duplicate take IDs" });
+  const count = takes.reduce((sum, take) => sum + take.recording.length, session.staged?.rawRecording.length ?? 0);
+  if (count > LOOP_SESSION_MAX_EVENTS) context.addIssue({ code: "custom", message: "Session has too many MIDI events" });
+  if (session.synth.selectedId === "soundfont" && !session.synth.soundFont) context.addIssue({ code: "custom", message: "SoundFont selection is required" });
+});
+export type LoopSession = z.infer<typeof loopSessionSchema>;
+export type SessionTake = z.infer<typeof sessionTakeSchema>;
+
+export function parseLoopSession(json: string): LoopSession {
+  if (new TextEncoder().encode(json).byteLength > LOOP_SESSION_MAX_BYTES) throw new Error("Loop session exceeds the 4 MiB file limit");
+  const parsed = loopSessionSchema.safeParse(JSON.parse(json));
+  if (!parsed.success) throw new Error(`Invalid loop session: ${parsed.error.issues.slice(0, 4).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
+  return parsed.data;
+}
+
 const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("play") }),
   z.object({ type: z.literal("stop") }),
@@ -195,6 +257,9 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("undo-delete") }),
   z.object({ type: z.literal("export-mp3"), name: exportNameSchema }),
   z.object({ type: z.literal("export-loop-sample"), name: exportNameSchema.optional() }),
+  z.object({ type: z.literal("export-loop-session") }),
+  // File validation belongs in the executor so invalid uploads are recoverable command errors.
+  z.object({ type: z.literal("import-loop-session"), sessionJson: z.string() }),
 ]);
 
 export const commandEnvelopeSchema = z.object({
@@ -214,6 +279,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     appliedCycle: z.number().int().nonnegative(),
     error: z.string().optional(),
     message: z.string().optional(),
+    sessionJson: z.string().max(LOOP_SESSION_MAX_BYTES).optional(),
   }),
 ]);
 

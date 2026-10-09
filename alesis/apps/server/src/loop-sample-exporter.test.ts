@@ -46,6 +46,39 @@ describe("loop sample exporter", () => {
     vi.mocked(fsPromises.rm).mockClear();
   });
 
+  it("trims leading silence from the mixed pad sample while retaining layer spacing and the cycle end", async () => {
+    const root = await temporaryRoot();
+    const library = new SampleLibrary(root);
+    try {
+      const snapshot = await playingSnapshot();
+      snapshot.synth.parameterValues = { attack: 0.001, release: 0.01, cutoff: 6_300, resonance: 0.2 };
+      snapshot.promoted = [testTake("first"), testTake("later")];
+      const phrase = (start: number): RecordedMidiEvent[] => [
+        { position: start, event: { type: "note-on", channel: 0, note: 60, velocity: 112 } },
+        { position: start + 0.05, event: { type: "note-off", channel: 0, note: 60 } },
+      ];
+      const result = await exportLoopSample({
+        snapshot, sampleRoot: root,
+        recordings: new Map([["first", phrase(0.25)], ["later", phrase(0.5)]]),
+      });
+      expect(result.durationSeconds).toBeGreaterThan(1.49);
+      expect(result.durationSeconds).toBeLessThan(1.52);
+      await library.scan();
+      const decoded = (await library.loadPage(0))[0]!;
+      expect(decoded.samples.length / 2 / 48_000).toBeCloseTo(result.durationSeconds, 4);
+      const peak = (start: number, end: number): number => decoded.samples
+        .subarray(Math.round(start * 48_000) * 2, Math.round(end * 48_000) * 2)
+        .reduce((maximum, sample) => Math.max(maximum, Math.abs(sample)), 0);
+      expect(peak(0, 0.03)).toBeGreaterThan(0.01);
+      expect(peak(0.25, 0.4)).toBeLessThan(0.001);
+      expect(peak(0.52, 0.57)).toBeGreaterThan(0.01);
+      expect(peak(1.3, 1.49)).toBeLessThan(0.001);
+    } finally {
+      await library.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it("selects audible staged and promoted takes, respecting mute, level, and staged-audible state", async () => {
     const root = await temporaryRoot();
     try {
@@ -72,16 +105,64 @@ describe("loop sample exporter", () => {
     }
   }, 30_000);
 
-  it("omits staged and takes while staged audio is disabled or monitor-only, but allows drums", async () => {
+  it.skipIf(!process.env.ALESIS_TEST_SOUNDFONT)("trims a delayed SoundFont render before MP3 encoding", async () => {
+    const root = await temporaryRoot();
+    const library = new SampleLibrary(root);
+    try {
+      const snapshot = await playingSnapshot();
+      snapshot.synth.selectedId = "soundfont";
+      snapshot.synth.soundFontPresets = [{ id: "0:0", bank: 0, program: 0, name: "Piano" }];
+      snapshot.synth.selectedSoundFontPresetId = "0:0";
+      snapshot.synth.parameterValues = { gain: 0.72, "reverb-send": 0, "chorus-send": 0 };
+      snapshot.promoted = [testTake("delayed")];
+      const result = await exportLoopSample({
+        snapshot, sampleRoot: root, soundFontPath: process.env.ALESIS_TEST_SOUNDFONT!,
+        recordings: new Map([["delayed", [
+          { position: 0.25, event: { type: "note-on", channel: 0, note: 60, velocity: 112 } },
+          { position: 0.75, event: { type: "note-off", channel: 0, note: 60 } },
+        ]]]),
+      });
+      expect(result.durationSeconds).toBeGreaterThan(1.45);
+      expect(result.durationSeconds).toBeLessThan(1.52);
+      await library.scan();
+      const decoded = (await library.loadPage(0))[0]!;
+      expect(decoded.samples.length / 2 / 48_000).toBeCloseTo(result.durationSeconds, 4);
+      expect(decoded.samples.subarray(0, 0.03 * 48_000 * 2).some((value) => Math.abs(value) > 0.001)).toBe(true);
+    } finally {
+      await library.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("does not publish a silent render when the only note starts at the cycle end", async () => {
     const root = await temporaryRoot();
     try {
       const snapshot = await playingSnapshot();
+      snapshot.promoted = [testTake("outside")];
+      await expect(exportLoopSample({
+        snapshot, sampleRoot: root,
+        recordings: new Map([["outside", [{ position: 1, event: { type: "note-on", channel: 0, note: 60, velocity: 112 } }]]]),
+      })).rejects.toThrow("No audible sample material after rendering");
+      expect(await readdir(root)).toEqual([]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(["playing", "stopped", "counting-in"] as const)("respects staged audibility and monitor-only while %s, but allows drums", async (state) => {
+    const root = await temporaryRoot();
+    try {
+      const snapshot = await playingSnapshot();
+      snapshot.transport.state = state;
       snapshot.capture.staged = testTake("staged");
       snapshot.capture.stagedAudible = false;
       snapshot.promoted = [testTake("promoted", { muted: true })];
       await expect(exportLoopSample({ name: "Silent", snapshot, recordings: new Map(), sampleRoot: root })).rejects.toThrow("No audible note material");
 
       snapshot.monitorOnly = true;
+      snapshot.capture.stagedAudible = true;
+      snapshot.promoted[0]!.muted = false;
+      await expect(exportLoopSample({ name: "Monitor Only", snapshot, recordings: new Map(), sampleRoot: root })).rejects.toThrow("No audible note material");
       snapshot.drums.enabled = true;
       snapshot.drums.volume = 1;
       await expect(exportLoopSample({ name: "Drums Need Font", snapshot, recordings: new Map(), sampleRoot: root }))
@@ -182,18 +263,44 @@ describe("loop sample exporter", () => {
     }
   }, 30_000);
 
-  it("rejects missing eligible recordings, stopped transport, overlong cycles, and unsafe names", async () => {
+  it.each(["stopped", "counting-in"] as const)("exports completed sources while %s without changing the snapshot or recordings", async (state) => {
+    const root = await temporaryRoot();
+    const library = new SampleLibrary(root);
+    try {
+      const snapshot = await playingSnapshot();
+      snapshot.transport.state = state;
+      snapshot.transport.progress = state === "counting-in" ? 0.5 : 0;
+      snapshot.capture.staged = testTake("staged");
+      snapshot.capture.stagedAudible = true;
+      snapshot.capture.previousStaged = testTake("previous");
+      snapshot.promoted = [testTake("promoted"), testTake("muted", { muted: true }), testTake("zero", { level: 0 })];
+      const recordings = new Map([["staged", structuredClone(noteRecording)], ["promoted", structuredClone(noteRecording)]]);
+      const before = structuredClone({ snapshot, recordings });
+
+      const result = await exportLoopSample({ snapshot, recordings, sampleRoot: root });
+
+      expect(result.durationSeconds).toBe(2);
+      expect((await stat(result.path)).size).toBeGreaterThan(1_000);
+      await library.scan();
+      const decoded = (await library.loadPage(0))[0]!;
+      expect(decoded.samples.length).toBe(2 * 48_000 * 2);
+      expect(decoded.samples.some((sample) => Math.abs(sample) > 0.001)).toBe(true);
+      expect({ snapshot, recordings }).toEqual(before);
+    } finally {
+      await library.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it.each(["playing", "stopped", "counting-in"] as const)("rejects missing eligible recordings, overlong cycles, and unsafe names while %s", async (state) => {
     const root = await temporaryRoot();
     try {
       const snapshot = await playingSnapshot();
+      snapshot.transport.state = state;
       snapshot.promoted = [testTake("needed")];
       await expect(exportLoopSample({ name: "Missing", snapshot, recordings: new Map(), sampleRoot: root }))
         .rejects.toThrow("Missing recording for audible take: needed");
 
-      snapshot.transport.state = "stopped";
-      await expect(exportLoopSample({ name: "Stopped", snapshot, recordings: new Map(), sampleRoot: root }))
-        .rejects.toThrow("transport to be playing");
-      snapshot.transport.state = "playing";
       snapshot.settings.bpm = 30;
       snapshot.settings.beatsPerMeasure = 16;
       snapshot.settings.loopMeasures = 4;

@@ -1,0 +1,14 @@
+{
+  "name": "hms-jazzy-browser",
+  "private": true,
+  "scripts": {
+    "test:web": "node --test tests/scene.test.cjs",
+    "build:web": "esbuild src/hms_jazzy/web/scene.js --bundle --minify --format=iife --global-name=Jazzy3D --outfile=src/hms_jazzy/web/scene.bundle.js --legal-comments=linked"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
