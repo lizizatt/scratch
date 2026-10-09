@@ -38,6 +38,8 @@ def test_gcode_command_produces_midi(run_cli, tmp_path):
     assert code == 0, f"stdout: {out}\nstderr: {err}"
     assert out_mid.exists(), f"Expected {out_mid} to exist. stderr: {err}"
     assert out_mid.stat().st_size > 0, "MIDI file should be non-empty"
+    assert "assume" in err and "origin" in err and "absolute" in err and "mm" in err
+    assert "uncalibrated heuristic" in err
 
 
 @pytest.mark.skipif(not GCODE_FILE.exists(), reason="No calibration.gcode or Bench.gcode")
@@ -86,6 +88,7 @@ def test_melody_optimize_smoke(run_cli, tmp_path):
     assert code == 0, f"stdout: {out}\nstderr: {err}"
     assert out_gcode.exists(), f"Expected {out_gcode}. stderr: {err}"
     assert out_gcode.stat().st_size > 0, "Output GCODE should be non-empty"
+    assert "uncalibrated heuristic" in err
 
     # Parse output and original; command count should match
     orig_parser = GCodeParser()
@@ -98,3 +101,82 @@ def test_melody_optimize_smoke(run_cli, tmp_path):
     orig_f = [c.f for c in orig_parser.commands if c.f is not None]
     out_f = [c.f for c in out_parser.commands if c.f is not None]
     assert orig_f != out_f, "Expected some F change when region matches a different-pitch melody"
+
+
+@pytest.mark.parametrize("config", [
+    None,
+    {"time_scale": 1.0, "default_acceleration": 100},
+    {"schema_version": 2, "acceleration_units": "mm/s^2", "max_acceleration": 20000},
+])
+def test_gcode_rejects_missing_or_legacy_timing(run_cli, tmp_path, config):
+    source = tmp_path / "snippet.gcode"
+    source.write_text("G1 X10 F600\n")
+    timing = tmp_path / "timing.json"
+    if config is not None:
+        timing.write_text(json.dumps(config))
+    output = tmp_path / "out.mid"
+    code, out, err = run_cli("gcode", str(source), "--timing-params", str(timing), "-o", str(output))
+    assert code != 0
+    assert not output.exists()
+    assert "Error:" in err
+    if config is not None and "schema_version" not in config:
+        assert "schema_version=2" in err
+
+
+def test_gcode_accepts_version2_timing(run_cli, tmp_path):
+    source = tmp_path / "snippet.gcode"
+    source.write_text("G1 X10 F600\n")
+    timing = tmp_path / "timing.json"
+    timing.write_text(json.dumps({
+        "schema_version": 2, "acceleration_units": "mm/s^2", "default_acceleration": 100,
+    }))
+    output = tmp_path / "out.mid"
+    code, out, err = run_cli("gcode", str(source), "--timing-params", str(timing), "-o", str(output))
+    assert code == 0, f"{out}\n{err}"
+    import mido
+    assert mido.MidiFile(str(output)).length == pytest.approx(1.1, abs=0.002)
+    assert "uncalibrated heuristic" in err
+
+
+def test_simulate_supported_snippet_warns(run_cli, tmp_path):
+    source = tmp_path / "snippet.gcode"
+    source.write_text("G1 X1 F600\n")
+    output = tmp_path / "out.wav"
+    code, out, err = run_cli("simulate", str(source), "-o", str(output))
+    assert code == 0, f"{out}\n{err}"
+    assert output.stat().st_size > 0
+    assert "assume" in err and "origin" in err and "mm" in err and "absolute" in err
+    assert "uncalibrated heuristic" in err
+
+
+@pytest.mark.parametrize("command", ["gcode", "simulate", "melody-optimize"])
+def test_legacy_commands_refuse_input_overwrite(run_cli, tmp_path, command):
+    source = tmp_path / "snippet.gcode"
+    raw = b"G1 X10 F600\n"
+    source.write_bytes(raw)
+    melody = tmp_path / "melody.json"
+    melody.write_text('[{"midi_note": 60, "start_sec": 0, "duration_sec": 1}]')
+    extras = [str(melody)] if command == "melody-optimize" else []
+    code, out, err = run_cli(command, str(source), *extras, "-o", str(source))
+    assert code != 0
+    assert "same file" in err.lower()
+    assert source.read_bytes() == raw
+
+
+@pytest.mark.parametrize("command", ["simulate", "melody-optimize"])
+def test_full_p1s_file_fails_closed(run_cli, tmp_path, command):
+    source = ROOT / "data" / "Bench.gcode"
+    if not source.exists():
+        pytest.skip("No full P1S fixture")
+    original = source.read_bytes()
+    output = tmp_path / "output"
+    output.write_text("previous output")
+    melody = tmp_path / "melody.json"
+    melody.write_text('[{"midi_note": 60, "start_sec": 0, "duration_sec": 1}]')
+    extras = [str(melody)] if command == "melody-optimize" else ["--max-duration", "0.1"]
+    code, out, err = run_cli(command, str(source), *extras, "-o", str(output))
+    assert code != 0
+    assert "Unsupported timeline" in err
+    assert "uncalibrated heuristic" in err
+    assert output.read_text() == "previous output"
+    assert source.read_bytes() == original

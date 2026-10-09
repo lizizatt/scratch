@@ -1,0 +1,114 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>PETG acoustic candidates</title>
+<style>
+:root{color-scheme:dark;font:16px/1.6 system-ui,sans-serif;background:#0c1521;color:#e6eff8}
+body{max-width:1080px;margin:auto;padding:36px 22px}h1{font-size:clamp(2rem,5vw,3rem);line-height:1.15;margin:12px 0}
+h2{margin:10px 0;font-size:1.5rem}p{color:#b9c9d9}.tag{font-size:.72rem;letter-spacing:.09em;color:#70dfc7;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:24px 0}article{padding:23px;background:#152336;border:1px solid #334459;border-radius:16px}
+audio{width:100%;margin:10px 0}button{font:inherit;border:1px solid #607a90;background:#233950;color:#fff;border-radius:9px;padding:10px 16px;cursor:pointer}
+button:hover,button:focus-visible{background:#35526f}nav{display:flex;gap:10px;flex-wrap:wrap}a{color:#79dfcd}img{width:100%;height:auto}small{color:#b9c9d9}
+.notice{padding:16px;border-left:3px solid #ffba77;background:#192638}footer{margin:26px 0}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style></head><body><header><span class="tag">PETG SQUARE / 2026-10-05 / OFFLINE</span>
+<h1>Three rates. One unchanged capture.</h1>
+<p>Auditions plus acceleration-aware single-voice spectral diagnostics. No calibrated profile or physical motor identification.</p></header>
+<p class="notice">Not matched to recording loudness. No per-file normalization, new trim, or time stretch.
+Recording playback is a derived PCM16 copy of the existing AAC decode; quantization is documented in the report.
+Fans are omitted from synthesis, not assumed off in the printer. The 8-cycle audio is the original baseline.</p>
+<h2>Compare a moment</h2><p>Approximate correspondence: recording = local + 12.15 s, frozen from the earlier envelope fit.
+Buttons pause all four players and request seeks only within available seekable ranges; they never start playback.
+Seek completion is checked after the seeked event, not inferred from loading readiness.</p>
+<nav aria-label="Synchronized seek"><button data-local="0">Border · 0 / 12.15 s</button>
+<button data-local="2.54">Fill · 2.54 / 14.69 s</button><button data-local="20">Later · 20 / 32.15 s</button></nav>
+<p id="status" role="status">Paused. Choose a moment, then play one clip.</p>
+<section class="grid" aria-label="Recording and candidates"><article><span class="tag">CAPTURE · RECORDING CLOCK</span><h2>Original recording / PCM playback</h2>
+<p>0–57.07 s · decoded WAV playback copy · mono 48 kHz PCM16</p>
+<audio controls preload="metadata" data-offset="12.15" aria-label="Original recording PCM playback" src="recording_playback.wav"></audio>
+<p class="media-status" role="status">Paused. Seeking requires a loaded seekable range.</p>
+<p><a href="../raw/New%20Recording%2015%20copy.m4a" download>Download unchanged original AAC (raw)</a> ·
+<a href="recording_playback.wav" download>Download decoded WAV playback copy</a></p>
+<p>Underlying AAC is still lossy; conversion cannot recover discarded detail. No new trim, stretch, or normalization.</p>
+<p>Real fans and processing may be present. Not loudness matched to the candidates.</p></article>
+<article><span class="tag">CANDIDATE · NOT CALIBRATED</span><h2>2.5 cycles/mm</h2>
+<p>Local 0–31.08 s · AB rate only changed</p>
+<audio controls preload="metadata" data-offset="0" aria-label="2.5 cycles per mm candidate" src="candidate_2p5.wav"></audio>
+<p class="media-status" role="status">Paused. Seeking requires a loaded seekable range.</p>
+<p><a href="candidate_2p5.wav" download>Download candidate WAV</a></p>
+<p>Full default ABZE voices and harmonics · fixed gain · motors only.</p></article>
+<article><span class="tag">CANDIDATE · NOT CALIBRATED</span><h2>5 cycles/mm</h2>
+<p>Local 0–31.08 s · AB rate only changed</p>
+<audio controls preload="metadata" data-offset="0" aria-label="5 cycles per mm candidate" src="candidate_5.wav"></audio>
+<p class="media-status" role="status">Paused. Seeking requires a loaded seekable range.</p>
+<p><a href="candidate_5.wav" download>Download candidate WAV</a></p>
+<p>Full default ABZE voices and harmonics · fixed gain · motors only.</p></article>
+<article><span class="tag">ORIGINAL BASELINE · BYTE-IDENTICAL</span><h2>8 cycles/mm</h2>
+<p>Local 0–31.08 s · AB rate only changed</p>
+<audio controls preload="metadata" data-offset="0" aria-label="8 cycles per mm candidate" src="candidate_8.wav"></audio>
+<p class="media-status" role="status">Paused. Seeking requires a loaded seekable range.</p>
+<p><a href="candidate_8.wav" download>Download candidate WAV</a></p>
+<p>Full default ABZE voices and harmonics · fixed gain · motors only.</p></article></section>
+<h2>Acceleration-aware evidence</h2><p>The plot uses a separate A-only fundamental chirp, not the full audition mix.
+Its entire window follows synthesized signed displacement and acceleration. Scores are arbitrary spectral contrast, not likelihood or significance.</p>
+<img src="scores.svg" alt="Bottom-region actual scores versus circular control mean and maximum at 4096 and 8192 samples">
+<p>2.5 and 5 were selected after examining this same recording. Stationary tones are suppressed by regional median whitening,
+but harmonic ambiguity and background/AGC confounds remain. The offset and early/late checks are not independent validation.</p>
+<footer><a href="REPORT.md">Full report and all regional scores</a> · <a href="report.json">Hashes, profiles, and controls (JSON)</a>
+<p><small>Standard 100%, complete square, only ends trimmed, Skip Silence off: user reports, not independent measurements.
+Phone wedged through the top hatch, otherwise closed; AGC unknown. No defaults changed.</small></p></footer>
+<script>
+const players = [...document.querySelectorAll('audio')];
+const status = document.getElementById('status');
+const inSeekableRange = (player, target) => {
+    for (let i = 0; i < player.seekable.length; i++) {
+        if (target >= player.seekable.start(i) && target <= player.seekable.end(i)) return true;
+    }
+    return false;
+};
+const mediaMessage = (player, message) => {
+    player.closest('article').querySelector('.media-status').textContent = message;
+};
+for (const player of players) {
+    player.addEventListener('play', () => {
+        for (const other of players) if (other !== player) other.pause();
+    });
+    player.addEventListener('error', () => {
+        delete player.dataset.seekTarget;
+        const reasons = {1: 'loading aborted', 2: 'network/loading failure',
+            3: 'audio decoding failure', 4: 'unsupported codec or source'};
+        const message = `Codec/loading error: ${reasons[player.error?.code] || 'unknown media failure'}. ` +
+            'Try the direct WAV download; check server byte-range support if seeking fails.';
+        mediaMessage(player, message);
+        status.textContent = `${player.getAttribute('aria-label')}: ${message}`;
+    });
+    player.addEventListener('seeked', () => {
+        if (player.dataset.seekTarget === undefined) return;
+        const target = Number(player.dataset.seekTarget);
+        const verified = !player.error && !player.seeking && inSeekableRange(player, target) &&
+            Math.abs(player.currentTime - target) <= 0.05;
+        mediaMessage(player, verified ? `Seek confirmed at ${player.currentTime.toFixed(2)} s. Paused; press play to listen.` :
+            'Seek not confirmed. Check loading/byte-range support or use the WAV download.');
+        delete player.dataset.seekTarget;
+    });
+}
+for (const button of document.querySelectorAll('button[data-local]')) {
+  button.addEventListener('click', () => {
+    const local = Number(button.dataset.local);
+        status.textContent = 'Players paused. Seek requested; see each player for completion or loading errors.';
+    for (const player of players) {
+      player.pause();
+            delete player.dataset.seekTarget;
+            const target = local + Number(player.dataset.offset);
+            if (player.error || !Number.isFinite(target) || !inSeekableRange(player, target)) {
+                mediaMessage(player, 'Cannot seek: codec/loading error or target outside available seekable ranges. Wait for loading and retry, or download the WAV.');
+                continue;
+            }
+            player.dataset.seekTarget = String(target);
+            mediaMessage(player, `Seeking to ${target.toFixed(2)} s; awaiting confirmation.`);
+            try { player.currentTime = target; }
+            catch (error) {
+                delete player.dataset.seekTarget;
+                mediaMessage(player, `Seek failed (loading/codec): ${error.message}`);
+            }
+    }
+  });
+}
+</script></body></html>

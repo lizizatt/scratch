@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "path": "log/audio_preview/audio_demo_motors.wav",
+  "peak": 0.21045482369221266,
+  "clipped_samples": 0,
+  "sha256": "9e57c7bf62deb14547837cca26721d0e9767e2a5c75541b6ed06f4ac7a491d0c",
+  "frames": 1141714,
+  "sample_rate": 48000,
+  "duration_sec": 23.785708333333332,
+  "planned_duration_sec": 23.785726955823392,
+  "truncated": false,
+  "profile": {
+    "schema_version": 1,
+    "calibrated": false,
+    "acoustic_cycles_per_mm": [
+      8.0,
+      8.0,
+      40.0,
+      8.0
+    ],
+    "harmonic_weights": [
+      1.0,
+      0.32,
+      0.12,
+      0.06
+    ],
+    "voice_gains": [
+      0.65,
+      0.53,
+      0.35,
+      0.4
+    ],
+    "master_gain": 0.18,
+    "amplitude_speed_mm_s": 4.0,
+    "fan_level": 0.12,
+    "fan_frequencies_hz": [
+      180.0,
+      125.0,
+      95.0
+    ],
+    "fan_time_constant_sec": 0.35,
+    "fan_noise_mix": 0.55,
+    "seed": 20261005
+  },
+  "motors": true,
+  "fans": false,
+  "stems": {},
+  "assumptions": [
+    "Offline uncalibrated audition, not actual stock P1S music or GCODE safety validation.",
+    "Acoustic cycles/mm are assumed, not physical measured steps/mm.",
+    "Signed cumulative displacement phase; magnitude of motor velocity sets pitch.",
+    "Fixed gain across all files; no per-file normalization or measured SPL.",
+    "All fans initially zero. Default M106/M107 aliases P1 only in this illustrative model.",
+    "P1/P2/P3 have toy duty-to-frequency and noise responses; physical mapping and RPM unknown.",
+    "No hotend/board fan, temperature acoustics, resonances, or stock noise compensation modeled."
+  ],
+  "source": {
+    "path": "data/audio_demo.gcode",
+    "sha256": "aae06436e8af16aa2d8b17b82c1dfc973a9b29696d17101991a975336d4adb3c",
+    "size_bytes": 1681
+  },
+  "profile_source": {
+    "path": "data/audio_preview_profile.json",
+    "sha256": "19333a6751e383d047308415e3dfd937efb017cb13f02ac4ac9c69270d271b76",
+    "size_bytes": 387
+  },
+  "context": {
+    "initial_xyz_mm": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "initial_e_mm": 0.0,
+    "xyz_mode": "absolute",
+    "e_mode": "absolute",
+    "units": "mm",
+    "feedrate_mm_min": null
+  },
+  "context_path": null,
+  "planner_config": {
+    "default_acceleration_mm_s2": 10000.0,
+    "max_velocity_xyz_mm_s": [
+      500.0,
+      500.0,
+      20.0
+    ],
+    "max_velocity_e_mm_s": 30.0,
+    "max_acceleration_xyz_mm_s2": [
+      20000.0,
+      20000.0,
+      500.0
+    ],
+    "max_acceleration_e_mm_s2": 5000.0,
+    "junction_velocity_jump_xyz_mm_s": [
+      9.0,
+      9.0,
+      3.0
+    ],
+    "junction_velocity_jump_e_mm_s": 2.5,
+    "max_velocity_ab_mm_s": null,
+    "max_acceleration_ab_mm_s2": null
+  },
+  "planner_label": "approximate theoretical P1S reference; not measured or stock verified",
+  "planner_diagnostics": [
+    "Approximate theoretical P1S reference, not measured/stock-verified; not GCODE safety validation.",
+    "Classic axis velocity-jump junction approximation; no firmware compensation or steps/mm assumed.",
+    "Dynamic M201/M203/M205 and all other unsupported timeline commands are rejected; M204 S is honored.",
+    "Nonblocking events retain source order at motion boundaries; E-only/Cartesian transitions stop."
+  ],
+  "firmware_accurate": false,
+  "report_path": "log/audio_preview/audio_demo_motors.json",
+  "render_options": {
+    "sample_rate": 48000,
+    "chunk_size": 8192,
+    "max_duration_sec": null,
+    "motors": true,
+    "fans": false,
+    "stems_dir": null
+  }
+}

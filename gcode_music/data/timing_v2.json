@@ -1,0 +1,8 @@
+{
+  "schema_version": 2,
+  "acceleration_units": "mm/s^2",
+  "mode": "rest_to_rest",
+  "default_acceleration": 10000.0,
+  "time_scale": 1.0,
+  "time_offset": 0.0
+}

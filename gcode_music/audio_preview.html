@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GCODE Music · First audition</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #10151d; color: #e7edf4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 980px; margin: auto; padding: 56px 24px; }
+    header { margin-bottom: 30px; }
+    .eyebrow { color: #6ee7cc; text-transform: uppercase; letter-spacing: .16em; font-size: .75rem; font-weight: 700; }
+    h1 { font-size: clamp(2.1rem, 6vw, 3.6rem); letter-spacing: -.045em; margin: 14px 0; line-height: 1.1; }
+    h2 { font-size: 1.2rem; margin: 0 0 10px; }
+    p { color: #adbacc; line-height: 1.6; }
+    a { color: #83dacb; text-underline-offset: 3px; }
+    a:hover { color: #c7fff2; }
+    .notice { padding: 16px 20px; border-left: 3px solid #e7b778; background: #29251f; border-radius: 0 8px 8px 0; color: #edcea5; }
+    .meta { display: flex; gap: 10px; flex-wrap: wrap; margin: 22px 0; }
+    .meta span { border: 1px solid #334152; border-radius: 20px; padding: 6px 12px; font-size: .8rem; color: #b8c6d7; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { padding: 24px; border: 1px solid #303c4c; border-radius: 14px; background: #19222e; }
+    .card.primary { grid-column: 1 / -1; border-color: #4e9f91; background: linear-gradient(115deg, #1a3436, #19222e 75%); }
+    .number { color: #6ee7cc; font-size: .8rem; font-weight: 700; margin-bottom: 10px; }
+    audio { display: block; width: 100%; margin: 20px 0 14px; }
+    .links { display: flex; gap: 18px; font-size: .85rem; flex-wrap: wrap; }
+    section { margin-top: 34px; }
+    .chapters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+    button { font: inherit; text-align: left; padding: 15px; border: 1px solid #334152; border-radius: 8px; background: #19222e; color: #d8e3ef; cursor: pointer; }
+    button:hover { background: #243644; border-color: #6ee7cc; }
+    :focus-visible { outline: 3px solid #e7b778; outline-offset: 4px; }
+    button time { display: block; font-size: .8rem; color: #6ee7cc; margin-bottom: 5px; }
+    .fine { font-size: .85rem; }
+    footer { border-top: 1px solid #303c4c; margin-top: 32px; padding-top: 20px; }
+    code { color: #d7e8ed; }
+    @media (max-width: 620px) { main { padding: 32px 16px; } .cards, .chapters { grid-template-columns: 1fr; } .card { padding: 20px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">GCODE Music / Offline sound lab</div>
+    <h1>Motion you can hear.</h1>
+    <p>A first audition of continuous CoreXY motion: an ascending scale, speed changes, diagonals, corners, and rests. Start with the motors, then compare the same motion with illustrative fans.</p>
+    <p class="notice"><strong>Uncalibrated simulation—not a P1S recording.</strong> Motor pitch, timbre, and fan levels are assumed. This tests the model's behavior, not its agreement with a stock printer. Start at low playback volume.</p>
+    <div class="meta"><span>23.79 seconds</span><span>48 kHz · mono · PCM16</span><span>Shared fixed gain</span><span>No clipped samples</span></div>
+  </header>
+  <div class="cards">
+    <article class="card primary">
+      <div class="number">01 / START HERE</div>
+      <h2 id="motor-title">Motors only</h2>
+      <p>Separate A, B, Z, and E voices. Listen for C4 → C5, pitch bends during acceleration, and smooth sound through the short collinear moves.</p>
+      <audio id="motors" aria-labelledby="motor-title" controls preload="metadata" src="log/audio_preview/audio_demo_motors.wav"></audio>
+      <div class="links"><a href="log/audio_preview/audio_demo_motors.wav" download>Download WAV</a><a href="log/audio_preview/audio_demo_motors.json">Provenance &amp; settings</a></div>
+    </article>
+    <article class="card">
+      <div class="number">02 / COMPARE</div>
+      <h2 id="mix-title">Motors + fans</h2>
+      <p>Identical motor gain, with toy fan tones and noise beginning at 11.25 s. No independent loudness normalization.</p>
+      <audio aria-labelledby="mix-title" controls preload="metadata" src="log/audio_preview/audio_demo_mix.wav"></audio>
+      <div class="links"><a href="log/audio_preview/audio_demo_mix.wav" download>Download WAV</a><a href="log/audio_preview/audio_demo_mix.json">Provenance</a></div>
+    </article>
+    <article class="card">
+      <div class="number">03 / ISOLATE</div>
+      <h2 id="fan-title">Fans only</h2>
+      <p>Silent until 11.25 s, then three illustrative sources spin up. They decay after 22.29 s. Not measured fan RPM or noise.</p>
+      <audio aria-labelledby="fan-title" controls preload="metadata" src="log/audio_preview/audio_demo_fans.wav"></audio>
+      <div class="links"><a href="log/audio_preview/audio_demo_fans.wav" download>Download WAV</a><a href="log/audio_preview/audio_demo_fans.json">Provenance</a></div>
+    </article>
+  </div>
+  <section aria-labelledby="landmarks">
+    <h2 id="landmarks">Listening landmarks</h2>
+    <p class="fine">Choose a landmark to pause and seek all three players to the same time. Then press play on the version you want to compare.</p>
+    <div class="chapters">
+      <button type="button" data-seek="0.5"><time>00.50–02.16</time>Z lift + diagonal positioning</button>
+      <button type="button" data-seek="2.507"><time>02.51–10.95</time>Ascending C-major scale · eight notes</button>
+      <button type="button" data-seek="11.246"><time>11.25–14.34</time>Y moves · two speeds + fan start</button>
+      <button type="button" data-seek="14.636"><time>14.64–17.57</time>Diagonals · one XY motor at a time</button>
+      <button type="button" data-seek="17.872"><time>17.87–19.19</time>Short segments, corner, reversal</button>
+      <button type="button" data-seek="19.186"><time>19.19–23.79</time>E voice, coordinated move, fan tail</button>
+    </div>
+    <p id="seek-status" role="status" class="fine">Playback is manual; nothing autoplays.</p>
+  </section>
+  <section>
+    <h2>What to sanity-check</h2>
+    <p>Is the scale recognizable? Do the acceleration bends feel plausible? Are the corners or direction changes objectionably clicky? Does the sound feel too tonal or too clean compared with your printer? Timestamps and which version you heard will make feedback useful.</p>
+    <p class="fine">The scale uses an assumed 8 acoustic cycles/mm for A/B—not measured steps/mm. Motion uses a P1S-reference approximation, without stock noise cancellation, measured enclosure resonances, or pressure advance. These clips do not establish whether a real P1S can play this scale.</p>
+  </section>
+  <footer>
+    <div class="links"><a href="data/audio_demo.gcode">Simulation-only source</a><a href="data/audio_preview_profile.json">Acoustic profile</a><a href="README.md">Usage &amp; limitations</a><a href="log/audio_preview/stems/A.wav">A stem</a><a href="log/audio_preview/stems/B.wav">B stem</a><a href="log/audio_preview/stems/Z.wav">Z stem</a><a href="log/audio_preview/stems/E.wav">E stem</a></div>
+    <p class="fine">The authored source is not a print job and has not been reviewed for printer execution. Do not send it to hardware. No hardware is accessed by this page or renderer.</p>
+  </footer>
+</main>
+<script>
+  const players = [...document.querySelectorAll('audio')];
+  for (const player of players) {
+    player.addEventListener('play', () => {
+      for (const other of players) if (other !== player) other.pause();
+    });
+    player.addEventListener('error', () => {
+      document.getElementById('seek-status').textContent = 'Audio could not load. Check the generated files and serve this page over local HTTP (see README); file URLs may be blocked.';
+    });
+  }
+  for (const button of document.querySelectorAll('[data-seek]')) {
+    button.addEventListener('click', () => {
+      const time = Number(button.dataset.seek);
+      const canSeek = players.every(player => Array.from({length: player.seekable.length}, (_, i) =>
+        time >= player.seekable.start(i) && time <= player.seekable.end(i)).some(Boolean));
+      if (!canSeek) {
+        document.getElementById('seek-status').textContent = 'Audio is not ready to seek. Wait for loading; if this persists, use a byte-range-capable HTTP server (see README).';
+        return;
+      }
+      for (const player of players) {
+        player.pause();
+        player.currentTime = time;
+      }
+      document.getElementById('seek-status').textContent = `All players paused at ${time.toFixed(2)} seconds. Press play to compare.`;
+    });
+  }
+</script>
+</body>
+</html>

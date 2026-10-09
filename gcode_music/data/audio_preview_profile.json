@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "calibrated": false,
+  "acoustic_cycles_per_mm": [8.0, 8.0, 40.0, 8.0],
+  "harmonic_weights": [1.0, 0.32, 0.12, 0.06],
+  "voice_gains": [0.65, 0.53, 0.35, 0.4],
+  "master_gain": 0.18,
+  "amplitude_speed_mm_s": 4.0,
+  "fan_level": 0.12,
+  "fan_frequencies_hz": [180.0, 125.0, 95.0],
+  "fan_time_constant_sec": 0.35,
+  "fan_noise_mix": 0.55,
+  "seed": 20261005
+}

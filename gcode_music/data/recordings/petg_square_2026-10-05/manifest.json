@@ -1,0 +1,383 @@
+{
+  "schema_version": 1,
+  "capture_date": "2026-10-05",
+  "calibrated": false,
+  "user_confirmations": {
+    "entire_square_captured": {
+      "value": true,
+      "provenance": "user report in 2026-10-05 task",
+      "independently_verified": false
+    },
+    "calibration_procedures_removed": {
+      "value": true,
+      "provenance": "user report in 2026-10-05 task",
+      "independently_verified": false
+    },
+    "printer_speed_mode": {
+      "value": "Standard 100%",
+      "provenance": "user report in 2026-10-05 task",
+      "independently_verified": false
+    },
+    "trimmed_only_ends": {
+      "value": true,
+      "provenance": "user report in 2026-10-05 task",
+      "independently_verified": false
+    },
+    "internal_cuts": {
+      "value": false,
+      "provenance": "user report in 2026-10-05 task",
+      "independently_verified": false
+    },
+    "recording_app": {
+      "value": "Voice Memos",
+      "provenance": "user report in 2026-10-05 task",
+      "independently_verified": false
+    },
+    "skip_silence_enabled": {
+      "value": false,
+      "provenance": "user report in 2026-10-05 task",
+      "independently_verified": false
+    },
+    "phone_placement": {
+      "value": "Phone wedged in the otherwise closed enclosure via the top hatch",
+      "provenance": "user report in 2026-10-05 task",
+      "independently_verified": false
+    }
+  },
+  "user_timing_estimates": {
+    "provenance": "user report in 2026-10-05 task, after candidate alignment was shared",
+    "clock": "seconds in the supplied trimmed recording",
+    "approximate": true,
+    "uncertainty_s": null,
+    "independently_verified": false,
+    "used_for_alignment_fit": false,
+    "estimates_s": {
+      "border_start": 12,
+      "infill_start": 15,
+      "printing_end": 43
+    },
+    "qualification": "User has no solid timing; rough recollections, not measured landmarks or held-out validation."
+  },
+  "assumptions": [
+    "Commanded XYZ boundary is nominal; mesh, trim and physical position are unknown.",
+    "E starts at arbitrary zero because the sourced extrusion mode is relative.",
+    "Planner assumes rest at the selected region boundaries; preceding/following motion is excluded.",
+    "Default PlannerConfig limits match sourced M201/M203/M205; only initial acceleration is overridden to 6000.",
+    "M204 S500 at line 823 supersedes that initial acceleration before the first XYZ move.",
+    "No physical pressure-advance, vibration/noise-compensation, or firmware planner state is established.",
+    "One constant exploratory offset, no time warping or speed rescaling; not a measured print start.",
+    "Outer-wall alignment is extrapolated from a globally selected offset, not independently validated.",
+    "Phone placement is user-described, not geometrically measured; hatch contact may couple vibration and the opening may alter enclosure acoustics.",
+    "Voice Memos Skip Silence was off and only ends were trimmed per user; gain/AGC, enhancement and other processing remain unknown. AAC is lossy.",
+    "Approximate user timing estimates are consistent with the candidate alignment but were supplied after it was shared; they are not independent timing validation.",
+    "No measured SPL, fan/motor identification, acoustic calibration, physical validation or safety guarantee.",
+    "Complete square capture is only the user report, not a guarantee established by this analysis.",
+    "Fans are excluded from the baseline, not assumed physically off: P3 S180 at line 784, part/aux S0 at 800/801; hotend/board state unknown."
+  ],
+  "source": {
+    "full_gcode_path": "source/plate_1.full.gcode",
+    "full_gcode_sha256": "a6b6672d7b24047743dc6e80b04011d6465aa6f31688c91f6475e4df4e55ecff",
+    "archive_member": "Metadata/plate_1.gcode",
+    "embedded_md5_as_stored": "58AB37A82BE34678F7D3980BE8701901",
+    "embedded_md5_normalized": "58ab37a82be34678f7d3980be8701901",
+    "embedded_md5_verified": true,
+    "full_line_count": 1136,
+    "retained_original_lines_inclusive": [
+      820,
+      1076
+    ],
+    "retained_record_count": 257,
+    "excluded_original_lines_inclusive": [
+      [
+        1,
+        819
+      ],
+      [
+        1077,
+        1136
+      ]
+    ],
+    "exclusion_reason": "Explicit nominal body scope, not unsupported-op filtering; startup/boundary and end sequence excluded.",
+    "full_input_supported": false,
+    "full_input_planner_refusal": "Cannot plan incomplete timeline: Line 505: opcode or parameter form not modeled",
+    "exact_statements": {
+      "3": {
+        "text": "; model printing time: 48s; total estimated time: 8m 5s",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L3"
+      },
+      "505": {
+        "text": "M201 X20000 Y20000 Z500 E5000",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L505"
+      },
+      "506": {
+        "text": "M203 X500 Y500 Z20 E30",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L506"
+      },
+      "508": {
+        "text": "M205 X9.00 Y9.00 Z3.00 E2.50",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L508"
+      },
+      "784": {
+        "text": "M106 P3 S180",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L784"
+      },
+      "788": {
+        "text": "G90",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L788"
+      },
+      "789": {
+        "text": "G21",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L789"
+      },
+      "790": {
+        "text": "M83 ; use relative distances for extrusion",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L790"
+      },
+      "800": {
+        "text": "M106 S0",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L800"
+      },
+      "801": {
+        "text": "M106 P2 S0",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L801"
+      },
+      "802": {
+        "text": "M204 S6000",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L802"
+      },
+      "817": {
+        "text": "G1 X141.762 Y140.776",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L817"
+      },
+      "818": {
+        "text": "G1 Z.2",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L818"
+      },
+      "819": {
+        "text": "G1 E.8 F1800",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L819"
+      },
+      "820": {
+        "text": "; FEATURE: Outer wall",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L820"
+      },
+      "823": {
+        "text": "M204 S500",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L823"
+      },
+      "825": {
+        "text": "G1 X116.823 Y140.776 E.90046",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L825"
+      },
+      "839": {
+        "text": "; FEATURE: Bottom surface",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L839"
+      },
+      "1076": {
+        "text": "M106 P2 S0",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L1076"
+      },
+      "1077": {
+        "text": "M981 S0 P20000 ; close spaghetti detector",
+        "provenance": "pinned full GCODE",
+        "reference": "source/plate_1.full.gcode#L1077"
+      }
+    }
+  },
+  "model": {
+    "execution_context": {
+      "initial_xyz_mm": [
+        141.762,
+        140.776,
+        0.2
+      ],
+      "initial_e_mm": 0,
+      "xyz_mode": "absolute",
+      "e_mode": "relative",
+      "units": "mm",
+      "feedrate_mm_min": 1800
+    },
+    "planner_config": {
+      "default_acceleration_mm_s2": 6000,
+      "max_velocity_xyz_mm_s": [
+        500.0,
+        500.0,
+        20.0
+      ],
+      "max_velocity_e_mm_s": 30.0,
+      "max_acceleration_xyz_mm_s2": [
+        20000.0,
+        20000.0,
+        500.0
+      ],
+      "max_acceleration_e_mm_s2": 5000.0,
+      "junction_velocity_jump_xyz_mm_s": [
+        9.0,
+        9.0,
+        3.0
+      ],
+      "junction_velocity_jump_e_mm_s": 2.5,
+      "max_velocity_ab_mm_s": null,
+      "max_acceleration_ab_mm_s2": null
+    },
+    "audio_profile": {
+      "schema_version": 1,
+      "calibrated": false,
+      "acoustic_cycles_per_mm": [
+        8.0,
+        8.0,
+        40.0,
+        8.0
+      ],
+      "harmonic_weights": [
+        1.0,
+        0.32,
+        0.12,
+        0.06
+      ],
+      "voice_gains": [
+        0.65,
+        0.53,
+        0.35,
+        0.4
+      ],
+      "master_gain": 0.18,
+      "amplitude_speed_mm_s": 4.0,
+      "fan_level": 0.12,
+      "fan_frequencies_hz": [
+        180.0,
+        125.0,
+        95.0
+      ],
+      "fan_time_constant_sec": 0.35,
+      "fan_noise_mix": 0.55,
+      "seed": 0
+    },
+    "render_audio": {
+      "schema_version": 1,
+      "path": "baseline_motor.wav",
+      "peak": 0.2667715067324874,
+      "clipped_samples": 0,
+      "sha256": "fbeaa6f1746e80a433eb76cf6950c5bf0437cd6e08a328174898762b7c7ebef2",
+      "frames": 1491942,
+      "sample_rate": 48000,
+      "duration_sec": 31.082125,
+      "planned_duration_sec": 31.082142344540916,
+      "truncated": false,
+      "profile": {
+        "schema_version": 1,
+        "calibrated": false,
+        "acoustic_cycles_per_mm": [
+          8.0,
+          8.0,
+          40.0,
+          8.0
+        ],
+        "harmonic_weights": [
+          1.0,
+          0.32,
+          0.12,
+          0.06
+        ],
+        "voice_gains": [
+          0.65,
+          0.53,
+          0.35,
+          0.4
+        ],
+        "master_gain": 0.18,
+        "amplitude_speed_mm_s": 4.0,
+        "fan_level": 0.12,
+        "fan_frequencies_hz": [
+          180.0,
+          125.0,
+          95.0
+        ],
+        "fan_time_constant_sec": 0.35,
+        "fan_noise_mix": 0.55,
+        "seed": 0
+      },
+      "motors": true,
+      "fans": false,
+      "stems": {},
+      "assumptions": [
+        "Offline uncalibrated audition, not actual stock P1S music or GCODE safety validation.",
+        "Acoustic cycles/mm are assumed, not physical measured steps/mm.",
+        "Signed cumulative displacement phase; magnitude of motor velocity sets pitch.",
+        "Fixed gain across all files; no per-file normalization or measured SPL.",
+        "All fans initially zero. Default M106/M107 aliases P1 only in this illustrative model.",
+        "P1/P2/P3 have toy duty-to-frequency and noise responses; physical mapping and RPM unknown.",
+        "No hotend/board fan, temperature acoustics, resonances, or stock noise compensation modeled."
+      ]
+    },
+    "global_defaults_modified": false,
+    "plan_diagnostics": [
+      "Approximate theoretical P1S reference, not measured/stock-verified; not GCODE safety validation.",
+      "Classic axis velocity-jump junction approximation; no firmware compensation or steps/mm assumed.",
+      "Dynamic M201/M203/M205 and all other unsupported timeline commands are rejected; M204 S is honored.",
+      "Nonblocking events retain source order at motion boundaries; E-only/Cartesian transitions stop."
+    ]
+  },
+  "inferences": {
+    "provenance": "exploratory analysis of one capture, not user-confirmed",
+    "alignment_independently_validated": false,
+    "details": "analysis.json"
+  },
+  "software": {
+    "source_module_sha256": {
+      "scripts/analyze_petg_square.py": "5e7e9b06d0ae878e4538a32fc7152e8b9960ebf475850455c22894622a296c28",
+      "gcode_source.py": "fc7b114b5b77f6f7e4e31106f456e5e1b4df3e3b1aab5712f241c74486c4e73f",
+      "motion_timeline.py": "2c2deba8db53dc95df56d15f0a61330d36c34f8e8936692a7b430e66d4b33538",
+      "motion_planner.py": "b12f85a6d7ec7122433342c32dcc51d624f6bd697d6e4e6272e71ab084e2cb42",
+      "models.py": "c0bc5fd744e2dd64d4c5fc4a9e90e68881ef384ba5532aaae5eb22d19e6ceb9b",
+      "motor_audio.py": "384e2b1a8104962264830f11b69c07d7e166c26cd74db6f7a7efb319a9f211e5"
+    },
+    "source_path_basis": "gcode_music project root, not bundle directory",
+    "python_version": "3.12.3",
+    "numpy_version": "2.5.3",
+    "ffmpeg_version": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers\nbuilt with gcc 13 (Ubuntu 13.2.0-23ubuntu3)\nconfiguration: --prefix=/usr --extra-version=3ubuntu5 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --disable-libmfx --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libjack --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-pocketsphinx --enable-librsvg --enable-libjxl --enable-shared\nlibavutil      58. 29.100 / 58. 29.100\nlibavcodec     60. 31.102 / 60. 31.102\nlibavformat    60. 16.100 / 60. 16.100\nlibavdevice    60.  3.100 / 60.  3.100\nlibavfilter     9. 12.100 /  9. 12.100\nlibswscale      7.  5.100 /  7.  5.100\nlibswresample   4. 12.100 /  4. 12.100\nlibpostproc    57.  3.100 / 57.  3.100\n",
+    "decode_arguments": [
+      "-v",
+      "error",
+      "-nostdin",
+      "-i",
+      "raw/New Recording 15 copy.m4a",
+      "-ac",
+      "1",
+      "-ar",
+      "48000",
+      "-f",
+      "f32le",
+      "pipe:1"
+    ]
+  },
+  "artifact_sha256": {
+    "raw/New Recording 15 copy.m4a": "756f714ab89ca307a4aa536bc497625dddb75c384fb30130ea89dda20c360d4e",
+    "raw/gcode_to_music_square.gcode.3mf": "ab21c24824e63a957d24e478689b6e9933ff7f3aa724642533bce97d589cacde",
+    "raw/gcode_to_music_square.3mf": "8b24568844a1ad3f972ed1904f3b910cc2139325184ad8839d84290f725808bc",
+    "source/plate_1.full.gcode": "a6b6672d7b24047743dc6e80b04011d6465aa6f31688c91f6475e4df4e55ecff",
+    "baseline_motor.wav": "fbeaa6f1746e80a433eb76cf6950c5bf0437cd6e08a328174898762b7c7ebef2",
+    "analysis.json": "d369b66d0fddb31208783ed8af31e80ace8381b352fa191159a4525cef0b215a",
+    "comparison.svg": "5f4dbd282e247454f46484a96669f99f203e9e2ecf50fd345eaa4eccec4333e1",
+    "REPORT.md": "cd1b72f7e6b0119b602827ce251f04f590f37e7f5568599cdd7d8448640c3ac2"
+  }
+}
