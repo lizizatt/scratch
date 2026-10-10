@@ -1,6 +1,13 @@
 # TODO: a higher-quality stock P1S simulator
 
-Created: 2026-10-05. Last updated: 2026-10-05. Status: continuous linear planning and uncalibrated audio audition implemented and tested; M0/M1/M2 remain partial. No hardware validation or acoustic calibration.
+Created: 2026-10-05. Last updated: 2026-10-09. Status: continuous linear planning, uncalibrated audio and single-capture full-harmonic diagnostics implemented; 707 tests pass. M0/M1/M2 remain partial. One exploratory real recording, no independent hardware validation or acoustic calibration.
+
+**Current next step:** [independent normal-print orientation recordings](NEXT_RECORDING.md).
+The [full-harmonic comparison](log/petg_harmonics/REPORT.md) is complete: full 5
+leads infill spectral contrast, but 2.5's second harmonic and 5's fundamental
+remain ambiguous, and synthetic contrast ranking can favor a wrong base rate.
+Do not promote a default or resume hardware melody edits on this evidence.
+Earlier test counts below describe historical milestones, not the current suite.
 
 ## Goal and scope
 
@@ -201,6 +208,15 @@ Until targets met, label output **uncalibrated** or **validated only for listed 
 - [ ] Human review and conservative A/B trials before deployment.
 
 ## Recommended next implementation steps
+
+The earlier foundation work order below remains backlog. The immediate acoustic
+task has advanced through the [full-harmonic follow-up](LISTENING_NOTES.md):
+12 fixed profiles, complete mixed-waveform spectra, fixed-background descriptions,
+synthetic recovery/null/ambiguity checks and reproducible reports. All archived
+recordings/auditions and default profiles remain unchanged. Browser checks
+verified six players' loading, muted playback, seeking and exclusive playback.
+Prepare the next capture using [NEXT_RECORDING.md](NEXT_RECORDING.md), then inspect
+its source and evaluate the fixed hypotheses before further acoustic tuning.
 
 The offline foundation now includes a tested, source-linked interpreter, continuous linear-motion planner, byte-identical no-op writing and listenable fixed-gain motor/fan previews. It is an approximation, not a stock-P1S firmware emulator. Audition the [demo](audio_preview.html) before adding timbral complexity.
 

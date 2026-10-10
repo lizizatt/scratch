@@ -18,6 +18,29 @@ The [candidate listening page](data/recordings/petg_square_2026-10-05/acoustic_c
 
 [scripts/compare_petg_acoustics.py](scripts/compare_petg_acoustics.py) reproduces the clips and [diagnostic report](data/recordings/petg_square_2026-10-05/acoustic_candidates/REPORT.md). The diagnostic follows a synthesized A-only fundamental through full accelerating FFT windows, at the frozen +12.15 s offset. The 5-cycle candidate scores above 2.5 and 8 at both window sizes, but rates were selected using this same recording; harmonic ambiguity, background sound and phone coupling remain unresolved. These are experimental alternatives, **not a calibrated replacement for the default profile**.
 
+### Full-harmonic follow-up and next real test
+
+The [full-harmonic report](log/petg_harmonics/REPORT.md) compares 12 fixed ABZE
+profiles: full, fundamental-only, second-only and upper harmonics at each AB
+rate. [Listen to five selected renders](log/petg_harmonics/index.html), including
+the original full profiles and the 2.5-second / 5-fundamental ambiguity.
+
+Full 5 still leads the infill contrast, but a synthetic known-rate test shows
+that contrast ranking can choose the wrong base rate. The two harmonic
+explanations score nearly identically. The user's preference for 2.5 remains
+recorded in [LISTENING_NOTES.md](LISTENING_NOTES.md); **no defaults changed**.
+
+[scripts/compare_petg_harmonics.py](scripts/compare_petg_harmonics.py) regenerates
+the report and selected WAVs when run with the configured Python environment
+from this project. Its default destination is [log/petg_harmonics/](log/petg_harmonics/),
+outside the frozen bundle. It checks all archived hashes and preserves bundle
+content and modification times. Report mtimes describe the local input snapshot;
+fresh checkouts can have different mtimes without different recording bytes.
+
+The next useful measurement is an ordinary square print at two orientations,
+with fixed external microphone placement: [NEXT_RECORDING.md](NEXT_RECORDING.md).
+No modified music GCODE is ready for a printer yet.
+
 ## Setup
 
 Requires Python 3.12 (other versions untested). Create an isolated environment and install:
