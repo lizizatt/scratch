@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 6 as const;
+export const PROTOCOL_VERSION = 7 as const;
 
 export const LOOP_SESSION_MAX_BYTES = 4 * 1024 * 1024;
 export const LOOP_SESSION_MAX_EVENTS_PER_TAKE = 32_768;
@@ -266,7 +266,23 @@ export function parseLoopSession(json: string): LoopSession {
   return parsed.data;
 }
 
+export const loopExportStatusSchema = z.object({
+  state: z.enum(["idle", "preparing", "ready", "previewing", "publishing", "canceling", "error"]),
+  artifactId: z.string().uuid().nullable(),
+  target: z.enum(["sample", "promoted"]).nullable(),
+  error: z.string().optional(),
+});
+export type LoopExportStatus = z.infer<typeof loopExportStatusSchema>;
+export const idleLoopExport: LoopExportStatus = { state: "idle", artifactId: null, target: null };
+export const loopArtifactInfoSchema = z.object({ artifactId: z.string().uuid(), durationSeconds: z.number().positive(), target: z.enum(["sample", "promoted"]) });
+export type LoopArtifactInfo = z.infer<typeof loopArtifactInfoSchema>;
+
 const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("prepare-loop-export"), artifactId: z.string().uuid(), target: z.enum(["sample", "promoted"]), startBeat: z.number().int().nonnegative().max(1023).optional() }),
+  z.object({ type: z.literal("preview-loop-export"), artifactId: z.string().uuid(), enabled: z.boolean() }),
+  z.object({ type: z.literal("publish-loop-export"), artifactId: z.string().uuid(), name: exportNameSchema.optional() }),
+  z.object({ type: z.literal("release-loop-export"), artifactId: z.string().uuid() }),
+  z.object({ type: z.literal("panic") }),
   z.object({ type: z.literal("play") }),
   z.object({ type: z.literal("stop") }),
   z.object({ type: z.literal("set-loop-start"), position: loopPositionSchema }),
@@ -310,7 +326,8 @@ export const commandEnvelopeSchema = z.object({
 });
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema }),
+  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema, loopExport: loopExportStatusSchema.default(idleLoopExport) }),
+  z.object({ type: z.literal("loop-export-status"), status: loopExportStatusSchema }),
   z.object({ type: z.literal("snapshot-update"), update: snapshotUpdateSchema, readiness: readinessSchema }),
   z.object({
     type: z.literal("command-result"),
@@ -321,6 +338,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     error: z.string().optional(),
     message: z.string().optional(),
     sessionJson: z.string().max(LOOP_SESSION_MAX_BYTES).optional(),
+    artifact: loopArtifactInfoSchema.optional(),
   }),
 ]);
 

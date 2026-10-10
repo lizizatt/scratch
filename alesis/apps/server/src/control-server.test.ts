@@ -676,12 +676,12 @@ describe("control server", () => {
     expect(executed).toEqual(["trigger-sample-pad", "release-sample-pad"]);
   });
 
-  it.each(["export-mp3", "export-loop-sample"] as const)("does not hold Stop behind a long-running %s", async (exportType) => {
+  it.each(["export-mp3", "export-loop-sample", "prepare-loop-export", "publish-loop-export", "release-loop-export"] as const)("does not hold Stop behind a long-running %s", async (exportType) => {
     engine = new SimulatedHostEngine();
     let releaseExport!: () => void;
     const exportGate = new Promise<void>((resolve) => { releaseExport = resolve; });
     const executeCommand = vi.fn(async (command) => {
-      if (command.type === "export-mp3" || command.type === "export-loop-sample") {
+      if (command.type === exportType) {
         await exportGate;
         const snapshot = engine!.snapshot();
         return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle };
@@ -693,7 +693,7 @@ describe("control server", () => {
     const inbox = new MessageInbox(socket);
     await inbox.next();
 
-    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "2030495e-26db-46d2-8283-8f01c3310fac", command: { type: exportType, name: "Session" } }));
+    socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "2030495e-26db-46d2-8283-8f01c3310fac", command: { type: exportType, name: "Session", artifactId: "da69b458-bace-4d76-a61b-7a806d9dfc3e", target: "sample" } }));
     socket.send(JSON.stringify({ protocolVersion: PROTOCOL_VERSION, commandId: "4f05d5d7-99b8-49c0-a116-c437f61620fd", command: { type: "stop" } }));
     const firstResult = (await collectUntil(inbox, (message) => message.type === "command-result")).at(-1);
 

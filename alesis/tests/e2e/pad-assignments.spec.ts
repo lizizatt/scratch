@@ -80,19 +80,25 @@ async function command(page: Page, command?: EngineCommand): Promise<EngineSnaps
     const socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/control`);
     let snapshot: EngineSnapshot;
     const id = crypto.randomUUID();
+    let sent = false;
+    let finished = false;
+    const timer = setTimeout(() => { socket.close(); reject(new Error("Control timeout")); }, 10_000);
     socket.onmessage = ({ data }) => {
       const message = JSON.parse(data);
       if (message.type === "snapshot") {
         snapshot = message.snapshot;
-        if (!command) { socket.close(); resolve(snapshot); }
+        if (!command) { finished = true; clearTimeout(timer); socket.close(); resolve(snapshot); }
+        else if (!sent) { sent = true; socket.send(JSON.stringify({ protocolVersion: snapshot.protocolVersion, commandId: id, command })); }
       }
       if (message.type === "command-result" && message.commandId === id) {
+        finished = true;
+        clearTimeout(timer);
         socket.close();
         if (message.accepted) resolve(snapshot); else reject(new Error(message.error));
       }
     };
-    socket.onopen = () => { if (command) socket.send(JSON.stringify({ protocolVersion: 6, commandId: id, command })); };
-    socket.onerror = () => reject(new Error("WebSocket failed"));
+    socket.onclose = () => { clearTimeout(timer); if (!finished) reject(new Error("Control connection closed before acknowledgement")); };
+    socket.onerror = () => { clearTimeout(timer); reject(new Error("WebSocket failed")); };
   }), command);
 }
 

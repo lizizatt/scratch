@@ -8,6 +8,7 @@ import type { MidiEvent } from "@alesis/engine";
 import { NeonPressureSynth, type NeonPressureParameters } from "./renderers.js";
 
 export { NeonPressureSynth, type NeonPressureParameters } from "./renderers.js";
+export { PcmLoopOutput, SimulatedLoopOutput, type LoopOutput } from "./loop-output.js";
 export { SampleLibrary, SampleMixer, SamplePlayer, SAMPLE_MAX_DURATION_SECONDS, SAMPLE_MAX_FILE_BYTES, SAMPLE_MAX_PAGE_BYTES, SAMPLE_PAGE_SIZE } from "./samples.js";
 export type { DecodedSample, SampleDescriptor, SampleLibraryOptions, SamplePlayerOptions } from "./samples.js";
 

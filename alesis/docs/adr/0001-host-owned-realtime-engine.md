@@ -10,6 +10,10 @@ The host process owns MIDI input, synthesis, the transport clock, loop capture a
 
 - The Alesis receiver and audio device connect to the host machine.
 - Losing the browser connection does not interrupt audio or transport.
+- Exception: explicit export preview is connection-owned and stops on owner
+	disconnect. It requires stopped transport, takes exclusive host output and
+	never automatically resumes performance. See [export preview](../LOOP_EXPORT_PREVIEW.md)
+	for the local-only implementation and validation status.
 - Browser commands such as mute and promote take effect at a server-defined audio boundary and acknowledge the applied engine revision.
 - The PWA can be privately served over Tailscale HTTPS and installed on iOS, but requires connectivity to the host for operation.
 - A software MIDI source and simulated audio engine must implement the same host interfaces as real hardware so development and CI do not require the Vortex.

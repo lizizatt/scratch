@@ -159,14 +159,20 @@ test("recording/export status and host errors do not cover controls", async ({ p
   state.snapshot.transport = { state: "counting-in", cycle: 1234, progress: 0 };
   state.publish();
   let exportId = "";
-  state.handle((command, id) => { if (command.type === "export-loop-sample") exportId = id; });
-  await page.getByRole("button", { name: "Export loop to sample library", exact: true }).click();
-  await evidence(page, "export-pending");
   const toolbar = await page.locator(".transport-controls, .transport-status, .export-actions").evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
   expect.soft(toolbar[0]!.right).toBeLessThanOrEqual(toolbar[1]!.left);
   expect.soft(toolbar[1]!.right).toBeLessThanOrEqual(toolbar[2]!.left);
   await hitTarget(page.getByRole("button", { name: "Stop", exact: true }));
   await hitTarget(page.getByRole("button", { name: "Promote staged take", exact: true }));
+  state.handle((command, id) => {
+    if (command.type === "prepare-loop-export") state.result(id, { accepted: true });
+    if (command.type === "publish-loop-export") exportId = id;
+  });
+  await page.getByRole("button", { name: "Export loop to sample library", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => exportId).not.toBe("");
+  await evidence(page, "export-pending");
+  await hitTarget(page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }));
   state.result(exportId, { accepted: true, message: "Loop sample exported to sample library. Warning: refresh is still pending; check the Pads pane before retrying." });
   await expect(page.locator(".sample-export-feedback")).toContainText("Warning:");
   await evidence(page, "export-feedback");

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   PROTOCOL_VERSION,
+  idleLoopExport,
+  type LoopExportStatus,
   serverMessageSchema,
   type EngineCommand,
   type EngineSnapshot,
@@ -18,6 +20,7 @@ export function useControlSocket(): {
   connection: ConnectionState;
   lastError: string | null;
   lastMessage: string | null;
+  loopExport: LoopExportStatus;
   send: (command: EngineCommand, onResult?: CommandResultHandler) => string | null;
 } {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
@@ -25,6 +28,7 @@ export function useControlSocket(): {
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
+  const [loopExport, setLoopExport] = useState<LoopExportStatus>(idleLoopExport);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingResultsRef = useRef(new Map<string, CommandResultHandler>());
 
@@ -53,7 +57,9 @@ export function useControlSocket(): {
         if (parsed.data.type === "snapshot") {
           setSnapshot(parsed.data.snapshot);
           setReadiness(parsed.data.readiness);
+          setLoopExport(parsed.data.loopExport);
         }
+        if (parsed.data.type === "loop-export-status") setLoopExport(parsed.data.status);
         if (parsed.data.type === "snapshot-update") {
           const update = parsed.data.update;
           setSnapshot((current) => current ? { ...current, ...update } : current);
@@ -105,5 +111,5 @@ export function useControlSocket(): {
     return commandId;
   };
 
-  return { snapshot, readiness, connection, lastError, lastMessage, send };
+  return { snapshot, readiness, connection, lastError, lastMessage, loopExport, send };
 }

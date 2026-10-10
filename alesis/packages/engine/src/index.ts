@@ -27,6 +27,7 @@ export interface EngineResult {
   error?: string;
   message?: string;
   sessionJson?: string;
+  artifact?: import("@alesis/protocol").LoopArtifactInfo;
 }
 
 export type EngineListener = (snapshot: EngineSnapshot) => void;
@@ -580,6 +581,12 @@ export class SimulatedHostEngine implements HostEngine {
       case "export-loop-session":
       case "import-loop-session":
         return reject("Loop sessions require host orchestration");
+      case "prepare-loop-export":
+      case "preview-loop-export":
+      case "publish-loop-export":
+      case "release-loop-export":
+      case "panic":
+        return reject("Preview and panic require host orchestration");
     }
 
     this.state.revision += 1;

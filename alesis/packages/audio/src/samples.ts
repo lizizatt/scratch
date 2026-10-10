@@ -443,6 +443,9 @@ export interface SamplePlayerOptions {
   onError?: (message: string) => void;
   spawnProcess?: typeof spawn;
   monotonicNow?: () => number;
+  /** An owned PCM source may bypass pad mixing/downmixing (48k stereo S16LE). */
+  renderPcm?: (frames: number) => Buffer;
+  stopImmediately?: boolean;
 }
 
 export class SamplePlayer {
@@ -482,7 +485,8 @@ export class SamplePlayer {
     };
     child.stdin?.on("error", (error) => {
       stopPump();
-      if (this.child === child) this.child = null;
+      // Exclusive preview must await this child, even when its input has failed.
+      if (this.child === child && !this.options.stopImmediately) this.child = null;
       if (!this.closing) report(`Sample playback stream failed: ${error.message}`);
       child.kill("SIGTERM");
     });
@@ -520,7 +524,7 @@ export class SamplePlayer {
           const queuedRoom = Math.floor(Math.max(0, SAMPLE_MAX_QUEUED_PCM_BYTES - input.writableLength) / SAMPLE_PCM_BYTES_PER_FRAME);
           const frameCount = Math.min(frameDebt, SAMPLE_MAX_CATCH_UP_FRAMES, queuedRoom);
           if (frameCount === 0) return;
-          const pcm = stereoFloatToDualMonoS16(this.mixer.render(frameCount));
+          const pcm = this.options.renderPcm?.(frameCount) ?? stereoFloatToDualMonoS16(this.mixer.render(frameCount));
           const accepted = input.write(pcm);
           acceptedFrames += pcm.length / SAMPLE_PCM_BYTES_PER_FRAME;
           if (!accepted) {
@@ -533,7 +537,7 @@ export class SamplePlayer {
         };
         child.stdin?.on("drain", childDrain);
         if (child.stdin) {
-          const startupPcm = stereoFloatToDualMonoS16(this.mixer.render(SAMPLE_LOOKAHEAD_FRAMES));
+          const startupPcm = this.options.renderPcm?.(SAMPLE_LOOKAHEAD_FRAMES) ?? stereoFloatToDualMonoS16(this.mixer.render(SAMPLE_LOOKAHEAD_FRAMES));
           const accepted = child.stdin.write(startupPcm);
           acceptedFrames += startupPcm.length / SAMPLE_PCM_BYTES_PER_FRAME;
           if (!accepted) blockedByBackpressure = true;
@@ -591,6 +595,14 @@ export class SamplePlayer {
     this.child = null;
     if (this.starting) await this.starting.catch(() => {});
     if (!child || child.exitCode !== null || child.signalCode !== null) return;
+    if (this.options.stopImmediately) {
+      child.kill("SIGKILL");
+      if (!await waitForChildExit(child, 500)) {
+        this.child = child;
+        throw new Error("Preview output has not exited; retry Stop");
+      }
+      return;
+    }
     child.stdin?.end();
     if (await waitForChildExit(child, 500)) return;
     child.kill("SIGTERM");

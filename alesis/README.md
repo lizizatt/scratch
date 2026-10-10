@@ -30,7 +30,12 @@ Use the save control in the Loops toolbar to choose a folder name. The host writ
 
 The separate **Export loop to sample library** control renders one
 loop cycle (up to 30 seconds), whether stopped or playing, from audible completed loop layers and an enabled
-drum pattern into the configured sample library with one tap and no name entry.
+drum pattern into the configured sample library. The shared export dialog offers
+an optional name/start beat and explicit stopped-transport host-output preview;
+press **Save** with a blank name for automatic numbering. These presentation
+and preview changes are **local only**, not part of the earlier Pi deployment.
+See [export preview](docs/LOOP_EXPORT_PREVIEW.md) for ownership, audio policies
+and safety limitations.
 The host assigns a rising numbered filename and refreshes the Pads catalog; it
 does not change pad mode or navigation target. See
 [Sample pads](docs/SAMPLE_PADS.md#loop-sample-export) for naming, counter

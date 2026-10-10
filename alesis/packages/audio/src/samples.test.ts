@@ -475,6 +475,44 @@ describe("SampleLibrary", () => {
 });
 
 describe("SamplePlayer", () => {
+  it("sends owned preview PCM unchanged and stops its pump before killing the owned child", async () => {
+    vi.useFakeTimers();
+    const child = fixtureChild();
+    const chunks: Buffer[] = [];
+    child.stdin.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    const source = vi.fn((frames: number) => Buffer.alloc(frames * 4, Buffer.from([1, 2, 3, 4])));
+    const player = new SamplePlayer("null", { spawnProcess: vi.fn(() => child) as unknown as typeof import("node:child_process").spawn, renderPcm: source, stopImmediately: true });
+    try {
+      const starting = player.start(); child.emit("spawn"); await starting;
+      await vi.advanceTimersByTimeAsync(30);
+      expect(chunks.length).toBeGreaterThan(1);
+      expect(Buffer.concat(chunks)).toEqual(Buffer.alloc(chunks.reduce((sum, chunk) => sum + chunk.length, 0), Buffer.from([1, 2, 3, 4])));
+      const closing = player.close();
+      expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+      child.emit("exit", null, "SIGKILL"); await closing;
+      const count = source.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(100);
+      expect(source).toHaveBeenCalledTimes(count);
+    } finally { child.exitCode = 0; await player.close(); vi.useRealTimers(); }
+  });
+
+  it("keeps a failed preview stream owned until its child exits", async () => {
+    const child = fixtureChild();
+    let closing: Promise<void> | undefined;
+    let closed = false;
+    const player = new SamplePlayer("null", { spawnProcess: vi.fn(() => child) as unknown as typeof import("node:child_process").spawn, stopImmediately: true, onError: () => { closing = player.close().then(() => { closed = true; }); } });
+    try {
+      const starting = player.start(); child.emit("spawn"); await starting;
+      child.stdin.emit("error", new Error("lost output"));
+      await Promise.resolve(); await Promise.resolve();
+      expect(closed).toBe(false);
+    } finally {
+      child.exitCode = 1; child.emit("exit", 1, null);
+      await closing; await player.close();
+    }
+    expect(closed).toBe(true);
+  });
+
   it("keeps a replacement pump running when an old child exits late", async () => {
     vi.useFakeTimers();
     const first = fixtureChild();

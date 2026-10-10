@@ -106,14 +106,21 @@ duration of 30 seconds, as a single MP3 in the configured sample library.
 Export works while stopped, playing, or counting in; it does not start, stop,
 or reset the transport.
 
-Before MP3 encoding, the host trims leading silence from the finished mix so
-the pad starts near the first sound, rather than waiting for its original beat
-position. Detection uses a conservative -80 dBFS threshold with 5 ms of pre-roll;
+With no start-beat override and a saved origin of zero, the host trims leading
+silence before MP3 encoding so the pad starts near the first sound, rather than
+waiting for its original beat position. Explicit start beats and nonzero saved
+origins preserve the complete cycle. The local-only warm-cycle policy includes
+preceding-cycle decay even on the first preview pass. Audible wrapped audio
+before the first attack is never onset-trimmed. Warm-up uses at least two cycles,
+targets four seconds and caps at sixteen cycles; it does not lengthen the sample
+or guarantee convergence for every long reverb/preset. There is no fade or gain
+change. Detection uses a conservative -80 dBFS threshold with 5 ms of pre-roll;
 onsets within the first 10 ms are left alone. Quiet attacks above that threshold,
 pauses between notes, relative layer timing, and the remaining audio through the
 cycle end are preserved. The resulting pad sample can be shorter than one cycle.
-An entirely silent render is rejected. Normal promoted-track/session exports
-keep their original timing. Existing sample files are not automatically rewritten;
+An entirely silent render is rejected. Promoted exports without a beat override
+keep their historical cold render and trailing tails; explicit-beat promoted
+exports use the same warm-cycle policy. Existing files are not automatically rewritten;
 re-export a loop to make a trimmed copy.
 
 The export includes audible, unmuted promoted takes and an audible staged take
@@ -125,8 +132,10 @@ the browser's enabled/disabled state is only a guide, and the host can still
 reject a capture that has no completed audible note material or required
 instrument assets.
 
-Tap **Export loop to sample library** once; no sample name or keyboard input is
-needed. The host assigns rising names beginning with `Loop 0001.mp3` and avoids
+Open **Export loop to sample library**, then **Save**; no sample name or keyboard
+input is required. The local-only [shared export dialog](LOOP_EXPORT_PREVIEW.md)
+also offers optional naming, start-beat selection and explicit host-output
+preview while stopped. The host assigns rising names beginning with `Loop 0001.mp3` and avoids
 overwriting existing files. The next number is retained in the hidden
 `.loop-sample-sequence` directory inside the sample library, so it survives host
 restarts and stays advanced even if exported samples are moved out of the
@@ -134,7 +143,7 @@ library or deleted. Keep `.loop-sample-sequence` with the library when moving
 the library if you want the sequence to continue. Failed or colliding exports
 can leave gaps; numbers are not reused. You can rename exported copies
 off-device without changing the host's counter state. The host still accepts
-explicit names from legacy clients, but the UI does not offer name entry.
+explicit names, now also available through the shared dialog.
 
 After a successful write, the host refreshes the sample catalog automatically.
 The result reports the generated filename, not a machine-specific path. If the

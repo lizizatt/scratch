@@ -20,43 +20,19 @@ import {
 import type { EngineCommand, EngineSnapshot, ServerMessage, Settings as EngineSettings, Take, PadAction } from "@alesis/protocol";
 import { assignedPadAction, LOOP_SESSION_MAX_BYTES, parseLoopSession } from "@alesis/protocol";
 import { useControlSocket, type ConnectionState } from "./use-control-socket";
+import { Waveform } from "./loop-interaction";
+import { LoopExportDialog } from "./loop-export-dialog";
 
 type Pane = "settings" | "synth" | "pads" | "loops";
 
 export function App() {
-  const { snapshot, readiness, connection, lastError, lastMessage, send } = useControlSocket();
+  const { snapshot, readiness, connection, lastError, lastMessage, loopExport, send } = useControlSocket();
   const [pane, setPane] = useState<Pane>("loops");
   const [sampleExport, setSampleExport] = useState<SampleExportState>({
     pending: false,
     feedback: null,
   });
-  const sampleExportPendingRef = useRef(false);
-
-  const triggerSampleExport = (): void => {
-    if (sampleExportPendingRef.current) return;
-    sampleExportPendingRef.current = true;
-    setSampleExport((current) => ({ ...current, pending: true, feedback: null }));
-    const commandId = send({ type: "export-loop-sample" }, (result) => {
-      sampleExportPendingRef.current = false;
-      setSampleExport((current) => ({
-        ...current,
-        pending: false,
-        feedback: result === null
-          ? { kind: "warning", message: "Outcome unknown: connection lost before confirmation. Check the sample library before retrying." }
-          : result.accepted
-            ? { kind: result.message?.includes("Warning:") ? "warning" : "success", message: result.message ?? "Loop sample exported." }
-            : { kind: "error", message: result.error ?? "Loop sample export failed." },
-      }));
-    });
-    if (!commandId) {
-      sampleExportPendingRef.current = false;
-      setSampleExport((current) => ({
-        ...current,
-        pending: false,
-        feedback: { kind: "error", message: "Host is not connected. The export was not started." },
-      }));
-    }
-  };
+  const [exportTarget, setExportTarget] = useState<"sample" | "promoted" | null>(null);
 
   if (!snapshot) {
     return <main className="boot"><span className={`connection-dot ${connection}`} /> CONNECTING TO HOST ENGINE</main>;
@@ -78,7 +54,8 @@ export function App() {
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
       {pane === "pads" && <PadsPane snapshot={snapshot} send={send} connection={connection} />}
-      {pane === "loops" && <LoopPane snapshot={snapshot} send={send} sampleExport={sampleExport} triggerSampleExport={triggerSampleExport} />}
+      {pane === "loops" && <LoopPane snapshot={snapshot} send={send} sampleExport={sampleExport} triggerSampleExport={() => setExportTarget("sample")} triggerPromotedExport={() => setExportTarget("promoted")} />}
+      {exportTarget && <LoopExportDialog target={exportTarget} snapshot={snapshot} status={loopExport} send={send} onClose={() => setExportTarget(null)} onSaved={(message) => setSampleExport({ pending: false, feedback: { kind: message.includes("Warning:") ? "warning" : "success", message } })} />}
       <nav className="app-nav" aria-label="Application sections">
         <NavButton active={pane === "settings"} label="Options" onClick={() => setPane("settings")}><Settings /></NavButton>
         <NavButton active={pane === "synth"} label="Synth" onClick={() => setPane("synth")}><Music2 /></NavButton>
@@ -467,9 +444,10 @@ function PadEditor({ snapshot, send, pad, close }: PaneProps & { pad: number; cl
   </dialog>;
 }
 
-function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PaneProps & {
+function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPromotedExport }: PaneProps & {
   sampleExport: SampleExportState;
   triggerSampleExport: () => void;
+  triggerPromotedExport: () => void;
 }) {
   const isPlaying = snapshot.transport.state !== "stopped";
   const beatCount = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
@@ -484,14 +462,6 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
     : !hasAudibleLoopLayer && !hasAudibleDrumPattern
       ? "Add an audible staged/promoted take or enable a nonzero drum pattern."
       : null;
-  const [saving, setSaving] = useState(false);
-  const [exportName, setExportName] = useState("");
-  const saveExport = (): void => {
-    if (!exportName.trim()) return;
-    send({ type: "export-mp3", name: exportName.trim() });
-    setSaving(false);
-    setExportName("");
-  };
   return (
     <section className="pane loop-pane" aria-label="Looper">
       <header className="loop-toolbar">
@@ -507,40 +477,22 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
           <button className={`icon-button sample-export-button ${sampleExport.pending ? "exporting" : ""}`} type="button" aria-label={sampleExport.pending ? "Exporting…" : "Export loop to sample library"} title={sampleExport.pending ? "Exporting…" : "Export loop to sample library"} disabled={sampleExportDisabledReason !== null || sampleExport.pending} onClick={triggerSampleExport}>
             <Music2 />{sampleExport.pending && <span>Exporting…</span>}
           </button>
-          <IconButton label="Save promoted tracks as MP3 files" disabled={snapshot.promoted.length === 0} onClick={() => setSaving(true)}><Download /></IconButton>
+          <IconButton label="Save promoted tracks as MP3 files" disabled={snapshot.promoted.length === 0} onClick={triggerPromotedExport}><Download /></IconButton>
         </div>
       </header>
 
       <LoopSessionControls snapshot={snapshot} send={send} />
 
-      <div className="loop-start-controls" aria-label="Loop start controls">
-        <label><input aria-label="Overdub staged loop" type="checkbox" checked={snapshot.capture.overdub} onChange={(event) => send({ type: "set-overdub", enabled: event.target.checked })} /> Overdub staged loop</label>
-        <label>Loop start <select aria-label="Loop start beat" value={snapshot.capture.loopStart} onChange={(event) => send({ type: "set-loop-start", position: Number(event.target.value) })}>
-          {Array.from({ length: beatCount }, (_, beat) => <option key={beat} value={beat / beatCount}>Beat {beat + 1}</option>)}
-          {Math.abs(snapshot.capture.loopStart * beatCount - Math.round(snapshot.capture.loopStart * beatCount)) > 1e-8 && <option value={snapshot.capture.loopStart}>Custom ({(snapshot.capture.loopStart * beatCount + 1).toFixed(2)})</option>}
-        </select></label>
-        <button type="button" disabled={snapshot.transport.state !== "playing"} onClick={() => send({ type: "set-loop-start", position: ((snapshot.transport.origin + snapshot.transport.progress) % 1) })}>Set start here</button>
-        <button type="button" onClick={() => send({ type: "set-loop-start", position: 0 })}>Reset start</button>
-        <span>Applies on next Play and exports; playback continues unchanged.</span>
-      </div>
       {snapshot.capture.error && <p role="alert">{snapshot.capture.error}</p>}
 
-      {saving && <div className="dialog-backdrop" onMouseDown={() => setSaving(false)}>
-        <form className="save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); saveExport(); }}>
-          <h2 id="save-title">Save MP3 audio</h2>
-          <label>Folder name<input autoFocus required maxLength={80} pattern="[A-Za-z0-9][-A-Za-z0-9 _]*" value={exportName} onChange={(event) => setExportName(event.target.value)} /></label>
-          <div className="dialog-actions"><button type="button" onClick={() => setSaving(false)}>Cancel</button><button type="submit">Save</button></div>
-        </form>
-      </div>}
-
-      <div className="signal-stack">
-        <section className="current-capture">
+      <div className={`signal-stack ${snapshot.capture.overdub ? "overdub-stack" : ""}`}>
+        {!snapshot.capture.overdub && <section className="current-capture">
           <span className="lane-label">Current capture // live</span>
           <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} live progress={snapshot.transport.state === "stopped" ? snapshot.capture.loopStart : (snapshot.transport.origin + snapshot.transport.progress) % 1} />
-        </section>
-        <section className="staged-capture">
+        </section>}
+        <section className={snapshot.capture.overdub ? "current-capture overdub-capture" : "staged-capture"}>
           <div className="staging-lane">
-            <span className="lane-label">Staged // {snapshot.capture.quantization === "off" ? "raw timing" : `quantized ${snapshot.capture.quantization}`}</span>
+            <span className="lane-label">{snapshot.capture.overdub ? "Current capture // overdub" : "Staged"} // {snapshot.capture.quantization === "off" ? "raw timing" : `quantized ${snapshot.capture.quantization}`}</span>
             <Waveform samples={snapshot.capture.staged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="Waiting for rollover" />
           </div>
           <div className="take-actions">
@@ -555,7 +507,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
             <IconButton label={snapshot.capture.stagedAudible ? "Mute staged take" : "Unmute staged take"} active={snapshot.capture.stagedAudible} pressed={snapshot.capture.stagedAudible} onClick={() => send({ type: "set-staged-audible", audible: !snapshot.capture.stagedAudible })}>{snapshot.capture.stagedAudible ? <Volume2 /> : <VolumeX />}</IconButton>
           </div>
         </section>
-        <section className="previous-staged-capture">
+        {!snapshot.capture.overdub && <section className="previous-staged-capture">
           <div className="staging-lane">
             <span className="lane-label">Previous staged // {snapshot.capture.overdub ? "held during overdub" : "expires at rollover"}</span>
             <Waveform samples={snapshot.capture.previousStaged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="No displaced take" />
@@ -563,7 +515,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport }: PanePro
           <div className="take-actions">
             <IconButton label="Promote previous staged take" disabled={!snapshot.capture.previousStaged} onClick={() => send({ type: "promote-previous-staged" })}><Plus /></IconButton>
           </div>
-        </section>
+        </section>}
         <div className="divider" />
         <section className="promoted-list" aria-label="Promoted takes">
           {snapshot.promoted.length === 0 && <div className="empty-list">PROMOTED TAKES APPEAR HERE</div>}
@@ -634,6 +586,7 @@ function LoopSessionControls({ snapshot, send }: PaneProps) {
     <div className="session-toolbar" role="toolbar" aria-label="Editable loop sessions">
       <button type="button" disabled={!stopped || pending} onClick={() => execute({ type: "export-loop-session" })}>Save loop session</button>
       <button type="button" disabled={!stopped || pending} onClick={() => input.current?.click()}>Load loop session</button>
+      <label className="overdub-toggle"><input aria-label="Overdub staged loop" type="checkbox" checked={snapshot.capture.overdub} onChange={(event) => send({ type: "set-overdub", enabled: event.target.checked })} /> Overdub</label>
       <input ref={input} type="file" hidden accept=".json,application/json" aria-label="Loop session JSON file" onChange={(event) => { void chooseFile(event); }} />
       <span>{pending ? "Working…" : "Stop first · Completed takes only · MP3 is not editable"}</span>
     </div>
@@ -662,23 +615,6 @@ function TakeRow({ take, index, beatCount, beatsPerMeasure, loopStart, send }: {
       <IconButton label={take.muted ? `Unmute take ${index + 1}` : `Mute take ${index + 1}`} active={!take.muted} pressed={!take.muted} onClick={() => send({ type: "set-take-muted", takeId: take.id, muted: !take.muted })}>{take.muted ? <VolumeX /> : <Volume2 />}</IconButton>
       <IconButton label={`Delete take ${index + 1}`} danger onClick={() => send({ type: "delete-take", takeId: take.id })}><Trash2 /></IconButton>
     </article>
-  );
-}
-
-function Waveform({ samples, beatCount, beatsPerMeasure, loopStart, live = false, progress, emptyLabel }: { samples: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; live?: boolean; progress?: number; emptyLabel?: string }) {
-  const amplitudes = samples.map((sample) => Math.abs(sample));
-  return (
-    <div className={`waveform ${live ? "live" : ""}`}>
-      <div className="beat-grid" aria-hidden="true">
-        {Array.from({ length: Math.max(0, beatCount - 1) }, (_, index) => <i key={index} className={(index + 1) % beatsPerMeasure === 0 ? "measure" : ""} style={{ left: `${(index + 1) / beatCount * 100}%` }} />)}
-      </div>
-      {samples.length > 0 ? <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{amplitudes.map((sample, index) => {
-        const x = amplitudes.length === 1 ? 50 : index / (amplitudes.length - 1) * 100;
-        return <line className="intensity-sample" key={index} x1={x} x2={x} y1={50 - sample * 44} y2={50 + sample * 44} />;
-      })}</svg> : <span>{emptyLabel}</span>}
-      <i className="loop-start-marker" aria-hidden="true" style={{ left: `${loopStart * 100}%` }} />
-      {progress !== undefined && <i className="playhead" style={{ left: `${progress * 100}%` }} />}
-    </div>
   );
 }
 
