@@ -40,6 +40,75 @@ function deferred<T>() {
 }
 
 describe("sample pad service", () => {
+  it("applies an edit made during a refresh without installing the old slot audio", async () => {
+    const library = fixtureLibrary(10);
+    const originalLoad = library.loadPage.bind(library);
+    const loading = deferred<void>();
+    const finish = deferred<void>();
+    library.loadSlots = async (ids) => ids.map((id) => id ? decoded(id) : null);
+    const service = new SamplePadService(library, () => {});
+    await service.refresh();
+    library.loadPage = async (page) => {
+      loading.resolve();
+      await finish.promise;
+      return originalLoad(page);
+    };
+    const refresh = service.refresh();
+    await loading.promise;
+    const edit = service.configure("samples", [{ mode: "samples", page: 0, pad: 0, action: { kind: "sample", sampleId: "sample-9" } }]);
+    finish.resolve();
+    await refresh;
+    await edit;
+    expect(service.snapshot()).toMatchObject({ status: "ready", page: [{ id: "sample-9" }, ...Array.from({ length: 7 }, (_, i) => ({ id: `sample-${i + 1}` }))] });
+    expect(await edit).toEqual({ accepted: true });
+    await service.close();
+  });
+
+  it("redacts quoted filesystem paths, including names containing spaces", async () => {
+    const library = fixtureLibrary(1);
+    library.loadPage = async () => { throw new Error("ENOENT: realpath '/private/user/Loop 0001.mp3'"); };
+    const service = new SamplePadService(library, () => {});
+    expect(await service.refresh()).toMatchObject({ accepted: false, error: "Unable to refresh samples: ENOENT: realpath [local path]" });
+    expect(JSON.stringify(service.snapshot())).not.toContain("/private");
+    await service.close();
+  });
+
+  it("preloads cross-page assignments and preserves missing IDs without falling back to a slot", async () => {
+    const library = fixtureLibrary(10);
+    library.loadSlots = vi.fn(async (ids: readonly (string | null)[]) => ids.map((id) => library.descriptors.some((entry) => entry.id === id) ? decoded(id!) : null));
+    const player = mockPlayer();
+    const service = new SamplePadService(library, () => {}, () => player);
+    await service.refresh();
+    const assignments = [{ mode: "samples" as const, page: 0, pad: 0, action: { kind: "sample" as const, sampleId: "sample-9" } }];
+    await service.configure("samples", assignments);
+    expect(service.snapshot().page[0]?.id).toBe("sample-9");
+    expect(service.snapshot().catalog).toHaveLength(10);
+    expect(JSON.stringify(service.snapshot())).not.toContain("/private");
+    expect(service.trigger(0, 100)).toBe(true);
+    expect(library.loadSlots).toHaveBeenCalledTimes(1);
+    await service.configure("samples", [{ ...assignments[0]!, action: { kind: "sample", sampleId: "deleted" } }]);
+    expect(service.snapshot().page[0]).toBeNull();
+    expect(service.trigger(0, 100)).toBe(false);
+    await service.configure("samples", []);
+    expect(service.snapshot().page[0]?.id).toBe("sample-0");
+    await service.close();
+  });
+
+  it("keeps control-only pages reachable when the library is empty and switches mode-specific overrides", async () => {
+    const library = fixtureLibrary(0);
+    library.loadSlots = vi.fn(async () => Array(8).fill(null));
+    const service = new SamplePadService(library, () => {});
+    await service.refresh();
+    expect((await service.selectPage(0)).accepted).toBe(true);
+    await service.configure("drums", [{ mode: "drums", page: 3, pad: 7, action: { kind: "control", target: "transport", operation: "toggle" } }]);
+    expect(service.snapshot().pageCount).toBe(4);
+    expect((await service.selectPage(3)).accepted).toBe(true);
+    await service.refresh();
+    expect(service.snapshot().pageIndex).toBe(3);
+    expect(service.snapshot().pageCount).toBe(4);
+    await service.close();
+  });
+
   it("scans and decodes in simulated mode, publishes eight safe pad descriptors, and previews loaded pads", async () => {
     const states: Array<{ status: string; page: Array<{ id: string; name: string; pad: number } | null> }> = [];
     const library = fixtureLibrary();

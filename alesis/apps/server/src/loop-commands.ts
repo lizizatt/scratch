@@ -6,7 +6,7 @@ import type { TransportPlayback } from "./transport-playback.js";
 /** Final engine-command path, after host-specific branches and clock advancement. */
 export async function executeLoopCommand(
   command: EngineCommand,
-  engine: Pick<SimulatedHostEngine, "snapshot" | "execute">,
+  engine: Pick<SimulatedHostEngine, "snapshot" | "execute" | "ensureOverdubStaged">,
   loops: MidiLoopScheduler,
   playback: Pick<TransportPlayback, "transaction">,
 ): Promise<EngineResult> {
@@ -29,14 +29,19 @@ export async function executeLoopCommand(
     loops.captureRecordings(engine.snapshot(), []);
   }
   const execute = async (): Promise<EngineResult> => {
+    if ((command.type === "stop" || command.type === "promote-staged" || command.type === "set-overdub" && !command.enabled)
+      && engine.snapshot().capture.overdub && loops.hasCurrentRecording()) {
+      engine.ensureOverdubStaged();
+      loops.finishOverdub(engine.snapshot());
+    }
     const result = await engine.execute(command);
     if (result.accepted && command.type === "configure" && command.clearAudio) loops.clearRecordings();
-    if (result.accepted && command.type === "stop") loops.discardCurrentRecording();
+    if (result.accepted && command.type === "stop") loops.update(engine.snapshot());
     if (result.accepted && command.type === "delete-take") loops.markDeleted(command.takeId);
     if (result.accepted && command.type === "undo-delete") loops.restoreDeleted();
     return result;
   };
-  return command.type === "stop" || command.type === "configure" && command.clearAudio
+  return command.type === "stop" || command.type === "promote-staged" && engine.snapshot().capture.overdub || command.type === "set-overdub" || command.type === "configure" && command.clearAudio
     ? playback.transaction(execute)
     : execute();
 }

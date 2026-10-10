@@ -17,7 +17,7 @@ describe("loop session format", () => {
   it("accepts version one and timing beyond the audio-sample duration limit", () => {
     const value = session();
     value.settings.loopMeasures = 128;
-    expect(parseLoopSession(JSON.stringify(value))).toEqual(value);
+    expect(parseLoopSession(JSON.stringify(value))).toEqual({ ...value, sourceOrigin: 0, loopStart: 0, overdub: false, settings: { ...value.settings, minimumVelocity: 1 } });
   });
   it.each([
     { version: 2 }, { format: "mp3" }, { devicePath: "/secret" }, { staged: take },

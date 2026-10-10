@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { commandEnvelopeSchema, engineSnapshotSchema, PROTOCOL_VERSION, serverMessageSchema } from "./index.js";
 
 describe("control protocol", () => {
+  it("does not inject a default velocity floor into unrelated partial configure commands", () => {
+    const parsed = commandEnvelopeSchema.parse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "configure", settings: { metronomeEnabled: false } } });
+    expect(parsed.command).toEqual({ type: "configure", settings: { metronomeEnabled: false } });
+    for (const minimumVelocity of [0, 128, 1.5]) {
+      expect(commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command: { type: "configure", settings: { minimumVelocity } } }).success).toBe(false);
+    }
+  });
+
   it("accepts compact high-rate snapshot updates", () => {
     const message = serverMessageSchema.parse({
       type: "snapshot-update",

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 6 as const;
+export const PROTOCOL_VERSION = 7 as const;
 
 export const LOOP_SESSION_MAX_BYTES = 4 * 1024 * 1024;
 export const LOOP_SESSION_MAX_EVENTS_PER_TAKE = 32_768;
@@ -20,6 +20,7 @@ export type MidiEvent = z.infer<typeof midiEventSchema>;
 
 const waveformSchema = z.array(z.number().min(-1).max(1)).max(256);
 const takeIdSchema = z.string().min(1).max(128);
+const loopPositionSchema = z.number().min(0).lt(1);
 export const exportNameSchema = z.string().trim().min(1).max(80).regex(/^[a-zA-Z0-9][a-zA-Z0-9 _-]*$/);
 export const quantizationModeSchema = z.enum(["off", "1/4", "1/8", "1/16", "1/32"]);
 export const velocityCurveSchema = z.enum(["linear", "responsive", "strong", "fixed"]);
@@ -44,6 +45,7 @@ export const settingsSchema = z.object({
   midiInputId: z.string(),
   audioOutputId: z.string(),
   velocityCurve: velocityCurveSchema,
+  minimumVelocity: z.number().int().min(1).max(127).default(1),
   metronomeEnabled: z.boolean(),
   metronomeVolume: z.number().min(0).max(1),
   countInEnabled: z.boolean(),
@@ -107,6 +109,32 @@ export const drumSettingsSchema = z.object({
 
 export const padModeSchema = z.enum(["drums", "samples"]);
 export const padNavigationTargetSchema = z.enum(["voices", "drum-kits", "sample-pages"]);
+export const MAX_SAMPLE_CATALOG = 4096;
+export const MAX_PAD_PAGES = MAX_SAMPLE_CATALOG / 8;
+export const sampleIdSchema = z.string().min(1).max(256).regex(/^[a-zA-Z0-9_-]+$/);
+export const padActionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("sample"), sampleId: sampleIdSchema }).strict(),
+  z.object({ kind: z.literal("control"), target: z.enum(["transport", "drums", "metronome", "arpeggiator"]), operation: z.enum(["toggle", "on", "off"]) }).strict(),
+]);
+export const padAssignmentSchema = z.object({
+  mode: padModeSchema,
+  page: z.number().int().min(0).max(MAX_PAD_PAGES - 1),
+  pad: z.number().int().min(0).max(7),
+  action: padActionSchema,
+}).strict();
+export const padAssignmentsSchema = z.array(padAssignmentSchema).max(MAX_SAMPLE_CATALOG * 2).refine(
+  (entries) => new Set(entries.map(({ mode, page, pad }) => `${mode}:${page}:${pad}`)).size === entries.length,
+  "Duplicate pad assignment",
+);
+export const sampleCatalogEntrySchema = z.object({ id: sampleIdSchema, name: z.string().min(1).max(256) }).strict();
+export type PadAction = z.infer<typeof padActionSchema>;
+export type PadAssignment = z.infer<typeof padAssignmentSchema>;
+export type SampleCatalogEntry = z.infer<typeof sampleCatalogEntrySchema>;
+
+export function assignedPadAction(pads: Pads, pad: number): PadAction | undefined {
+  return pads.assignments.find((entry) => entry.mode === pads.mode && entry.page === pads.samplePageIndex && entry.pad === pad)?.action;
+}
+
 export const drumKitSchema = z.object({
   id: z.string().min(1).max(128),
   bank: z.number().int().min(0).max(16_383),
@@ -127,6 +155,8 @@ export const padsSchema = z.object({
   samplePageIndex: z.number().int().nonnegative(),
   samplePageCount: z.number().int().nonnegative(),
   samplePage: z.array(samplePadSchema).length(8),
+  sampleCatalog: z.array(sampleCatalogEntrySchema).max(MAX_SAMPLE_CATALOG).default([]),
+  assignments: padAssignmentsSchema.default([]),
   sampleLibraryStatus: z.enum(["ready", "loading", "error"]),
   sampleLibraryError: z.string().optional(),
   drumKits: z.array(drumKitSchema),
@@ -147,6 +177,7 @@ export const engineSnapshotSchema = z.object({
     state: z.enum(["stopped", "counting-in", "playing"]),
     cycle: z.number().int().nonnegative(),
     progress: z.number().min(0).max(1),
+    origin: loopPositionSchema.default(0),
   }),
   monitorOnly: z.boolean(),
   synth: z.object({
@@ -162,6 +193,9 @@ export const engineSnapshotSchema = z.object({
   arpeggiator: arpeggiatorSchema,
   drums: drumSettingsSchema,
   capture: z.object({
+    loopStart: loopPositionSchema.default(0),
+    overdub: z.boolean().default(false),
+    error: z.string().nullable().default(null),
     currentWaveform: waveformSchema,
     hasCurrentEvents: z.boolean(),
     staged: takeSchema.nullable(),
@@ -185,6 +219,7 @@ export const snapshotUpdateSchema = engineSnapshotSchema.pick({
 const recordingSchema = z.array(z.object({
   position: z.number().min(0).max(1),
   event: midiEventSchema,
+  continuation: z.literal(true).optional(),
 }).strict()).max(LOOP_SESSION_MAX_EVENTS_PER_TAKE).refine(
   (events) => events.every((event, index) => index === 0 || event.position >= events[index - 1]!.position),
   "Recording events must be ordered by position",
@@ -196,6 +231,9 @@ const sessionTakeSchema = z.object({
 export const loopSessionSchema = z.object({
   format: z.literal("alesis-loop-session"),
   version: z.literal(1),
+  sourceOrigin: z.literal(0).default(0),
+  loopStart: loopPositionSchema.default(0),
+  overdub: z.boolean().default(false),
   settings: settingsSchema.omit({ midiInputId: true, audioOutputId: true }).strict(),
   synth: z.object({
     selectedId: z.string().min(1).max(128),
@@ -228,9 +266,27 @@ export function parseLoopSession(json: string): LoopSession {
   return parsed.data;
 }
 
+export const loopExportStatusSchema = z.object({
+  state: z.enum(["idle", "preparing", "ready", "previewing", "publishing", "canceling", "error"]),
+  artifactId: z.string().uuid().nullable(),
+  target: z.enum(["sample", "promoted"]).nullable(),
+  error: z.string().optional(),
+});
+export type LoopExportStatus = z.infer<typeof loopExportStatusSchema>;
+export const idleLoopExport: LoopExportStatus = { state: "idle", artifactId: null, target: null };
+export const loopArtifactInfoSchema = z.object({ artifactId: z.string().uuid(), durationSeconds: z.number().positive(), target: z.enum(["sample", "promoted"]) });
+export type LoopArtifactInfo = z.infer<typeof loopArtifactInfoSchema>;
+
 const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("prepare-loop-export"), artifactId: z.string().uuid(), target: z.enum(["sample", "promoted"]), startBeat: z.number().int().nonnegative().max(1023).optional() }),
+  z.object({ type: z.literal("preview-loop-export"), artifactId: z.string().uuid(), enabled: z.boolean() }),
+  z.object({ type: z.literal("publish-loop-export"), artifactId: z.string().uuid(), name: exportNameSchema.optional() }),
+  z.object({ type: z.literal("release-loop-export"), artifactId: z.string().uuid() }),
+  z.object({ type: z.literal("panic") }),
   z.object({ type: z.literal("play") }),
   z.object({ type: z.literal("stop") }),
+  z.object({ type: z.literal("set-loop-start"), position: loopPositionSchema }),
+  z.object({ type: z.literal("set-overdub"), enabled: z.boolean() }),
   z.object({ type: z.literal("set-monitor-only"), enabled: z.boolean() }),
   z.object({ type: z.literal("configure"), settings: settingsSchema.partial(), clearAudio: z.boolean().optional() }),
   z.object({ type: z.literal("select-synth"), synthId: z.string().min(1) }),
@@ -242,6 +298,7 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("select-pad-program"), program: z.number().int().nonnegative().safe() }),
   z.object({ type: z.literal("step-pad-navigation"), direction: z.union([z.literal(-1), z.literal(1)]) }),
   z.object({ type: z.literal("refresh-samples") }),
+  padAssignmentSchema.extend({ type: z.literal("configure-pad"), action: padActionSchema.nullable() }).strict(),
   z.object({ type: z.literal("trigger-sample-pad"), pad: z.number().int().min(0).max(7), velocity: z.number().int().min(1).max(127) }),
   z.object({ type: z.literal("release-sample-pad"), pad: z.number().int().min(0).max(7) }),
   z.object({ type: z.literal("set-synth-parameter"), parameterId: z.string().min(1), value: z.number() }),
@@ -269,7 +326,8 @@ export const commandEnvelopeSchema = z.object({
 });
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema }),
+  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema, loopExport: loopExportStatusSchema.default(idleLoopExport) }),
+  z.object({ type: z.literal("loop-export-status"), status: loopExportStatusSchema }),
   z.object({ type: z.literal("snapshot-update"), update: snapshotUpdateSchema, readiness: readinessSchema }),
   z.object({
     type: z.literal("command-result"),
@@ -280,6 +338,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     error: z.string().optional(),
     message: z.string().optional(),
     sessionJson: z.string().max(LOOP_SESSION_MAX_BYTES).optional(),
+    artifact: loopArtifactInfoSchema.optional(),
   }),
 ]);
 

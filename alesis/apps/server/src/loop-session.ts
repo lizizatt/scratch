@@ -31,6 +31,8 @@ export function exportLoopSession(host: LoopSessionHost): EngineResult {
   const kit = snapshot.pads.drumKits.find(({ id }) => id === snapshot.pads.selectedDrumKitId);
   const session: LoopSession = {
     format: "alesis-loop-session", version: 1, settings,
+    sourceOrigin: 0, loopStart: snapshot.capture.loopStart,
+    overdub: snapshot.capture.overdub,
     synth: { selectedId: snapshot.synth.selectedId, parameterValues: snapshot.synth.parameterValues, soundFont: font && preset ? { ...font, preset } : null },
     drums: snapshot.drums,
     percussion: kit && host.percussionSoundFontId ? { soundFontId: host.percussionSoundFontId, kit } : null,

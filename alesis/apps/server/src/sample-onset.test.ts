@@ -26,4 +26,12 @@ describe("sample onset trim", () => {
     expect(() => sampleOnsetTrimFrame(Buffer.alloc(400))).toThrow("No audible sample material");
     expect(() => sampleOnsetTrimFrame(Buffer.alloc(5))).toThrow("Incomplete sample PCM frame");
   });
+
+  it("preserves delayed wrapped reflections before the first attack without disabling legacy cold-onset trim", () => {
+    const pcm = Buffer.alloc(4 * 4800);
+    pcm.writeInt16LE(100, 1200 * 4);
+    expect(sampleOnsetTrimFrame(pcm, 2400)).toBe(0);
+    expect(sampleOnsetTrimFrame(pcm, 1200)).toBe(960);
+    expect(sampleOnsetTrimFrame(pcm)).toBe(960);
+  });
 });

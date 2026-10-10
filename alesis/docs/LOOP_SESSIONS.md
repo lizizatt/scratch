@@ -20,10 +20,17 @@ host; recordings are otherwise held only in memory. There is no autosave.
 - Tempo, meter, loop measures, quantization, staged audition, monitor-only,
   metronome/count-in/key response, selected synth and its parameters,
   arpeggiator settings, drum pattern/volume and selected percussion kit.
+- Global loop-start marker, staged-overdub mode, and minimum positive input
+  velocity. MIDI stays in source coordinates; moving the marker does not rewrite
+  stored takes. See [loop editing](LOOP_EDITING.md) for playback/export semantics.
 - SoundFont ID/name and named preset bank/program identity. The percussion layer
   references the host's FluidR3 GM font and its kit.
 
-The partial current cycle, held live notes/arpeggiator latch state, delete-undo
+In default rotating-capture mode, Stop discards the partial current cycle. In
+overdub mode, Stop closes accepted held gates at the stop position and merges
+the partial capture into staging before saving becomes available.
+
+The uncommitted current cycle, held live notes/arpeggiator latch state, delete-undo
 history, sample-pad audio/triggers, device IDs, paths and SoundFont assets are
 excluded. All takes use the host's current synth, just as during normal playback;
 this is not a per-take instrument archive.
@@ -37,6 +44,13 @@ events. Timing uses the engine's normal ranges; the MP3 sample-export 30-second
 limit does not apply. Missing recordings and oversized sessions fail explicitly;
 no tracks or MIDI are silently dropped. Unknown versions, fields, malformed MIDI,
 duplicate IDs, unordered events and incompatible parameters are rejected.
+
+Older version-1 files remain readable: absent `sourceOrigin`/`loopStart` default
+to zero, `overdub` to false, and `settings.minimumVelocity` to 1 (unchanged input).
+New files include these fields and may include `continuation: true` on synthetic
+wrapped note attacks. This metadata keeps one held gate from becoming a second
+replacement attack and survives quantization. New files are not guaranteed to
+load in older hosts with strict schemas; retain old backups before upgrading.
 
 Install the same SoundFonts on the destination host first. Missing fonts, named
 presets or kits reject the whole import, with no fallback. IDs/names identify

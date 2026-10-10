@@ -41,6 +41,30 @@ async function temporaryRoot(): Promise<string> {
 }
 
 describe("loop sample exporter", () => {
+  it("preserves selected leading silence in the decoded MP3 instead of trimming it away", async () => {
+    const root = await temporaryRoot();
+    const library = new SampleLibrary(root);
+    try {
+      const snapshot = await playingSnapshot();
+      snapshot.capture.loopStart = 0.25;
+      snapshot.synth.parameterValues = { attack: 0.001, release: 0.01, cutoff: 6_300, resonance: 0.2 };
+      snapshot.promoted = [testTake("delayed")];
+      const result = await exportLoopSample({ snapshot, sampleRoot: root, recordings: new Map([["delayed", [
+        { position: 0.5, event: { type: "note-on", channel: 0, note: 60, velocity: 112 } },
+        { position: 0.6, event: { type: "note-off", channel: 0, note: 60 } },
+      ]]]) });
+      expect(result.durationSeconds).toBe(2);
+      await library.scan();
+      const decoded = (await library.loadPage(0))[0]!;
+      const peak = (start: number, end: number) => decoded.samples.subarray(start * 48_000 * 2, end * 48_000 * 2).reduce((max, sample) => Math.max(max, Math.abs(sample)), 0);
+      expect(peak(0, 0.45)).toBeLessThan(0.001);
+      expect(peak(0.52, 0.6)).toBeGreaterThan(0.01);
+    } finally {
+      await library.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   beforeEach(() => {
     vi.mocked(fsPromises.link).mockClear();
     vi.mocked(fsPromises.rm).mockClear();

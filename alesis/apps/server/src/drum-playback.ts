@@ -1,7 +1,7 @@
 import type { AudioOutput } from "@alesis/audio";
 import type { EngineSnapshot } from "@alesis/protocol";
 import { drumPatternAtStep } from "./drum-patterns.js";
-import { beatAt, beatDeadline, countInOpeningAllowanceMs, countInOpeningBeat, monotonicClock, transportBeatAnchor, type MonotonicClock, type TransportBeatAnchor } from "./transport-clock.js";
+import { beatAt, beatDeadline, countInOpeningAllowanceMs, countInOpeningBeat, monotonicClock, sourceOriginBeats, transportBeatAnchor, type MonotonicClock, type TransportBeatAnchor } from "./transport-clock.js";
 
 export type DrumPlaybackClock = MonotonicClock;
 const gridEpsilon = 1e-9;
@@ -54,9 +54,11 @@ export class DrumPlaybackScheduler {
     // MIDI, meters and control commands can publish the same transport position repeatedly.
     const time = snapshotTime ?? (previous && !restart && position === previous.position
       ? previous.time : now);
+    const transportGrid = grid ?? transportBeatAnchor(snapshot, time);
+    const originBeats = sourceOriginBeats(snapshot);
     this.cancelTimer();
     this.anchor = {
-      grid: grid ?? transportBeatAnchor(snapshot, time),
+      grid: { ...transportGrid, beat: transportGrid.beat + originBeats },
       pattern: { settings: { ...snapshot.settings }, drums: { ...snapshot.drums } },
       playing, countingIn: snapshot.transport.state === "counting-in", cycle: snapshot.transport.cycle, position, time, steps, stepMs, configuration,
     };
@@ -69,9 +71,9 @@ export class DrumPlaybackScheduler {
     const current = this.project(now);
     // Publishing an engine boundary can itself take a fraction of a millisecond.
     if (restart || changed) this.nextStep = Math.max(this.lastStep === null ? 0 : this.lastStep + 1, Math.ceil(current - 1 / stepMs));
-    const opening = countInOpeningBeat(snapshot, this.anchor.grid, now, previous?.countingIn ? previous.cycle : null);
+    const opening = countInOpeningBeat(snapshot, transportGrid, now, previous?.countingIn ? previous.cycle : null);
     if (opening !== null) {
-      this.nextStep = opening * 4;
+      this.nextStep = Math.ceil((opening + originBeats) * 4 - gridEpsilon);
       this.schedule(now, countInOpeningAllowanceMs);
       return;
     }

@@ -5,6 +5,7 @@ import type { EngineResult, HostEngine } from "@alesis/engine";
 import {
   commandEnvelopeSchema,
   LOOP_SESSION_MAX_BYTES,
+  idleLoopExport,
   type CommandEnvelope,
   type EngineCommand,
   type Readiness,
@@ -12,6 +13,9 @@ import {
 } from "@alesis/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import sirv from "sirv";
+import type { LoopExports } from "./loop-export.js";
+
+const longCommand = (command: EngineCommand): boolean => ["export-mp3", "export-loop-sample", "prepare-loop-export", "publish-loop-export", "release-loop-export"].includes(command.type);
 
 export interface ControlServer {
   readonly port: number;
@@ -22,6 +26,7 @@ export interface ControlServer {
 }
 
 interface ConnectionState {
+  id: string;
   heldSamplePads: Set<number>;
   cleanup: Promise<void> | null;
 }
@@ -37,9 +42,10 @@ export async function createControlServer(
   engine: HostEngine,
   port = 0,
   staticDirectory?: string,
-  executeCommand: (command: EngineCommand) => Promise<EngineResult> = (command) => engine.execute(command),
+  executeCommand: (command: EngineCommand, source?: string) => Promise<EngineResult> = (command) => engine.execute(command),
   host = "127.0.0.1",
   readiness: Readiness = readyForDevelopment,
+  exports?: Pick<LoopExports, "status" | "subscribe" | "disconnect">,
 ): Promise<ControlServer> {
   const httpServer = createHttpServer(staticDirectory, readiness);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control", maxPayload: LOOP_SESSION_MAX_BYTES * 6 + 1024 });
@@ -69,7 +75,7 @@ export async function createControlServer(
   };
 
   const broadcastSnapshotNow = (): void => {
-    const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage);
+    const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport } satisfies ServerMessage);
     webSocketServer.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) client.send(payload);
     });
@@ -111,12 +117,16 @@ export async function createControlServer(
     scheduleSnapshot(snapshot);
   });
 
+  const unsubscribeExports = exports?.subscribe((status) => {
+    const payload = JSON.stringify({ type: "loop-export-status", status } satisfies ServerMessage);
+    for (const socket of webSocketServer.clients) if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+  });
   webSocketServer.on("connection", (socket) => {
     const connectionId = randomUUID();
     socket.on("error", () => { /* Payload-limit/protocol errors close only this connection. */ });
-    const connection: ConnectionState = { heldSamplePads: new Set<number>(), cleanup: null };
+    const connection: ConnectionState = { id: connectionId, heldSamplePads: new Set<number>(), cleanup: null };
     connections.add(connection);
-    socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness } satisfies ServerMessage));
+    socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport } satisfies ServerMessage));
     socket.on("message", async (data) => {
       const envelope = parseEnvelope(data.toString());
       if (!envelope) {
@@ -125,7 +135,8 @@ export async function createControlServer(
       }
 
       const sessionCommand = envelope.command.type === "export-loop-session" || envelope.command.type === "import-loop-session";
-      const resultKey = sessionCommand ? `${connectionId}:${envelope.commandId}` : envelope.commandId;
+      const ownedCommand = sessionCommand || longCommand(envelope.command) || envelope.command.type === "preview-loop-export";
+      const resultKey = ownedCommand ? `${connectionId}:${envelope.commandId}` : envelope.commandId;
       const cached = results.get(resultKey);
       if (cached) {
         socket.send(JSON.stringify(cached));
@@ -145,16 +156,23 @@ export async function createControlServer(
         if (sessionCommand) pendingSessionCommands += 1;
         const execute = async () => {
           const holdGeneration = sampleHoldGeneration;
-          const message = await executeEnvelope(envelope, engine, executeTrackedCommand, readiness);
-          if (message.type === "command-result" && message.accepted) {
+          const message = await executeEnvelope(envelope, engine, (command) => {
+            if (connection.cleanup) throw new Error("Connection closed before command execution");
+            if (command.type === "release-sample-pad" && !connection.heldSamplePads.has(command.pad)) {
+              const snapshot = engine.snapshot();
+              return Promise.resolve({ accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle });
+            }
+            return executeTrackedCommand(command, connection.id);
+          }, readiness);
+          if (message.type === "command-result") {
             if (envelope.command.type === "trigger-sample-pad" && holdGeneration === sampleHoldGeneration) {
               connection.heldSamplePads.add(envelope.command.pad);
             }
-            if (envelope.command.type === "release-sample-pad") connection.heldSamplePads.delete(envelope.command.pad);
+            if (message.accepted && envelope.command.type === "release-sample-pad") connection.heldSamplePads.delete(envelope.command.pad);
           }
           return message;
         };
-        if (envelope.command.type === "export-mp3" || envelope.command.type === "export-loop-sample") {
+        if (longCommand(envelope.command)) {
           pending = commandTail.then(execute, execute);
         } else {
           pending = enqueueCommand(execute);
@@ -181,12 +199,14 @@ export async function createControlServer(
     });
   });
 
-  const executeTrackedCommand = async (command: EngineCommand): Promise<EngineResult> => {
+  const executeTrackedCommand = async (command: EngineCommand, source?: string): Promise<EngineResult> => {
     const before = engine.snapshot();
     if ((command.type === "import-loop-session" || command.type === "export-loop-session") && before.transport.state !== "stopped") {
       return { accepted: false, revision: before.revision, appliedCycle: before.transport.cycle, error: "Stop transport before saving or loading a loop session" };
     }
-    const result = await executeCommand(command);
+    const result = command.type === "trigger-sample-pad" || command.type === "release-sample-pad" || longCommand(command) || command.type === "preview-loop-export"
+      ? await executeCommand(command, source)
+      : await executeCommand(command);
     if (result.accepted) {
       const after = engine.snapshot();
       const samplePageNavigation = (command.type === "select-pad-program" || command.type === "step-pad-navigation")
@@ -197,6 +217,7 @@ export async function createControlServer(
         );
       if (
         command.type === "refresh-samples"
+        || command.type === "configure-pad"
         || (command.type === "set-pad-mode" && before.pads.mode !== after.pads.mode)
         || samplePageNavigation
       ) invalidateSamplePadHolds();
@@ -206,17 +227,21 @@ export async function createControlServer(
 
   const queueConnectionCleanup = (connection: ConnectionState): Promise<void> => {
     if (connection.cleanup) return connection.cleanup;
-    connection.cleanup = enqueueCommand(async () => {
+    const cancelExport = exports?.disconnect(connection.id);
+    const releasePads = enqueueCommand(async () => {
       const pads = [...connection.heldSamplePads];
       connection.heldSamplePads.clear();
       for (const pad of pads) {
         try {
-          await executeCommand({ type: "release-sample-pad", pad });
+          await executeCommand({ type: "release-sample-pad", pad }, connection.id);
         } catch {
           // Continue releasing other pads even if one cleanup command fails.
         }
       }
     });
+    // A committed sample export may enqueue its catalog refresh. Do not wait for
+    // that export from inside the same control queue on disconnect.
+    connection.cleanup = Promise.all([cancelExport, releasePads]).then(() => undefined);
     void connection.cleanup.then(() => connections.delete(connection), () => connections.delete(connection));
     return connection.cleanup;
   };
@@ -232,11 +257,14 @@ export async function createControlServer(
     if (typeof commandOrFactory === "function") {
       return enqueueCommand(async () => {
         const command = commandOrFactory();
-        return command ? executeTrackedCommand(command) : null;
+        if (!command) return null;
+        const result = await executeTrackedCommand(command);
+        broadcastSnapshotNow();
+        return result;
       });
     }
     const execute = () => executeTrackedCommand(commandOrFactory);
-    return commandOrFactory.type === "export-mp3" || commandOrFactory.type === "export-loop-sample"
+    return longCommand(commandOrFactory)
       ? commandTail.then(execute, execute)
       : enqueueCommand(execute);
   }
@@ -247,6 +275,7 @@ export async function createControlServer(
     invalidateSamplePadHolds,
     async close() {
       unsubscribe();
+      unsubscribeExports?.();
       if (snapshotTimer) clearTimeout(snapshotTimer);
       const connectionCleanups = [...connections].map(queueConnectionCleanup);
       for (const client of webSocketServer.clients) client.terminate();
@@ -334,6 +363,7 @@ function commandResult(envelope: CommandEnvelope, result: EngineResult): ServerM
     ...(result.error === undefined ? {} : { error: result.error }),
     ...(result.message === undefined ? {} : { message: result.message }),
     ...(result.sessionJson === undefined ? {} : { sessionJson: result.sessionJson }),
+    ...(result.artifact === undefined ? {} : { artifact: result.artifact }),
   };
 }
 

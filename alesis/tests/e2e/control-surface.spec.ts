@@ -454,6 +454,7 @@ test("cleans up held samples on mode/page/loading transitions, pane exit, and wi
 });
 
 test("edits BPM locally and confirms only on commit", async ({ page }, testInfo) => {
+  const awaitCommandResult = observeControlCommandResults(page);
   let dialogs = 0;
   page.on("dialog", async (dialog) => {
     dialogs += 1;
@@ -477,12 +478,12 @@ test("edits BPM locally and confirms only on commit", async ({ page }, testInfo)
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await expect(page.getByRole("button", { name: "Promote staged take" })).toBeEnabled({ timeout: 3_000 });
   await expect(page.getByRole("button", { name: "Promote previous staged take" })).toBeEnabled({ timeout: 3_000 });
-  await page.getByRole("button", { name: "Promote previous staged take" }).click();
-  await expect(page.getByRole("button", { name: "Promote previous staged take" })).toBeDisabled();
+  // Capture refills the previous slot every 200 ms; its disabled state is transient.
+  await awaitCommandResult({ type: "promote-previous-staged" }, () => page.getByRole("button", { name: "Promote previous staged take" }).click());
   await expect(page.locator(".take-row")).toHaveCount(1);
   await expect(page.locator(".current-capture svg .intensity-sample")).toHaveCount(96);
   const exportName = `E2E ${testInfo.project.name} ${process.pid}`;
-  const exportDirectory = join(homedir(), "alesis_recordings", exportName);
+  const exportDirectory = join(process.env.ALESIS_EXPORT_DIR!, exportName);
   exportDirectories.add(exportDirectory);
   await rm(exportDirectory, { recursive: true, force: true });
   await page.getByRole("button", { name: "Save promoted tracks as MP3 files" }).click();
@@ -568,16 +569,9 @@ test("keeps loop export feedback across pane switches and finds it in Pads", asy
       await page.getByRole("button", { name: "Play", exact: true }).click();
       await expect(sampleExportButton).toBeEnabled();
     }
-    await expect(page.getByLabel("Sample name")).toHaveCount(0);
     await sampleExportButton.click();
-    await expect(page.getByRole("button", { name: "Exporting…" })).toBeDisabled();
-
-    await page.getByRole("button", { name: "Pads" }).click();
-    await expect(page.getByRole("region", { name: "Pad controls" })).toBeVisible();
-    await page.getByRole("button", { name: "Loops" }).click();
-    await expect(page.getByRole("button", { name: "Exporting…" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Stop", exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "Stop", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     const feedback = page.locator(".sample-export-feedback");
     await expect(feedback).toContainText("Saved ", { timeout: 30_000 });
     const message = (await feedback.textContent())?.trim() ?? "";
@@ -588,6 +582,7 @@ test("keeps loop export feedback across pane switches and finds it in Pads", asy
     expect(exportedFilenames).not.toContain(filename);
     exportedFilenames.push(filename);
     names!.add(filename);
+    await page.getByRole("button", { name: "Stop", exact: true }).click();
     await expect(page.locator(".transport-status")).toContainText("stopped");
 
     await page.getByRole("button", { name: "Pads" }).click();

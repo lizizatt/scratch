@@ -28,6 +28,10 @@ floating bottom-left navigation, and no document-level page scrolling.
 - MIDI input, audio output, count-in, metronome enablement, and metronome volume are host settings.
 - Key Response selects Linear, Responsive, Strong, or Fixed 127 note-on
 	velocity mapping. Strong is the default for the Vortex.
+- Minimum impact velocity ranges from 1 (unchanged) to 127. It floors positive
+	note-on velocities after Key Response, before arpeggiation/capture. Note-off
+	and velocity-zero note-on releases are never raised. This setting persists
+	in the host settings cache and editable session files.
 - Count-in runs before each Play from Stop.
 
 ## Synth
@@ -63,16 +67,37 @@ floating bottom-left navigation, and no document-level page scrolling.
 - Monitor Only suppresses staged and promoted playback while preserving direct synth output.
 - Metronome defaults to 25% and triggers once per beat.
 
+### Start marker and overdub
+
+- Loop start selects a source beat; Set start here uses the latest displayed
+	source playhead position. Reset start returns to source beat 1.
+- A dashed gold marker appears in every lane. Waveforms remain in source
+	coordinates; the moving playhead uses the active playback origin.
+- Changing the marker while playing never seeks or closes active gates. The
+	next Play from Stop and new exports use the selected origin. Ongoing playback
+	keeps its original origin, including at rollover.
+- Overdub staged loop is off by default. When enabled, staging retains its ID
+	across passes. Incoming notes replace only the nearest older same-channel,
+	same-pitch attack within ±1/8 beat around the circular timeline; unmatched
+	pitches/times add notes. New attacks in a pass do not replace each other.
+- Stop, disabling overdub, and promoting staging commit the accepted partial
+	overdub. Promotion freezes the take; subsequent capture uses new staging.
+- Capacity rejection appears inline and preserves accepted capture. Save and
+	clear or load a smaller session before resuming capture.
+- The marker and overdub mode belong to the editable session. Browser reload
+	retains host state; host restart does not restore MIDI or enable overdub.
+	See [loop editing](docs/LOOP_EDITING.md) for export and controller details.
+
 ### Current
 
 - Displays live MIDI intensity over the cycle with beat and measure guides.
 - Populating a waveform does not resize its lane: SVGs fill the allocated box
 	without contributing their intrinsic square aspect ratio to grid sizing.
-- Stop discards a partial current capture.
+- Stop discards a partial current capture unless staged overdub is enabled.
 
 ### Staged
 
-- Rollover replaces staging with the completed cycle.
+- With overdub off, rollover replaces staging with the completed cycle.
 - Quantization choices are Off, 1/4, 1/8, 1/16, and 1/32.
 - Quantization snaps current staged MIDI to the nearest circular grid, deduplicates equivalent events per bin, and preserves a minimum note duration.
 - Changing quantization reprocesses current staging from raw timestamps.
@@ -82,7 +107,8 @@ floating bottom-left navigation, and no document-level page scrolling.
 
 - Displaced staging remains for one cycle in a narrower recovery row.
 - It is silent and can only be promoted.
-- Its timing is frozen; the next rollover replaces it.
+- Its timing is frozen; the next rollover replaces it in default mode. Overdub
+	retains the previous-staged recovery slot unchanged.
 
 ### Promoted
 

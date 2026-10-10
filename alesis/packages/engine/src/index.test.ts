@@ -302,7 +302,7 @@ describe("SimulatedHostEngine", () => {
     await captureOneCycle(engine);
     engine.advance(1.75);
     expect((await engine.execute({ type: "configure", settings: { bpm: 240 }, clearAudio: true })).accepted).toBe(true);
-    expect(engine.snapshot().transport).toEqual({ state: "playing", cycle: 0, progress: 0 });
+    expect(engine.snapshot().transport).toEqual({ state: "playing", cycle: 0, progress: 0, origin: 0 });
     expect(engine.snapshot().capture).toMatchObject({ staged: null, previousStaged: null, currentWaveform: [], hasCurrentEvents: false });
   });
 

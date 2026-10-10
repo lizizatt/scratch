@@ -83,6 +83,7 @@ test("exports a completed demo take while stopped without restarting transport",
 
     exporting = true;
     await exportButton.click();
+    await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
     const feedback = page.locator(".sample-export-feedback");
     await expect(feedback).toHaveText(/^Saved Loop \d{4,}\.mp3 to the sample library\.$/, { timeout: 30_000 });
     const filename = (await feedback.textContent())!.match(/^Saved (Loop \d{4,}\.mp3) to the sample library\.$/)![1]!;
@@ -93,7 +94,7 @@ test("exports a completed demo take while stopped without restarting transport",
     expect(after.capture).toEqual(before.capture);
     expect(after.promoted).toEqual(before.promoted);
     expect(after.settings).toEqual(before.settings);
-    expect(exportCommands.map(({ type }) => type)).toEqual(["export-loop-sample"]);
+    expect(exportCommands.map(({ type }) => type)).toEqual(["prepare-loop-export", "publish-loop-export"]);
     expect(exportStates.length).toBeGreaterThan(0);
     expect(exportStates.every((state) => state === "stopped")).toBe(true);
     await expect(page.locator(".transport-status")).toContainText("stopped");

@@ -13,6 +13,22 @@ const hasFfmpeg = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status 
 const encoderList = hasFfmpeg ? spawnSync("ffmpeg", ["-hide_banner", "-encoders"], { encoding: "utf8" }) : null;
 const canGenerateMp3 = Boolean(encoderList?.status === 0 && `${encoderList.stdout}${encoderList.stderr}`.includes("libmp3lame"));
 
+it("keeps sample IDs stable when a colliding filename sorts before an existing file", async () => {
+  const root = mkdtempSync(join(tmpdir(), "alesis-stable-sample-"));
+  const library = new SampleLibrary(root);
+  try {
+    writeFileSync(join(root, "a-b.mp3"), "fixture");
+    const id = (await library.scan())[0]!.id;
+    writeFileSync(join(root, "a b.mp3"), "fixture");
+    const catalog = await library.scan();
+    expect(catalog.find(({ name }) => name === "a-b")!.id).toBe(id);
+    expect(new Set(catalog.map(({ id }) => id)).size).toBe(2);
+  } finally {
+    await library.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 function fixtureSample(id: string, values: number[]): { id: string; name: string; samples: Float32Array } {
   return { id, name: id, samples: new Float32Array(values) };
 }
@@ -421,6 +437,17 @@ describe("SampleLibrary", () => {
       mixer.trigger(0, 127);
       mixer.panic();
       expect(mixer.render(256)).toEqual(new Float32Array(512));
+
+      const assigned = await library.loadSlots([descriptors[9]!.id, descriptors[0]!.id, "missing", null, null, null, null, null]);
+      expect(assigned.map((sample) => sample?.name ?? null)).toEqual(["tone-09", "tone-00", null, null, null, null, null, null]);
+      mixer.setPage(assigned);
+      renderPad(0, 765);
+      renderPad(1, 180);
+      rmSync(join(root, "tone-00.mp3"));
+      symlinkSync("/dev/null", join(root, "tone-00.mp3"));
+      const unavailable = await library.loadSlots([descriptors[0]!.id, descriptors[9]!.id, null, null, null, null, null, null]);
+      expect(unavailable[0]).toBeNull();
+      expect(unavailable[1]?.name).toBe("tone-09");
     } finally {
       await library.close();
       rmSync(root, { recursive: true, force: true });
@@ -448,6 +475,44 @@ describe("SampleLibrary", () => {
 });
 
 describe("SamplePlayer", () => {
+  it("sends owned preview PCM unchanged and stops its pump before killing the owned child", async () => {
+    vi.useFakeTimers();
+    const child = fixtureChild();
+    const chunks: Buffer[] = [];
+    child.stdin.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    const source = vi.fn((frames: number) => Buffer.alloc(frames * 4, Buffer.from([1, 2, 3, 4])));
+    const player = new SamplePlayer("null", { spawnProcess: vi.fn(() => child) as unknown as typeof import("node:child_process").spawn, renderPcm: source, stopImmediately: true });
+    try {
+      const starting = player.start(); child.emit("spawn"); await starting;
+      await vi.advanceTimersByTimeAsync(30);
+      expect(chunks.length).toBeGreaterThan(1);
+      expect(Buffer.concat(chunks)).toEqual(Buffer.alloc(chunks.reduce((sum, chunk) => sum + chunk.length, 0), Buffer.from([1, 2, 3, 4])));
+      const closing = player.close();
+      expect(child.kill).toHaveBeenCalledWith("SIGKILL");
+      child.emit("exit", null, "SIGKILL"); await closing;
+      const count = source.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(100);
+      expect(source).toHaveBeenCalledTimes(count);
+    } finally { child.exitCode = 0; await player.close(); vi.useRealTimers(); }
+  });
+
+  it("keeps a failed preview stream owned until its child exits", async () => {
+    const child = fixtureChild();
+    let closing: Promise<void> | undefined;
+    let closed = false;
+    const player = new SamplePlayer("null", { spawnProcess: vi.fn(() => child) as unknown as typeof import("node:child_process").spawn, stopImmediately: true, onError: () => { closing = player.close().then(() => { closed = true; }); } });
+    try {
+      const starting = player.start(); child.emit("spawn"); await starting;
+      child.stdin.emit("error", new Error("lost output"));
+      await Promise.resolve(); await Promise.resolve();
+      expect(closed).toBe(false);
+    } finally {
+      child.exitCode = 1; child.emit("exit", 1, null);
+      await closing; await player.close();
+    }
+    expect(closed).toBe(true);
+  });
+
   it("keeps a replacement pump running when an old child exits late", async () => {
     vi.useFakeTimers();
     const first = fixtureChild();

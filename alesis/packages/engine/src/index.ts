@@ -1,6 +1,8 @@
 import {
   PROTOCOL_VERSION,
   MAX_PROMOTED_TAKES,
+  padAssignmentSchema,
+  padAssignmentsSchema,
   engineSnapshotSchema,
   type EngineCommand,
   type EngineSnapshot,
@@ -25,6 +27,7 @@ export interface EngineResult {
   error?: string;
   message?: string;
   sessionJson?: string;
+  artifact?: import("@alesis/protocol").LoopArtifactInfo;
 }
 
 export type EngineListener = (snapshot: EngineSnapshot) => void;
@@ -157,6 +160,8 @@ export class SimulatedHostEngine implements HostEngine {
     next.arpeggiator = structuredClone(session.arpeggiator);
     next.monitorOnly = session.monitorOnly;
     next.capture = {
+      loopStart: session.loopStart,
+      overdub: session.overdub, error: null,
       currentWaveform: [], hasCurrentEvents: false,
       staged: session.staged ? structuredClone(session.staged.take) : null,
       previousStaged: session.previousStaged ? structuredClone(session.previousStaged.take) : null,
@@ -164,7 +169,7 @@ export class SimulatedHostEngine implements HostEngine {
     };
     next.promoted = session.promoted.map(({ take }) => structuredClone(take));
     next.canUndoDelete = false;
-    next.transport = { state: "stopped", cycle: 0, progress: 0 };
+    next.transport = { state: "stopped", cycle: 0, progress: 0, origin: 0 };
     next.revision += 1;
     engineSnapshotSchema.parse(next);
     // Install recordings before publishing their take IDs. No await may split this commit.
@@ -201,6 +206,19 @@ export class SimulatedHostEngine implements HostEngine {
 
   markCaptureActivity(): void {
     if (this.state.transport.state === "playing") this.state.capture.hasCurrentEvents = true;
+  }
+
+  /** Host capture commits before the next publication, avoiding reentrant recording writes. */
+  setStagedWaveform(takeId: string, waveform: number[]): void {
+    if (this.state.capture.staged?.id === takeId) this.state.capture.staged.waveform = [...waveform];
+  }
+
+  setCaptureError(error: string): void {
+    this.state.capture.error = error;
+  }
+
+  ensureOverdubStaged(): void {
+    if (this.state.capture.overdub && !this.state.capture.staged) this.state.capture.staged = this.newStagedTake(this.state.transport.cycle);
   }
 
   async execute(command: EngineCommand): Promise<EngineResult> {
@@ -298,6 +316,18 @@ export class SimulatedHostEngine implements HostEngine {
     this.publish(false);
   }
 
+  setSampleCatalog(catalog: Pads["sampleCatalog"]): void {
+    this.state.pads.sampleCatalog = structuredClone(catalog);
+    this.state.revision += 1;
+    this.publish(false);
+  }
+
+  restorePadAssignments(assignments: Pads["assignments"]): void {
+    this.state.pads.assignments = padAssignmentsSchema.parse(assignments);
+    this.state.revision += 1;
+    this.publish(false);
+  }
+
   advance(seconds: number): void {
     if (!Number.isFinite(seconds) || seconds < 0) throw new Error("advance requires nonnegative finite seconds");
     if (this.state.transport.state === "stopped") return;
@@ -362,6 +392,7 @@ export class SimulatedHostEngine implements HostEngine {
     switch (command.type) {
       case "play":
         if (this.state.transport.state === "stopped") {
+          this.state.transport.origin = this.state.capture.loopStart;
           this.elapsedSeconds = 0;
           this.state.transport.progress = 0;
           if (this.state.settings.countInEnabled) {
@@ -371,6 +402,13 @@ export class SimulatedHostEngine implements HostEngine {
             this.state.transport.state = "playing";
           }
         }
+        break;
+      case "set-overdub":
+        this.state.capture.overdub = command.enabled;
+        break;
+      case "set-loop-start":
+        if (!Number.isFinite(command.position) || command.position < 0 || command.position >= 1) return reject("Loop start must be from 0 (inclusive) to 1 (exclusive)");
+        this.state.capture.loopStart = command.position;
         break;
       case "stop":
         this.state.transport.state = "stopped";
@@ -398,6 +436,10 @@ export class SimulatedHostEngine implements HostEngine {
         if (settings.midiInputId !== undefined) this.state.settings.midiInputId = settings.midiInputId;
         if (settings.audioOutputId !== undefined) this.state.settings.audioOutputId = settings.audioOutputId;
         if (settings.velocityCurve !== undefined) this.state.settings.velocityCurve = settings.velocityCurve;
+        if (settings.minimumVelocity !== undefined) {
+          if (!Number.isInteger(settings.minimumVelocity) || settings.minimumVelocity < 1 || settings.minimumVelocity > 127) return reject("Minimum velocity must be an integer from 1 to 127");
+          this.state.settings.minimumVelocity = settings.minimumVelocity;
+        }
         if (settings.metronomeEnabled !== undefined) this.state.settings.metronomeEnabled = settings.metronomeEnabled;
         if (settings.metronomeVolume !== undefined) this.state.settings.metronomeVolume = settings.metronomeVolume;
         if (settings.countInEnabled !== undefined) this.state.settings.countInEnabled = settings.countInEnabled;
@@ -429,6 +471,16 @@ export class SimulatedHostEngine implements HostEngine {
       case "set-pad-mode":
         this.state.pads.mode = command.mode;
         break;
+      case "configure-pad": {
+        const parsed = padAssignmentSchema.omit({ action: true }).safeParse({ mode: command.mode, page: command.page, pad: command.pad });
+        if (!parsed.success || command.page >= Math.max(1, this.state.pads.samplePageCount)) return reject("Pad page is outside the available range");
+        if (command.action !== null && !padAssignmentSchema.safeParse({ ...parsed.data, action: command.action }).success) return reject("Invalid pad action");
+        const action = command.action;
+        if (action?.kind === "sample" && !this.state.pads.sampleCatalog.some(({ id }) => id === action.sampleId)) return reject("Sample is not in the library");
+        this.state.pads.assignments = this.state.pads.assignments.filter(({ mode, page, pad }) => mode !== command.mode || page !== command.page || pad !== command.pad);
+        if (command.action) this.state.pads.assignments.push({ ...parsed.data, action: structuredClone(command.action) });
+        break;
+      }
       case "set-pad-navigation-target":
         this.state.pads.navigationTarget = command.target;
         this.updatePadNavigation(false);
@@ -529,6 +581,12 @@ export class SimulatedHostEngine implements HostEngine {
       case "export-loop-session":
       case "import-loop-session":
         return reject("Loop sessions require host orchestration");
+      case "prepare-loop-export":
+      case "preview-loop-export":
+      case "publish-loop-export":
+      case "release-loop-export":
+      case "panic":
+        return reject("Preview and panic require host orchestration");
     }
 
     this.state.revision += 1;
@@ -537,18 +595,17 @@ export class SimulatedHostEngine implements HostEngine {
 
   private rollover(): void {
     const completedCycle = this.state.transport.cycle;
-    this.state.capture.previousStaged = this.state.capture.staged;
-    this.state.capture.staged = {
-      id: `take-${this.nextTakeId++}`,
-      cycle: completedCycle,
-      level: 0.8,
-      muted: !this.state.capture.stagedAudible,
-      waveform: [...this.currentWaveform],
-    };
+    if (!this.state.capture.overdub) this.state.capture.previousStaged = this.state.capture.staged;
+    if (!this.state.capture.overdub || !this.state.capture.staged) this.state.capture.staged = this.newStagedTake(completedCycle);
+    else this.state.capture.staged.cycle = completedCycle;
     this.currentWaveform = emptyWaveform();
     this.state.capture.hasCurrentEvents = false;
     this.state.transport.cycle += 1;
     this.state.revision += 1;
+  }
+
+  private newStagedTake(cycle: number): Take {
+    return { id: `take-${this.nextTakeId++}`, cycle, level: 0.8, muted: !this.state.capture.stagedAudible, waveform: [...this.currentWaveform] };
   }
 
   private padNavigationCount(target: PadNavigationTarget = this.state.pads.navigationTarget): number {
@@ -609,6 +666,9 @@ export class SimulatedHostEngine implements HostEngine {
   }
 
   private clearAudio(): void {
+    this.state.capture.error = null;
+    this.state.capture.loopStart = 0;
+    this.state.transport.origin = 0;
     this.state.capture.currentWaveform = [];
     this.state.capture.hasCurrentEvents = false;
     this.state.capture.staged = null;
@@ -636,10 +696,12 @@ export class SimulatedHostEngine implements HostEngine {
 
   private writeIntensity(start: number, end: number): void {
     const intensity = Math.min(1, Math.sqrt([...this.activeNotes.values()].reduce((sum, velocity) => sum + (velocity / 127) ** 2, 0)));
-    const first = Math.min(waveformBucketCount - 1, Math.floor(start * waveformBucketCount));
-    const last = Math.min(waveformBucketCount - 1, Math.floor(end * waveformBucketCount));
+    const origin = this.state.transport.origin;
+    const first = Math.floor((origin + start) * waveformBucketCount);
+    const last = Math.floor((origin + Math.min(end, 1 - Number.EPSILON)) * waveformBucketCount);
     for (let index = first; index <= last; index += 1) {
-      this.currentWaveform[index] = Math.max(this.currentWaveform[index] ?? 0, intensity);
+      const bucket = index % waveformBucketCount;
+      this.currentWaveform[bucket] = Math.max(this.currentWaveform[bucket] ?? 0, intensity);
     }
   }
 

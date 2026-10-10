@@ -4,7 +4,7 @@ import type { EngineSnapshot } from "@alesis/protocol";
 import { MidiArpeggiator, rateBeats } from "./arpeggiator.js";
 import { DrumPlaybackScheduler } from "./drum-playback.js";
 import type { MidiLoopScheduler } from "./loop-playback.js";
-import { beatAt, beatDeadline, countInOpeningAllowanceMs, countInOpeningBeat, monotonicClock, transportBeatAnchor, type MonotonicClock, type TransportBeatAnchor } from "./transport-clock.js";
+import { beatAt, beatDeadline, countInOpeningAllowanceMs, countInOpeningBeat, monotonicClock, sourceOriginBeats, transportBeatAnchor, type MonotonicClock, type TransportBeatAnchor } from "./transport-clock.js";
 
 const epsilon = 1e-9;
 
@@ -238,12 +238,12 @@ export class TransportPlayback {
 
   private stepBeat(step: number): number {
     const config = this.snapshot!.arpeggiator;
-    return rateBeats[config.rate] * (step + (step % 2 === 1 ? config.swing : 0));
+    return rateBeats[config.rate] * (step + (step % 2 === 1 ? config.swing : 0)) - sourceOriginBeats(this.snapshot!);
   }
 
   private firstStepAt(beat: number): number {
     const rate = rateBeats[this.snapshot!.arpeggiator.rate];
-    let step = Math.max(0, Math.floor(beat / (2 * rate)) * 2);
+    let step = Math.max(0, Math.floor((beat + sourceOriginBeats(this.snapshot!)) / (2 * rate)) * 2);
     while (this.stepBeat(step) < beat - epsilon
       || this.lastBeat !== null && this.stepBeat(step) <= this.lastBeat + epsilon) step += 1;
     return step;

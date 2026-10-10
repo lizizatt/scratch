@@ -1,5 +1,11 @@
 @import url("https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Space+Mono:wght@400;700&display=swap");
 
+.loop-start-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; padding: 0.5rem 0; }
+.loop-start-controls label { display: flex; align-items: center; gap: 0.4rem; }
+.loop-start-controls span { flex-basis: 100%; font-size: 0.75rem; opacity: 0.75; }
+.loop-start-marker { position: absolute; top: 0; bottom: 0; border-left: 2px dashed #ffcd6b; pointer-events: none; }
+.loop-start-marker::before { content: ""; position: absolute; top: 0; left: -5px; border: 4px solid transparent; border-top-color: #ffcd6b; }
+
 :root { color-scheme: dark; font-family: "Share Tech Mono", monospace; background: #000; --black:#000; --deep:#032b61; --blue:#075dff; --cyan:#00b7ff; --ice:#8cecff; --text:#b9f5ff; --dim:#32688a; --line:rgba(0,183,255,.24); --danger:#ff3d8d; }
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
@@ -87,6 +93,17 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .sample-state { color: var(--dim); font-size: 9px; }
 .sample-error { color: var(--danger); }
 .sample-pad-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); grid-template-rows: repeat(2,minmax(64px,1fr)); gap: 8px; }
+.sample-pad-cell { display: flex; min-width: 0; }
+.sample-pad-cell .sample-pad { flex: 1; border-radius: 4px 0 0 4px; }
+.pad-edit { flex: 0 0 40px; padding: 8px; border-radius: 0 4px 4px 0; border-left: 0; touch-action: manipulation; }
+.pad-edit svg { width: 18px; height: 18px; }
+.pad-editor { color: var(--text); width: min(480px, calc(100vw - 32px)); overscroll-behavior: contain; touch-action: pan-y; }
+.pad-editor::backdrop { background: rgb(0 0 0 / 75%); }
+.pad-editor fieldset { display: grid; gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.pad-editor select { width: 100%; min-width: 0; min-height: 44px; }
+.pad-editor p { font-size: 12px; line-height: 1.5; }
+.pad-editor .dialog-actions { flex-wrap: wrap; }
+.pad-editor button { min-height: 44px; }
 .sample-pad { min-width: 0; min-height: 64px; padding: 7px 10px; display: grid; grid-template-columns: 27px minmax(0,1fr); align-items: center; gap: 8px; border-color: rgba(0,183,255,.2); color: var(--dim); text-align: left; }
 .sample-pad.loaded { border-color: rgba(0,183,255,.55); color: var(--ice); background: linear-gradient(145deg,rgba(3,43,97,.72),rgba(0,17,34,.72)); }
 .sample-pad.loaded:hover { color: #fff; border-color: var(--cyan); background: rgba(3,43,97,.9); }
@@ -108,6 +125,17 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .session-feedback.error { color: var(--danger); }
 .session-dialog { color: var(--text); background: #001122; border-color: var(--cyan); font-size: 12px; }
 .session-dialog::backdrop { background: rgb(0 0 0 / 75%); }
+.loop-export-dialog { color: var(--text); background: #001122; width: min(600px,94vw); max-height: 90dvh; overflow: auto; border: 1px solid var(--cyan); }
+.loop-export-dialog::backdrop { background: rgb(0 0 0 / 80%); }
+.loop-export-dialog form { display: grid; gap: 10px; }
+.loop-export-dialog p { margin: 0; font-size: 11px; line-height: 1.4; }
+.loop-export-dialog .dialog-actions { flex-wrap: wrap; }
+.loop-export-dialog button { min-height: 40px; }
+.loop-interaction { display: grid; gap: 6px; }
+.loop-interaction .waveform { height: 76px; }
+.start-beat-slider { display: grid; gap: 6px; font-size: 12px; }
+.start-beat-slider input { width: 100%; accent-color: var(--cyan); min-height: 32px; }
+.export-status { color: var(--cyan); font-size: 12px; }
 .session-dialog p { line-height: 1.5; }
 .loop-toolbar { min-height: 44px; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 8px; }
 .loop-toolbar > .icon-button { justify-self: end; }
@@ -127,6 +155,10 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .icon-button.danger:hover { color: var(--danger); border-color: var(--danger); }
 .signal-stack { height: calc(100% - 46px); min-height: 0; display: grid; grid-template-rows: minmax(72px,1.05fr) minmax(56px,.78fr) minmax(46px,.62fr) 1px minmax(62px,1.25fr); gap: 7px; }
 .current-capture { display: grid; grid-template-rows: auto 1fr; gap: 3px; }
+.loop-pane .signal-stack.overdub-stack { min-height: 220px; grid-template-rows: minmax(90px,1fr) 1px auto; }
+.current-capture.overdub-capture { grid-template-rows: 1fr; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }
+.overdub-toggle { display: flex; align-items: center; gap: 6px; min-height: 40px; cursor: pointer; }
+.overdub-toggle input { accent-color: var(--cyan); width: 18px; height: 18px; }
 .lane-label { color: var(--dim); font-size: 10px; text-transform: uppercase; }
 .waveform { min-width: 0; height: 100%; position: relative; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; color: var(--deep); font-size: 10px; text-transform: uppercase; }
 /* SVG aspect ratios must not contribute a square intrinsic height to flexible lanes. */
@@ -185,6 +217,10 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
   .take-row { min-height: 42px; }
   .take-row .waveform { height: 32px; }
   .quantization-select { width: 94px; height: 28px; font-size: 9px; }
+}
+@media (max-height:420px) and (orientation:landscape) {
+  .loop-pane { padding-top: 12px; gap: 6px; }
+  .loop-start-controls { padding-block: 2px; gap: 4px 8px; }
 }
 @media (max-width:700px) and (orientation:landscape) {
   .sample-export-hint { max-width: 80px; }
