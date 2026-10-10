@@ -53,6 +53,24 @@ def test_parse_file_returns_commands(tmp_path):
     assert all(isinstance(c, GCodeCommand) for c in commands)
 
 
+def test_parser_keeps_source_spans_separate_from_lexical_fields(tmp_path):
+    source = tmp_path / 'spans.gcode'
+    source.write_bytes(b'; F999\r\n\r\ng1x+0.0(F77)y-.5 f 600 ; tail\nT255\nM970.3 Q1')
+    parser = GCodeParser()
+    commands = parser.parse_file(str(source))
+    assert [cmd.line_num for cmd in commands] == [1, 2, 3, 4, 5]
+    move = commands[2]
+    assert (move.command, move.x, move.y, move.f) == ('G1', 0, -.5, 600)
+    assert move.source.text == 'g1x+0.0(F77)y-.5 f 600 ; tail\n'
+    assert [move.source.text[token.start:token.end] for token in move.source.tokens] == ['g1', 'x+0.0', 'y-.5', 'f 600']
+    assert commands[-1].command == 'M970.3'
+    # No implicit modal F is written back into parsed command fields.
+    source.write_text('G1 F600\nG1 X10\n')
+    second = parser.parse_file(str(source))
+    assert second[1].f is None
+    assert move.source.text.endswith('; tail\n')
+
+
 # --- Frequency mapping ---
 
 def test_feedrate_to_frequency_bounds():

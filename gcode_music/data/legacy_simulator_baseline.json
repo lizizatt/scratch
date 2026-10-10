@@ -1,0 +1,39 @@
+{
+  "captured_on": "2026-10-05",
+  "status": "Pre-M1 legacy comparison, not ground truth; do not use to calibrate the corrected model",
+  "environment": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "mido": "1.3.3",
+    "pytest": "9.1.1"
+  },
+  "existing_tests_passed": 31,
+  "synthetic_move": {
+    "distance_mm": 100,
+    "feedrate_mm_min": 6000,
+    "acceleration_parameter": 1000,
+    "legacy_duration_seconds": 37.94733192202055,
+    "correct_rest_to_rest_seconds_at_1000_mm_s2": 1.1
+  },
+  "capture_method": "GCodeParser.parse_file, MovementAnalyzer.segment_movements(TimingParams()), then segments_to_wav(max_duration_sec=5) with defaults; timing is whole-file, WAV is the first five legacy seconds. WAV temporary files were discarded; hashes are historical fingerprints, not portable test expectations.",
+  "fixtures": {
+    "data/ground_truth/calibration.gcode": {
+      "input_sha256": "504c53d55d8a5bbe9c00b9a15e5d699d3ecdda265c13966acf0c91086ddb9014",
+      "legacy_parsed_commands": 34,
+      "legacy_segments": 28,
+      "legacy_total_seconds": 247.58068292307507,
+      "render_seconds_observed": 0.004314163001254201,
+      "wav_frames": 220500,
+      "wav_sha256": "d0e22694c1bc1b4bbaa44f81f43e14ce2b5e9996f0899227e90f52e9d22bf915"
+    },
+    "data/Bench.gcode": {
+      "input_sha256": "07f560d4ab4f6d9c602968bf952528f7e51cc8a2eca07ee485b47b8b3b8bc26e",
+      "legacy_parsed_commands": 130212,
+      "legacy_segments": 54156,
+      "legacy_total_seconds": 115942.05633192079,
+      "render_seconds_observed": 0.0025128740817308426,
+      "wav_frames": 220500,
+      "wav_sha256": "b2c3ae9ff1311e8bc98ba0e939c82e177b50a7354f526ac9260481a1122f37ad"
+    }
+  }
+}
