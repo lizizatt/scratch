@@ -164,7 +164,7 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 /* SVG aspect ratios must not contribute a square intrinsic height to flexible lanes. */
 .waveform svg { position: absolute; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; }
 .waveform .intensity-sample { stroke: rgba(7,93,255,.72); stroke-width: 1.05; vector-effect: non-scaling-stroke; }
-.waveform.live .intensity-sample { stroke: var(--cyan); filter: drop-shadow(0 0 3px var(--cyan)); }
+.waveform.live .intensity-sample, .waveform .incoming-waveform .intensity-sample { stroke: var(--cyan); filter: drop-shadow(0 0 3px var(--cyan)); }
 .beat-grid { position: absolute; z-index: 0; inset: 0; pointer-events: none; }
 .beat-grid i { width: 1px; position: absolute; inset-block: 0; background: rgba(140,236,255,.12); }
 .beat-grid i.measure { background: rgba(140,236,255,.22); }

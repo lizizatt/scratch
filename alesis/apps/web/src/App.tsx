@@ -450,6 +450,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
   triggerPromotedExport: () => void;
 }) {
   const isPlaying = snapshot.transport.state !== "stopped";
+  const captureProgress = isPlaying ? (snapshot.transport.origin + snapshot.transport.progress) % 1 : snapshot.capture.loopStart;
   const beatCount = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
   const cycleSeconds = 60 / snapshot.settings.bpm * beatCount;
   const hasAudibleLoopLayer = !snapshot.monitorOnly && (
@@ -488,12 +489,12 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
       <div className={`signal-stack ${snapshot.capture.overdub ? "overdub-stack" : ""}`}>
         {!snapshot.capture.overdub && <section className="current-capture">
           <span className="lane-label">Current capture // live</span>
-          <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} live progress={snapshot.transport.state === "stopped" ? snapshot.capture.loopStart : (snapshot.transport.origin + snapshot.transport.progress) % 1} />
+          <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} live progress={captureProgress} />
         </section>}
         <section className={snapshot.capture.overdub ? "current-capture overdub-capture" : "staged-capture"}>
           <div className="staging-lane">
             <span className="lane-label">{snapshot.capture.overdub ? "Current capture // overdub" : "Staged"} // {snapshot.capture.quantization === "off" ? "raw timing" : `quantized ${snapshot.capture.quantization}`}</span>
-            <Waveform samples={snapshot.capture.staged?.waveform ?? []} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="Waiting for rollover" />
+            <Waveform samples={snapshot.capture.staged?.waveform ?? []} {...snapshot.capture.overdub ? { incomingSamples: snapshot.capture.currentWaveform, progress: captureProgress } : {}} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="Waiting for rollover" />
           </div>
           <div className="take-actions">
             <select className="quantization-select" aria-label="Staged quantization" value={snapshot.capture.quantization} onChange={(event) => send({ type: "set-quantization", mode: event.target.value as EngineSnapshot["capture"]["quantization"] })}>

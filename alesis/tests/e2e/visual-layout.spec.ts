@@ -124,6 +124,61 @@ for (const [takes, samples] of [[0, 0], [2, 3], [12, 256]]) {
   });
 }
 
+test("overdub animates incoming waveform over saved capture with a moving playhead", async ({ page, baseURL }) => {
+  const state = await fixture(page, baseURL!, 0, 4);
+  state.snapshot.capture.overdub = true;
+  state.snapshot.capture.staged!.waveform = [0.5, 0.25, 0, 0];
+  state.snapshot.capture.currentWaveform = [0, 0, 0.75, 0];
+  state.snapshot.capture.loopStart = 0.25;
+  state.snapshot.transport = { state: "playing", cycle: 1, origin: 0.25, progress: 0.5 };
+  state.publish();
+  const lane = page.locator(".current-capture");
+  const saved = lane.locator(".base-waveform .intensity-sample");
+  const incoming = lane.locator(".incoming-waveform .intensity-sample");
+  await expect(page.locator(".staged-capture, .previous-staged-capture, .loop-start-marker")).toHaveCount(0);
+  await expect(saved).toHaveCount(4);
+  await expect(incoming).toHaveCount(4);
+  await expect(saved.nth(0)).toHaveAttribute("y2", "72");
+  await expect(incoming.nth(2)).toHaveAttribute("y2", "83");
+  await expect(lane.locator(".playhead")).toHaveAttribute("style", "left: 75%;");
+  expect(await saved.first().evaluate((node) => getComputedStyle(node).stroke))
+    .not.toBe(await incoming.first().evaluate((node) => getComputedStyle(node).stroke));
+  const bounds = await lane.boundingBox();
+
+  state.snapshot.capture.currentWaveform = [0, 0, 0.75, 1];
+  state.snapshot.transport.progress = 0.875;
+  state.publish();
+  await expect(incoming.nth(3)).toHaveAttribute("y2", "94");
+  await expect(saved.nth(0)).toHaveAttribute("y2", "72");
+  await expect(lane.locator(".playhead")).toHaveAttribute("style", "left: 12.5%;");
+  expect(await lane.boundingBox()).toEqual(bounds);
+  await containedChildren(page);
+  await evidence(page, "overdub-live-overlay");
+
+  state.snapshot.capture.staged!.waveform = [0.5, 0.25, 0.75, 1];
+  state.snapshot.capture.currentWaveform = [];
+  state.snapshot.transport = { state: "stopped", cycle: 2, origin: 0.25, progress: 0 };
+  state.publish();
+  await expect(incoming).toHaveCount(0);
+  await expect(saved.nth(3)).toHaveAttribute("y2", "94");
+  await expect(lane.locator(".playhead")).toHaveAttribute("style", "left: 25%;");
+
+  state.snapshot.capture.staged = null;
+  state.snapshot.capture.currentWaveform = [0, 0.5];
+  state.snapshot.transport.state = "playing";
+  state.publish();
+  await expect(saved).toHaveCount(0);
+  await expect(incoming).toHaveCount(2);
+  await expect(lane.getByText("Waiting for rollover")).toHaveCount(0);
+  await expect(incoming.nth(1)).toHaveAttribute("y2", "72");
+
+  state.snapshot.capture.overdub = false;
+  state.publish();
+  await expect(incoming).toHaveCount(0);
+  await expect(lane.locator(".intensity-sample")).toHaveCount(2);
+  await expect(page.locator(".staged-capture")).toBeVisible();
+});
+
 test("named SoundFont selectors and expanded effect controls remain legible", async ({ page, baseURL }) => {
   await fixture(page, baseURL!);
   await page.getByRole("button", { name: "Synth", exact: true }).click();

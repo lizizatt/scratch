@@ -1,14 +1,15 @@
-export function Waveform({ samples, beatCount, beatsPerMeasure, loopStart, showLoopStart = false, live = false, progress, emptyLabel }: { samples: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; showLoopStart?: boolean; live?: boolean; progress?: number; emptyLabel?: string }) {
-  const amplitudes = samples.map((sample) => Math.abs(sample));
+export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMeasure, loopStart, showLoopStart = false, live = false, progress, emptyLabel }: { samples: number[]; incomingSamples?: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; showLoopStart?: boolean; live?: boolean; progress?: number; emptyLabel?: string }) {
   return (
     <div className={`waveform ${live ? "live" : ""}`}>
       <div className="beat-grid" aria-hidden="true">
         {Array.from({ length: Math.max(0, beatCount - 1) }, (_, index) => <i key={index} className={(index + 1) % beatsPerMeasure === 0 ? "measure" : ""} style={{ left: `${(index + 1) / beatCount * 100}%` }} />)}
       </div>
-      {samples.length > 0 ? <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{amplitudes.map((sample, index) => {
-        const x = amplitudes.length === 1 ? 50 : index / (amplitudes.length - 1) * 100;
-        return <line className="intensity-sample" key={index} x1={x} x2={x} y1={50 - sample * 44} y2={50 + sample * 44} />;
-      })}</svg> : <span>{emptyLabel}</span>}
+      {[samples, incomingSamples].map((layer, layerIndex) => layer.length > 0 && <svg key={layerIndex} className={layerIndex === 0 ? "base-waveform" : "incoming-waveform"} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{layer.map((sample, index) => {
+        const amplitude = Math.abs(sample);
+        const x = layer.length === 1 ? 50 : index / (layer.length - 1) * 100;
+        return <line className="intensity-sample" key={index} x1={x} x2={x} y1={50 - amplitude * 44} y2={50 + amplitude * 44} />;
+      })}</svg>)}
+      {samples.length === 0 && incomingSamples.length === 0 && <span>{emptyLabel}</span>}
       {showLoopStart && <i className="loop-start-marker" aria-hidden="true" style={{ left: `${loopStart * 100}%` }} />}
       {progress !== undefined && <i className="playhead" style={{ left: `${progress * 100}%` }} />}
     </div>
