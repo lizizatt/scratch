@@ -1,4 +1,5 @@
 import type { AudioOutput } from "@alesis/audio";
+import type { RuntimeSnapshot } from "@alesis/engine";
 import type { EngineSnapshot } from "@alesis/protocol";
 import { drumPatternAtStep } from "./drum-patterns.js";
 import { beatAt, beatDeadline, countInOpeningAllowanceMs, countInOpeningBeat, monotonicClock, sourceOriginBeats, transportBeatAnchor, type MonotonicClock, type TransportBeatAnchor } from "./transport-clock.js";
@@ -34,7 +35,7 @@ export class DrumPlaybackScheduler {
   ) {}
 
   /** snapshotTime is the monotonic time represented by transport.progress, not its publication time. */
-  update(snapshot: EngineSnapshot, snapshotTime?: number, grid?: TransportBeatAnchor): void {
+  update(snapshot: RuntimeSnapshot, snapshotTime?: number, grid?: TransportBeatAnchor): void {
     if (this.disposed) return;
     const now = this.clock.now();
     const previous = this.anchor;

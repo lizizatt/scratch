@@ -1,5 +1,7 @@
 import type { EngineSnapshot } from "@alesis/protocol";
 
+type ClockSnapshot = Pick<EngineSnapshot, "settings" | "transport">;
+
 export interface MonotonicClock {
   now(): number;
   setTimeout(callback: () => void, delayMs: number): ReturnType<typeof setTimeout>;
@@ -19,7 +21,7 @@ export interface TransportBeatAnchor {
   beatMs: number;
 }
 
-export function transportBeatAnchor(snapshot: EngineSnapshot, time: number): TransportBeatAnchor {
+export function transportBeatAnchor(snapshot: ClockSnapshot, time: number): TransportBeatAnchor {
   return {
     time,
     beat: (snapshot.transport.cycle + snapshot.transport.progress)
@@ -29,7 +31,7 @@ export function transportBeatAnchor(snapshot: EngineSnapshot, time: number): Tra
 }
 
 /** Generated grids follow the latched source origin, never an in-flight marker edit. */
-export function sourceOriginBeats(snapshot: EngineSnapshot): number {
+export function sourceOriginBeats(snapshot: ClockSnapshot): number {
   return snapshot.transport.origin * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
 }
 
@@ -44,7 +46,7 @@ export function beatDeadline(anchor: TransportBeatAnchor, beat: number): number 
 export const countInOpeningAllowanceMs = 50;
 
 /** Only the count-in's original opening may arrive late, not a later cycle after a stall. */
-export function countInOpeningBeat(snapshot: EngineSnapshot, anchor: TransportBeatAnchor, now: number, countInCycle: number | null): number | null {
+export function countInOpeningBeat(snapshot: ClockSnapshot, anchor: TransportBeatAnchor, now: number, countInCycle: number | null): number | null {
   if (countInCycle === null || snapshot.transport.state !== "playing") return null;
   const opening = countInCycle * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
   const lateMs = (beatAt(anchor, now) - opening) * anchor.beatMs;

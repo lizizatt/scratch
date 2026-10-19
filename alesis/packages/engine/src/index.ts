@@ -32,6 +32,28 @@ export interface EngineResult {
 
 export type EngineListener = (snapshot: EngineSnapshot) => void;
 
+export type RuntimeTake = Pick<Take, "id" | "cycle" | "level" | "muted">;
+
+/** Detached playback/capture state; no catalogs, waveform arrays or render recipes. */
+export interface RuntimeSnapshot {
+  revision: number;
+  settings: EngineSnapshot["settings"];
+  transport: EngineSnapshot["transport"];
+  monitorOnly: boolean;
+  arpeggiator: EngineSnapshot["arpeggiator"];
+  drums: EngineSnapshot["drums"];
+  synth: Pick<EngineSnapshot["synth"], "selectedId" | "selectedSoundFontId" | "selectedSoundFontPresetId">;
+  pads: Pick<Pads, "mode" | "selectedDrumKitId">;
+  capture: Pick<EngineSnapshot["capture"], "hasCurrentEvents" | "stagedAudible" | "quantization" | "loopStart" | "overdub" | "error"> & {
+    staged: RuntimeTake | null;
+    previousStaged: RuntimeTake | null;
+  };
+  promoted: RuntimeTake[];
+}
+
+export type RuntimeEngineListener = (snapshot: RuntimeSnapshot) => void;
+type Subscription = { kind: "full"; listener: EngineListener } | { kind: "runtime"; listener: RuntimeEngineListener };
+
 export interface HostEngine {
   execute(command: EngineCommand): Promise<EngineResult>;
   dispatchMidi(event: MidiEvent): void;
@@ -80,7 +102,7 @@ export interface SimulatedHostEngineOptions {
 
 export class SimulatedHostEngine implements HostEngine {
   private state: EngineSnapshot;
-  private listeners = new Set<EngineListener>();
+  private listeners = new Map<EngineListener | RuntimeEngineListener, Subscription>();
   private activeNotes = new Map<string, number>();
   private currentWaveform = emptyWaveform();
   private elapsedSeconds = 0;
@@ -145,6 +167,23 @@ export class SimulatedHostEngine implements HostEngine {
     return structuredClone(this.state);
   }
 
+  runtimeSnapshot(): RuntimeSnapshot {
+    const { revision, settings, transport, monitorOnly, arpeggiator, drums, synth, pads, capture, promoted } = this.state;
+    return {
+      revision, settings: { ...settings }, transport: { ...transport }, monitorOnly,
+      arpeggiator: { ...arpeggiator }, drums: { ...drums },
+      synth: { selectedId: synth.selectedId, selectedSoundFontId: synth.selectedSoundFontId, selectedSoundFontPresetId: synth.selectedSoundFontPresetId },
+      pads: { mode: pads.mode, selectedDrumKitId: pads.selectedDrumKitId },
+      capture: {
+        hasCurrentEvents: capture.hasCurrentEvents, stagedAudible: capture.stagedAudible,
+        quantization: capture.quantization, loopStart: capture.loopStart, overdub: capture.overdub, error: capture.error,
+        staged: capture.staged ? runtimeTake(capture.staged) : null,
+        previousStaged: capture.previousStaged ? runtimeTake(capture.previousStaged) : null,
+      },
+      promoted: promoted.map(runtimeTake),
+    };
+  }
+
   /** Host-only commit, after file/capability validation and audio preparation. */
   restoreLoopSession(session: LoopSession, presets: SoundFontPreset[], commitResources: () => void): EngineResult {
     if (this.state.transport.state !== "stopped") throw new Error("Stop transport before loading a loop session");
@@ -186,8 +225,14 @@ export class SimulatedHostEngine implements HostEngine {
   }
 
   subscribe(listener: EngineListener): () => void {
-    this.listeners.add(listener);
+    this.listeners.set(listener, { kind: "full", listener });
     listener(this.snapshot());
+    return () => this.listeners.delete(listener);
+  }
+
+  subscribeRuntime(listener: RuntimeEngineListener): () => void {
+    this.listeners.set(listener, { kind: "runtime", listener });
+    listener(this.runtimeSnapshot());
     return () => this.listeners.delete(listener);
   }
 
@@ -707,9 +752,19 @@ export class SimulatedHostEngine implements HostEngine {
 
   private publish(incrementRevision = true): void {
     if (incrementRevision) this.state.revision += 1;
-    const snapshot = this.snapshot();
-    this.listeners.forEach((listener) => listener(snapshot));
+    const subscriptions = [...this.listeners.values()];
+    // Both views describe this publication, even if an earlier listener reenters.
+    const snapshot = subscriptions.some(({ kind }) => kind === "full") ? this.snapshot() : null;
+    const runtime = subscriptions.some(({ kind }) => kind === "runtime") ? this.runtimeSnapshot() : null;
+    this.listeners.forEach((subscription) => {
+      if (subscription.kind === "full") subscription.listener(snapshot ?? this.snapshot());
+      else subscription.listener(runtime ?? this.runtimeSnapshot());
+    });
   }
+}
+
+function runtimeTake({ id, cycle, level, muted }: Take): RuntimeTake {
+  return { id, cycle, level, muted };
 }
 
 function defaultParameterValues(instrument: InstrumentDescriptor): Record<string, number> {

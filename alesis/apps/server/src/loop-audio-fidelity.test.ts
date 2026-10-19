@@ -12,6 +12,7 @@ import { MidiLoopScheduler } from "./loop-playback.js";
 import { applyVelocityCurve, PerformanceRouter } from "./performance-router.js";
 import { renderLoopArtifact, type LoopArtifact } from "./loop-render.js";
 import { cycleRenderEvents, cycleRenderSchedule } from "./cycle-render-schedule.js";
+import { expectExactBuffer } from "./test-helpers/exact-buffer.js";
 
 // Agreed seam: host MIDI -> routed capture -> production replay deliveries/export.
 // No audio device, wall-clock scheduling, or physical latency is exercised here.
@@ -223,7 +224,7 @@ async function assertEncodedRepeats(result: LoopArtifact) {
     left -= count;
   }
   const preview = Buffer.concat(chunks);
-  for (let pass = 0; pass < 3; pass++) expect(preview.subarray(pass * saved.length, (pass + 1) * saved.length)).toEqual(saved);
+  for (let pass = 0; pass < 3; pass++) expectExactBuffer(preview.subarray(pass * saved.length, (pass + 1) * saved.length), saved, `Encoded preview pass ${pass + 1}`);
 }
 
 describe("offline host/capture/replay/export audio fidelity (STH required)", () => {
@@ -258,7 +259,7 @@ describe("offline host/capture/replay/export audio fidelity (STH required)", () 
       left -= count;
     }
     const preview = Buffer.concat(chunks);
-    for (let pass = 0; pass < 3; pass++) expect(preview.subarray(pass * frames * 4, (pass + 1) * frames * 4)).toEqual(saved);
+    for (let pass = 0; pass < 3; pass++) expectExactBuffer(preview.subarray(pass * frames * 4, (pass + 1) * frames * 4), saved, `Preview pass ${pass + 1}`);
     const firstReplay = continuous.slice(frames * 2, frames * 3);
     // FluidSynth MIDI file rendering quantizes delivery to native blocks; no phase
     // alignment or fitted gain is allowed to conceal a shifted attack or gate.
@@ -406,7 +407,7 @@ describe("offline host/capture/replay/export audio fidelity (STH required)", () 
         const promoted = await artifact(h, 0, "promoted");
         await assertEncodedRepeats(promoted);
         expect(defaultSample.durationSeconds).toBe(cycle);
-        expect(defaultSample.pcm).toEqual(result.pcm);
+        expectExactBuffer(defaultSample.pcm, result.pcm, "Default sample PCM");
         expect(promoted.durationSeconds).toBe(cycle);
         expect(rms(mono(promoted.pcm), 0.001, 0.004)).toBeGreaterThan(0.001);
       }

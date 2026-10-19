@@ -6,7 +6,7 @@ export class MetronomeScheduler {
 
   constructor(private readonly output: AudioOutput) {}
 
-  update(snapshot: EngineSnapshot): void {
+  update(snapshot: Pick<EngineSnapshot, "settings" | "transport">): void {
     if (snapshot.transport.state === "stopped") {
       this.lastBeatKey = null;
       return;

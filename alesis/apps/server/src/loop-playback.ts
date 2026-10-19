@@ -1,5 +1,5 @@
 import type { AudioOutput } from "@alesis/audio";
-import type { MidiEvent } from "@alesis/engine";
+import type { MidiEvent, RuntimeSnapshot, RuntimeTake } from "@alesis/engine";
 import type { EngineSnapshot, LoopSession, QuantizationMode, SessionTake, Take } from "@alesis/protocol";
 import { LOOP_SESSION_MAX_EVENTS, LOOP_SESSION_MAX_EVENTS_PER_TAKE } from "@alesis/protocol";
 import { isMappedDrumPadRelease } from "./sample-pads.js";
@@ -19,7 +19,7 @@ const subdivisionsPerBeat: Record<Exclude<QuantizationMode, "off">, number> = {
 };
 
 interface AudibleTake {
-  take: Take;
+  take: RuntimeTake;
   channel: number;
 }
 
@@ -68,7 +68,7 @@ export class MidiLoopScheduler {
   } = {}) {}
 
   /** Next event or rollover on the authoritative cycle, including a newly audible opening. */
-  nextPlaybackPosition(snapshot: EngineSnapshot): number {
+  nextPlaybackPosition(snapshot: RuntimeSnapshot): number {
     if (snapshot.transport.state !== "playing") return Infinity;
     if (this.playbackCycle !== snapshot.transport.cycle) return 0;
     let next = 1;
@@ -80,7 +80,7 @@ export class MidiLoopScheduler {
     return next;
   }
 
-  record(event: MidiEvent, snapshot: EngineSnapshot, endsAtCycleBoundary = false): void {
+  record(event: MidiEvent, snapshot: RuntimeSnapshot, endsAtCycleBoundary = false): void {
     if (snapshot.transport.state === "playing") this.advanceRecordingCycle(snapshot);
     const release = event.type === "note-off" || event.type === "note-on" && event.velocity === 0;
     const noteKey = "note" in event ? `${event.channel}:${event.note}` : null;
@@ -127,7 +127,7 @@ export class MidiLoopScheduler {
     }
   }
 
-  update(snapshot: EngineSnapshot): void {
+  update(snapshot: RuntimeSnapshot): void {
     if (snapshot.transport.state !== "playing") {
       this.releaseAllNotes();
       this.playbackCycle = null;
@@ -232,7 +232,7 @@ export class MidiLoopScheduler {
     }));
   }
 
-  captureRecordings(snapshot: EngineSnapshot, takeIds: readonly string[]): Map<string, RecordedMidiEvent[]> {
+  captureRecordings(snapshot: RuntimeSnapshot, takeIds: readonly string[]): Map<string, RecordedMidiEvent[]> {
     this.advanceRecordingCycle(snapshot);
     const staged = snapshot.capture.staged;
     if (staged && this.rawRecordings.has(staged.id)
@@ -262,7 +262,7 @@ export class MidiLoopScheduler {
   }
 
   /** Commit a partial overdub before Stop or disabling; the rotating default still discards it. */
-  finishOverdub(snapshot: EngineSnapshot): void {
+  finishOverdub(snapshot: RuntimeSnapshot): void {
     this.advanceRecordingCycle(snapshot);
     if (!snapshot.capture.overdub || snapshot.transport.state !== "playing" || !snapshot.capture.staged) return;
     this.commitRecording(snapshot.capture.staged.id, snapshot, snapshot.transport.progress);
@@ -295,7 +295,7 @@ export class MidiLoopScheduler {
     };
   }
 
-  private advanceRecordingCycle(snapshot: EngineSnapshot): void {
+  private advanceRecordingCycle(snapshot: RuntimeSnapshot): void {
     if (snapshot.transport.state !== "playing") return;
     if (this.recordingCycle === null) {
       this.recordingCycle = snapshot.transport.cycle;
@@ -312,7 +312,7 @@ export class MidiLoopScheduler {
     this.recordingCycle = snapshot.transport.cycle;
   }
 
-  private commitRecording(takeId: string, snapshot: EngineSnapshot, end: number): void {
+  private commitRecording(takeId: string, snapshot: RuntimeSnapshot, end: number): void {
     const closed = this.currentRecording.map((item) => this.continuationNotes.has(item) && snapshot.capture.overdub ? { ...item, continuation: true as const } : item);
     for (const owners of this.heldRecordingNotes.values()) for (const { event } of owners) {
       closed.push({ position: end, event: { type: "note-off", channel: event.channel, note: event.note } });
@@ -354,7 +354,7 @@ export class MidiLoopScheduler {
     }
   }
 
-  private audibleTakes(snapshot: EngineSnapshot): AudibleTake[] {
+  private audibleTakes(snapshot: RuntimeSnapshot): AudibleTake[] {
     if (snapshot.monitorOnly) return [];
     const takes = [
       ...(snapshot.capture.staged && snapshot.capture.stagedAudible ? [snapshot.capture.staged] : []),
@@ -428,7 +428,7 @@ export class MidiLoopScheduler {
     return channel;
   }
 
-  private reconcileRecordings(snapshot: EngineSnapshot): void {
+  private reconcileRecordings(snapshot: RuntimeSnapshot): void {
     const retainedIds = new Set([
       snapshot.capture.staged?.id,
       snapshot.capture.previousStaged?.id,

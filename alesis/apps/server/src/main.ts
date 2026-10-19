@@ -131,14 +131,14 @@ const drumPadNotes = new DrumPadNoteTracker();
 const dispatchPerformance = (event: MidiEvent, endsAtCycleBoundary = false): void => {
   if (loopExports?.blocksPerformance()) return;
   engine.markCaptureActivity();
-  loops.record(event, engine.snapshot(), endsAtCycleBoundary);
+  loops.record(event, engine.runtimeSnapshot(), endsAtCycleBoundary);
   audio.dispatchMidi(event);
 };
 const dispatchDrumPadEvent = (event: MidiEvent, playAudio: boolean): void => {
   if (loopExports?.blocksPerformance()) return;
   engine.dispatchMidi(event);
   engine.markCaptureActivity();
-  loops.record(event, engine.snapshot());
+  loops.record(event, engine.runtimeSnapshot());
   if (playAudio) audio.dispatchMidi(event);
 };
 const dispatchArpeggio = (event: MidiEvent, endsAtCycleBoundary = false): void => {
@@ -165,7 +165,7 @@ const handleMidi = (event: MidiInputEvent): void => {
     return;
   }
   advanceTransportClock();
-  const { velocityCurve, minimumVelocity } = engine.snapshot().settings;
+  const { velocityCurve, minimumVelocity } = engine.runtimeSnapshot().settings;
   const curvedEvent = applyVelocityCurve(event, velocityCurve, minimumVelocity);
   engine.dispatchMidi(curvedEvent);
   for (const routedEvent of performanceRouter.route(curvedEvent)) {
@@ -611,7 +611,7 @@ padPerformance = new PadPerformance({
   samples: samplePads,
   drum(event, playAudio) {
     advanceTransportClock();
-    const { velocityCurve, minimumVelocity } = engine.snapshot().settings;
+    const { velocityCurve, minimumVelocity } = engine.runtimeSnapshot().settings;
     const curvedEvent = applyVelocityCurve(event, velocityCurve, minimumVelocity);
     drumPadNotes.observe(curvedEvent);
     dispatchDrumPadEvent(curvedEvent, playAudio);
@@ -707,7 +707,7 @@ const metronome = new MetronomeScheduler(currentAudio);
 const timer = setInterval(() => {
   if (importingSession || loopExports?.blocksPerformance()) return;
   advanceTransportClock();
-  const snapshot = engine.snapshot();
+  const snapshot = engine.runtimeSnapshot();
   metronome.update(snapshot);
 }, 50);
 let demoNoteOn = false;

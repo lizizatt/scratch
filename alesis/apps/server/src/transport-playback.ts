@@ -1,6 +1,5 @@
 import type { AudioOutput } from "@alesis/audio";
-import type { MidiEvent, SimulatedHostEngine } from "@alesis/engine";
-import type { EngineSnapshot } from "@alesis/protocol";
+import type { MidiEvent, RuntimeSnapshot, SimulatedHostEngine } from "@alesis/engine";
 import { MidiArpeggiator, rateBeats } from "./arpeggiator.js";
 import { DrumPlaybackScheduler } from "./drum-playback.js";
 import type { MidiLoopScheduler } from "./loop-playback.js";
@@ -13,7 +12,7 @@ export class TransportPlayback {
   private readonly arpeggiator: MidiArpeggiator;
   private readonly drums: DrumPlaybackScheduler;
   private readonly unsubscribe: () => void;
-  private snapshot: EngineSnapshot | null = null;
+  private snapshot: RuntimeSnapshot | null = null;
   private anchor: TransportBeatAnchor | null = null;
   private lastTime: number;
   private idleTime: number;
@@ -26,22 +25,22 @@ export class TransportPlayback {
   private generation = 0;
   private processing = false;
   private transactionDepth = 0;
-  private pendingSnapshot: EngineSnapshot | null = null;
+  private pendingSnapshot: RuntimeSnapshot | null = null;
   private suspended = false;
   private panicked = false;
   private disposed = false;
 
   constructor(
-    private readonly engine: Pick<SimulatedHostEngine, "snapshot" | "subscribe" | "advance">,
+    private readonly engine: Pick<SimulatedHostEngine, "runtimeSnapshot" | "subscribeRuntime" | "advance">,
     audio: Pick<AudioOutput, "playDrum">,
     private readonly dispatch: (event: MidiEvent, endsAtCycleBoundary?: boolean) => void,
     private readonly clock: MonotonicClock = monotonicClock,
     private readonly loops?: MidiLoopScheduler,
   ) {
     this.lastTime = this.idleTime = clock.now();
-    this.arpeggiator = new MidiArpeggiator(engine.snapshot().arpeggiator);
+    this.arpeggiator = new MidiArpeggiator(engine.runtimeSnapshot().arpeggiator);
     this.drums = new DrumPlaybackScheduler(audio, clock);
-    this.unsubscribe = engine.subscribe((snapshot) => this.synchronize(snapshot));
+    this.unsubscribe = engine.subscribeRuntime((snapshot) => this.synchronize(snapshot));
   }
 
   /** Also called by dispatchArpeggio, so recorded positions represent actual delivery. */
@@ -54,8 +53,8 @@ export class TransportPlayback {
       this.engine.advance(seconds);
       // Synchronous arp subscribers finish recording boundary deliveries first.
       // A reentrant command publication must also finish its recording cleanup.
-      if (!this.processing) this.loops?.update(this.engine.snapshot());
-      this.synchronize(this.engine.snapshot());
+      if (!this.processing) this.loops?.update(this.engine.runtimeSnapshot());
+      this.synchronize(this.engine.runtimeSnapshot());
     }
     return seconds;
   }
@@ -70,7 +69,7 @@ export class TransportPlayback {
       if (this.snapshot?.transport.state === "stopped") this.standaloneDeadline = this.clock.now();
       else if (this.anchor) this.nextStep = this.firstStepAt(beatAt(this.anchor, this.clock.now()));
     }
-    this.synchronize(this.engine.snapshot());
+    this.synchronize(this.engine.runtimeSnapshot());
   }
 
   /** Defer subscription playback until command cleanup completes, retaining the held chord. */
@@ -86,7 +85,7 @@ export class TransportPlayback {
       this.transactionDepth -= 1;
       if (this.transactionDepth === 0) {
         this.pendingSnapshot = null;
-        this.synchronize(this.engine.snapshot());
+        this.synchronize(this.engine.runtimeSnapshot());
       }
     }
   }
@@ -109,7 +108,7 @@ export class TransportPlayback {
     this.lastTime = this.idleTime = this.clock.now();
     this.snapshot = null;
     this.suspended = this.panicked = false;
-    this.synchronize(this.engine.snapshot());
+    this.synchronize(this.engine.runtimeSnapshot());
   }
 
   dispose(): void {
@@ -119,7 +118,7 @@ export class TransportPlayback {
     this.drums.dispose();
   }
 
-  private synchronize(snapshot: EngineSnapshot): void {
+  private synchronize(snapshot: RuntimeSnapshot): void {
     if (this.disposed) return;
     if (this.transactionDepth > 0) {
       this.pendingSnapshot = snapshot;
@@ -146,7 +145,7 @@ export class TransportPlayback {
     }
   }
 
-  private update(snapshot: EngineSnapshot): void {
+  private update(snapshot: RuntimeSnapshot): void {
     const now = this.clock.now();
     const previous = this.snapshot;
     const transport = snapshot.transport;
@@ -274,7 +273,7 @@ export class TransportPlayback {
     this.timer = this.clock.setTimeout(() => {
       if (generation !== this.generation || this.disposed || this.suspended) return;
       this.timer = undefined;
-      if (this.advance() === 0) this.synchronize(this.engine.snapshot());
+      if (this.advance() === 0) this.synchronize(this.engine.runtimeSnapshot());
     }, Math.max(1, Math.ceil(deadline - this.clock.now())));
   }
 
