@@ -183,10 +183,15 @@ test("shared export dialog snaps only start, previews on host, saves prepared by
   await control(baseURL!, { type: "set-loop-start", position: 0.375 });
   const before = await control(baseURL!);
   const sessionBefore = parseLoopSession(await download(page));
+  await expect(page.locator(".loop-start-marker")).toHaveCount(0);
+  await expect(page.locator(".current-capture .playhead")).toBeVisible();
+  await expect(page.locator(".current-capture .playhead")).toHaveAttribute("style", "left: 37.5%;");
   for (const target of ["sample", "promoted"] as const) {
     commands.length = 0;
     await page.getByRole("button", { name: target === "sample" ? "Export loop to sample library" : "Save promoted tracks as MP3 files", exact: true }).click();
     const dialog = page.getByRole("dialog");
+    await expect(dialog.locator(".loop-start-marker")).toBeVisible();
+    await expect(page.locator(".loop-start-marker")).toHaveCount(1);
     await dialog.getByLabel("Choose start beat").click();
     const slider = dialog.getByRole("slider", { name: "Export start beat" });
     await slider.focus();
@@ -195,6 +200,7 @@ test("shared export dialog snaps only start, previews on host, saves prepared by
     await slider.press("ArrowLeft");
     await expect(slider).toHaveValue("1");
     await expect(slider).toHaveAttribute("aria-valuetext", "Beat 2 of 4");
+    await expect(dialog.locator(".loop-start-marker")).toHaveAttribute("style", "left: 25%;");
     const preview = dialog.getByRole("button", { name: "Preview on host output", exact: true });
     await reachable(preview);
     await preview.click();
