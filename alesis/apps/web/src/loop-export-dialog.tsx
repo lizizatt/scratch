@@ -10,6 +10,7 @@ export function LoopExportDialog({ target, snapshot, status, send, onClose, onSa
   onClose(): void; onSaved(message: string): void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const saveButton = useRef<HTMLButtonElement>(null);
   const artifact = useRef<string | null>(null);
   const preparation = useRef<{ id: string; settled: Promise<Result | null> } | null>(null);
   const operation = useRef(0);
@@ -17,7 +18,7 @@ export function LoopExportDialog({ target, snapshot, status, send, onClose, onSa
   sendRef.current = send;
   const [pending, setPending] = useState(false);
   const [startBeat, setStartBeat] = useState<number | null>(null);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => target === "promoted" ? `Loop ${new Date().toISOString().replace(/[:.]/g, "-")}` : "");
   const [error, setError] = useState<string | null>(null);
   // The display and beat domain are frozen at opening just like the host preparation recipe.
   const [display] = useState(snapshot);
@@ -29,6 +30,7 @@ export function LoopExportDialog({ target, snapshot, status, send, onClose, onSa
   const previewing = status.artifactId === artifact.current && status.state === "previewing";
   useEffect(() => {
     dialog.current?.showModal();
+    if (target === "promoted") saveButton.current?.focus();
     return () => {
       operation.current += 1;
       const id = artifact.current ?? preparation.current?.id;
@@ -97,7 +99,7 @@ export function LoopExportDialog({ target, snapshot, status, send, onClose, onSa
   return <dialog ref={dialog} className="save-dialog loop-export-dialog" aria-labelledby="loop-export-title" onCancel={(event) => { event.preventDefault(); close(); }}>
     <form onSubmit={(event) => { event.preventDefault(); action("save"); }}>
       <h2 id="loop-export-title">{target === "sample" ? "Export loop to sample library" : "Save MP3 audio"}</h2>
-      <label>{target === "sample" ? "Sample name (optional)" : "Folder name"}<input autoFocus required={target === "promoted"} maxLength={80} pattern="[A-Za-z0-9][-A-Za-z0-9 _]*" value={name} disabled={pending} onChange={(event) => setName(event.target.value)} /></label>
+      <label>{target === "sample" ? "Sample name (optional)" : "Folder name"}<input autoFocus={target === "sample"} required={target === "promoted"} maxLength={80} pattern="[A-Za-z0-9][-A-Za-z0-9 _]*" value={name} disabled={pending} onChange={(event) => setName(event.target.value)} /></label>
       <LoopInteraction waveform={waveform} beatCount={beats} beatsPerMeasure={display.settings.beatsPerMeasure} startBeat={startBeat} legacyStart={display.capture.loopStart} disabled={pending} onStartBeatChange={(beat) => invalidate(() => setStartBeat(beat))} />
       <p>Preview takes over the host audio output, not this browser. Stop transport first. It never resumes automatically.</p>
       <p>{target === "sample" ? "Audible staged/promoted takes + drums. Default zero origin trims leading silence." : "All promoted tracks, including muted tracks, plus their normalized mix. Default retains renderer tails."} Choosing a beat exports one exact cycle.</p>
@@ -108,7 +110,7 @@ export function LoopExportDialog({ target, snapshot, status, send, onClose, onSa
         <button type="button" onClick={close}>Cancel</button>
         <button type="button" disabled={pending || (!previewing && snapshot.transport.state !== "stopped")} onClick={() => previewing && artifact.current
           ? request({ type: "preview-loop-export", artifactId: artifact.current, enabled: false }, () => {}) : action("preview")}>{previewing ? "Stop preview" : "Preview on host output"}</button>
-        <button type="submit" disabled={pending || (target === "promoted" && !name.trim())}>Save</button>
+        <button ref={saveButton} type="submit" disabled={pending || (target === "promoted" && !name.trim())}>Save</button>
       </div>
     </form>
   </dialog>;

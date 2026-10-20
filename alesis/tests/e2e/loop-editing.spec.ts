@@ -166,6 +166,57 @@ test("legacy sessions restore musical settings with marker zero, overdub off and
   expect(restored.transport.state).toBe("stopped");
 });
 
+test("deletes staged and overdub capture through the host without deleting promoted tracks", async ({ page, baseURL }) => {
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Promote staged take", exact: true })).toBeEnabled();
+  const current = page.getByRole("button", { name: "Delete current capture", exact: true });
+  await expect(current).toBeEnabled();
+  const beforeDelete = await control(baseURL!);
+  await current.click();
+  await expect.poll(async () => (await control(baseURL!)).revision).toBeGreaterThan(beforeDelete.revision);
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await page.getByRole("button", { name: "Promote staged take", exact: true }).click();
+  const promoted = (await control(baseURL!)).promoted;
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Delete staged take", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await page.getByRole("button", { name: "Delete staged take", exact: true }).click();
+  await expect.poll(async () => (await control(baseURL!)).capture.staged).toBeNull();
+  expect((await control(baseURL!)).promoted).toEqual(promoted);
+
+  await page.getByLabel("Overdub staged loop").click();
+  await expect(page.getByLabel("Overdub staged loop")).toBeChecked();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Promote staged take", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await current.click();
+  await expect(current).toBeDisabled();
+  expect((await control(baseURL!)).capture).toMatchObject({ staged: null, currentWaveform: [], hasCurrentEvents: false });
+  expect((await control(baseURL!)).promoted).toEqual(promoted);
+});
+
+test("saves promoted MP3 audio without typing a folder name", async ({ page }) => {
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Promote staged take", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await page.getByRole("button", { name: "Promote staged take", exact: true }).click();
+  await page.getByRole("button", { name: "Save promoted tracks as MP3 files", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Save MP3 audio", exact: true });
+  const folder = dialog.getByLabel("Folder name");
+  await expect(folder).toHaveValue(/^Loop \d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/);
+  expect(await folder.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
+  const name = await folder.inputValue();
+  const save = dialog.getByRole("button", { name: "Save", exact: true });
+  await expect(save).toBeEnabled();
+  await expect(save).toBeFocused();
+  await reachable(save);
+  await save.click();
+  await expect(dialog).toHaveCount(0);
+  const directory = join(process.env.ALESIS_EXPORT_DIR!, name);
+  expect((await stat(join(directory, "track-01.mp3"))).size).toBeGreaterThan(1_000);
+  expect((await stat(join(directory, "mix.mp3"))).size).toBeGreaterThan(1_000);
+});
+
 test("shared export dialog snaps only start, previews on host, saves prepared bytes and cancels", async ({ page, baseURL }, info) => {
   const commands: EngineCommand[] = [];
   page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {

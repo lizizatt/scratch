@@ -124,6 +124,47 @@ for (const [takes, samples] of [[0, 0], [2, 3], [12, 256]]) {
   });
 }
 
+test("capture delete buttons target their own lanes and disable when empty", async ({ page, baseURL }) => {
+  const state = await fixture(page, baseURL!, 2, 4);
+  const commands: EngineCommand[] = [];
+  state.handle((command, commandId) => {
+    commands.push(command);
+    state.result(commandId, { accepted: true });
+  });
+  const current = page.getByRole("button", { name: "Delete current capture", exact: true });
+  const staged = page.getByRole("button", { name: "Delete staged take", exact: true });
+  await hitTarget(current);
+  await current.click();
+  await expect.poll(() => commands.at(-1)).toEqual({ type: "delete-current-capture" });
+  await hitTarget(staged);
+  await staged.click();
+  await expect.poll(() => commands.at(-1)).toEqual({ type: "delete-staged" });
+  await containedChildren(page);
+  await evidence(page, "capture-delete-normal");
+  state.snapshot.capture.currentWaveform = [];
+  state.snapshot.capture.hasCurrentEvents = false;
+  state.publish();
+  await expect(current).toBeDisabled();
+  await expect(staged).toBeEnabled();
+
+  state.snapshot.capture.overdub = true;
+  state.publish();
+  await expect(staged).toHaveCount(0);
+  await expect(current).toBeEnabled();
+  await hitTarget(current);
+  await current.click();
+  await expect.poll(() => commands.at(-1)).toEqual({ type: "delete-staged" });
+  await containedChildren(page);
+  await evidence(page, "capture-delete-overdub");
+  state.snapshot.capture.staged = null;
+  state.publish();
+  await expect(current).toBeDisabled();
+  state.snapshot.capture.currentWaveform = [0.5];
+  state.snapshot.capture.hasCurrentEvents = true;
+  state.publish();
+  await expect(current).toBeEnabled();
+});
+
 test("overdub animates incoming waveform over saved capture with a moving playhead", async ({ page, baseURL }) => {
   const state = await fixture(page, baseURL!, 0, 4);
   state.snapshot.capture.overdub = true;

@@ -451,6 +451,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
 }) {
   const isPlaying = snapshot.transport.state !== "stopped";
   const captureProgress = isPlaying ? (snapshot.transport.origin + snapshot.transport.progress) % 1 : snapshot.capture.loopStart;
+  const hasIncomingCapture = snapshot.capture.hasCurrentEvents || snapshot.capture.currentWaveform.some((sample) => sample !== 0);
   const beatCount = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
   const cycleSeconds = 60 / snapshot.settings.bpm * beatCount;
   const hasAudibleLoopLayer = !snapshot.monitorOnly && (
@@ -487,9 +488,14 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
       {snapshot.capture.error && <p role="alert">{snapshot.capture.error}</p>}
 
       <div className={`signal-stack ${snapshot.capture.overdub ? "overdub-stack" : ""}`}>
-        {!snapshot.capture.overdub && <section className="current-capture">
-          <span className="lane-label">Current capture // live</span>
-          <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} live progress={captureProgress} />
+        {!snapshot.capture.overdub && <section className="current-capture live-capture">
+          <div className="staging-lane">
+            <span className="lane-label">Current capture // live</span>
+            <Waveform samples={snapshot.capture.currentWaveform} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} live progress={captureProgress} />
+          </div>
+          <div className="take-actions">
+            <IconButton label="Delete current capture" disabled={!hasIncomingCapture} onClick={() => send({ type: "delete-current-capture" })}><Trash2 /></IconButton>
+          </div>
         </section>}
         <section className={snapshot.capture.overdub ? "current-capture overdub-capture" : "staged-capture"}>
           <div className="staging-lane">
@@ -506,6 +512,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
             </select>
             <IconButton label="Promote staged take" disabled={!snapshot.capture.staged} onClick={() => send({ type: "promote-staged" })}><Plus /></IconButton>
             <IconButton label={snapshot.capture.stagedAudible ? "Mute staged take" : "Unmute staged take"} active={snapshot.capture.stagedAudible} pressed={snapshot.capture.stagedAudible} onClick={() => send({ type: "set-staged-audible", audible: !snapshot.capture.stagedAudible })}>{snapshot.capture.stagedAudible ? <Volume2 /> : <VolumeX />}</IconButton>
+            <IconButton label={snapshot.capture.overdub ? "Delete current capture" : "Delete staged take"} disabled={!snapshot.capture.staged && !(snapshot.capture.overdub && hasIncomingCapture)} onClick={() => send({ type: "delete-staged" })}><Trash2 /></IconButton>
           </div>
         </section>
         {!snapshot.capture.overdub && <section className="previous-staged-capture">

@@ -203,6 +203,7 @@ export class MidiLoopScheduler {
 
   /** Stop/clear discard captured audio, not controllers still applied live. */
   discardCurrentRecording(): void {
+    this.capacityRejected = false;
     this.currentRecording = [];
     this.heldRecordingNotes.clear();
     this.initializedRecordingChannels.clear();

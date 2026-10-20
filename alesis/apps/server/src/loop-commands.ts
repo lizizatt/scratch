@@ -25,23 +25,27 @@ export async function executeLoopCommand(
     }
   }
   // Finalize any completed rollover before Stop discards the partial cycle or promotion moves its ID.
-  if (command.type === "stop" || command.type === "promote-staged" || command.type === "promote-previous-staged") {
+  const deletingCapture = command.type === "delete-current-capture" || command.type === "delete-staged";
+  if (command.type === "stop" || command.type === "promote-staged" || command.type === "promote-previous-staged" || deletingCapture) {
     loops.captureRecordings(engine.snapshot(), []);
   }
   const execute = async (): Promise<EngineResult> => {
+    const discardCurrent = command.type === "delete-current-capture" || command.type === "delete-staged" && engine.snapshot().capture.overdub;
     if ((command.type === "stop" || command.type === "promote-staged" || command.type === "set-overdub" && !command.enabled)
       && engine.snapshot().capture.overdub && loops.hasCurrentRecording()) {
       engine.ensureOverdubStaged();
       loops.finishOverdub(engine.snapshot());
     }
     const result = await engine.execute(command);
+    if (result.accepted && discardCurrent) loops.discardCurrentRecording();
+    if (result.accepted && deletingCapture) loops.update(engine.snapshot());
     if (result.accepted && command.type === "configure" && command.clearAudio) loops.clearRecordings();
     if (result.accepted && command.type === "stop") loops.update(engine.snapshot());
     if (result.accepted && command.type === "delete-take") loops.markDeleted(command.takeId);
     if (result.accepted && command.type === "undo-delete") loops.restoreDeleted();
     return result;
   };
-  return command.type === "stop" || command.type === "promote-staged" && engine.snapshot().capture.overdub || command.type === "set-overdub" || command.type === "configure" && command.clearAudio
+  return deletingCapture || command.type === "stop" || command.type === "promote-staged" && engine.snapshot().capture.overdub || command.type === "set-overdub" || command.type === "configure" && command.clearAudio
     ? playback.transaction(execute)
     : execute();
 }

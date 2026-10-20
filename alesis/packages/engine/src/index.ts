@@ -580,11 +580,25 @@ export class SimulatedHostEngine implements HostEngine {
       case "set-quantization":
         this.state.capture.quantization = command.mode;
         break;
+      case "delete-current-capture":
+        this.clearCurrentCapture();
+        this.activeNotes.clear();
+        this.state.capture.error = null;
+        break;
+      case "delete-staged":
+        this.state.capture.staged = null;
+        this.state.capture.error = null;
+        if (this.state.capture.overdub) {
+          this.clearCurrentCapture();
+          this.activeNotes.clear();
+        }
+        break;
       case "promote-staged":
         if (!this.state.capture.staged) return reject("No staged take to promote");
         if (this.state.promoted.length >= maxPromotedTakes) return reject(`At most ${maxPromotedTakes} promoted takes are supported`);
         this.state.promoted.push(this.state.capture.staged);
         this.state.capture.staged = null;
+        if (this.state.capture.overdub) this.clearCurrentCapture();
         break;
       case "promote-previous-staged":
         if (!this.state.capture.previousStaged) return reject("No previous staged take to promote");
@@ -708,6 +722,12 @@ export class SimulatedHostEngine implements HostEngine {
   private sortedDrumKits(): DrumKit[] {
     return [...this.state.pads.drumKits]
       .sort((left, right) => left.bank - right.bank || left.program - right.program || left.name.localeCompare(right.name));
+  }
+
+  private clearCurrentCapture(): void {
+    this.currentWaveform = emptyWaveform();
+    this.state.capture.currentWaveform = [];
+    this.state.capture.hasCurrentEvents = false;
   }
 
   private clearAudio(): void {

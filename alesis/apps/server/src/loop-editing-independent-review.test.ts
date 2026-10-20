@@ -70,7 +70,7 @@ async function host(arp = false, countIn = false) {
     for (const routed of router.route(curved)) playback.handle(routed);
   };
   const command = async (command: EngineCommand) => {
-    if (["play", "stop", "configure", "configure-arpeggiator"].includes(command.type)) playback.advance();
+    if (["play", "stop", "configure", "configure-arpeggiator", "delete-current-capture", "delete-staged", "promote-staged"].includes(command.type)) playback.advance();
     expect((await executeLoopCommand(command, engine, loops, playback)).accepted).toBe(true);
   };
   const poll = () => { playback.advance(); clock.setTimeout(poll, 50); };
@@ -99,6 +99,93 @@ async function releasedBeforePedal() {
 }
 
 describe("independent loop-editing review reproductions", () => {
+  it.each([false, true])("deletes incoming capture without recapturing held notes (overdub %s)", async (overdub) => {
+    const h = await host();
+    await h.command({ type: "set-overdub", enabled: overdub });
+    await h.command({ type: "play" });
+    h.clock.until(200);
+    h.input({ type: "note-on", channel: 0, note: 60, velocity: 100 });
+    h.clock.until(400);
+    h.input({ type: "note-off", channel: 0, note: 60 });
+    h.clock.until(2_200);
+    const staged = h.engine.snapshot().capture.staged;
+    h.input({ type: "note-on", channel: 0, note: 64, velocity: 100 });
+    h.clock.until(2_400);
+    const transport = h.engine.snapshot().transport;
+    await h.command({ type: "delete-current-capture" });
+    expect(h.engine.snapshot().transport).toEqual(transport);
+    expect(h.engine.snapshot().capture.staged).toEqual(staged);
+    expect(h.engine.snapshot().capture.currentWaveform).toEqual([]);
+    h.clock.until(4_100);
+    expect(h.engine.snapshot().capture.currentWaveform.every((sample) => sample === 0)).toBe(true);
+    h.input({ type: "note-off", channel: 0, note: 64 });
+    const notes = pairRecording(h.loops.captureSessionTakes(h.engine.snapshot()).staged!.recording).notes;
+    expect(notes.map(({ on }) => "note" in on.event ? on.event.note : null)).toEqual(overdub ? [60] : []);
+    h.input({ type: "note-on", channel: 0, note: 67, velocity: 100 });
+    h.clock.until(4_300);
+    h.input({ type: "note-off", channel: 0, note: 67 });
+    h.clock.until(6_010);
+    expect(pairRecording(h.loops.captureSessionTakes(h.engine.snapshot()).staged!.recording).notes.some(({ on }) => "note" in on.event && on.event.note === 67)).toBe(true);
+  });
+
+  it.each([false, true])("deletes staged audio without touching promoted tracks (overdub %s)", async (overdub) => {
+    const h = await host();
+    await h.command({ type: "play" });
+    h.input({ type: "note-on", channel: 0, note: 55, velocity: 100 });
+    h.clock.until(400);
+    h.input({ type: "note-off", channel: 0, note: 55 });
+    h.clock.until(2_010);
+    await h.command({ type: "promote-staged" });
+    await h.command({ type: "set-overdub", enabled: overdub });
+    h.clock.until(2_200);
+    h.input({ type: "note-on", channel: 0, note: 60, velocity: 100 });
+    h.clock.until(4_100);
+    h.input({ type: "note-off", channel: 0, note: 60 });
+    h.clock.until(4_200);
+    h.input({ type: "note-on", channel: 0, note: 64, velocity: 100 });
+    h.clock.until(4_400);
+    h.input({ type: "note-off", channel: 0, note: 64 });
+    const before = h.engine.snapshot();
+    h.replay.length = 0;
+    await h.command({ type: "delete-staged" });
+    const after = h.engine.snapshot();
+    expect(after.transport).toEqual(before.transport);
+    expect(after.promoted).toEqual(before.promoted);
+    expect(after.capture.previousStaged).toEqual(before.capture.previousStaged);
+    expect(after.capture.staged).toBeNull();
+    expect(after.capture.currentWaveform).toEqual(overdub ? [] : before.capture.currentWaveform);
+    expect(h.replay.some(({ event }) => event.type === "note-off" && event.note === 60)).toBe(true);
+    h.clock.until(6_500);
+    const session = h.loops.captureSessionTakes(h.engine.snapshot());
+    expect(pairRecording(session.staged!.recording).notes.map(({ on }) => "note" in on.event ? on.event.note : null)).toEqual(overdub ? [] : [60, 64]);
+    expect(pairRecording(session.promoted[0]!.recording).notes.map(({ on }) => "note" in on.event ? on.event.note : null)).toEqual([55]);
+    expect(h.replay.some(({ at, event }) => at >= 6_000 && event.type === "note-on" && event.velocity > 0 && event.note === 60)).toBe(!overdub);
+  });
+
+  it("clears the whole current waveform after mid-cycle overdub promotion", async () => {
+    const h = await host();
+    await h.command({ type: "set-overdub", enabled: true });
+    await h.command({ type: "play" });
+    h.clock.until(200);
+    h.input({ type: "note-on", channel: 0, note: 60, velocity: 100 });
+    h.clock.until(400);
+    h.input({ type: "note-off", channel: 0, note: 60 });
+    h.clock.until(2_200);
+    h.input({ type: "note-on", channel: 0, note: 64, velocity: 110 });
+    h.clock.until(2_400);
+    h.input({ type: "note-off", channel: 0, note: 64 });
+    expect(h.engine.snapshot().capture.currentWaveform.some((sample) => sample > 0)).toBe(true);
+    await h.command({ type: "promote-staged" });
+    expect(h.engine.snapshot().capture.currentWaveform).toEqual([]);
+    expect(h.engine.snapshot().capture.hasCurrentEvents).toBe(false);
+    const promoted = h.loops.captureSessionTakes(h.engine.snapshot()).promoted[0]!;
+    expect(pairRecording(promoted.recording).notes.map(({ on }) => "note" in on.event ? on.event.note : null)).toEqual([60, 64]);
+    h.clock.until(2_600);
+    expect(h.engine.snapshot().capture.currentWaveform.every((sample) => sample === 0)).toBe(true);
+    h.clock.until(4_010);
+    expect(pairRecording(h.loops.captureSessionTakes(h.engine.snapshot()).staged!.recording).notes).toEqual([]);
+  });
+
   it.each([false, true].flatMap((overdub) => [false, true].map((zeroRelease) => ({ overdub, zeroRelease }))))
     ("owns repeated/overlapping releases including carried gates: overdub=$overdub zero=$zeroRelease", async ({ overdub, zeroRelease }) => {
       const h = await host();

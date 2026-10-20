@@ -338,7 +338,7 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
     const snapshot = engine.snapshot();
     return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: "Not Ready: transport dependencies are unavailable" };
   }
-  if (command.type === "play" || command.type === "stop" || command.type === "configure" || command.type === "configure-arpeggiator") {
+  if (command.type === "play" || command.type === "stop" || command.type === "configure" || command.type === "configure-arpeggiator" || command.type === "delete-current-capture" || command.type === "delete-staged" || command.type === "promote-staged") {
     advanceTransportClock();
   }
   if (command.type === "export-loop-session") return exportLoopSession(loopSessionHost);

@@ -307,6 +307,8 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("set-staged-audible"), audible: z.boolean() }),
   z.object({ type: z.literal("set-quantization"), mode: quantizationModeSchema }),
   z.object({ type: z.literal("promote-staged") }),
+  z.object({ type: z.literal("delete-current-capture") }),
+  z.object({ type: z.literal("delete-staged") }),
   z.object({ type: z.literal("promote-previous-staged") }),
   z.object({ type: z.literal("set-take-level"), takeId: takeIdSchema, level: z.number().min(0).max(1) }),
   z.object({ type: z.literal("set-take-muted"), takeId: takeIdSchema, muted: z.boolean() }),

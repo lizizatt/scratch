@@ -1,9 +1,10 @@
 # Loop start, staged overdub, and input velocity
 
 The original loop-editing update was deployed and activation verified on the Pi
-on 2026-10-07. The newer [overdub presentation and export preview](LOOP_EXPORT_PREVIEW.md)
-changes are **LOCAL ONLY** and are not included in that deployment. Neither is
-physical audio acceptance.
+on 2026-10-07. Export preview and the live overdub display were subsequently
+deployed on 2026-10-19, through commit `7703c5d`. Capture deletion, the promotion
+waveform reset, and keyboard-free MP3 naming described below are **LOCAL ONLY**.
+Physical audio acceptance remains separate.
 
 ## Historical deployment checkpoint — 2026-10-07
 
@@ -59,6 +60,19 @@ In the current local UI, **Overdub** is beside **Load loop session**. Enabling
 it hides both staging lanes and presents the committed staged waveform and its
 actions in **Current capture**. Disabling it restores the lanes. No merge,
 replacement or capture semantics changed with that presentation update.
+
+The trash button in normal **Current capture** discards only the incoming pass;
+the **Staged** trash button removes only the completed staged loop. In overdub,
+the combined **Current capture** trash button removes both the saved staged loop
+and the incoming pass. Transport keeps its position, promoted tracks and the
+previous-staged recovery slot are unchanged, and newly played notes can still be
+recorded. Held input discarded by deletion is not carried into another pass.
+These capture deletions are immediate and are not part of promoted-track Undo.
+
+Successful overdub promotion clears the entire incoming waveform, including the
+portion before the playhead, while preserving the promoted MIDI recording.
+The **Save MP3 audio** dialog starts with an editable timestamped folder name and
+focuses **Save**, so exporting does not require a keyboard.
 
 For each new attack, the nearest older attack of the same MIDI channel and pitch
 within **±1/8 beat** is replaced, including its release. The distance wraps around

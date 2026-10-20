@@ -156,7 +156,7 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .signal-stack { height: calc(100% - 46px); min-height: 0; display: grid; grid-template-rows: minmax(72px,1.05fr) minmax(56px,.78fr) minmax(46px,.62fr) 1px minmax(62px,1.25fr); gap: 7px; }
 .current-capture { display: grid; grid-template-rows: auto 1fr; gap: 3px; }
 .loop-pane .signal-stack.overdub-stack { min-height: 220px; grid-template-rows: minmax(90px,1fr) 1px auto; }
-.current-capture.overdub-capture { grid-template-rows: 1fr; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }
+.current-capture.overdub-capture, .current-capture.live-capture { grid-template-rows: 1fr; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }
 .overdub-toggle { display: flex; align-items: center; gap: 6px; min-height: 40px; cursor: pointer; }
 .overdub-toggle input { accent-color: var(--cyan); width: 18px; height: 18px; }
 .lane-label { color: var(--dim); font-size: 10px; text-transform: uppercase; }
