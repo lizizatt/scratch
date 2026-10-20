@@ -124,6 +124,34 @@ for (const [takes, samples] of [[0, 0], [2, 3], [12, 256]]) {
   });
 }
 
+test("loops label the voice they were recorded in only while that voice applies", async ({ page, baseURL }) => {
+  const state = await fixture(page, baseURL!, 2, 8);
+  const font = state.snapshot.synth.selectedSoundFontId!;
+  const voice = (name: string, soundFontId = font) => ({ soundFontId, presetId: "0:0", bank: 0, program: 0, name });
+  state.snapshot.capture.staged!.voice = voice("Miku Sustain");
+  state.snapshot.capture.previousStaged!.voice = voice("Warm Strings");
+  state.snapshot.promoted[0]!.voice = voice("Studio Piano");
+  state.snapshot.promoted[1]!.voice = voice("Elsewhere", "another-font");
+  state.publish();
+
+  await expect(page.locator(".staged-capture .voice-label")).toHaveText("Miku Sustain");
+  await expect(page.locator(".previous-staged-capture .voice-label")).toHaveText("Warm Strings");
+  await expect(page.locator(".take-row").nth(0).locator(".voice-label")).toHaveText("Studio Piano");
+  await expect(page.locator(".take-row").nth(1).locator(".voice-label")).toHaveText("Current voice");
+  await containedChildren(page);
+  await evidence(page, "voice-labels");
+
+  state.snapshot.capture.overdub = true;
+  state.publish();
+  await expect(page.locator(".current-capture .voice-label")).toHaveText("Miku Sustain");
+  await containedChildren(page);
+  await evidence(page, "voice-labels-overdub");
+
+  state.snapshot.synth.selectedId = "subtractive";
+  state.publish();
+  await expect(page.locator(".voice-label")).toHaveCount(0);
+});
+
 test("capture delete buttons target their own lanes and disable when empty", async ({ page, baseURL }) => {
   const state = await fixture(page, baseURL!, 2, 4);
   const commands: EngineCommand[] = [];

@@ -3,8 +3,9 @@
 The original loop-editing update was deployed and activation verified on the Pi
 on 2026-10-07. Export preview and the live overdub display were subsequently
 deployed on 2026-10-19, through commit `7703c5d`. Capture deletion, the promotion
-waveform reset, and keyboard-free MP3 naming described below are **LOCAL ONLY**.
-Physical audio acceptance remains separate.
+waveform reset, and keyboard-free MP3 naming (commit `2fb491e`) are committed but
+**not deployed**. Per-loop voices, described below, are **LOCAL ONLY** and
+uncommitted. Physical audio acceptance remains separate.
 
 ## Historical deployment checkpoint — 2026-10-07
 
@@ -73,6 +74,35 @@ Successful overdub promotion clears the entire incoming waveform, including the
 portion before the playhead, while preserving the promoted MIDI recording.
 The **Save MP3 audio** dialog starts with an editable timestamped folder name and
 focuses **Save**, so exporting does not require a keyboard.
+
+## Loop voices
+
+Each loop keeps the SoundFont voice (bank and program) it was recorded in, so
+you can record one loop, change voice, and record another that sounds different
+while the first keeps its own timbre. This works within the selected SoundFont;
+switching SoundFonts is not supported per loop yet.
+
+- **Normal mode:** a loop takes the voice active when its pass **ends**. Changing
+  voice mid-pass applies to that loop, and later changes never alter a loop that
+  is already staged, previous-staged, or promoted. Promotion freezes the voice.
+- **Overdub:** there is one staged loop, so it **follows the current voice**:
+  changing voice, enabling overdub, or a new pass re-voices the whole staged
+  loop. Promote it first to freeze its voice. The previous-staged slot and
+  promoted loops are never re-voiced.
+- **Playback:** every loop already plays on its own MIDI channel, and the host
+  pins that channel to the loop's voice before its notes play. Live playing on
+  channel 0 follows the voice you select. Voices are re-asserted after a
+  renderer restart or loaded session, and released when a loop is muted,
+  deleted, cleared, or monitor-only is on. If a loop's SoundFont is not the one
+  selected, or the Neon synth is active, it plays in the current voice instead.
+- **Exports and sessions:** MIDI, MP3 and sample exports render each loop in its
+  own voice. Saved sessions store it; sessions saved earlier have no voice and
+  keep the current voice. Loading rejects a voice that is missing from the
+  session's SoundFont instead of substituting another. Saving drops a voice that
+  belongs to a SoundFont other than the one being saved, since it is not in
+  effect.
+- **Display:** staged and promoted loops show their voice name on the waveform,
+  or *Current voice* when it does not apply.
 
 For each new attack, the nearest older attack of the same MIDI channel and pitch
 within **±1/8 beat** is replaced, including its release. The distance wraps around

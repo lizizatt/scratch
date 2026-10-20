@@ -23,6 +23,9 @@ export interface AudioOutput {
   selectDrumKit(bank: number, program: number): void;
   loadSoundFont(path: string): Promise<void>;
   selectSoundFontPreset(bank: number, program: number): void;
+  /** Pins one performance channel to a voice until cleared; global selection skips it. */
+  setChannelVoice(channel: number, bank: number, program: number): void;
+  clearChannelVoice(channel: number): void;
   selectSynth(synthId: string): Promise<void>;
   setSynthParameter(synthId: string, parameterId: string, value: number): void;
   close(): Promise<void>;
@@ -83,6 +86,11 @@ interface SoundFontParameterValues {
   "reverb-room": number;
   "reverb-damping": number;
   "reverb-width": number;
+}
+
+export interface ChannelVoice {
+  bank: number;
+  program: number;
 }
 
 const soundFontParameterRanges: Record<keyof SoundFontParameterValues, readonly [number, number]> = {
@@ -176,6 +184,8 @@ export class SilentAudioOutput implements AudioOutput {
   selectDrumKit(): void {}
   async loadSoundFont(): Promise<void> {}
   selectSoundFontPreset(): void {}
+  setChannelVoice(): void {}
+  clearChannelVoice(): void {}
   async selectSynth(): Promise<void> {}
   setSynthParameter(): void {}
   async close(): Promise<void> {}
@@ -257,6 +267,7 @@ export class FluidSynthOutput implements AudioOutput {
   private pendingRecoveryReason: string | null = null;
   private closing = false;
   private readonly soundFontParameters: SoundFontParameterValues;
+  private readonly channelVoices = new Map<number, ChannelVoice>();
   private readonly neonOutput: NeonPressureOutput;
   private selectedSynthId = "soundfont";
   private percussionBank = 128;
@@ -389,7 +400,20 @@ export class FluidSynthOutput implements AudioOutput {
   selectSoundFontPreset(bank: number, program: number): void {
     this.soundFontParameters.bank = bank;
     this.soundFontParameters.program = program;
-    for (const command of soundFontSelectionCommands(bank, program)) this.writeCommand(command);
+    for (const command of soundFontSelectionCommands(bank, program, this.channelVoices)) this.writeCommand(command);
+  }
+
+  setChannelVoice(channel: number, bank: number, program: number): void {
+    if (!performanceChannels.includes(channel)) throw new RangeError(`Channel does not play SoundFont voices: ${channel}`);
+    if (!Number.isInteger(bank) || bank < 0 || bank > 16_383) throw new RangeError(`Voice bank out of range: ${bank}`);
+    if (!Number.isInteger(program) || program < 0 || program > 127) throw new RangeError(`Voice program out of range: ${program}`);
+    this.channelVoices.set(channel, { bank, program });
+    this.writeCommand(`select ${channel} 1 ${bank} ${program}`);
+  }
+
+  clearChannelVoice(channel: number): void {
+    if (!this.channelVoices.delete(channel)) return;
+    this.writeCommand(`select ${channel} 1 ${Math.round(this.soundFontParameters.bank)} ${Math.round(this.soundFontParameters.program)}`);
   }
 
   async selectSynth(synthId: string): Promise<void> {
@@ -417,7 +441,7 @@ export class FluidSynthOutput implements AudioOutput {
     }
     if (!(parameterId in this.soundFontParameters)) throw new Error(`Unknown SoundFont parameter: ${parameterId}`);
     this.soundFontParameters[parameterId as keyof SoundFontParameterValues] = value;
-    for (const command of soundFontParameterCommands(parameterId, value, this.soundFontParameters)) this.writeCommand(command);
+    for (const command of soundFontParameterCommands(parameterId, value, this.soundFontParameters, this.channelVoices)) this.writeCommand(command);
   }
 
   async close(): Promise<void> {
@@ -438,7 +462,7 @@ export class FluidSynthOutput implements AudioOutput {
   }
 
   private applySoundFontParameters(): void {
-    for (const command of soundFontInitializationCommands(this.soundFontParameters)) this.writeCommand(command);
+    for (const command of soundFontInitializationCommands(this.soundFontParameters, this.channelVoices)) this.writeCommand(command);
     for (const command of auxiliaryPercussionSelectionCommands(this.percussionSoundFontPath !== null)) this.writeCommand(command);
     this.writeCommand(`select 9 ${this.percussionSoundFontId()} ${this.percussionBank} ${this.percussionProgram}`);
   }
@@ -568,13 +592,13 @@ export function parseSoundFontPresets(output: string): SoundFontPreset[] {
   });
 }
 
-export function soundFontParameterCommands(parameterId: string, value: number, selection = { bank: 0, program: 0 }): string[] {
+export function soundFontParameterCommands(parameterId: string, value: number, selection = { bank: 0, program: 0 }, voices: ReadonlyMap<number, ChannelVoice> = new Map()): string[] {
   const range = soundFontParameterRanges[parameterId as keyof SoundFontParameterValues];
   if (!range) throw new Error(`Unknown SoundFont parameter: ${parameterId}`);
   if (!Number.isFinite(value) || value < range[0] || value > range[1]) throw new Error(`SoundFont parameter out of range: ${parameterId}=${value}`);
   switch (parameterId) {
-    case "bank": return soundFontSelectionCommands(Math.round(value), selection.program);
-    case "program": return soundFontSelectionCommands(selection.bank, Math.round(value));
+    case "bank": return soundFontSelectionCommands(Math.round(value), selection.program, voices);
+    case "program": return soundFontSelectionCommands(selection.bank, Math.round(value), voices);
     case "gain": return [`gain ${value}`];
     case "reverb-send": return [
       `reverb ${value > 0 ? 1 : 0}`,
@@ -589,16 +613,19 @@ export function soundFontParameterCommands(parameterId: string, value: number, s
   }
 }
 
-export function soundFontInitializationCommands(parameters: SoundFontParameterValues): string[] {
+export function soundFontInitializationCommands(parameters: SoundFontParameterValues, voices: ReadonlyMap<number, ChannelVoice> = new Map()): string[] {
   return [
-    ...soundFontSelectionCommands(parameters.bank, parameters.program),
+    ...soundFontSelectionCommands(parameters.bank, parameters.program, voices),
     ...["gain", "reverb-room", "reverb-damping", "reverb-width", "reverb-send"].flatMap((parameterId) =>
-      soundFontParameterCommands(parameterId, parameters[parameterId as keyof SoundFontParameterValues], parameters)),
+      soundFontParameterCommands(parameterId, parameters[parameterId as keyof SoundFontParameterValues], parameters, voices)),
   ];
 }
 
-function soundFontSelectionCommands(bank: number, program: number): string[] {
-  return performanceChannels.map((channel) => `select ${channel} 1 ${Math.round(bank)} ${Math.round(program)}`);
+function soundFontSelectionCommands(bank: number, program: number, voices: ReadonlyMap<number, ChannelVoice> = new Map()): string[] {
+  return performanceChannels.map((channel) => {
+    const voice = voices.get(channel);
+    return `select ${channel} 1 ${Math.round(voice?.bank ?? bank)} ${Math.round(voice?.program ?? program)}`;
+  });
 }
 
 export function fluidSynthArguments(deviceId: string, soundFontPath: string, gain: number, percussionSoundFontPath?: string | null): string[] {

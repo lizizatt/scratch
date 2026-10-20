@@ -170,6 +170,7 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .beat-grid i.measure { background: rgba(140,236,255,.22); }
 .waveform > span { position: relative; z-index: 1; }
 .playhead { width: 1px; z-index: 2; position: absolute; inset-block: 0; background: var(--ice); box-shadow: 0 0 10px var(--cyan); }
+.voice-label { position: absolute; z-index: 3; top: 2px; left: 6px; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 400; color: var(--ice); opacity: .85; text-shadow: 0 0 4px #000; pointer-events: none; }
 .staged-capture { width: 91%; min-height: 0; margin-left: 5%; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }
 .previous-staged-capture { width: 84%; min-height: 0; margin-left: 9%; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; opacity: .72; }
 .staging-lane { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0,1fr); gap: 2px; }

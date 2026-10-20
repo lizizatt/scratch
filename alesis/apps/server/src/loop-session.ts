@@ -29,6 +29,11 @@ export function exportLoopSession(host: LoopSessionHost): EngineResult {
   const preset = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
   if (snapshot.synth.selectedSoundFontId && (!font || !preset)) throw new Error("Selected SoundFont or preset is unavailable");
   const kit = snapshot.pads.drumKits.find(({ id }) => id === snapshot.pads.selectedDrumKitId);
+  const takes = host.loops.captureSessionTakes(snapshot);
+  // A session stores one SoundFont; a voice from another one is already inactive, so it is not saved.
+  for (const entry of [takes.staged, takes.previousStaged, ...takes.promoted]) {
+    if (entry?.take.voice && entry.take.voice.soundFontId !== font?.id) delete entry.take.voice;
+  }
   const session: LoopSession = {
     format: "alesis-loop-session", version: 1, settings,
     sourceOrigin: 0, loopStart: snapshot.capture.loopStart,
@@ -40,7 +45,7 @@ export function exportLoopSession(host: LoopSessionHost): EngineResult {
     monitorOnly: snapshot.monitorOnly,
     stagedAudible: snapshot.capture.stagedAudible,
     quantization: snapshot.capture.quantization,
-    ...host.loops.captureSessionTakes(snapshot),
+    ...takes,
   };
   const sessionJson = JSON.stringify(session);
   parseLoopSession(sessionJson);
@@ -101,6 +106,14 @@ function validateCapabilities(session: LoopSession, snapshot: EngineSnapshot, ho
     presets = host.inspectPresets(font.id);
     if (!presets.some((preset) => preset.id === font.preset.id && preset.bank === font.preset.bank && preset.program === font.preset.program && preset.name === font.preset.name)) {
       throw new Error(`Missing preset ${font.preset.name} (bank ${font.preset.bank}, program ${font.preset.program}) in ${font.name}`);
+    }
+  }
+  for (const entry of [session.staged, session.previousStaged, ...session.promoted]) {
+    const voice = entry?.take.voice;
+    if (!voice) continue;
+    if (!font || voice.soundFontId !== font.id) throw new Error(`Take voice ${voice.name} belongs to a different SoundFont than the session`);
+    if (!presets.some((preset) => preset.id === voice.presetId && preset.bank === voice.bank && preset.program === voice.program && preset.name === voice.name)) {
+      throw new Error(`Missing take voice ${voice.name} (bank ${voice.bank}, program ${voice.program}) in ${font.name}`);
     }
   }
   const percussion = session.percussion;

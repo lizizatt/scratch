@@ -49,6 +49,7 @@ export class MidiLoopScheduler {
   private activeBends = new Map<string, { takeId: string; channel: number; value: number }>();
   private activeSustains = new Map<string, { takeId: string; channel: number; value: number }>();
   private takeChannels = new Map<string, number>();
+  private appliedVoices = new Map<number, { bank: number; program: number }>();
   private rotated = new WeakMap<RecordedMidiEvent[], Map<number, RecordedMidiEvent[]>>();
 
   private playbackRecording(takeId: string, origin: number): RecordedMidiEvent[] {
@@ -151,6 +152,7 @@ export class MidiLoopScheduler {
     }
 
     const audible = this.audibleTakes(snapshot);
+    this.syncVoices(snapshot, audible);
     const cycleChanged = this.playbackCycle !== snapshot.transport.cycle;
     if (cycleChanged) this.releaseAllNotes();
     this.releaseInactiveNotes(new Set(audible.map(({ take }) => take.id)));
@@ -183,6 +185,7 @@ export class MidiLoopScheduler {
   clearRecordings(): void {
     this.capacityRejected = false;
     this.releaseAllNotes();
+    this.clearAppliedVoices();
     this.recordings.clear();
     this.rawRecordings.clear();
     this.appliedQuantization.clear();
@@ -220,6 +223,8 @@ export class MidiLoopScheduler {
   /** Renderer replacement preserves physical holds; host panic clears them instead. */
   reapplyInputControllers(): void {
     for (const event of this.recordingControllers.values()) this.output.dispatchMidi(structuredClone(event));
+    // A reset renderer forgets channel voices, so assert them before the next take event.
+    for (const [channel, { bank, program }] of this.appliedVoices) this.output.setChannelVoice(channel, bank, program);
   }
 
   storageStats(): { recordings: number; rawRecordings: number; channels: number } {
@@ -289,6 +294,7 @@ export class MidiLoopScheduler {
       this.rawRecordings = raw;
       this.appliedQuantization = applied;
       this.takeChannels.clear();
+      this.appliedVoices.clear();
       this.resetRecordingInput();
       this.playbackCycle = null;
       this.playbackPosition = -1;
@@ -361,7 +367,8 @@ export class MidiLoopScheduler {
       ...(snapshot.capture.staged && snapshot.capture.stagedAudible ? [snapshot.capture.staged] : []),
       ...snapshot.promoted.filter((take) => !take.muted),
     ];
-    return takes.map((take) => ({ take, channel: this.channelFor(take.id) }));
+    const audibleIds = new Set(takes.map(({ id }) => id));
+    return takes.map((take) => ({ take, channel: this.channelFor(take.id, audibleIds) }));
   }
 
   private dispatch(takeId: string, channel: number, level: number, event: MidiEvent): void {
@@ -419,12 +426,45 @@ export class MidiLoopScheduler {
     this.activeSustains.clear();
   }
 
-  private channelFor(takeId: string): number {
+  /** Pin each audible take's channel to its recorded voice; other SoundFonts and Neon use the global voice. */
+  private syncVoices(snapshot: RuntimeSnapshot, audible: AudibleTake[]): void {
+    const wanted = new Map<number, { bank: number; program: number }>();
+    if (snapshot.synth.selectedId === "soundfont") {
+      for (const { take, channel } of audible) {
+        if (take.voice && take.voice.soundFontId === snapshot.synth.selectedSoundFontId) wanted.set(channel, take.voice);
+      }
+    }
+    for (const channel of [...this.appliedVoices.keys()]) {
+      if (wanted.has(channel)) continue;
+      this.appliedVoices.delete(channel);
+      this.output.clearChannelVoice(channel);
+    }
+    for (const [channel, { bank, program }] of wanted) {
+      const applied = this.appliedVoices.get(channel);
+      if (applied?.bank === bank && applied.program === program) continue;
+      this.appliedVoices.set(channel, { bank, program });
+      this.output.setChannelVoice(channel, bank, program);
+    }
+  }
+
+  private clearAppliedVoices(): void {
+    for (const channel of this.appliedVoices.keys()) this.output.clearChannelVoice(channel);
+    this.appliedVoices.clear();
+  }
+
+  private channelFor(takeId: string, audibleIds: ReadonlySet<string>): number {
     const assigned = this.takeChannels.get(takeId);
     if (assigned !== undefined) return assigned;
     const used = new Set(this.takeChannels.values());
-    const channel = playbackChannels.find((candidate) => !used.has(candidate))
-      ?? playbackChannels[this.takeChannels.size % playbackChannels.length]!;
+    let channel = playbackChannels.find((candidate) => !used.has(candidate));
+    if (channel === undefined) {
+      // Audible takes sharing a channel would also share a voice, so take one from a silent take first.
+      const silent = [...this.takeChannels].find(([id]) => !audibleIds.has(id));
+      if (silent) {
+        this.takeChannels.delete(silent[0]);
+        channel = silent[1];
+      } else channel = playbackChannels[this.takeChannels.size % playbackChannels.length]!;
+    }
     this.takeChannels.set(takeId, channel);
     return channel;
   }
@@ -442,6 +482,8 @@ export class MidiLoopScheduler {
   }
 
   private deleteRecording(takeId: string): void {
+    const channel = this.takeChannels.get(takeId);
+    if (channel !== undefined && this.appliedVoices.delete(channel)) this.output.clearChannelVoice(channel);
     this.recordings.delete(takeId);
     this.rawRecordings.delete(takeId);
     this.appliedQuantization.delete(takeId);

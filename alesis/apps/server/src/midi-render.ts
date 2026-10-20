@@ -21,6 +21,13 @@ export interface TakeWavRenderRequest {
   cyclePolicy?: "include-wrapped-tails";
 }
 
+/** A take keeps its recorded voice while its SoundFont is selected; otherwise the global voice plays. */
+export function takePreset(take: Take, snapshot: EngineSnapshot): { bank: number; program: number } | undefined {
+  const { voice } = take;
+  if (voice && snapshot.synth.selectedId === "soundfont" && voice.soundFontId === snapshot.synth.selectedSoundFontId) return voice;
+  return snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
+}
+
 export async function renderTakeWav(request: TakeWavRenderRequest): Promise<string> {
   if (request.cyclePolicy === "include-wrapped-tails") return renderWarmTakeWav(request);
   const { recording, take, snapshot, temporaryDirectory, baseName, soundFontPath, percussionSoundFontPath } = request;
@@ -74,7 +81,7 @@ async function renderWarmTakeWav(request: TakeWavRenderRequest): Promise<string>
     const midi = join(temporaryDirectory, `${baseName}-${name}.mid`);
     const warm = join(temporaryDirectory, `${baseName}-${name}-warm.wav`);
     const path = join(temporaryDirectory, `${baseName}-${name}.wav`);
-    await writeFile(midi, await cycleToSoundFontMidi(part, snapshot));
+    await writeFile(midi, await cycleToSoundFontMidi(part, snapshot, take));
     await renderSoundFontMidi(midi, warm, font, snapshot);
     const start = part.warmupCycles * part.frames;
     await run("ffmpeg", ["-nostdin", "-v", "error", "-i", warm, "-af", `atrim=start_sample=${start}:end_sample=${start + part.frames},asetpts=N/SR/TB`, "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", path]);
@@ -130,10 +137,10 @@ async function renderWarmNeonWav(schedule: CycleRenderSchedule, snapshot: Engine
   return output;
 }
 
-async function cycleToSoundFontMidi(schedule: CycleRenderSchedule, snapshot: EngineSnapshot): Promise<Uint8Array> {
+async function cycleToSoundFontMidi(schedule: CycleRenderSchedule, snapshot: EngineSnapshot, take: Take): Promise<Uint8Array> {
   // One tick per PCM frame: repeated cycles do not accumulate rounded BPM drift.
   const track: FileMidiEvent[] = [{ deltaTime: 0, type: "setTempo", microsecondsPerBeat: 500_000, meta: true }];
-  const preset = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
+  const preset = takePreset(take, snapshot);
   const kit = snapshot.pads.drumKits.find(({ id }) => id === snapshot.pads.selectedDrumKitId);
   for (const channel of new Set(schedule.events.map(({ event }) => event.channel))) {
     if (channel !== 9) {
@@ -201,7 +208,7 @@ export async function renderNeonWav(recording: RecordedMidiEvent[], take: Take, 
 export function recordingToMidi(recording: RecordedMidiEvent[], take: Take, snapshot: EngineSnapshot): Uint8Array {
   const ticksPerBeat = 480;
   const totalTicks = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures * ticksPerBeat;
-  const preset = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
+  const preset = takePreset(take, snapshot);
   const drumKit = snapshot.pads.drumKits.find(({ id }) => id === snapshot.pads.selectedDrumKitId);
   const tracks = new Map<number, Array<{ tick: number; priority: number; event: FileMidiEvent }>>();
   const activeNoteTicks = new Map<string, number[]>();

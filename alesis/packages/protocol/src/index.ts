@@ -51,12 +51,21 @@ export const settingsSchema = z.object({
   countInEnabled: z.boolean(),
 });
 
+export const takeVoiceSchema = z.object({
+  soundFontId: z.string().min(1).max(128),
+  presetId: z.string().min(1).max(128),
+  bank: z.number().int().min(0).max(16_383),
+  program: z.number().int().min(0).max(127),
+  name: z.string().min(1).max(256),
+}).strict();
+
 export const takeSchema = z.object({
   id: takeIdSchema,
   cycle: z.number().int().nonnegative(),
   level: z.number().min(0).max(1),
   muted: z.boolean(),
   waveform: waveformSchema,
+  voice: takeVoiceSchema.optional(),
 });
 
 export const instrumentControlSchema = z.object({
@@ -346,6 +355,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
 
 export type Settings = z.infer<typeof settingsSchema>;
 export type Take = z.infer<typeof takeSchema>;
+export type TakeVoice = z.infer<typeof takeVoiceSchema>;
 export type InstrumentControl = z.infer<typeof instrumentControlSchema>;
 export type InstrumentDescriptor = z.infer<typeof instrumentDescriptorSchema>;
 export type SoundFont = z.infer<typeof soundFontSchema>;

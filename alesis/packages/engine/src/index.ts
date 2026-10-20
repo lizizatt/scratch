@@ -14,6 +14,7 @@ import {
   type SoundFont,
   type SoundFontPreset,
   type Take,
+  type TakeVoice,
   type LoopSession,
   type MidiEvent,
 } from "@alesis/protocol";
@@ -32,7 +33,7 @@ export interface EngineResult {
 
 export type EngineListener = (snapshot: EngineSnapshot) => void;
 
-export type RuntimeTake = Pick<Take, "id" | "cycle" | "level" | "muted">;
+export type RuntimeTake = Pick<Take, "id" | "cycle" | "level" | "muted" | "voice">;
 
 /** Detached playback/capture state; no catalogs, waveform arrays or render recipes. */
 export interface RuntimeSnapshot {
@@ -284,6 +285,7 @@ export class SimulatedHostEngine implements HostEngine {
     this.state.synth.soundFonts = structuredClone(soundFonts);
     this.state.synth.selectedSoundFontId = selectedSoundFontId;
     this.updatePadNavigation(false);
+    this.syncStagedVoice();
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
@@ -296,6 +298,7 @@ export class SimulatedHostEngine implements HostEngine {
     this.state.synth.soundFontPresets = structuredClone(presets);
     this.state.synth.selectedSoundFontPresetId = selectedPresetId;
     this.updatePadNavigation(false);
+    this.syncStagedVoice();
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
@@ -312,6 +315,7 @@ export class SimulatedHostEngine implements HostEngine {
     this.state.synth.soundFontPresets = structuredClone(presets);
     this.state.synth.selectedSoundFontPresetId = selectedPresetId;
     this.updatePadNavigation(false);
+    this.syncStagedVoice();
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
@@ -329,6 +333,7 @@ export class SimulatedHostEngine implements HostEngine {
     this.state.synth.soundFontPresets = structuredClone(presets);
     this.state.synth.selectedSoundFontPresetId = selectedPresetId;
     this.updatePadNavigation(false);
+    this.syncStagedVoice();
     this.state.revision += 1;
     this.publish(false);
     return { accepted: true, revision: this.state.revision, appliedCycle: this.state.transport.cycle };
@@ -450,6 +455,7 @@ export class SimulatedHostEngine implements HostEngine {
         break;
       case "set-overdub":
         this.state.capture.overdub = command.enabled;
+        this.syncStagedVoice();
         break;
       case "set-loop-start":
         if (!Number.isFinite(command.position) || command.position < 0 || command.position >= 1) return reject("Loop start must be from 0 (inclusive) to 1 (exclusive)");
@@ -499,17 +505,20 @@ export class SimulatedHostEngine implements HostEngine {
         if (!instrument) return reject(`Unknown synth: ${command.synthId}`);
         this.state.synth.selectedId = command.synthId;
         this.state.synth.parameterValues = defaultParameterValues(instrument);
+        this.syncStagedVoice();
         break;
       }
       case "select-soundfont":
         if (!this.state.synth.soundFonts.some(({ id }) => id === command.soundFontId)) return reject(`Unknown SoundFont: ${command.soundFontId}`);
         this.state.synth.selectedSoundFontId = command.soundFontId;
         this.updatePadNavigation(false);
+        this.syncStagedVoice();
         break;
       case "select-soundfont-preset":
         if (!this.state.synth.soundFontPresets.some(({ id }) => id === command.presetId)) return reject(`Unknown SoundFont preset: ${command.presetId}`);
         this.state.synth.selectedSoundFontPresetId = command.presetId;
         this.updatePadNavigation(false);
+        this.syncStagedVoice();
         break;
       case "refresh-soundfonts":
         return reject("SoundFont refresh requires the host catalog");
@@ -656,7 +665,10 @@ export class SimulatedHostEngine implements HostEngine {
     const completedCycle = this.state.transport.cycle;
     if (!this.state.capture.overdub) this.state.capture.previousStaged = this.state.capture.staged;
     if (!this.state.capture.overdub || !this.state.capture.staged) this.state.capture.staged = this.newStagedTake(completedCycle);
-    else this.state.capture.staged.cycle = completedCycle;
+    else {
+      this.state.capture.staged.cycle = completedCycle;
+      this.syncStagedVoice();
+    }
     this.currentWaveform = emptyWaveform();
     this.state.capture.hasCurrentEvents = false;
     this.state.transport.cycle += 1;
@@ -664,7 +676,25 @@ export class SimulatedHostEngine implements HostEngine {
   }
 
   private newStagedTake(cycle: number): Take {
-    return { id: `take-${this.nextTakeId++}`, cycle, level: 0.8, muted: !this.state.capture.stagedAudible, waveform: [...this.currentWaveform] };
+    const voice = this.currentVoice();
+    return { id: `take-${this.nextTakeId++}`, cycle, level: 0.8, muted: !this.state.capture.stagedAudible, waveform: [...this.currentWaveform], ...(voice ? { voice } : {}) };
+  }
+
+  /** The SoundFont voice a take recorded now would keep; Neon takes have none. */
+  private currentVoice(): TakeVoice | undefined {
+    const { selectedId, selectedSoundFontId, selectedSoundFontPresetId, soundFontPresets } = this.state.synth;
+    if (selectedId !== "soundfont" || !selectedSoundFontId) return undefined;
+    const preset = soundFontPresets.find(({ id }) => id === selectedSoundFontPresetId);
+    return preset ? { soundFontId: selectedSoundFontId, presetId: preset.id, bank: preset.bank, program: preset.program, name: preset.name } : undefined;
+  }
+
+  /** Overdub keeps one staged take, so it follows the current voice; other takes stay frozen. */
+  private syncStagedVoice(): void {
+    const staged = this.state.capture.staged;
+    if (!this.state.capture.overdub || !staged) return;
+    const voice = this.currentVoice();
+    if (voice) staged.voice = voice;
+    else delete staged.voice;
   }
 
   private padNavigationCount(target: PadNavigationTarget = this.state.pads.navigationTarget): number {
@@ -701,7 +731,10 @@ export class SimulatedHostEngine implements HostEngine {
     const { navigationTarget, navigationIndex } = this.state.pads;
     if (navigationTarget === "voices") {
       const preset = this.voicesInCurrentBank()[navigationIndex];
-      if (preset) this.state.synth.selectedSoundFontPresetId = preset.id;
+      if (preset) {
+        this.state.synth.selectedSoundFontPresetId = preset.id;
+        this.syncStagedVoice();
+      }
     } else if (navigationTarget === "drum-kits") {
       const kit = this.sortedDrumKits()[navigationIndex];
       if (kit) this.state.pads.selectedDrumKitId = kit.id;
@@ -783,8 +816,8 @@ export class SimulatedHostEngine implements HostEngine {
   }
 }
 
-function runtimeTake({ id, cycle, level, muted }: Take): RuntimeTake {
-  return { id, cycle, level, muted };
+function runtimeTake({ id, cycle, level, muted, voice }: Take): RuntimeTake {
+  return { id, cycle, level, muted, ...(voice ? { voice: { ...voice } } : {}) };
 }
 
 function defaultParameterValues(instrument: InstrumentDescriptor): Record<string, number> {

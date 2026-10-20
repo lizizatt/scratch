@@ -263,6 +263,57 @@ describe("FluidSynth output", () => {
     expect(auxiliaryPercussionSelectionCommands(false)).toEqual(["select 9 1 128 0", "select 15 1 128 0"]);
   });
 
+  it("pins a channel's voice across global preset changes and renderer launches", () => {
+    const commands: string[] = [];
+    const output = new FluidSynthOutput({ device: { id: "test", name: "Test", pcm: "test" }, commandObserver: (command) => commands.push(command) });
+    output.selectSoundFontPreset(0, 0);
+    commands.length = 0;
+
+    output.setChannelVoice(3, 0, 40);
+    expect(commands).toEqual(["select 3 1 0 40"]);
+    commands.length = 0;
+
+    output.selectSoundFontPreset(8, 5);
+    expect(commands).toHaveLength(14);
+    expect(commands).toContain("select 3 1 0 40");
+    expect(commands).toContain("select 2 1 8 5");
+    expect(commands).not.toContain("select 3 1 8 5");
+    commands.length = 0;
+
+    (output as unknown as { applySoundFontParameters: () => void }).applySoundFontParameters();
+    expect(commands).toContain("select 3 1 0 40");
+    expect(commands).not.toContain("select 3 1 8 5");
+    commands.length = 0;
+
+    output.setSynthParameter("soundfont", "bank", 2);
+    expect(commands).toContain("select 3 1 0 40");
+    expect(commands).toContain("select 4 1 2 5");
+  });
+
+  it("returns a cleared channel to the global voice once and ignores repeats", () => {
+    const commands: string[] = [];
+    const output = new FluidSynthOutput({ device: { id: "test", name: "Test", pcm: "test" }, commandObserver: (command) => commands.push(command) });
+    output.selectSoundFontPreset(4, 9);
+    output.setChannelVoice(5, 0, 40);
+    commands.length = 0;
+
+    output.clearChannelVoice(5);
+    output.clearChannelVoice(5);
+    output.clearChannelVoice(6);
+
+    expect(commands).toEqual(["select 5 1 4 9"]);
+  });
+
+  it("rejects channel voices outside the melodic range", () => {
+    const output = new FluidSynthOutput({ device: { id: "test", name: "Test", pcm: "test" }, commandObserver: () => {} });
+
+    expect(() => output.setChannelVoice(9, 0, 1)).toThrow(/does not play/);
+    expect(() => output.setChannelVoice(15, 0, 1)).toThrow(/does not play/);
+    expect(() => output.setChannelVoice(1, 16_384, 1)).toThrow(/bank out of range/);
+    expect(() => output.setChannelVoice(1, 0, 128)).toThrow(/program out of range/);
+    expect(() => output.setChannelVoice(1, 0, 1.5)).toThrow(/program out of range/);
+  });
+
   it("releases each public drum hit after 80 milliseconds", () => {
     vi.useFakeTimers();
     try {

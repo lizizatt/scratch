@@ -15,6 +15,8 @@ function fakeOutput(): AudioOutput & { dispatchMidi: ReturnType<typeof vi.fn> } 
     selectDrumKit: () => {},
     loadSoundFont: async () => {},
     selectSoundFontPreset: () => {},
+    setChannelVoice: () => {},
+    clearChannelVoice: () => {},
     selectSynth: async () => {},
     setSynthParameter: () => {},
     close: async () => {},

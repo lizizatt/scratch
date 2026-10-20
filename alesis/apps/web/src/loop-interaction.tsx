@@ -1,4 +1,4 @@
-export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMeasure, loopStart, showLoopStart = false, live = false, progress, emptyLabel }: { samples: number[]; incomingSamples?: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; showLoopStart?: boolean; live?: boolean; progress?: number; emptyLabel?: string }) {
+export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMeasure, loopStart, showLoopStart = false, live = false, progress, emptyLabel, label }: { samples: number[]; incomingSamples?: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; showLoopStart?: boolean; live?: boolean; progress?: number; emptyLabel?: string; label?: string }) {
   return (
     <div className={`waveform ${live ? "live" : ""}`}>
       <div className="beat-grid" aria-hidden="true">
@@ -12,6 +12,7 @@ export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMea
       {samples.length === 0 && incomingSamples.length === 0 && <span>{emptyLabel}</span>}
       {showLoopStart && <i className="loop-start-marker" aria-hidden="true" style={{ left: `${loopStart * 100}%` }} />}
       {progress !== undefined && <i className="playhead" style={{ left: `${progress * 100}%` }} />}
+      {label && <b className="voice-label" title={label}>{label}</b>}
     </div>
   );
 }

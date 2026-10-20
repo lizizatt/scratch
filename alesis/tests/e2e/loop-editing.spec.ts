@@ -206,15 +206,20 @@ test("saves promoted MP3 audio without typing a folder name", async ({ page }) =
   await expect(folder).toHaveValue(/^Loop \d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/);
   expect(await folder.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
   const name = await folder.inputValue();
-  const save = dialog.getByRole("button", { name: "Save", exact: true });
-  await expect(save).toBeEnabled();
-  await expect(save).toBeFocused();
-  await reachable(save);
-  await save.click();
-  await expect(dialog).toHaveCount(0);
   const directory = join(process.env.ALESIS_EXPORT_DIR!, name);
-  expect((await stat(join(directory, "track-01.mp3"))).size).toBeGreaterThan(1_000);
-  expect((await stat(join(directory, "mix.mp3"))).size).toBeGreaterThan(1_000);
+  try {
+    const save = dialog.getByRole("button", { name: "Save", exact: true });
+    await expect(save).toBeEnabled();
+    await expect(save).toBeFocused();
+    await reachable(save);
+    await save.click();
+    await expect(dialog).toHaveCount(0);
+    expect((await stat(join(directory, "track-01.mp3"))).size).toBeGreaterThan(1_000);
+    expect((await stat(join(directory, "mix.mp3"))).size).toBeGreaterThan(1_000);
+  } finally {
+    // The export folder lives under the sample library other suites count.
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("shared export dialog snaps only start, previews on host, saves prepared bytes and cancels", async ({ page, baseURL }, info) => {
