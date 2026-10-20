@@ -49,6 +49,8 @@ export class MidiLoopScheduler {
   private activeBends = new Map<string, { takeId: string; channel: number; value: number }>();
   private activeSustains = new Map<string, { takeId: string; channel: number; value: number }>();
   private takeChannels = new Map<string, number>();
+  /** Melodic channels the performer has played on; a loop there would share the performer's voice. */
+  private liveChannels = new Set<number>();
   private appliedVoices = new Map<number, { bank: number; program: number }>();
   private rotated = new WeakMap<RecordedMidiEvent[], Map<number, RecordedMidiEvent[]>>();
 
@@ -82,6 +84,7 @@ export class MidiLoopScheduler {
   }
 
   record(event: MidiEvent, snapshot: RuntimeSnapshot, endsAtCycleBoundary = false): void {
+    if (event.channel !== 9) this.liveChannels.add(event.channel);
     if (snapshot.transport.state === "playing") this.advanceRecordingCycle(snapshot);
     const release = event.type === "note-off" || event.type === "note-on" && event.velocity === 0;
     const noteKey = "note" in event ? `${event.channel}:${event.note}` : null;
@@ -454,19 +457,37 @@ export class MidiLoopScheduler {
 
   private channelFor(takeId: string, audibleIds: ReadonlySet<string>): number {
     const assigned = this.takeChannels.get(takeId);
-    if (assigned !== undefined) return assigned;
+    if (assigned !== undefined) {
+      if (!this.liveChannels.has(assigned)) return assigned;
+      this.releaseTakeNotes(takeId);
+      this.takeChannels.delete(takeId);
+    }
+    const free = playbackChannels.filter((candidate) => !this.liveChannels.has(candidate));
+    const pool = free.length > 0 ? free : playbackChannels;
     const used = new Set(this.takeChannels.values());
-    let channel = playbackChannels.find((candidate) => !used.has(candidate));
+    let channel = pool.find((candidate) => !used.has(candidate));
     if (channel === undefined) {
       // Audible takes sharing a channel would also share a voice, so take one from a silent take first.
-      const silent = [...this.takeChannels].find(([id]) => !audibleIds.has(id));
+      const silent = [...this.takeChannels].find(([id, held]) => !audibleIds.has(id) && pool.includes(held));
       if (silent) {
         this.takeChannels.delete(silent[0]);
         channel = silent[1];
-      } else channel = playbackChannels[this.takeChannels.size % playbackChannels.length]!;
+      } else channel = pool[this.takeChannels.size % pool.length]!;
     }
     this.takeChannels.set(takeId, channel);
     return channel;
+  }
+
+  /** Silence a take's sounding notes where it is leaving; controller state there now belongs to live input. */
+  private releaseTakeNotes(takeId: string): void {
+    for (const [key, note] of this.activeNotes) {
+      if (note.takeId !== takeId) continue;
+      const release = { type: "note-off" as const, channel: note.channel, note: note.note };
+      if (!isMappedDrumPadRelease(release)) this.output.dispatchMidi(release);
+      this.activeNotes.delete(key);
+    }
+    for (const key of [...this.activeBends.keys()]) if (key.startsWith(`${takeId}:`)) this.activeBends.delete(key);
+    for (const key of [...this.activeSustains.keys()]) if (key.startsWith(`${takeId}:`)) this.activeSustains.delete(key);
   }
 
   private reconcileRecordings(snapshot: RuntimeSnapshot): void {

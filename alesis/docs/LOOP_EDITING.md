@@ -89,9 +89,12 @@ switching SoundFonts is not supported per loop yet.
   changing voice, enabling overdub, or a new pass re-voices the whole staged
   loop. Promote it first to freeze its voice. The previous-staged slot and
   promoted loops are never re-voiced.
-- **Playback:** every loop already plays on its own MIDI channel, and the host
-  pins that channel to the loop's voice before its notes play. Live playing on
-  channel 0 follows the voice you select. Voices are re-asserted after a
+- **Playback:** every loop plays on its own MIDI channel, and the host pins that
+  channel to the loop's voice before its notes play. Loops never use a channel
+  you play on (the Vortex keys send on channel 1, bend on channel 0), so live
+  playing always follows the voice you select; a loop is moved off a channel as
+  soon as live input uses it. A channel carries one voice, so with every spare
+  channel in use a loop could still share one. Voices are re-asserted after a
   renderer restart or loaded session, and released when a loop is muted,
   deleted, cleared, or monitor-only is on. If a loop's SoundFont is not the one
   selected, or the Neon synth is active, it plays in the current voice instead.

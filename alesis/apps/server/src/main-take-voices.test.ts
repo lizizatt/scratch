@@ -61,8 +61,10 @@ it("production host keeps an earlier loop's voice while a later loop is recorded
   await submit({ type: "select-synth", synthId: "soundfont" });
   await submit({ type: "select-soundfont-preset", presetId: first.id });
   await submit({ type: "play" });
-  input({ type: "note-on", channel: 0, note: 60, velocity: 100 });
-  input({ type: "note-off", channel: 0, note: 60 });
+  // The Vortex keybed sends notes on channel 1 (bend on channel 0).
+  input({ type: "pitch-bend", channel: 0, value: 0.1 });
+  input({ type: "note-on", channel: 1, note: 60, velocity: 100 });
+  input({ type: "note-off", channel: 1, note: 60 });
   await vi.waitFor(() => expect(host.engine.snapshot().capture.staged?.voice?.presetId).toBe(first.id), { timeout: 4000 });
   await submit({ type: "promote-staged" });
 
@@ -77,4 +79,6 @@ it("production host keeps an earlier loop's voice while a later loop is recorded
   const secondCall = pinned.find(([, bank, program]) => bank === second.bank && program === second.program);
   expect(secondCall, "the later loop's voice was pinned on its channel").toBeDefined();
   expect(secondCall![0]).not.toBe(firstCall![0]);
+  expect(pinned.map(([channel]) => channel), "loops never use the channels the keys play on").not.toContain(1);
+  expect(pinned.map(([channel]) => channel)).not.toContain(0);
 }, 20_000);

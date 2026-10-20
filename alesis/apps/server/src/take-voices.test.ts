@@ -38,12 +38,12 @@ async function host(synthId = "soundfont") {
     time = seconds;
     loops.update(engine.snapshot());
   };
-  const play = (note: number, from: number, to: number) => {
+  const play = (note: number, from: number, to: number, channel = 0) => {
     until(from);
-    const on: MidiEvent = { type: "note-on", channel: 0, note, velocity: 100 };
+    const on: MidiEvent = { type: "note-on", channel, note, velocity: 100 };
     loops.record(on, engine.snapshot());
     until(to);
-    loops.record({ type: "note-off", channel: 0, note }, engine.snapshot());
+    loops.record({ type: "note-off", channel, note }, engine.snapshot());
   };
   const channelOf = (voice: string) => Number(calls.find((call) => call.startsWith("voice ") && call.endsWith(` ${voice}`))!.split(" ")[1]);
   return { engine, loops, calls, command, until, play, channelOf };
@@ -158,6 +158,40 @@ describe("per-take voices on isolated playback channels", () => {
     await h.command({ type: "select-soundfont-preset", presetId: "0:40" });
     expect(h.calls).toEqual([`voice ${staged} 0:40`]);
     expect(h.engine.snapshot().promoted[0]?.voice?.presetId).toBe("0:0");
+  });
+
+  it("keeps loops off the channel the performer plays on, so live notes follow the selected voice", async () => {
+    const h = await host();
+    // The Vortex keybed sends notes on channel 1, which is also the first loop channel.
+    await h.command({ type: "play" });
+    h.play(60, 0.2, 0.4, 1);
+    h.until(2.01);
+    await h.command({ type: "promote-staged" });
+    await h.command({ type: "select-soundfont-preset", presetId: "0:40" });
+    h.play(64, 2.5, 2.7, 1);
+    h.until(4.01);
+
+    const touched = h.calls.filter((call) => call.startsWith("voice ") || call.startsWith("clear ")).map((call) => Number(call.split(" ")[1]));
+    expect(touched.length).toBeGreaterThan(0);
+    expect(touched).not.toContain(1);
+    expect(h.calls.filter((call) => call.startsWith("note ")).map((call) => Number(call.split(" ")[1]))).not.toContain(1);
+  });
+
+  it("moves a loop off a channel once live input starts using it", async () => {
+    const h = await host();
+    await h.command({ type: "play" });
+    h.play(60, 0.2, 0.4);
+    h.until(2.01);
+    const first = h.channelOf("0:0");
+    h.calls.length = 0;
+
+    h.play(62, 2.2, 2.3, first);
+    h.until(2.6);
+
+    expect(h.calls).toContain(`clear ${first}`);
+    const moved = h.calls.find((call) => call.startsWith("voice ") && call.endsWith(" 0:0"));
+    expect(moved).toBeDefined();
+    expect(Number(moved!.split(" ")[1])).not.toBe(first);
   });
 
   it("never lets two audible takes share a channel, so each keeps its own voice at full capacity", async () => {
