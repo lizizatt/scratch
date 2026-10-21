@@ -3,6 +3,7 @@ import type { MidiEvent, RuntimeSnapshot, SimulatedHostEngine } from "@alesis/en
 import { MidiArpeggiator, rateBeats } from "./arpeggiator.js";
 import { DrumPlaybackScheduler } from "./drum-playback.js";
 import type { MidiLoopScheduler } from "./loop-playback.js";
+import type { MetronomeScheduler } from "./metronome.js";
 import { beatAt, beatDeadline, countInOpeningAllowanceMs, countInOpeningBeat, monotonicClock, sourceOriginBeats, transportBeatAnchor, type MonotonicClock, type TransportBeatAnchor } from "./transport-clock.js";
 
 const epsilon = 1e-9;
@@ -36,6 +37,7 @@ export class TransportPlayback {
     private readonly dispatch: (event: MidiEvent, endsAtCycleBoundary?: boolean) => void,
     private readonly clock: MonotonicClock = monotonicClock,
     private readonly loops?: MidiLoopScheduler,
+    private readonly metronome?: MetronomeScheduler,
   ) {
     this.lastTime = this.idleTime = clock.now();
     this.arpeggiator = new MidiArpeggiator(engine.runtimeSnapshot().arpeggiator);
@@ -185,6 +187,8 @@ export class TransportPlayback {
     // Both consumers receive the very same anchor, including off-cadence publications.
     this.drums.update(snapshot, this.lastTime, this.anchor);
     if (generation !== this.generation) return;
+    // Same engine position as the arpeggiator and drums, so clicks cannot trail the beat by a poll.
+    this.metronome?.update(snapshot);
     if (transport.state === "counting-in") {
       // Wake the authoritative engine at the boundary instead of waiting for its 50ms poll.
       this.arm(this.lastTime + (1 - transport.progress) * snapshot.settings.beatsPerMeasure * this.anchor.beatMs);
@@ -262,6 +266,7 @@ export class TransportPlayback {
   }
 
   private arm(deadline: number): void {
+    if (this.metronome && this.snapshot) deadline = Math.min(deadline, this.metronome.nextBeatTime(this.snapshot, this.lastTime));
     if (this.loops && this.snapshot) {
       const snapshot = this.snapshot;
       const cycleMs = 60_000 / snapshot.settings.bpm * snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;

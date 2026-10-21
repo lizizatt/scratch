@@ -148,7 +148,8 @@ const dispatchArpeggio = (event: MidiEvent, endsAtCycleBoundary = false): void =
 let handleProgramChange: (program: number) => void = () => {};
 const hardwareProgramChangeNavigation = new HardwareProgramChangeNavigationMapper();
 const advanceTransportClock = (): number => playback.advance();
-const playback = new TransportPlayback(engine, currentAudio, dispatchArpeggio, undefined, loops);
+const metronome = new MetronomeScheduler(currentAudio);
+const playback = new TransportPlayback(engine, currentAudio, dispatchArpeggio, undefined, loops, metronome);
 const handleMidi = (event: MidiInputEvent): void => {
   if (loopExports?.blocksPerformance()) return;
   if (event.type === "program-change") {
@@ -703,11 +704,11 @@ const hotplugTimer = simulatedAudioMode && softwareMidiMode ? undefined : setInt
     .catch((error) => console.error(`Hotplug reconciliation failed: ${error instanceof Error ? error.message : String(error)}`))
     .finally(() => { hotplugBusy = false; });
 }, 1000);
-const metronome = new MetronomeScheduler(currentAudio);
 const timer = setInterval(() => {
   if (importingSession || loopExports?.blocksPerformance()) return;
   advanceTransportClock();
   const snapshot = engine.runtimeSnapshot();
+  // Fallback only: the transport already clicks each beat from its own deadline timer.
   metronome.update(snapshot);
 }, 50);
 let demoNoteOn = false;
