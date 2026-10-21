@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>PETG harmonic hypotheses</title>
+<style>body{font:17px/1.6 system-ui;max-width:1000px;margin:auto;padding:24px;background:#101a26;color:#eaf0f6}
+section{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+article{background:#1c2d40;padding:20px;border-radius:12px}audio{width:100%}a{color:#83dfd0}</style></head><body>
+<h1>PETG: full-waveform harmonic hypotheses</h1><p>Not calibrated; no physical fundamental identification.
+Ablations are quieter at the shared fixed gain. No loudness matching, retiming, or normalization.
+Only AB rate changes; harmonic ablations affect all ABZE voices, with ZE rates fixed at40/8.</p>
+<p>AB h2 at2.5 shares frequency trajectories with h1 at5, not waveform identity: phases, gains and ZE differ.</p>
+<p>Choose one native player; starting it pauses the others. Recording = local +12.15 s.</p><section><article><h2>Original capture / archived PCM playback</h2><p>Full recording clock; local +12.15 s. Underlying AAC is lossy.</p><audio controls preload="metadata" aria-label="Original capture" src="../../data/recordings/petg_square_2026-10-05/acoustic_candidates/recording_playback.wav"></audio></article><article><h2>full_2p5</h2><p>Local clock; fixed gain, ABZE motors only.</p><audio controls preload="metadata" aria-label="full_2p5" src="full_2p5.wav"></audio></article><article><h2>full_5</h2><p>Local clock; fixed gain, ABZE motors only.</p><audio controls preload="metadata" aria-label="full_5" src="full_5.wav"></audio></article><article><h2>full_8</h2><p>Local clock; fixed gain, ABZE motors only.</p><audio controls preload="metadata" aria-label="full_8" src="full_8.wav"></audio></article><article><h2>second_2p5</h2><p>Local clock; fixed gain, ABZE motors only.</p><audio controls preload="metadata" aria-label="second_2p5" src="second_2p5.wav"></audio></article><article><h2>fundamental_5</h2><p>Local clock; fixed gain, ABZE motors only.</p><audio controls preload="metadata" aria-label="fundamental_5" src="fundamental_5.wav"></audio></article></section>
+<p><a href="REPORT.md">All regional scores and limitations</a> · <a href="report.json">Profiles, controls and hashes</a> ·
+<a href="../../data/recordings/petg_square_2026-10-05/raw/New%20Recording%2015%20copy.m4a" download>Unchanged original AAC</a></p>
+<script>const players=[...document.querySelectorAll('audio')];
+for(const player of players) player.addEventListener('play',()=>{
+  for(const other of players) if(other!==player) other.pause();
+});</script></body></html>
