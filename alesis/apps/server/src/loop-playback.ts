@@ -99,7 +99,8 @@ export class MidiLoopScheduler {
       else this.recordingControllers.set(key, structuredClone(event));
       if (snapshot.transport.state === "playing") this.capturedControllerKeys.add(key);
     }
-    if (snapshot.transport.state !== "playing") return;
+    // A key released during a pause must still close its recorded gate; nothing else is captured while paused.
+    if (snapshot.transport.state === "paused" ? !(release && noteKey && this.heldRecordingNotes.has(noteKey)) : snapshot.transport.state !== "playing") return;
     if (snapshot.capture.overdub && release && noteKey && !this.heldRecordingNotes.has(noteKey)) return;
     if (snapshot.capture.overdub && !release) {
       const stagedId = snapshot.capture.staged?.id;
@@ -138,6 +139,8 @@ export class MidiLoopScheduler {
   update(snapshot: RuntimeSnapshot): void {
     if (snapshot.transport.state !== "playing") {
       this.releaseAllNotes();
+      // A pause keeps its place so that resuming continues instead of replaying the pass so far.
+      if (snapshot.transport.state === "paused") return;
       this.playbackCycle = null;
       this.playbackPosition = -1;
       if (snapshot.transport.state === "stopped") {
@@ -318,7 +321,7 @@ export class MidiLoopScheduler {
   /** Commit a partial overdub before Stop or disabling; the rotating default still discards it. */
   finishOverdub(snapshot: RuntimeSnapshot): void {
     this.advanceRecordingCycle(snapshot);
-    if (!snapshot.capture.overdub || snapshot.transport.state !== "playing" || !snapshot.capture.staged) return;
+    if (!snapshot.capture.overdub || (snapshot.transport.state !== "playing" && snapshot.transport.state !== "paused") || !snapshot.capture.staged) return;
     this.commitRecording(snapshot.capture.staged.id, snapshot, snapshot.transport.progress);
     this.seedRecording(snapshot.transport.progress);
   }
@@ -377,9 +380,11 @@ export class MidiLoopScheduler {
     const incoming = rotateRecording(closed, wrapPosition(-snapshot.transport.origin));
     const raw = snapshot.capture.overdub ? mergeOverdub(this.rawRecordings.get(takeId) ?? [], incoming, totalBeats) : incoming;
     const rendered = quantizeRecording(raw, snapshot.capture.quantization, totalBeats);
+    // An overdub pass that added nothing must not invalidate a take someone is editing.
+    const changed = JSON.stringify(this.recordings.get(takeId)) !== JSON.stringify(rendered);
     this.rawRecordings.set(takeId, raw);
     this.recordings.set(takeId, rendered);
-    this.recordingVersions.set(takeId, ++this.versionCounter);
+    if (changed) this.recordingVersions.set(takeId, ++this.versionCounter);
     this.appliedQuantization.set(takeId, snapshot.capture.quantization);
     if (snapshot.capture.overdub) this.feedback.stagedWaveform?.(takeId, recordingWaveform(rendered));
   }

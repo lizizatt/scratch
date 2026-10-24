@@ -21,10 +21,6 @@ export async function executeTakeNotesCommand(
     const takeNotes = loops.takeNotes(engine.runtimeSnapshot(), command.takeId);
     return takeNotes ? { accepted: true, ...base, takeNotes } : reject("This take has no MIDI recording");
   }
-  // An overdub pass merges into this take at every rollover, which would overwrite a concurrent edit.
-  if (snapshot.capture.overdub && staged?.id === command.takeId && snapshot.transport.state !== "stopped") {
-    return reject("Stop playback to edit the take being overdubbed");
-  }
   return playback.transaction(async () => {
     try {
       const { takeNotes, waveform } = loops.setTakeNotes(engine.runtimeSnapshot(), command.takeId, command.version, command.notes);

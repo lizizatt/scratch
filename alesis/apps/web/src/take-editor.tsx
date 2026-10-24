@@ -59,8 +59,7 @@ export function TakeEditor({ snapshot, send, takeId, onBack }: { snapshot: Engin
 
   const beatCount = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
   const step = snap === "off" ? 0 : 1 / (beatCount * subdivisionsPerBeat[snap]);
-  const locked = snapshot.capture.overdub && snapshot.capture.staged?.id === takeId && snapshot.transport.state !== "stopped";
-  const busy = !loaded || pending || locked || !take;
+  const busy = !loaded || pending || !take;
   const isPlaying = snapshot.transport.state !== "stopped";
   const progress = isPlaying ? (snapshot.transport.origin + snapshot.transport.progress) % 1 : snapshot.capture.loopStart;
 
@@ -241,7 +240,6 @@ export function TakeEditor({ snapshot, send, takeId, onBack }: { snapshot: Engin
   return (
     <section className="pane take-editor" aria-label="Take editor">
       {header}
-      {locked && <p className="take-editor-note" role="status">Stop playback to edit the take being overdubbed.</p>}
       {error && <p className="take-editor-note error" role="alert">{error}</p>}
       {loaded && notes.length === 0 && <p className="take-editor-note" role="status">This take has no notes.</p>}
       <div className="roll-scroll" ref={scroller}>

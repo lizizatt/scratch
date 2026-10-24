@@ -480,7 +480,12 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
       <header className="loop-toolbar">
         <div className="transport-controls">
           <IconButton label="Stop" onClick={() => send({ type: "stop" })}><Square /></IconButton>
-          <IconButton label={isPlaying ? "Pause unavailable; stop transport" : "Play"} active={isPlaying} onClick={() => send({ type: "play" })}>{isPlaying ? <Pause /> : <Play />}</IconButton>
+          <IconButton
+            label={snapshot.transport.state === "playing" ? "Pause" : snapshot.transport.state === "paused" ? "Resume" : snapshot.transport.state === "counting-in" ? "Pause unavailable during count-in" : "Play"}
+            active={snapshot.transport.state === "playing" || snapshot.transport.state === "counting-in"}
+            disabled={snapshot.transport.state === "counting-in"}
+            onClick={() => send({ type: snapshot.transport.state === "playing" ? "pause" : "play" })}
+          >{snapshot.transport.state === "playing" || snapshot.transport.state === "counting-in" ? <Pause /> : <Play />}</IconButton>
           <IconButton label="Monitor only" active={snapshot.monitorOnly} pressed={snapshot.monitorOnly} onClick={() => send({ type: "set-monitor-only", enabled: !snapshot.monitorOnly })}><Headphones /></IconButton>
           <IconButton label={snapshot.settings.metronomeEnabled ? "Mute metronome" : "Unmute metronome"} active={snapshot.settings.metronomeEnabled} pressed={snapshot.settings.metronomeEnabled} onClick={() => send({ type: "configure", settings: { metronomeEnabled: !snapshot.settings.metronomeEnabled } })}>{snapshot.settings.metronomeEnabled ? <Volume2 /> : <VolumeX />}</IconButton>
         </div>

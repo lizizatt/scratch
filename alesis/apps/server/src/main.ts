@@ -343,7 +343,7 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
     const snapshot = engine.snapshot();
     return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: "Not Ready: transport dependencies are unavailable" };
   }
-  if (command.type === "play" || command.type === "stop" || command.type === "configure" || command.type === "configure-arpeggiator" || command.type === "delete-current-capture" || command.type === "delete-staged" || command.type === "promote-staged" || command.type === "get-take-notes" || command.type === "set-take-notes") {
+  if (command.type === "play" || command.type === "pause" || command.type === "stop" || command.type === "configure" || command.type === "configure-arpeggiator" || command.type === "delete-current-capture" || command.type === "delete-staged" || command.type === "promote-staged" || command.type === "get-take-notes" || command.type === "set-take-notes") {
     advanceTransportClock();
   }
   if (command.type === "get-take-notes" || command.type === "set-take-notes") return executeTakeNotesCommand(command, engine, loops, playback);

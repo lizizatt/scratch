@@ -68,7 +68,7 @@ export class TransportPlayback {
     const hadNotes = this.arpeggiator.hasHeldNotes;
     for (const output of this.arpeggiator.handle(event)) this.dispatch(output);
     if (!hadNotes && this.arpeggiator.hasHeldNotes) {
-      if (this.snapshot?.transport.state === "stopped") this.standaloneDeadline = this.clock.now();
+      if (this.snapshot?.transport.state === "stopped" || this.snapshot?.transport.state === "paused") this.standaloneDeadline = this.clock.now();
       else if (this.anchor) this.nextStep = this.firstStepAt(beatAt(this.anchor, this.clock.now()));
     }
     this.synchronize(this.engine.runtimeSnapshot());

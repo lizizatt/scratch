@@ -392,7 +392,7 @@ export class SimulatedHostEngine implements HostEngine {
 
   advance(seconds: number): void {
     if (!Number.isFinite(seconds) || seconds < 0) throw new Error("advance requires nonnegative finite seconds");
-    if (this.state.transport.state === "stopped") return;
+    if (this.state.transport.state === "stopped" || this.state.transport.state === "paused") return;
     this.advanceTransport(seconds);
     this.publish(false);
   }
@@ -463,7 +463,14 @@ export class SimulatedHostEngine implements HostEngine {
           } else {
             this.state.transport.state = "playing";
           }
+        } else if (this.state.transport.state === "paused") {
+          // Resumes from the held position with no count-in.
+          this.state.transport.state = "playing";
         }
+        break;
+      case "pause":
+        if (this.state.transport.state !== "playing") return reject("Pause is only available while playing");
+        this.state.transport.state = "paused";
         break;
       case "set-overdub":
         this.state.capture.overdub = command.enabled;

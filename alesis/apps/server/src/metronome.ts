@@ -19,6 +19,8 @@ export class MetronomeScheduler {
 
   /** Clicks when the beat changes; safe to call from any cadence because each beat clicks once. */
   update(snapshot: MetronomeSnapshot): void {
+    // A pause keeps the beat it stopped on, so resuming mid-beat does not click again.
+    if (snapshot.transport.state === "paused") return;
     if (snapshot.transport.state === "stopped") {
       this.lastBeatKey = null;
       return;
@@ -37,7 +39,7 @@ export class MetronomeScheduler {
 
   /** Monotonic time of the next beat, given progress measured at `measuredAt`; Infinity when no click is due. */
   nextBeatTime(snapshot: MetronomeSnapshot, measuredAt: number): number {
-    if (snapshot.transport.state === "stopped" || !snapshot.settings.metronomeEnabled || snapshot.settings.metronomeVolume <= 0) return Infinity;
+    if (snapshot.transport.state === "stopped" || snapshot.transport.state === "paused" || !snapshot.settings.metronomeEnabled || snapshot.settings.metronomeVolume <= 0) return Infinity;
     const position = snapshot.transport.progress * beatsInPhase(snapshot);
     return measuredAt + (Math.floor(position + beatEpsilon) + 1 - position) * 60_000 / snapshot.settings.bpm;
   }

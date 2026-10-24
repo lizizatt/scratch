@@ -18,6 +18,7 @@ if (!inheritedSampleLibrary) {
 process.env.ALESIS_E2E_SAMPLE_LIBRARY_DIR = sampleLibraryDirectory;
 process.env.SAMPLE_LIBRARY_DIR = sampleLibraryDirectory;
 process.env.ALESIS_SETTINGS_PATH = join(sampleLibraryDirectory, "playwright-settings-v1.json");
+process.env.ALESIS_AUTOSAVE_PATH = join(sampleLibraryDirectory, "playwright-autosave-v1.json");
 process.env.ALESIS_EXPORT_DIR = join(sampleLibraryDirectory, "promoted-exports");
 
 export default defineConfig({
@@ -34,6 +35,7 @@ export default defineConfig({
     env: {
       SAMPLE_LIBRARY_DIR: sampleLibraryDirectory,
       ALESIS_SETTINGS_PATH: process.env.ALESIS_SETTINGS_PATH,
+      ALESIS_AUTOSAVE_PATH: process.env.ALESIS_AUTOSAVE_PATH,
       ALESIS_EXPORT_DIR: process.env.ALESIS_EXPORT_DIR,
     },
   },

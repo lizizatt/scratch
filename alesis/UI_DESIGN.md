@@ -57,7 +57,14 @@ floating bottom-left navigation, and no document-level page scrolling.
 
 ### Toolbar
 
-- Stop, Play, Monitor Only, and Metronome Mute appear at upper left.
+- Stop, Play/Pause, Monitor Only, and Metronome Mute appear at upper left.
+- Play becomes **Pause** while playing and **Resume** while paused. Pause freezes
+	the loop position, silences loop playback, drums, metronome and the synced
+	arpeggiator, and stops capturing; held chords still sound and the arpeggiator
+	free-runs, as when stopped. Resume continues from the same spot with no
+	count-in and no replay of the pass so far. Stop from a pause resets as usual.
+	Pause is unavailable during the count-in. Session save/load and export
+	preview still require a full stop.
 - The right-hand actions are Export loop to sample library and Save promoted
 	tracks as MP3 files. The latter prompts for a host folder name and exports
 	each promoted take plus `mix.mp3` under `~/alesis_recordings/<name>/`.
@@ -136,8 +143,11 @@ floating bottom-left navigation, and no document-level page scrolling.
 - **Snap to grid** (Off, 1/4, 1/8, 1/16, 1/32) quantizes drags and resizes;
 	**Quantize** snaps the starts of the selected notes, or all notes with none
 	selected. Delete removes the selection; Undo steps back through this visit's edits.
-- Each gesture is one host command. A stale editor is refused and reloaded; the
-	take being overdubbed can only be edited while stopped.
+- Each gesture is one host command. A stale editor is refused and reloaded.
+	Editing works while the loop plays or is paused. Playback replaces staged takes
+	each pass (outside overdub), so promote one or pause to keep editing it. In
+	overdub the staged take stays, and only a pass that records new notes makes an
+	open editor stale.
 
 ## Accessibility
 

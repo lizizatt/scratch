@@ -191,20 +191,27 @@ describe("editing a take's notes through the host", () => {
     expect(saved.promoted[0]!.recording.filter(({ event }) => event.type === "note-on")).toHaveLength(1);
   });
 
-  it("refuses to edit the take being overdubbed while playing, and allows it when stopped", async () => {
+  it("edits the take being overdubbed while it plays; only a pass that adds notes makes an open editor stale", async () => {
     const h = await host();
     await h.command({ type: "set-overdub", enabled: true });
     await h.command({ type: "play" });
     h.play(60, 0.2, 0.4);
     h.until(2.01);
     const staged = h.engine.snapshot().capture.staged!;
-    const { notes, version } = await h.notesOf(staged.id);
-    const refused = await h.command({ type: "set-take-notes", takeId: staged.id, version, notes });
-    expect(refused).toMatchObject({ accepted: false });
-    expect(refused.error).toMatch(/Stop playback/);
-    await h.command({ type: "stop" });
+    const opened = await h.notesOf(staged.id);
+
+    h.until(4.01);
+    expect((await h.notesOf(staged.id)).version).toBe(opened.version);
+    const edited = await h.command({ type: "set-take-notes", takeId: staged.id, version: opened.version, notes: opened.notes.map((entry) => ({ ...entry, start: 0.6 })) });
+    expect(edited.accepted).toBe(true);
     const reread = await h.notesOf(staged.id);
-    expect((await h.command({ type: "set-take-notes", takeId: staged.id, version: reread.version, notes })).accepted).toBe(true);
+    expect(reread.notes[0]!.start).toBeCloseTo(0.6, 9);
+
+    h.play(64, 4.2, 4.4);
+    h.until(6.01);
+    const stale = await h.command({ type: "set-take-notes", takeId: staged.id, version: reread.version, notes: reread.notes });
+    expect(stale).toMatchObject({ accepted: false });
+    expect((await h.notesOf(staged.id)).notes.map(({ note: key }) => key).sort()).toEqual([60, 64]);
   });
 
   it("releases a note that is sounding from the take when it is edited", async () => {

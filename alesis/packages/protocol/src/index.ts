@@ -203,7 +203,7 @@ export const engineSnapshotSchema = z.object({
   }),
   settings: settingsSchema,
   transport: z.object({
-    state: z.enum(["stopped", "counting-in", "playing"]),
+    state: z.enum(["stopped", "counting-in", "playing", "paused"]),
     cycle: z.number().int().nonnegative(),
     progress: z.number().min(0).max(1),
     origin: loopPositionSchema.default(0),
@@ -314,6 +314,7 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("release-loop-export"), artifactId: z.string().uuid() }),
   z.object({ type: z.literal("panic") }),
   z.object({ type: z.literal("play") }),
+  z.object({ type: z.literal("pause") }),
   z.object({ type: z.literal("stop") }),
   z.object({ type: z.literal("set-loop-start"), position: loopPositionSchema }),
   z.object({ type: z.literal("set-overdub"), enabled: z.boolean() }),

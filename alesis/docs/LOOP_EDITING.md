@@ -158,9 +158,10 @@ edit, so a stale editor is refused with a reload message instead of overwriting.
   promoted takes are frozen recordings and are replaced directly.
 - Edits run inside the transport transaction, silence notes sounding from the
   take, redraw its waveform, and are included in session files and exports.
-- The staged take being overdubbed cannot be edited while the transport runs
-  (each pass merges into it); stop first. A non-overdub staged take edited while
-  playing disappears at the next rollover like any staged take.
+- The staged take stays editable while overdubbing: a pass that records nothing
+  leaves its version unchanged, and one that adds notes makes an open editor stale
+  (the edit is refused and the editor reloads). A non-overdub staged take edited
+  while playing disappears at the next rollover like any staged take.
 - Notes are interpreted in the take's own (source) coordinates, the same as the
   waveform lanes, regardless of the loop start marker.
 

@@ -228,3 +228,37 @@ test("impact velocity sliders set the range and push each other instead of inver
   await expect(min).toHaveValue("40");
   await page.screenshot({ path: `artifacts/ui-qa/impact-options-${info.project.name}.png` });
 });
+
+test("Pause holds the transport in place and Resume continues from it", async ({ page, baseURL }) => {
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await expect(page.locator(".transport-status")).toContainText("paused");
+  const held = (await control(baseURL!)).snapshot.transport;
+  await page.waitForTimeout(700);
+  expect((await control(baseURL!)).snapshot.transport).toMatchObject({ state: "paused", cycle: held.cycle, progress: held.progress });
+
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect(page.locator(".transport-status")).toContainText("playing");
+  await expect.poll(async () => { const { cycle, progress } = (await control(baseURL!)).snapshot.transport; return cycle + progress; }).not.toBe(held.cycle + held.progress);
+  await page.getByRole("button", { name: "Stop", exact: true }).click();
+  await expect(page.locator(".transport-status")).toContainText("stopped");
+});
+
+test("a promoted take can be edited while the loop is playing", async ({ page, baseURL }) => {
+  const takeId = await openPromotedTake(page, baseURL!);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator(".transport-status")).toContainText("playing");
+  await page.getByRole("button", { name: "Edit take 1", exact: true }).click();
+  const before = await notesOf(baseURL!, takeId);
+  await page.getByLabel("Snap to grid").selectOption("1/4");
+  const { x, y } = await center(page.locator(".roll-note").first());
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x, y - 16 * 3, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await notesOf(baseURL!, takeId)).some((entry) => entry.note === before[0]!.note + 3)).toBe(true);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect((await control(baseURL!)).snapshot.transport.state).toBe("playing");
+});

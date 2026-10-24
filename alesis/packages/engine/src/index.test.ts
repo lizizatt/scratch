@@ -33,6 +33,32 @@ describe("SimulatedHostEngine", () => {
     expect(engine.snapshot().settings).toMatchObject({ minimumVelocity: 30, maximumVelocity: 120 });
   });
 
+  it("pauses in place, resumes without a count-in, and refuses to pause outside playback", async () => {
+    const engine = new SimulatedHostEngine();
+    await engine.execute({ type: "configure", settings: { countInEnabled: true, bpm: 120, beatsPerMeasure: 4, loopMeasures: 1 } });
+    await expect(engine.execute({ type: "pause" })).resolves.toMatchObject({ accepted: false });
+
+    await engine.execute({ type: "play" });
+    await expect(engine.execute({ type: "pause" })).resolves.toMatchObject({ accepted: false });
+    engine.advance(2);
+    engine.advance(0.5);
+    const held = engine.snapshot().transport;
+    expect(held.state).toBe("playing");
+
+    await expect(engine.execute({ type: "pause" })).resolves.toMatchObject({ accepted: true });
+    engine.advance(10);
+    expect(engine.snapshot().transport).toEqual({ ...held, state: "paused" });
+
+    await engine.execute({ type: "play" });
+    expect(engine.snapshot().transport.state).toBe("playing");
+    engine.advance(0.25);
+    expect(engine.snapshot().transport.progress).toBeCloseTo(held.progress + 0.125, 9);
+
+    await engine.execute({ type: "pause" });
+    await engine.execute({ type: "stop" });
+    expect(engine.snapshot().transport).toMatchObject({ state: "stopped", progress: 0 });
+  });
+
   it("rejects loop sample export without the host sample service", async () => {
     const engine = new SimulatedHostEngine();
 
