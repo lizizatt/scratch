@@ -29,6 +29,7 @@ export interface EngineResult {
   message?: string;
   sessionJson?: string;
   artifact?: import("@alesis/protocol").LoopArtifactInfo;
+  takeNotes?: import("@alesis/protocol").TakeNotes;
 }
 
 export type EngineListener = (snapshot: EngineSnapshot) => void;
@@ -259,6 +260,17 @@ export class SimulatedHostEngine implements HostEngine {
     if (this.state.capture.staged?.id === takeId) this.state.capture.staged.waveform = [...waveform];
   }
 
+  /** Redraws a take after its notes were edited; unlike capture feedback this publishes. */
+  setTakeWaveform(takeId: string, waveform: number[]): boolean {
+    const { staged, previousStaged } = this.state.capture;
+    const take = [staged, previousStaged, ...this.state.promoted].find((candidate) => candidate?.id === takeId);
+    if (!take) return false;
+    take.waveform = [...waveform];
+    this.state.revision += 1;
+    this.publish(false);
+    return true;
+  }
+
   setCaptureError(error: string): void {
     this.state.capture.error = error;
   }
@@ -479,6 +491,9 @@ export class SimulatedHostEngine implements HostEngine {
           || command.settings.loopMeasures !== undefined && command.settings.loopMeasures !== this.state.settings.loopMeasures;
         const hasAudio = this.state.capture.staged !== null || this.state.capture.previousStaged !== null || this.state.promoted.length > 0;
         if (timingChanged && hasAudio && !command.clearAudio) return reject("Timing changes require clearAudio while takes exist");
+        if (command.settings.minimumVelocity !== undefined && command.settings.maximumVelocity !== undefined && command.settings.minimumVelocity > command.settings.maximumVelocity) {
+          return reject("Minimum impact velocity cannot exceed the maximum");
+        }
         if (timingChanged && command.clearAudio) this.clearAudio();
         const settings = command.settings;
         if (settings.bpm !== undefined) this.state.settings.bpm = settings.bpm;
@@ -490,6 +505,13 @@ export class SimulatedHostEngine implements HostEngine {
         if (settings.minimumVelocity !== undefined) {
           if (!Number.isInteger(settings.minimumVelocity) || settings.minimumVelocity < 1 || settings.minimumVelocity > 127) return reject("Minimum velocity must be an integer from 1 to 127");
           this.state.settings.minimumVelocity = settings.minimumVelocity;
+          // Moving one end past the other carries it along, so a lone slider change is never rejected.
+          if (settings.minimumVelocity > this.state.settings.maximumVelocity) this.state.settings.maximumVelocity = settings.minimumVelocity;
+        }
+        if (settings.maximumVelocity !== undefined) {
+          if (!Number.isInteger(settings.maximumVelocity) || settings.maximumVelocity < 1 || settings.maximumVelocity > 127) return reject("Maximum velocity must be an integer from 1 to 127");
+          this.state.settings.maximumVelocity = settings.maximumVelocity;
+          if (settings.maximumVelocity < this.state.settings.minimumVelocity) this.state.settings.minimumVelocity = settings.maximumVelocity;
         }
         if (settings.metronomeEnabled !== undefined) this.state.settings.metronomeEnabled = settings.metronomeEnabled;
         if (settings.metronomeVolume !== undefined) this.state.settings.metronomeVolume = settings.metronomeVolume;
@@ -649,6 +671,9 @@ export class SimulatedHostEngine implements HostEngine {
       case "export-loop-session":
       case "import-loop-session":
         return reject("Loop sessions require host orchestration");
+      case "get-take-notes":
+      case "set-take-notes":
+        return reject("Take editing requires host orchestration");
       case "prepare-loop-export":
       case "preview-loop-export":
       case "publish-loop-export":

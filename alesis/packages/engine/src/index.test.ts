@@ -18,6 +18,21 @@ describe("SimulatedHostEngine", () => {
     expect(result.revision).toBe(engine.snapshot().revision);
   });
 
+  it("rejects an inverted impact range, and lets a lone change carry the other end along", async () => {
+    const engine = new SimulatedHostEngine();
+    await engine.execute({ type: "configure", settings: { minimumVelocity: 20, maximumVelocity: 100 } });
+
+    await expect(engine.execute({ type: "configure", settings: { bpm: 90, minimumVelocity: 110, maximumVelocity: 109 } })).resolves.toMatchObject({ accepted: false });
+    expect(engine.snapshot().settings).toMatchObject({ bpm: 118, minimumVelocity: 20, maximumVelocity: 100 });
+
+    await engine.execute({ type: "configure", settings: { minimumVelocity: 110 } });
+    expect(engine.snapshot().settings).toMatchObject({ minimumVelocity: 110, maximumVelocity: 110 });
+    await engine.execute({ type: "configure", settings: { maximumVelocity: 40 } });
+    expect(engine.snapshot().settings).toMatchObject({ minimumVelocity: 40, maximumVelocity: 40 });
+    await engine.execute({ type: "configure", settings: { minimumVelocity: 30, maximumVelocity: 120 } });
+    expect(engine.snapshot().settings).toMatchObject({ minimumVelocity: 30, maximumVelocity: 120 });
+  });
+
   it("rejects loop sample export without the host sample service", async () => {
     const engine = new SimulatedHostEngine();
 

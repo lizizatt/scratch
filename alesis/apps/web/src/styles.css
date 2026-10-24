@@ -187,6 +187,40 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .level-control { display: grid; gap: 2px; color: var(--dim); font-size: 8px; text-align: center; }
 .level-control input { width: 100%; accent-color: var(--cyan); }
 .undo-button { align-self: flex-end; flex-shrink: 0; min-height: 40px; display: flex; align-items: center; gap: 7px; padding: 0 11px; }
+.slider-value { display: flex; align-items: center; gap: 12px; }
+.setting .slider-value input[type="range"] { flex: 1; width: auto; padding: 0; border: 0; accent-color: var(--cyan); }
+.slider-value output { min-width: 3ch; color: var(--cyan); text-align: right; }
+.waveform.openable { cursor: pointer; }
+.waveform.openable:hover, .waveform.openable:focus-visible { border-color: var(--cyan); }
+.app-shell .take-editor { display: flex; flex-direction: column; gap: 6px; padding: max(24px, env(safe-area-inset-top)) 3vw calc(max(10px, env(safe-area-inset-bottom)) + 58px); overflow: hidden; }
+.take-editor-header { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.take-editor-header h1 { margin: 0; color: var(--ice); font: 700 clamp(13px,2vw,20px) "Space Mono",monospace; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.back-button { min-height: 40px; display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+.take-editor-tools { min-width: 0; margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.take-editor-tools > button, .tool-toggle button { min-height: 36px; display: flex; align-items: center; gap: 5px; padding: 0 9px; font-size: 11px; }
+.take-editor-tools svg, .back-button svg { width: 17px; height: 17px; }
+.tool-toggle { display: flex; gap: 2px; }
+.tool-toggle button.active { color: #000; border-color: var(--cyan); background: var(--cyan); }
+.snap-control { display: flex; align-items: center; gap: 4px; color: var(--dim); }
+.snap-control select { min-height: 36px; padding: 0 6px; color: var(--cyan); border: 1px solid var(--line); border-radius: 6px; background: #000; font-size: 11px; }
+.take-editor-note { flex: 0 0 auto; margin: 0; color: var(--dim); font-size: 11px; }
+.take-editor-note.error { color: var(--danger); }
+.roll-scroll { flex: 1 1 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; border: 1px solid var(--line); border-radius: 7px; scrollbar-color: var(--blue) #000; scrollbar-width: thin; }
+.roll-body { display: grid; grid-template-columns: 38px minmax(0,1fr); }
+.roll-keys { display: flex; flex-direction: column; border-right: 1px solid var(--line); background: #00060d; }
+.roll-keys span { display: block; flex: none; padding-right: 4px; border-bottom: 1px solid rgba(140,236,255,.08); color: var(--dim); font-size: 9px; line-height: 15px; text-align: right; }
+.roll-keys span.black { background: rgba(0,0,0,.65); }
+.roll-grid { position: relative; min-width: 0; overflow: hidden; }
+.roll-rows { position: absolute; inset: 0; display: flex; flex-direction: column; pointer-events: none; }
+.roll-rows i { display: block; flex: none; border-bottom: 1px solid rgba(140,236,255,.07); }
+.roll-rows i.black { background: rgba(0,0,0,.4); }
+.snap-lines { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(90deg,rgba(140,236,255,.08) 1px,transparent 1px); background-size: var(--snap-width) 100%; }
+.roll-note { position: absolute; z-index: 2; min-width: 6px; box-sizing: border-box; border: 1px solid var(--ice); border-radius: 3px; background: var(--blue); cursor: grab; touch-action: none; }
+.roll-note.drum { background: #7a2bd6; }
+.roll-note.selected { border-color: #fff; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.note-handle { position: absolute; top: 0; right: -1px; bottom: 0; width: 9px; border-radius: 0 3px 3px 0; background: rgba(255,255,255,.4); cursor: ew-resize; }
+.velocity-tooltip { position: absolute; z-index: 6; padding: 3px 8px; border: 1px solid var(--cyan); border-radius: 5px; background: #001122; color: var(--ice); font-size: 12px; white-space: nowrap; pointer-events: none; }
+.roll-grid .playhead { z-index: 3; pointer-events: none; }
 
 @media (orientation: portrait) { .app-shell::before { content:"ROTATE DEVICE FOR PERFORMANCE VIEW"; position:absolute; z-index:100; inset:0; display:grid; place-items:center; padding:30px; color:var(--cyan); background:#000; text-align:center; font-size:18px; } }
 @media (max-height:500px) {

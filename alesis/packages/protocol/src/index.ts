@@ -1,11 +1,13 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 7 as const;
+export const PROTOCOL_VERSION = 8 as const;
 
 export const LOOP_SESSION_MAX_BYTES = 4 * 1024 * 1024;
 export const LOOP_SESSION_MAX_EVENTS_PER_TAKE = 32_768;
 export const LOOP_SESSION_MAX_EVENTS = 100_000;
 export const MAX_PROMOTED_TAKES = 12;
+// Each note is at most four recorded events (attack, release, and a wrapped attack/release pair).
+export const MAX_EDITABLE_NOTES = LOOP_SESSION_MAX_EVENTS_PER_TAKE / 4;
 
 const midiByte = z.number().int().min(0).max(127);
 const midiChannel = z.number().int().min(0).max(15);
@@ -46,6 +48,7 @@ export const settingsSchema = z.object({
   audioOutputId: z.string(),
   velocityCurve: velocityCurveSchema,
   minimumVelocity: z.number().int().min(1).max(127).default(1),
+  maximumVelocity: z.number().int().min(1).max(127).default(127),
   metronomeEnabled: z.boolean(),
   metronomeVolume: z.number().min(0).max(1),
   countInEnabled: z.boolean(),
@@ -58,6 +61,23 @@ export const takeVoiceSchema = z.object({
   program: z.number().int().min(0).max(127),
   name: z.string().min(1).max(256),
 }).strict();
+
+/** One played note of a take, in loop-fraction coordinates; `start + duration` past 1 wraps to the loop start. */
+export const editableNoteSchema = z.object({
+  id: z.number().int().min(0).max(MAX_EDITABLE_NOTES * 4),
+  channel: midiChannel,
+  note: midiByte,
+  velocity: z.number().int().min(1).max(127),
+  start: loopPositionSchema,
+  duration: z.number().gt(0).max(1),
+}).strict();
+export type EditableNote = z.infer<typeof editableNoteSchema>;
+export const takeNotesSchema = z.object({
+  takeId: takeIdSchema,
+  version: z.number().int().nonnegative(),
+  notes: z.array(editableNoteSchema).max(MAX_EDITABLE_NOTES),
+}).strict();
+export type TakeNotes = z.infer<typeof takeNotesSchema>;
 
 export const takeSchema = z.object({
   id: takeIdSchema,
@@ -264,6 +284,7 @@ export const loopSessionSchema = z.object({
   const count = takes.reduce((sum, take) => sum + take.recording.length, session.staged?.rawRecording.length ?? 0);
   if (count > LOOP_SESSION_MAX_EVENTS) context.addIssue({ code: "custom", message: "Session has too many MIDI events" });
   if (session.synth.selectedId === "soundfont" && !session.synth.soundFont) context.addIssue({ code: "custom", message: "SoundFont selection is required" });
+  if (session.settings.minimumVelocity > session.settings.maximumVelocity) context.addIssue({ code: "custom", message: "Minimum velocity exceeds maximum velocity" });
 });
 export type LoopSession = z.infer<typeof loopSessionSchema>;
 export type SessionTake = z.infer<typeof sessionTakeSchema>;
@@ -319,6 +340,8 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("delete-current-capture") }),
   z.object({ type: z.literal("delete-staged") }),
   z.object({ type: z.literal("promote-previous-staged") }),
+  z.object({ type: z.literal("get-take-notes"), takeId: takeIdSchema }),
+  z.object({ type: z.literal("set-take-notes"), takeId: takeIdSchema, version: z.number().int().nonnegative(), notes: z.array(editableNoteSchema).max(MAX_EDITABLE_NOTES) }),
   z.object({ type: z.literal("set-take-level"), takeId: takeIdSchema, level: z.number().min(0).max(1) }),
   z.object({ type: z.literal("set-take-muted"), takeId: takeIdSchema, muted: z.boolean() }),
   z.object({ type: z.literal("delete-take"), takeId: takeIdSchema }),
@@ -350,6 +373,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     message: z.string().optional(),
     sessionJson: z.string().max(LOOP_SESSION_MAX_BYTES).optional(),
     artifact: loopArtifactInfoSchema.optional(),
+    takeNotes: takeNotesSchema.optional(),
   }),
 ]);
 

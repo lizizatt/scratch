@@ -21,6 +21,7 @@ const cachedSettingsSchema = settingsSchema.pick({
   loopMeasures: true,
   velocityCurve: true,
   minimumVelocity: true,
+  maximumVelocity: true,
   metronomeEnabled: true,
   metronomeVolume: true,
   countInEnabled: true,

@@ -12,6 +12,7 @@ import { createRendererControllerRestorer, panicRendererInput } from "./renderer
 import { TransportPlayback } from "./transport-playback.js";
 import { MidiLoopScheduler } from "./loop-playback.js";
 import { executeLoopCommand } from "./loop-commands.js";
+import { executeTakeNotesCommand } from "./take-editing.js";
 import { exportLoopSession, importLoopSession, prepareSessionAudio, type LoopSessionHost } from "./loop-session.js";
 import { MetronomeScheduler } from "./metronome.js";
 import { applyVelocityCurve, PerformanceRouter } from "./performance-router.js";
@@ -166,8 +167,8 @@ const handleMidi = (event: MidiInputEvent): void => {
     return;
   }
   advanceTransportClock();
-  const { velocityCurve, minimumVelocity } = engine.runtimeSnapshot().settings;
-  const curvedEvent = applyVelocityCurve(event, velocityCurve, minimumVelocity);
+  const { velocityCurve, minimumVelocity, maximumVelocity } = engine.runtimeSnapshot().settings;
+  const curvedEvent = applyVelocityCurve(event, velocityCurve, minimumVelocity, maximumVelocity);
   engine.dispatchMidi(curvedEvent);
   for (const routedEvent of performanceRouter.route(curvedEvent)) {
     playback.handle(routedEvent);
@@ -339,9 +340,10 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
     const snapshot = engine.snapshot();
     return { accepted: false, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, error: "Not Ready: transport dependencies are unavailable" };
   }
-  if (command.type === "play" || command.type === "stop" || command.type === "configure" || command.type === "configure-arpeggiator" || command.type === "delete-current-capture" || command.type === "delete-staged" || command.type === "promote-staged") {
+  if (command.type === "play" || command.type === "stop" || command.type === "configure" || command.type === "configure-arpeggiator" || command.type === "delete-current-capture" || command.type === "delete-staged" || command.type === "promote-staged" || command.type === "get-take-notes" || command.type === "set-take-notes") {
     advanceTransportClock();
   }
+  if (command.type === "get-take-notes" || command.type === "set-take-notes") return executeTakeNotesCommand(command, engine, loops, playback);
   if (command.type === "export-loop-session") return exportLoopSession(loopSessionHost);
   if (command.type === "import-loop-session") {
     if (hotplugBusy) throw new Error("Audio/MIDI reconnection is in progress; retry loading the session");
@@ -612,8 +614,8 @@ padPerformance = new PadPerformance({
   samples: samplePads,
   drum(event, playAudio) {
     advanceTransportClock();
-    const { velocityCurve, minimumVelocity } = engine.runtimeSnapshot().settings;
-    const curvedEvent = applyVelocityCurve(event, velocityCurve, minimumVelocity);
+    const { velocityCurve, minimumVelocity, maximumVelocity } = engine.runtimeSnapshot().settings;
+    const curvedEvent = applyVelocityCurve(event, velocityCurve, minimumVelocity, maximumVelocity);
     drumPadNotes.observe(curvedEvent);
     dispatchDrumPadEvent(curvedEvent, playAudio);
   },

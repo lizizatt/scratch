@@ -23,16 +23,17 @@ describe("settings cache", () => {
     try {
       const path = join(directory, "settings.json");
       const source = configuredEngine();
-      await source.execute({ type: "configure", settings: { bpm: 137, velocityCurve: "responsive", minimumVelocity: 72 } });
+      await source.execute({ type: "configure", settings: { bpm: 137, velocityCurve: "responsive", minimumVelocity: 72, maximumVelocity: 100 } });
       await saveSettingsCache(path, settingsCacheFromSnapshot(source.snapshot()));
       const target = configuredEngine();
       await restoreSettingsCache((await loadSettingsCache(path))!, (command) => target.execute(command));
-      expect(target.snapshot().settings).toMatchObject({ bpm: 137, velocityCurve: "responsive", minimumVelocity: 72 });
+      expect(target.snapshot().settings).toMatchObject({ bpm: 137, velocityCurve: "responsive", minimumVelocity: 72, maximumVelocity: 100 });
       const legacy = settingsCacheFromSnapshot(source.snapshot());
       delete (legacy.settings as Partial<typeof legacy.settings>).minimumVelocity;
+      delete (legacy.settings as Partial<typeof legacy.settings>).maximumVelocity;
       await writeFile(path, JSON.stringify(legacy));
       await restoreSettingsCache((await loadSettingsCache(path))!, (command) => target.execute(command));
-      expect(target.snapshot().settings).toMatchObject({ bpm: 137, velocityCurve: "responsive", minimumVelocity: 1 });
+      expect(target.snapshot().settings).toMatchObject({ bpm: 137, velocityCurve: "responsive", minimumVelocity: 1, maximumVelocity: 127 });
       expect(target.snapshot().capture.overdub).toBe(false);
       expect(target.snapshot().transport.state).toBe("stopped");
     } finally { await rm(directory, { recursive: true, force: true }); }

@@ -14,6 +14,16 @@ describe("PerformanceRouter", () => {
     expect(applyVelocityCurve({ ...note, velocity: 100 }, "strong")).toMatchObject({ velocity: 127 });
   });
 
+  it("limits shaped velocities to the configured minimum and maximum impact", () => {
+    const note = { type: "note-on", channel: 0, note: 60, velocity: 20 } as const;
+
+    expect(applyVelocityCurve(note, "linear", 30, 90)).toMatchObject({ velocity: 30 });
+    expect(applyVelocityCurve({ ...note, velocity: 110 }, "linear", 30, 90)).toMatchObject({ velocity: 90 });
+    expect(applyVelocityCurve({ ...note, velocity: 60 }, "linear", 30, 90)).toMatchObject({ velocity: 60 });
+    // A fixed response then plays at the maximum.
+    expect(applyVelocityCurve(note, "fixed", 1, 100)).toMatchObject({ velocity: 100 });
+  });
+
   it("does not curve note releases or non-note expression", () => {
     expect(applyVelocityCurve({ type: "note-on", channel: 0, note: 60, velocity: 0 }, "strong")).toEqual({ type: "note-on", channel: 0, note: 60, velocity: 0 });
     expect(applyVelocityCurve({ type: "note-off", channel: 0, note: 60 }, "strong")).toEqual({ type: "note-off", channel: 0, note: 60 });

@@ -1,9 +1,10 @@
 import type { AudioOutput } from "@alesis/audio";
 import type { MidiEvent, RuntimeSnapshot, RuntimeTake } from "@alesis/engine";
-import type { EngineSnapshot, LoopSession, QuantizationMode, SessionTake, Take } from "@alesis/protocol";
+import type { EditableNote, EngineSnapshot, LoopSession, QuantizationMode, SessionTake, Take, TakeNotes } from "@alesis/protocol";
 import { LOOP_SESSION_MAX_EVENTS, LOOP_SESSION_MAX_EVENTS_PER_TAKE } from "@alesis/protocol";
 import { isMappedDrumPadRelease } from "./sample-pads.js";
 import { mergeOverdub, recordingWaveform, rotateRecording, wrapPosition } from "./circular-recording.js";
+import { normalizeNotes, notesFromRecording, recordingFromNotes } from "./take-notes.js";
 
 export interface RecordedMidiEvent {
   position: number;
@@ -32,6 +33,9 @@ const playbackChannels = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14];
 
 export class MidiLoopScheduler {
   private recordings = new Map<string, RecordedMidiEvent[]>();
+  /** Changes whenever a take's recording is replaced, so a stale editor cannot overwrite it. */
+  private recordingVersions = new Map<string, number>();
+  private versionCounter = 0;
   private rawRecordings = new Map<string, RecordedMidiEvent[]>();
   private appliedQuantization = new Map<string, QuantizationMode>();
   private retainedDeletedTakeId: string | null = null;
@@ -149,6 +153,7 @@ export class MidiLoopScheduler {
       if (rawRecording && this.appliedQuantization.get(snapshot.capture.staged.id) !== snapshot.capture.quantization) {
         const totalBeats = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
         this.recordings.set(snapshot.capture.staged.id, quantizeRecording(rawRecording, snapshot.capture.quantization, totalBeats));
+        this.recordingVersions.set(snapshot.capture.staged.id, ++this.versionCounter);
         this.appliedQuantization.set(snapshot.capture.staged.id, snapshot.capture.quantization);
         if (snapshot.capture.overdub) this.feedback.stagedWaveform?.(snapshot.capture.staged.id, recordingWaveform(this.recordings.get(snapshot.capture.staged.id)!));
       }
@@ -190,6 +195,7 @@ export class MidiLoopScheduler {
     this.releaseAllNotes();
     this.clearAppliedVoices();
     this.recordings.clear();
+    this.recordingVersions.clear();
     this.rawRecordings.clear();
     this.appliedQuantization.clear();
     this.takeChannels.clear();
@@ -248,6 +254,7 @@ export class MidiLoopScheduler {
       && this.appliedQuantization.get(staged.id) !== snapshot.capture.quantization) {
       const totalBeats = snapshot.settings.beatsPerMeasure * snapshot.settings.loopMeasures;
       this.recordings.set(staged.id, quantizeRecording(this.rawRecordings.get(staged.id)!, snapshot.capture.quantization, totalBeats));
+      this.recordingVersions.set(staged.id, ++this.versionCounter);
       this.appliedQuantization.set(staged.id, snapshot.capture.quantization);
     }
     return this.exportRecordings(takeIds);
@@ -268,6 +275,44 @@ export class MidiLoopScheduler {
       previousStaged: snapshot.capture.previousStaged ? capture(snapshot.capture.previousStaged) : null,
       promoted: snapshot.promoted.map(capture),
     };
+  }
+
+  /** A take's notes for editing, with the version an edit must present. */
+  takeNotes(snapshot: RuntimeSnapshot, takeId: string): TakeNotes | null {
+    this.captureRecordings(snapshot, []);
+    const recording = this.recordings.get(takeId);
+    return recording ? { takeId, version: this.recordingVersion(takeId), notes: notesFromRecording(recording) } : null;
+  }
+
+  /**
+   * Replaces a take's notes, keeping its controllers. The edit becomes the take's raw timing, so changing
+   * the staged quantization later re-quantizes the edited notes. Throws when the edit is stale or too large.
+   */
+  setTakeNotes(snapshot: RuntimeSnapshot, takeId: string, version: number, notes: readonly EditableNote[]): { takeNotes: TakeNotes; waveform: number[] } {
+    this.captureRecordings(snapshot, []);
+    const previous = this.recordings.get(takeId);
+    if (!previous) throw new Error("This take has no MIDI recording");
+    if (version !== this.recordingVersion(takeId)) throw new Error("The take changed since it was opened; reload it before editing");
+    const normalized = normalizeNotes(notes);
+    const recording = recordingFromNotes(normalized, previous);
+    const others = [...this.recordings].reduce((sum, [id, existing]) => sum + (id === takeId ? 0 : existing.length), 0);
+    if (recording.length > LOOP_SESSION_MAX_EVENTS_PER_TAKE || others + recording.length > LOOP_SESSION_MAX_EVENTS) {
+      throw new Error("The edited take has too many MIDI events");
+    }
+    this.releaseTakeNotes(takeId);
+    this.recordings.set(takeId, recording);
+    if (snapshot.capture.staged?.id === takeId) {
+      this.rawRecordings.set(takeId, structuredClone(recording));
+      this.appliedQuantization.set(takeId, snapshot.capture.quantization);
+    }
+    this.recordingVersions.set(takeId, ++this.versionCounter);
+    return { takeNotes: { takeId, version: this.recordingVersion(takeId), notes: normalized }, waveform: recordingWaveform(recording) };
+  }
+
+  private recordingVersion(takeId: string): number {
+    let version = this.recordingVersions.get(takeId);
+    if (version === undefined) this.recordingVersions.set(takeId, version = ++this.versionCounter);
+    return version;
   }
 
   /** Commit a partial overdub before Stop or disabling; the rotating default still discards it. */
@@ -294,6 +339,7 @@ export class MidiLoopScheduler {
       this.activeBends.clear();
       this.activeSustains.clear();
       this.recordings = recordings;
+      this.recordingVersions.clear();
       this.rawRecordings = raw;
       this.appliedQuantization = applied;
       this.takeChannels.clear();
@@ -333,6 +379,7 @@ export class MidiLoopScheduler {
     const rendered = quantizeRecording(raw, snapshot.capture.quantization, totalBeats);
     this.rawRecordings.set(takeId, raw);
     this.recordings.set(takeId, rendered);
+    this.recordingVersions.set(takeId, ++this.versionCounter);
     this.appliedQuantization.set(takeId, snapshot.capture.quantization);
     if (snapshot.capture.overdub) this.feedback.stagedWaveform?.(takeId, recordingWaveform(rendered));
   }
@@ -506,6 +553,7 @@ export class MidiLoopScheduler {
     const channel = this.takeChannels.get(takeId);
     if (channel !== undefined && this.appliedVoices.delete(channel)) this.output.clearChannelVoice(channel);
     this.recordings.delete(takeId);
+    this.recordingVersions.delete(takeId);
     this.rawRecordings.delete(takeId);
     this.appliedQuantization.delete(takeId);
     this.takeChannels.delete(takeId);

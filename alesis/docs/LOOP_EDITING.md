@@ -126,11 +126,43 @@ closure within the capture limits.
 Promotion freezes rendered MIDI, including quantization; deletion/Undo restores
 that frozen recording. Timing changes still require explicit audio clearing.
 
-In Options, **Minimum impact velocity** floors positive note-ons after the
-selected Key Response curve and before routing/arpeggiation/capture. Default 1
-preserves existing behavior. Velocity-zero note-ons and note-offs remain releases.
-Replay/export use captured velocity and take level, not the current input floor.
-The floor does not change saved sample audio or generated drum-pattern velocity.
+In Options, **Minimum impact velocity** and **Maximum impact velocity** clamp
+positive note-ons to that range after the selected Key Response curve and before
+routing/arpeggiation/capture. Defaults 1 and 127 preserve existing behavior (a
+Fixed 127 response plays at the maximum). A configure command setting only one
+end moves the other when it would cross; setting both inverted is rejected.
+Velocity-zero note-ons and note-offs remain releases. Sample-pad triggers use the
+same range. Replay/export use captured velocity and take level, not the current
+input range, and velocities edited in the take editor are never clamped to it.
+The range does not change saved sample audio or generated drum-pattern velocity.
+
+## Take editor
+
+Protocol 8 adds `get-take-notes` and `set-take-notes`. A take's recording stays
+host-owned: the host pairs attacks with releases into notes (`id`, `channel`,
+`note`, `velocity`, `start`, `duration`, with loop-fraction coordinates and gates
+that wrap the loop end kept as one note) and returns them with a per-take
+`version`. `set-take-notes` replaces the notes and must present the version it
+read; the host bumps it on every capture commit, re-quantization, session load and
+edit, so a stale editor is refused with a reload message instead of overwriting.
+
+- Controller events (pedal, bend, pressure) keep their recorded positions. Ties
+  between a controller and a note event keep the controller first, and releases
+  precede attacks.
+- Notes of the same channel and key never overlap, circularly: an earlier note is
+  cut where the next begins, and of two attacks closer than 1e-4 of the loop only
+  the later survives. The reply carries the normalized notes.
+- Editing the staged take makes the edit its raw timing and marks the current
+  quantization as applied, so unchanged quantization keeps the edit; changing the
+  staged quantization later re-quantizes the edited notes. Previous-staged and
+  promoted takes are frozen recordings and are replaced directly.
+- Edits run inside the transport transaction, silence notes sounding from the
+  take, redraw its waveform, and are included in session files and exports.
+- The staged take being overdubbed cannot be edited while the transport runs
+  (each pass merges into it); stop first. A non-overdub staged take edited while
+  playing disappears at the next rollover like any staged take.
+- Notes are interpreted in the take's own (source) coordinates, the same as the
+  waveform lanes, regardless of the loop start marker.
 
 ## Coordinates, playback, and export
 
@@ -208,8 +240,8 @@ The existing 4 MiB serialized-file limit is independently checked on save/load.
   Options floor, saved host settings, browser reload, and session roundtrips at
   800×480, 844×390 and 1280×800. Screenshots are under `artifacts/ui-qa/`.
 
-Piano-roll grids, dragging/resizing and selected-note quantization are deferred
-in [TODO](../TODO.md). On-device latency, acoustic fidelity and dense-load
+Adding notes, marquee selection, auditioning while dragging, and editing
+controller events remain deferred in [TODO](../TODO.md). On-device latency, acoustic fidelity and dense-load
 acceptance remain hardware work. Development tests used no Pi access or live
 audio; the deployment checks above subsequently ran silently on the Pi.
 

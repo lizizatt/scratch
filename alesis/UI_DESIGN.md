@@ -28,10 +28,13 @@ floating bottom-left navigation, and no document-level page scrolling.
 - MIDI input, audio output, count-in, metronome enablement, and metronome volume are host settings.
 - Key Response selects Linear, Responsive, Strong, or Fixed 127 note-on
 	velocity mapping. Strong is the default for the Vortex.
-- Minimum impact velocity ranges from 1 (unchanged) to 127. It floors positive
-	note-on velocities after Key Response, before arpeggiation/capture. Note-off
-	and velocity-zero note-on releases are never raised. This setting persists
-	in the host settings cache and editable session files.
+- Minimum and maximum impact velocity are sliders from 1 to 127 (defaults 1 and
+	127). They clamp positive note-on velocities after Key Response, before
+	arpeggiation/capture; Fixed 127 therefore plays at the maximum. Dragging one
+	slider past the other carries it along. Note-off and velocity-zero note-on
+	releases are never changed. They apply to live input and sample-pad triggers
+	only, not to velocities edited in the take editor. They persist in the host
+	settings cache and editable session files.
 - Count-in runs before each Play from Stop.
 
 ## Synth
@@ -102,6 +105,7 @@ floating bottom-left navigation, and no document-level page scrolling.
 - Quantization snaps current staged MIDI to the nearest circular grid, deduplicates equivalent events per bin, and preserves a minimum note duration.
 - Changing quantization reprocesses current staging from raw timestamps.
 - Staging can be auditioned, muted, or promoted.
+- Clicking the staged waveform opens the take editor (see Promoted).
 
 ### Previous staged
 
@@ -116,6 +120,24 @@ floating bottom-left navigation, and no document-level page scrolling.
 - Each row has waveform, level, mute, and delete controls.
 - Export includes every promoted take, even when its playback mute is active, and applies each take's level.
 - One-level undo restores the latest deleted take.
+
+### Take editor
+
+- Clicking the staged, previous-staged or a promoted waveform opens that take in
+	a note editor; **Back** (upper left) or any navigation button leaves it.
+- Pitch rows run down the grid and the loop runs left to right, with beat and
+	measure guides, the snap grid, and the playhead. Notes wrapped across the loop
+	end show in two pieces.
+- Drag a note to move it in time and pitch (all selected notes move together);
+	drag its right edge to resize; shift/ctrl-click adds to the selection.
+- Right-drag a note, or drag with the **Velocity** tool (for touch), to change its
+	velocity: dragging up raises it, down lowers it, and a tooltip shows the value.
+	This ignores the Options impact range.
+- **Snap to grid** (Off, 1/4, 1/8, 1/16, 1/32) quantizes drags and resizes;
+	**Quantize** snaps the starts of the selected notes, or all notes with none
+	selected. Delete removes the selection; Undo steps back through this visit's edits.
+- Each gesture is one host command. A stale editor is refused and reloaded; the
+	take being overdubbed can only be edited while stopped.
 
 ## Accessibility
 

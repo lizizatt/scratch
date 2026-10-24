@@ -36,7 +36,8 @@ export class PadPerformance {
     const kind: Hold = action?.kind === "control" ? "control" : action?.kind === "sample" || snapshot.pads.mode === "samples" ? "sample" : "drum";
     const held = this.holds.get(source) ?? new Map<number, Hold>();
     if (kind === "control" && held.has(pad)) return this.result(true);
-    if (kind === "sample" && !this.dependencies.samples.trigger(pad, Math.max(velocity, snapshot.settings.minimumVelocity))) return this.result(false, "Assigned sample is unavailable");
+    const { minimumVelocity, maximumVelocity } = snapshot.settings;
+    if (kind === "sample" && !this.dependencies.samples.trigger(pad, Math.min(maximumVelocity, Math.max(velocity, minimumVelocity)))) return this.result(false, "Assigned sample is unavailable");
     held.set(pad, kind);
     this.holds.set(source, held);
     if (kind === "drum") this.dependencies.drum({ type: "note-on", channel: 9, note: 36 + pad, velocity }, true);

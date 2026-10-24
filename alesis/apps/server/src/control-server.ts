@@ -181,7 +181,9 @@ export async function createControlServer(
         void pending.then((message) => {
           const cachedMessage: ServerMessage = message.type === "command-result" && message.sessionJson !== undefined
             ? { type: "command-result", commandId: message.commandId, revision: message.revision, appliedCycle: message.appliedCycle, accepted: false, error: "Session download already sent. Save again to download a new copy." }
-            : message;
+            : message.type === "command-result" && message.takeNotes !== undefined
+              ? { ...message, takeNotes: undefined }
+              : message;
           results.set(resultKey, cachedMessage);
           if (results.size > 512) results.delete(results.keys().next().value!);
         }).finally(() => {
@@ -364,6 +366,7 @@ function commandResult(envelope: CommandEnvelope, result: EngineResult): ServerM
     ...(result.message === undefined ? {} : { message: result.message }),
     ...(result.sessionJson === undefined ? {} : { sessionJson: result.sessionJson }),
     ...(result.artifact === undefined ? {} : { artifact: result.artifact }),
+    ...(result.takeNotes === undefined ? {} : { takeNotes: result.takeNotes }),
   };
 }
 

@@ -10,6 +10,17 @@ describe("control protocol", () => {
     }
   });
 
+  it("bounds the maximum impact velocity and validates take note edits", () => {
+    const envelope = (command: unknown) => commandEnvelopeSchema.safeParse({ protocolVersion: PROTOCOL_VERSION, commandId: crypto.randomUUID(), command }).success;
+    for (const maximumVelocity of [0, 128, 99.5]) expect(envelope({ type: "configure", settings: { maximumVelocity } })).toBe(false);
+    expect(envelope({ type: "configure", settings: { maximumVelocity: 90 } })).toBe(true);
+    const note = { id: 0, channel: 1, note: 60, velocity: 100, start: 0.5, duration: 0.25 };
+    expect(envelope({ type: "set-take-notes", takeId: "take-1", version: 3, notes: [note] })).toBe(true);
+    for (const bad of [{ velocity: 0 }, { velocity: 128 }, { start: 1 }, { duration: 0 }, { duration: 1.5 }, { note: 128 }, { extra: true }]) {
+      expect(envelope({ type: "set-take-notes", takeId: "take-1", version: 3, notes: [{ ...note, ...bad }] })).toBe(false);
+    }
+  });
+
   it("accepts compact high-rate snapshot updates", () => {
     const message = serverMessageSchema.parse({
       type: "snapshot-update",

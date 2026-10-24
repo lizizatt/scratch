@@ -75,9 +75,9 @@ until the P0 readiness slice passes with fake devices.
 
 ## Deferred beyond v1
 
-- Piano-roll editing: note grid, drag/move/resize gestures, and selected-note
-  quantization. Keep edits host-owned and preserve raw timing; current waveform
-  lanes are summaries, not a note editor.
+- Piano-roll extras beyond the shipped take editor (docs/LOOP_EDITING.md): adding
+  notes, marquee selection, auditioning notes while dragging, and editing
+  controller (pedal/bend) events.
 - Hardware Panic mapping.
 - WS2812B lighting.
 - Battery telemetry board replacement.

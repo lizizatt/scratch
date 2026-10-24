@@ -1,6 +1,10 @@
-export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMeasure, loopStart, showLoopStart = false, live = false, progress, emptyLabel, label }: { samples: number[]; incomingSamples?: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; showLoopStart?: boolean; live?: boolean; progress?: number; emptyLabel?: string; label?: string }) {
+export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMeasure, loopStart, showLoopStart = false, live = false, progress, emptyLabel, label, onOpen, openLabel }: { samples: number[]; incomingSamples?: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; showLoopStart?: boolean; live?: boolean; progress?: number; emptyLabel?: string; label?: string; onOpen?: () => void; openLabel?: string }) {
+  const openable = onOpen ? {
+    role: "button", tabIndex: 0, "aria-label": openLabel ?? "Edit take", onClick: onOpen,
+    onKeyDown: (event: React.KeyboardEvent) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } },
+  } : {};
   return (
-    <div className={`waveform ${live ? "live" : ""}`}>
+    <div className={`waveform ${live ? "live" : ""} ${onOpen ? "openable" : ""}`} {...openable}>
       <div className="beat-grid" aria-hidden="true">
         {Array.from({ length: Math.max(0, beatCount - 1) }, (_, index) => <i key={index} className={(index + 1) % beatsPerMeasure === 0 ? "measure" : ""} style={{ left: `${(index + 1) / beatCount * 100}%` }} />)}
       </div>

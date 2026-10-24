@@ -107,7 +107,7 @@ test("stable overdub, marker and velocity floor survive browser reload and sessi
   const floor = page.getByLabel("Minimum impact velocity");
   await reachable(floor);
   await expect(floor).toHaveValue("1");
-  await floor.selectOption("72");
+  await floor.fill("72");
   await page.getByLabel("Metronome", { exact: true }).check();
   await page.getByLabel("Key response", { exact: true }).selectOption("responsive");
   await expect(floor).toHaveValue("72");

@@ -22,12 +22,15 @@ import { assignedPadAction, LOOP_SESSION_MAX_BYTES, parseLoopSession } from "@al
 import { useControlSocket, type ConnectionState } from "./use-control-socket";
 import { Waveform } from "./loop-interaction";
 import { LoopExportDialog } from "./loop-export-dialog";
+import { TakeEditor } from "./take-editor";
 
 type Pane = "settings" | "synth" | "pads" | "loops";
 
 export function App() {
   const { snapshot, readiness, connection, lastError, lastMessage, loopExport, send } = useControlSocket();
   const [pane, setPane] = useState<Pane>("loops");
+  const [editingTakeId, setEditingTakeId] = useState<string | null>(null);
+  const goTo = (next: Pane): void => { setEditingTakeId(null); setPane(next); };
   const [sampleExport, setSampleExport] = useState<SampleExportState>({
     pending: false,
     feedback: null,
@@ -54,13 +57,14 @@ export function App() {
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
       {pane === "pads" && <PadsPane snapshot={snapshot} send={send} connection={connection} />}
-      {pane === "loops" && <LoopPane snapshot={snapshot} send={send} sampleExport={sampleExport} triggerSampleExport={() => setExportTarget("sample")} triggerPromotedExport={() => setExportTarget("promoted")} />}
+      {pane === "loops" && editingTakeId === null && <LoopPane snapshot={snapshot} send={send} sampleExport={sampleExport} triggerSampleExport={() => setExportTarget("sample")} triggerPromotedExport={() => setExportTarget("promoted")} editTake={setEditingTakeId} />}
+      {pane === "loops" && editingTakeId !== null && <TakeEditor key={editingTakeId} snapshot={snapshot} send={send} takeId={editingTakeId} onBack={() => setEditingTakeId(null)} />}
       {exportTarget && <LoopExportDialog target={exportTarget} snapshot={snapshot} status={loopExport} send={send} onClose={() => setExportTarget(null)} onSaved={(message) => setSampleExport({ pending: false, feedback: { kind: message.includes("Warning:") ? "warning" : "success", message } })} />}
       <nav className="app-nav" aria-label="Application sections">
-        <NavButton active={pane === "settings"} label="Options" onClick={() => setPane("settings")}><Settings /></NavButton>
-        <NavButton active={pane === "synth"} label="Synth" onClick={() => setPane("synth")}><Music2 /></NavButton>
-        <NavButton active={pane === "pads"} label="Pads" onClick={() => setPane("pads")}><Drum /></NavButton>
-        <NavButton active={pane === "loops"} label="Loops" onClick={() => setPane("loops")}><Repeat2 /></NavButton>
+        <NavButton active={pane === "settings"} label="Options" onClick={() => goTo("settings")}><Settings /></NavButton>
+        <NavButton active={pane === "synth"} label="Synth" onClick={() => goTo("synth")}><Music2 /></NavButton>
+        <NavButton active={pane === "pads"} label="Pads" onClick={() => goTo("pads")}><Drum /></NavButton>
+        <NavButton active={pane === "loops"} label="Loops" onClick={() => goTo("loops")}><Repeat2 /></NavButton>
       </nav>
     </main>
   );
@@ -118,6 +122,10 @@ function SettingsPane({ snapshot, send }: PaneProps) {
     setDraft((current) => ({ ...current, [field]: value }));
     send({ type: "configure", settings: { [field]: value } });
   };
+  // The host moves the opposite end along when one slider passes the other.
+  const setImpact = (field: "minimumVelocity" | "maximumVelocity") => (event: ChangeEvent<HTMLInputElement>) => {
+    send({ type: "configure", settings: { [field]: Number(event.target.value) } });
+  };
 
   return (
     <section className="pane settings-pane" aria-label="Options">
@@ -128,7 +136,8 @@ function SettingsPane({ snapshot, send }: PaneProps) {
         <Setting label="Input device"><select aria-label="Input device" value={draft.midiInputId} onChange={updateSelection("midiInputId")}><option value={draft.midiInputId}>{draft.midiInputId.startsWith("alsa") ? "Vortex Wireless 2" : "Software Vortex"}</option></select></Setting>
         <Setting label="Output device"><select aria-label="Output device" value={draft.audioOutputId} onChange={updateSelection("audioOutputId")}><option value={draft.audioOutputId}>{draft.audioOutputId.startsWith("alsa:") ? "CM108 USB audio" : "Simulated output"}</option></select></Setting>
         <Setting label="Key response"><select aria-label="Key response" value={draft.velocityCurve} onChange={updateSelection("velocityCurve")}><option value="linear">Linear</option><option value="responsive">Responsive</option><option value="strong">Strong</option><option value="fixed">Fixed 127</option></select></Setting>
-        <Setting label="Minimum impact velocity"><select aria-label="Minimum impact velocity" value={snapshot.settings.minimumVelocity} onChange={(event) => send({ type: "configure", settings: { minimumVelocity: Number(event.target.value) } })}>{Array.from({ length: 127 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}{index === 0 ? " (unchanged)" : ""}</option>)}</select></Setting>
+        <Setting label="Minimum impact velocity"><span className="slider-value"><input aria-label="Minimum impact velocity" type="range" min="1" max="127" step="1" value={snapshot.settings.minimumVelocity} onChange={setImpact("minimumVelocity")} /><output>{snapshot.settings.minimumVelocity}</output></span></Setting>
+        <Setting label="Maximum impact velocity"><span className="slider-value"><input aria-label="Maximum impact velocity" type="range" min="1" max="127" step="1" value={snapshot.settings.maximumVelocity} onChange={setImpact("maximumVelocity")} /><output>{snapshot.settings.maximumVelocity}</output></span></Setting>
         <Setting label="Metronome"><input aria-label="Metronome" type="checkbox" checked={draft.metronomeEnabled} onChange={updateBoolean("metronomeEnabled")} /></Setting>
         <Setting label="Click volume"><input aria-label="Click volume" type="range" min="0" max="100" value={numberDraft.metronomeVolume} onChange={setNumber("metronomeVolume")} onBlur={commitNumber("metronomeVolume", 0.01)} /></Setting>
         <Setting label="Count-in"><input aria-label="Count-in" type="checkbox" checked={draft.countInEnabled} onChange={updateBoolean("countInEnabled")} /></Setting>
@@ -444,10 +453,11 @@ function PadEditor({ snapshot, send, pad, close }: PaneProps & { pad: number; cl
   </dialog>;
 }
 
-function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPromotedExport }: PaneProps & {
+function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPromotedExport, editTake }: PaneProps & {
   sampleExport: SampleExportState;
   triggerSampleExport: () => void;
   triggerPromotedExport: () => void;
+  editTake: (takeId: string) => void;
 }) {
   const isPlaying = snapshot.transport.state !== "stopped";
   const captureProgress = isPlaying ? (snapshot.transport.origin + snapshot.transport.progress) % 1 : snapshot.capture.loopStart;
@@ -459,6 +469,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
     || snapshot.promoted.some((take) => !take.muted && take.level > 0)
   );
   const hasAudibleDrumPattern = snapshot.drums.enabled && snapshot.drums.volume > 0;
+  const openTake = (take: Take | null, openLabel: string): { onOpen?: () => void; openLabel?: string } => take ? { onOpen: () => editTake(take.id), openLabel } : {};
   const sampleExportDisabledReason = cycleSeconds > 30
     ? "Loop cycle must be 30 seconds or shorter."
     : !hasAudibleLoopLayer && !hasAudibleDrumPattern
@@ -500,7 +511,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
         <section className={snapshot.capture.overdub ? "current-capture overdub-capture" : "staged-capture"}>
           <div className="staging-lane">
             <span className="lane-label">{snapshot.capture.overdub ? "Current capture // overdub" : "Staged"} // {snapshot.capture.quantization === "off" ? "raw timing" : `quantized ${snapshot.capture.quantization}`}</span>
-            <Waveform samples={snapshot.capture.staged?.waveform ?? []} {...snapshot.capture.overdub ? { incomingSamples: snapshot.capture.currentWaveform, progress: captureProgress } : {}} {...voiceLabelProps(snapshot, snapshot.capture.staged)} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="Waiting for rollover" />
+            <Waveform samples={snapshot.capture.staged?.waveform ?? []} {...snapshot.capture.overdub ? { incomingSamples: snapshot.capture.currentWaveform, progress: captureProgress } : {}} {...voiceLabelProps(snapshot, snapshot.capture.staged)} {...openTake(snapshot.capture.staged, "Edit staged take")} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="Waiting for rollover" />
           </div>
           <div className="take-actions">
             <select className="quantization-select" aria-label="Staged quantization" value={snapshot.capture.quantization} onChange={(event) => send({ type: "set-quantization", mode: event.target.value as EngineSnapshot["capture"]["quantization"] })}>
@@ -518,7 +529,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
         {!snapshot.capture.overdub && <section className="previous-staged-capture">
           <div className="staging-lane">
             <span className="lane-label">Previous staged // {snapshot.capture.overdub ? "held during overdub" : "expires at rollover"}</span>
-            <Waveform samples={snapshot.capture.previousStaged?.waveform ?? []} {...voiceLabelProps(snapshot, snapshot.capture.previousStaged)} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="No displaced take" />
+            <Waveform samples={snapshot.capture.previousStaged?.waveform ?? []} {...voiceLabelProps(snapshot, snapshot.capture.previousStaged)} {...openTake(snapshot.capture.previousStaged, "Edit previous staged take")} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} emptyLabel="No displaced take" />
           </div>
           <div className="take-actions">
             <IconButton label="Promote previous staged take" disabled={!snapshot.capture.previousStaged} onClick={() => send({ type: "promote-previous-staged" })}><Plus /></IconButton>
@@ -527,7 +538,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
         <div className="divider" />
         <section className="promoted-list" aria-label="Promoted takes">
           {snapshot.promoted.length === 0 && <div className="empty-list">PROMOTED TAKES APPEAR HERE</div>}
-          {snapshot.promoted.map((take, index) => <TakeRow key={take.id} take={take} index={index} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} send={send} {...voiceLabelProps(snapshot, take)} />)}
+          {snapshot.promoted.map((take, index) => <TakeRow key={take.id} take={take} index={index} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} send={send} edit={() => editTake(take.id)} {...voiceLabelProps(snapshot, take)} />)}
         </section>
       </div>
       {snapshot.canUndoDelete && <button className="undo-button" type="button" onClick={() => send({ type: "undo-delete" })}><RotateCcw /> Undo delete</button>}
@@ -621,11 +632,11 @@ function voiceLabelProps(snapshot: EngineSnapshot, take: Take | null): { label?:
   return { label: voice.soundFontId === snapshot.synth.selectedSoundFontId ? voice.name : "Current voice" };
 }
 
-function TakeRow({ take, index, beatCount, beatsPerMeasure, loopStart, send, label }: { take: Take; index: number; beatCount: number; beatsPerMeasure: number; loopStart: number; send: SendCommand; label?: string }) {
+function TakeRow({ take, index, beatCount, beatsPerMeasure, loopStart, send, label, edit }: { take: Take; index: number; beatCount: number; beatsPerMeasure: number; loopStart: number; send: SendCommand; label?: string; edit: () => void }) {
   return (
     <article className="take-row">
       <span className="take-number">{String(index + 1).padStart(2, "0")}</span>
-      <Waveform samples={take.waveform} beatCount={beatCount} beatsPerMeasure={beatsPerMeasure} loopStart={loopStart} {...label ? { label } : {}} />
+      <Waveform samples={take.waveform} beatCount={beatCount} beatsPerMeasure={beatsPerMeasure} loopStart={loopStart} {...label ? { label } : {}} onOpen={edit} openLabel={`Edit take ${index + 1}`} />
       <label className="level-control">LEVEL<input aria-label={`Level take ${index + 1}`} type="range" min="0" max="100" value={take.level * 100} onChange={(event) => send({ type: "set-take-level", takeId: take.id, level: Number(event.target.value) / 100 })} /></label>
       <IconButton label={take.muted ? `Unmute take ${index + 1}` : `Mute take ${index + 1}`} active={!take.muted} pressed={!take.muted} onClick={() => send({ type: "set-take-muted", takeId: take.id, muted: !take.muted })}>{take.muted ? <VolumeX /> : <Volume2 />}</IconButton>
       <IconButton label={`Delete take ${index + 1}`} danger onClick={() => send({ type: "delete-take", takeId: take.id })}><Trash2 /></IconButton>
