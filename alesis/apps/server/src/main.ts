@@ -3,6 +3,7 @@ import { discoverCm108AudioDevice, discoverSoundFontPresets, discoverSoundFonts,
 import { AlsaSequencerMidiSource, discoverVortexSequencerPort, SoftwareVortex, type AlsaSequencerPort, type MidiInputEvent, type MidiSource } from "@alesis/midi";
 import type { DrumKit, EngineCommand, EngineSnapshot, Readiness, SoundFontPreset } from "@alesis/protocol";
 import { existsSync } from "node:fs";
+import { copyFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,7 @@ import { MidiLoopScheduler } from "./loop-playback.js";
 import { executeLoopCommand } from "./loop-commands.js";
 import { executeTakeNotesCommand } from "./take-editing.js";
 import { exportLoopSession, importLoopSession, prepareSessionAudio, type LoopSessionHost } from "./loop-session.js";
+import { Autosaver, defaultAutosavePath, readAutosave } from "./autosave.js";
 import { MetronomeScheduler } from "./metronome.js";
 import { applyVelocityCurve, PerformanceRouter } from "./performance-router.js";
 import { DeviceHotplugCoordinator } from "./hotplug.js";
@@ -112,6 +114,7 @@ const loops = new MidiLoopScheduler(currentAudio, {
   captureError: (message) => engine.setCaptureError(message),
 });
 let importingSession = false;
+let hotplugBusy = false;
 let loopExports: LoopExports | undefined;
 const sampleRoot = process.env.SAMPLE_LIBRARY_DIR ?? join(homedir(), ".local/share/alesis/samples");
 const sampleLibrary = new SampleLibrary(sampleRoot);
@@ -544,6 +547,39 @@ if (cachedSettings) {
     console.error(`Unable to restore saved settings: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+// Loops recorded before a power cut come back, stopped, exactly as they were last saved.
+const autosavePath = defaultAutosavePath();
+try {
+  const autosaved = await readAutosave(autosavePath);
+  if (autosaved) {
+    try {
+      const result = await executeCommand({ type: "import-loop-session", sessionJson: autosaved });
+      if (!result.accepted) throw new Error(result.error ?? "rejected");
+      console.log("Restored autosaved loops");
+    } catch (error) {
+      // Keep the file for manual recovery; the first save of an empty session would otherwise remove it.
+      await copyFile(autosavePath, `${autosavePath}.rejected`).catch(() => {});
+      console.error(`Unable to restore autosaved loops (kept as ${autosavePath}.rejected): ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+} catch (error) {
+  console.error(`Unable to read autosaved loops: ${error instanceof Error ? error.message : String(error)}`);
+}
+const autosaver = new Autosaver({
+  path: autosavePath,
+  capture() {
+    const snapshot = engine.snapshot();
+    if (!snapshot.capture.staged && !snapshot.capture.previousStaged && snapshot.promoted.length === 0) return null;
+    return exportLoopSession(loopSessionHost, { whileRunning: true }).sessionJson!;
+  },
+  busy: () => importingSession || hotplugBusy,
+  playing: () => engine.runtimeSnapshot().transport.state !== "stopped",
+  onError: (message) => console.error(message),
+});
+const autosaveCommandTypes = new Set<EngineCommand["type"]>([
+  "stop", "promote-staged", "promote-previous-staged", "delete-staged", "delete-take", "undo-delete",
+  "set-take-level", "set-take-muted", "set-take-notes", "set-staged-audible", "set-overdub", "set-loop-start", "set-monitor-only",
+]);
 const persistentCommandTypes = new Set<EngineCommand["type"]>([
   "import-loop-session",
   "configure",
@@ -569,6 +605,7 @@ const persistSettings = (): Promise<void> => {
 };
 const executeAndPersist = async (command: EngineCommand, source?: string) => {
   const result = await executeCommand(command, source);
+  if (result.accepted && (autosaveCommandTypes.has(command.type) || persistentCommandTypes.has(command.type))) autosaver.request();
   if (result.accepted && persistentCommandTypes.has(command.type)) {
     try { await persistSettings(); }
     catch { return { ...result, accepted: false, error: "Applied in memory, but settings could not be saved. Check host storage and retry." }; }
@@ -696,7 +733,6 @@ const hotplug = new DeviceHotplugCoordinator({ audio: audioStarted, midi: midiCo
     await engine.execute({ type: "configure", settings: {} });
   },
 });
-let hotplugBusy = false;
 const hotplugTimer = simulatedAudioMode && softwareMidiMode ? undefined : setInterval(() => {
   if (hotplugBusy || importingSession) return;
   hotplugBusy = true;
@@ -746,6 +782,7 @@ async function shutdown(): Promise<void> {
   if (midiDemoStart) clearTimeout(midiDemoStart);
   if (midiDemo) clearInterval(midiDemo);
   panic();
+  await autosaver.dispose();
   await persistSettings().catch((error) => console.error(`Unable to save settings during shutdown: ${String(error)}`));
   disconnectMidi();
   await midi?.close();

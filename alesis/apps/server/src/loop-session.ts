@@ -18,9 +18,9 @@ export interface LoopSessionHost {
   prepareAudio(session: LoopSession): Promise<PreparedSessionAudio>;
 }
 
-export function exportLoopSession(host: LoopSessionHost): EngineResult {
+export function exportLoopSession(host: LoopSessionHost, options: { whileRunning?: boolean } = {}): EngineResult {
   const snapshot = host.engine.snapshot();
-  requireStopped(snapshot);
+  if (!options.whileRunning) requireStopped(snapshot);
   if (!snapshot.capture.staged && !snapshot.capture.previousStaged && snapshot.promoted.length === 0) {
     throw new Error("No completed takes to save");
   }

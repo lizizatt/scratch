@@ -104,11 +104,16 @@ export async function loadSettingsCache(path: string): Promise<SettingsCache | n
 }
 
 export async function saveSettingsCache(path: string, cache: SettingsCache): Promise<void> {
+  await writeFileAtomically(path, `${JSON.stringify(cache, null, 2)}\n`);
+}
+
+/** Write, fsync, rename and fsync the directory, so a power cut leaves the old or the new file whole. */
+export async function writeFileAtomically(path: string, contents: string): Promise<void> {
   const directory = dirname(path);
   const temporaryPath = join(directory, `.${basename(path)}.${process.pid}.tmp`);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   try {
-    await writeFile(temporaryPath, `${JSON.stringify(cache, null, 2)}\n`, { mode: 0o600 });
+    await writeFile(temporaryPath, contents, { mode: 0o600 });
     const temporaryFile = await open(temporaryPath, "r");
     await temporaryFile.sync();
     await temporaryFile.close();

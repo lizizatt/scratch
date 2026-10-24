@@ -8,8 +8,27 @@ cannot be undone. Transport stays stopped. Both operations are rejected by the
 host if another client starts playback first.
 
 MP3 exports and sample-pad MP3s are rendered audio, **not editable backups**.
-They cannot restore recorded MIDI. Save a loop-session file before restarting the
-host; recordings are otherwise held only in memory. There is no autosave.
+They cannot restore recorded MIDI. The host also keeps an automatic copy (below), but
+a saved session file is still the way to keep takes across a reinstall or move them
+between devices.
+
+## Autosave
+
+The host writes the current session to `~/.local/share/alesis/autosave-loop-session-v1.json`
+(`ALESIS_AUTOSAVE_PATH` overrides it) so recorded takes survive a power cut. It
+uses the same format as a saved session file, including the staged and previous
+takes and the musical settings.
+
+- Saved about 2 seconds after any command that changes takes or settings, on Stop,
+  and every 30 seconds while playing, because the staged take changes every pass.
+  Unchanged content is not rewritten. Writes are fsynced and renamed into place, so
+  a power cut leaves the previous or the new file whole, never a partial one.
+- Restored at boot after the saved settings, with transport stopped. The partial
+  capture in progress at the cut is lost (as with Stop), so at most the last
+  30 seconds of a long play session are missing.
+- With no completed takes the file is removed. If a boot restore fails (for example
+  the SoundFont was removed) the file is kept as `autosave-loop-session-v1.json.rejected`
+  and the error is logged.
 
 ## Included
 
