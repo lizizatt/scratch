@@ -18,7 +18,7 @@ export interface LoopSessionHost {
   prepareAudio(session: LoopSession): Promise<PreparedSessionAudio>;
 }
 
-export function exportLoopSession(host: LoopSessionHost, options: { whileRunning?: boolean } = {}): EngineResult {
+export function exportLoopSession(host: LoopSessionHost, options: { whileRunning?: boolean; checkCapabilities?: boolean } = {}): EngineResult {
   const snapshot = host.engine.snapshot();
   if (!options.whileRunning) requireStopped(snapshot);
   if (!snapshot.capture.staged && !snapshot.capture.previousStaged && snapshot.promoted.length === 0) {
@@ -49,7 +49,8 @@ export function exportLoopSession(host: LoopSessionHost, options: { whileRunning
   };
   const sessionJson = JSON.stringify(session);
   parseLoopSession(sessionJson);
-  validateCapabilities(session, snapshot, host);
+  // Inspecting a SoundFont's presets reads the whole file, far too slow for a periodic autosave.
+  if (options.checkCapabilities !== false) validateCapabilities(session, snapshot, host);
   return { accepted: true, revision: snapshot.revision, appliedCycle: snapshot.transport.cycle, sessionJson, message: "Loop session ready to download." };
 }
 
@@ -60,7 +61,10 @@ export async function importLoopSession(json: string, host: LoopSessionHost): Pr
   if (session.staged) {
     const totalBeats = session.settings.beatsPerMeasure * session.settings.loopMeasures;
     const rendered = quantizeRecording(session.staged.rawRecording, session.quantization, totalBeats);
-    if (JSON.stringify(rendered) !== JSON.stringify(session.staged.recording)
+    const saved = JSON.stringify(session.staged.recording);
+    // Sessions saved before notes kept their played length snapped every release to the grid too.
+    if (JSON.stringify(rendered) !== saved
+      && JSON.stringify(quantizeRecording(session.staged.rawRecording, session.quantization, totalBeats, "grid")) !== saved
       && !matchesLegacyQuantization(session.staged.recording, session.staged.rawRecording, session.quantization, totalBeats)) {
       throw new Error("Staged MIDI does not match its raw recording and quantization");
     }

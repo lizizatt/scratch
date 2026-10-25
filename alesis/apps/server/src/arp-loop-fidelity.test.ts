@@ -542,7 +542,7 @@ describe("live arpeggio -> capture -> loop audio delivery", () => {
     ]);
   });
 
-  it("keeps a late arpeggio's quantized release at the closing boundary, after its attack", async () => {
+  it("keeps a late arpeggio's gate length when its attack is quantized", async () => {
     const h = await host({ rate: "1/4", gate: 0.75 });
     await h.command({ type: "set-quantization", mode: "1/4" });
     await h.command({ type: "play" });
@@ -555,12 +555,12 @@ describe("live arpeggio -> capture -> loop audio delivery", () => {
     const take = h.engine.snapshot().capture.staged!;
     expect(h.loops.exportRecordings([take.id]).get(take.id)).toEqual([
       { position: 0.75, event: { type: "note-on", channel: 0, note: 60, velocity: 103 } },
-      { position: 1, event: { type: "note-off", channel: 0, note: 60 } },
+      { position: expect.closeTo(0.9375, 9), event: { type: "note-off", channel: 0, note: 60 } },
     ]);
     h.clock.until(4_001);
     expectFidelity(normalized(h.replay, 2_000), [
       { at: 1_500, event: { type: "note-on", channel: 0, note: 60, velocity: 82 } },
-      { at: 2_000, event: { type: "note-off", channel: 0, note: 60 } },
+      { at: 1_875, event: { type: "note-off", channel: 0, note: 60 } },
     ]);
   });
 
@@ -576,12 +576,12 @@ describe("live arpeggio -> capture -> loop audio delivery", () => {
     const take = h.engine.snapshot().capture.staged!;
     expect(h.loops.exportRecordings([take.id]).get(take.id)).toEqual([
       { position: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 103 } },
-      { position: 0.25, event: { type: "note-off", channel: 0, note: 60 } },
+      { position: expect.closeTo(0.0625, 9), event: { type: "note-off", channel: 0, note: 60 } },
     ]);
     h.clock.until(2_600);
     expectFidelity(normalized(h.replay, 2_000), [
       { at: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 82 } },
-      { at: 500, event: { type: "note-off", channel: 0, note: 60 } },
+      { at: 125, event: { type: "note-off", channel: 0, note: 60 } },
     ]);
   });
 

@@ -570,7 +570,7 @@ const autosaver = new Autosaver({
   capture() {
     const snapshot = engine.snapshot();
     if (!snapshot.capture.staged && !snapshot.capture.previousStaged && snapshot.promoted.length === 0) return null;
-    return exportLoopSession(loopSessionHost, { whileRunning: true }).sessionJson!;
+    return exportLoopSession(loopSessionHost, { whileRunning: true, checkCapabilities: false }).sessionJson!;
   },
   busy: () => importingSession || hotplugBusy,
   playing: () => engine.runtimeSnapshot().transport.state !== "stopped",

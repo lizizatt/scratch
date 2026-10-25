@@ -61,28 +61,48 @@ describe("MidiLoopScheduler", () => {
     ]);
   });
 
-  it("preserves a short note for at least one quantization step", () => {
+  it("keeps a short note's played length instead of stretching it to a grid step", () => {
     const result = quantizeRecording([
       { position: 0.13, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
       { position: 0.14, event: { type: "note-off", channel: 0, note: 60 } },
     ], "1/16", 4);
 
-    expect(result).toEqual([
-      { position: 0.125, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
-      { position: 0.1875, event: { type: "note-off", channel: 0, note: 60 } },
-    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toEqual({ position: 0.125, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } });
+    expect(result[1]!.position).toBeCloseTo(0.135, 9);
+    expect(result[1]!.event).toEqual({ type: "note-off", channel: 0, note: 60 });
   });
 
-  it("preserves an audible release when a one-beat loop has only one grid bin", () => {
+  it("stretches a note to a grid step only in the legacy grid-length mode", () => {
+    const result = quantizeRecording([
+      { position: 0.13, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
+      { position: 0.14, event: { type: "note-off", channel: 0, note: 60 } },
+    ], "1/16", 4, "grid");
+
+    expect(result.map(({ position }) => position)).toEqual([0.125, 0.1875]);
+  });
+
+  it("keeps a 50% arpeggio gate when the grid matches the arpeggio rate", () => {
+    const step = 1 / 32;
+    const raw = [0, 1, 2].flatMap((index) => [
+      { position: index * step + 0.0004, event: { type: "note-on" as const, channel: 1, note: 60 + index, velocity: 80 } },
+      { position: index * step + 0.0004 + step / 2, event: { type: "note-off" as const, channel: 1, note: 60 + index } },
+    ]);
+    const result = quantizeRecording(raw, "1/16", 8);
+
+    result.forEach(({ position, event }, index) => {
+      expect(position / step).toBeCloseTo(Math.floor(index / 2) + (event.type === "note-off" ? 0.5 : 0), 9);
+    });
+  });
+
+  it("keeps a long note's length when a one-beat loop has only one grid bin", () => {
     const result = quantizeRecording([
       { position: 0.1, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
       { position: 0.9, event: { type: "note-off", channel: 0, note: 60 } },
     ], "1/4", 1);
 
-    expect(result).toEqual([
-      { position: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
-      { position: 0.5, event: { type: "note-off", channel: 0, note: 60 } },
-    ]);
+    expect(result[0]).toEqual({ position: 0, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } });
+    expect(result[1]!.position).toBeCloseTo(0.8, 9);
   });
 
   it("wraps events nearest the loop end onto the first circular bin", () => {
@@ -251,7 +271,7 @@ describe("MidiLoopScheduler", () => {
 
     expect(captured.get(stagedId)).toEqual([
       { position: 0.25, event: { type: "note-on", channel: 0, note: 60, velocity: 100 } },
-      { position: 0.5, event: { type: "note-off", channel: 0, note: 60 } },
+      { position: expect.closeTo(0.27, 9), event: { type: "note-off", channel: 0, note: 60 } },
     ]);
     expect(output.dispatchMidi).not.toHaveBeenCalled();
   });

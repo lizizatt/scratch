@@ -200,7 +200,8 @@ describe("confirmed adversarial loop regressions", () => {
     expect(attacks[0]!.event).toMatchObject({ velocity: 80 });
     expect(Math.abs(attacks[0]!.at - 2_500)).toBeLessThanOrEqual(1);
     const firstRelease = h.replay.find(({ at, event }) => at > attacks[0]!.at && event.type === "note-off")!;
-    expect(Math.abs(firstRelease.at - 3_500)).toBeLessThanOrEqual(1);
+    // The surviving attack was played for 900 ms; the discarded one's 20 ms gate is not used.
+    expect(Math.abs(firstRelease.at - 3_400)).toBeLessThanOrEqual(1);
   });
 
   it("loads a valid v1 staged take produced by the previous quantizer", async () => {
@@ -421,14 +422,16 @@ describe("confirmed adversarial loop regressions", () => {
 
   it.each([false, true])("retains the winning pair across the terminal seam (velocity-zero release=%s)", (zeroRelease) => {
     const release: MidiEvent = zeroRelease ? { type: "note-on", channel: 2, note: 60, velocity: 0 } : { type: "note-off", channel: 2, note: 60 };
-    expect(quantizeRecording([
+    const quantized = quantizeRecording([
       { position: 0.01, event: { type: "note-on", channel: 2, note: 60, velocity: 70 } },
       { position: 0.6, event: release },
       { position: 0.95, event: { type: "note-on", channel: 2, note: 60, velocity: 100 } },
       { position: 1, event: release },
-    ], "1/4", 4)).toEqual([
-      { position: 0, event: { type: "note-on", channel: 2, note: 60, velocity: 100 } },
-      { position: 0.25, event: release },
-    ]);
+    ], "1/4", 4);
+    expect(quantized).toHaveLength(2);
+    expect(quantized[0]).toEqual({ position: 0, event: { type: "note-on", channel: 2, note: 60, velocity: 100 } });
+    // The winning attack moved across the seam, so its gate keeps its played 0.05 cycle length.
+    expect(quantized[1]!.position).toBeCloseTo(0.05, 9);
+    expect(quantized[1]!.event).toEqual(release);
   });
 });

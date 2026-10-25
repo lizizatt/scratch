@@ -109,7 +109,7 @@ floating bottom-left navigation, and no document-level page scrolling.
 
 - With overdub off, rollover replaces staging with the completed cycle.
 - Quantization choices are Off, 1/4, 1/8, 1/16, and 1/32.
-- Quantization snaps current staged MIDI to the nearest circular grid, deduplicates equivalent events per bin, and preserves a minimum note duration.
+- Quantization snaps each staged attack to the nearest circular grid point and deduplicates equivalent events per bin. A note keeps the length it was played with, so an arpeggio's gate is the same on playback as live (a 1/16 grid on a 1/16 arpeggio no longer turns 50% gates into back-to-back notes). A gate held to the loop end stays held to it. Sessions saved before this snapped releases to the grid too and still load unchanged.
 - Changing quantization reprocesses current staging from raw timestamps.
 - Staging can be auditioned, muted, or promoted.
 - Clicking the staged waveform opens the take editor (see Promoted).

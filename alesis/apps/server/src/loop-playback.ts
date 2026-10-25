@@ -574,13 +574,17 @@ export function remapMidiEvent(event: MidiEvent, channel: number, level: number)
   return { ...event, channel: outputChannel };
 }
 
-export function quantizeRecording(recording: RecordedMidiEvent[], mode: QuantizationMode, totalBeats: number): RecordedMidiEvent[] {
+/**
+ * Snaps attacks to the grid. By default each note keeps the length it was played with, so an arpeggio's
+ * gate survives; "grid" snaps releases too (older sessions were saved that way) and is for validation only.
+ */
+export function quantizeRecording(recording: RecordedMidiEvent[], mode: QuantizationMode, totalBeats: number, lengths: "preserve" | "grid" = "preserve"): RecordedMidiEvent[] {
   if (mode === "off") return structuredClone(recording);
   const gridSize = totalBeats * subdivisionsPerBeat[mode];
   type QuantizedEvent = RecordedMidiEvent & { order: number; attack?: number };
   const candidates: QuantizedEvent[] = [];
   const survivingAttacks = new Map<string, number>();
-  const activeNoteBins = new Map<string, { bin: number; order: number }>();
+  const activeNoteBins = new Map<string, { bin: number; exact: number; order: number }>();
   recording.forEach(({ position, event, continuation }, order) => {
     const terminalRelease = position === 1 && (event.type === "note-off" || event.type === "note-on" && event.velocity === 0);
     const absoluteBin = Math.round(position * gridSize);
@@ -588,7 +592,7 @@ export function quantizeRecording(recording: RecordedMidiEvent[], mode: Quantiza
     let attack: number | undefined;
     if (event.type === "note-on" && event.velocity > 0) {
       attack = order;
-      activeNoteBins.set(`${event.channel}:${event.note}`, { bin: absoluteBin, order });
+      activeNoteBins.set(`${event.channel}:${event.note}`, { bin: absoluteBin, exact: position * gridSize, order });
       survivingAttacks.set(`${bin}:${eventIdentity(event)}`, order);
     }
     if (event.type === "note-off" || event.type === "note-on" && event.velocity === 0) {
@@ -596,12 +600,19 @@ export function quantizeRecording(recording: RecordedMidiEvent[], mode: Quantiza
       const onset = activeNoteBins.get(key);
       if (onset !== undefined) {
         attack = onset.order;
-        // Wrap the pair together: an end release stays at 1 unless its attack
-        // also crossed the seam. Keep ownership until losing pairs are removed.
-        bin = absoluteBin - (onset.bin >= gridSize ? gridSize : 0);
-        const attackBin = onset.bin % gridSize;
-        if (bin === attackBin || gridSize === 1 && !terminalRelease) {
-          bin = attackBin < gridSize - 1 ? attackBin + 1 : attackBin + 0.5;
+        const wrapped = onset.bin >= gridSize ? gridSize : 0;
+        if (lengths === "preserve") {
+          // A gate held to the loop end stays held to it unless its attack moved across the seam.
+          bin = terminalRelease && !wrapped ? gridSize
+            : Math.min(gridSize, onset.bin - wrapped + Math.max(1e-3, position * gridSize - onset.exact));
+        } else {
+          // Wrap the pair together: an end release stays at 1 unless its attack
+          // also crossed the seam. Keep ownership until losing pairs are removed.
+          bin = absoluteBin - wrapped;
+          const attackBin = onset.bin % gridSize;
+          if (bin === attackBin || gridSize === 1 && !terminalRelease) {
+            bin = attackBin < gridSize - 1 ? attackBin + 1 : attackBin + 0.5;
+          }
         }
       }
       activeNoteBins.delete(key);

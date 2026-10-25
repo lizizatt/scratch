@@ -62,7 +62,16 @@ function withoutIds(session: LoopSession) {
 }
 
 describe("editable loop sessions", () => {
-  it.each(["legacy", "modern"] as const)("preserves exact %s staged timing on import, export and playback until quantization changes", async (representation) => {
+  it("skips the SoundFont inspection when asked, since autosave runs while the host is playing", async () => {
+    const { host } = await fixture();
+    const inspect = vi.spyOn(host, "inspectPresets");
+    exportLoopSession(host, { whileRunning: true, checkCapabilities: false });
+    expect(inspect).not.toHaveBeenCalled();
+    exportLoopSession(host);
+    expect(inspect).toHaveBeenCalled();
+  });
+
+  it.each(["legacy", "grid-length", "modern"] as const)("preserves exact %s staged timing on import, export and playback until quantization changes", async (representation) => {
     const { host, engine, loops, dispatch } = await fixture();
     const session = parseLoopSession(exportLoopSession(host).sessionJson!);
     session.monitorOnly = false;
@@ -75,7 +84,7 @@ describe("editable loop sessions", () => {
     session.staged!.rawRecording = raw;
     session.staged!.recording = representation === "legacy"
       ? [{ position: 0, event: raw[1]!.event }, raw[0]!]
-      : quantizeRecording(raw, "1/4", 4);
+      : quantizeRecording(raw, "1/4", 4, representation === "grid-length" ? "grid" : "preserve");
     const saved = structuredClone(session.staged!.recording);
     await importLoopSession(JSON.stringify(session), host);
     expect(withoutIds(parseLoopSession(exportLoopSession(host).sessionJson!))).toEqual(withoutIds(session));
