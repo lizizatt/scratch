@@ -368,6 +368,10 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
     advanceTransportClock();
   }
   if (command.type === "get-take-notes" || command.type === "set-take-notes") return executeTakeNotesCommand(command, engine, loops, playback);
+  if (command.type === "audition-note") {
+    const sounded = loops.auditionNote(engine.runtimeSnapshot(), command);
+    return sounded ? currentResult() : { ...currentResult(), accepted: false, error: `Unknown take: ${command.takeId}` };
+  }
   if (command.type === "export-loop-session") return exportLoopSession(loopSessionHost);
   if (command.type === "import-loop-session") {
     if (hotplugBusy) throw new Error("Audio/MIDI reconnection is in progress; retry loading the session");
@@ -700,6 +704,7 @@ const panic = (): void => {
   controlServer?.invalidateSamplePadHolds();
   performanceRouter.panic();
   sustainPedals.reset();
+  loops.cancelAuditions();
   drumPadNotes.panic((event) => dispatchDrumPadEvent(event, false));
   samplePads.panic();
   }, audio);

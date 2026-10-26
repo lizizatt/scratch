@@ -262,3 +262,159 @@ test("a promoted take can be edited while the loop is playing", async ({ page, b
   await expect(page.getByRole("alert")).toHaveCount(0);
   expect((await control(baseURL!)).snapshot.transport.state).toBe("playing");
 });
+
+test("the stretch tool lengthens or shortens every selected note by dragging, and a plain tap changes nothing", async ({ page, baseURL }) => {
+  const takeId = await openPromotedTake(page, baseURL!);
+  await page.getByLabel("Snap to grid").selectOption("1/16");
+  const before = await notesOf(baseURL!, takeId);
+  const first = before[0]!;
+  const target = page.locator(`.roll-note[data-note="${first.note}"]`).first();
+  await page.getByRole("button", { name: "Stretch", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Stretch", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+  await target.click();
+  expect(await notesOf(baseURL!, takeId)).toEqual(before);
+
+  const { x, y } = await center(target);
+  const longer = first.start + first.duration < 0.5;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + (longer ? 70 : -70), y, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(async () => (await notesOf(baseURL!, takeId)).find(({ id }) => id === first.id)!.duration).not.toBe(first.duration);
+  const after = (await notesOf(baseURL!, takeId)).find(({ id }) => id === first.id)!;
+  if (longer) expect(after.duration).toBeGreaterThan(first.duration);
+  else expect(after.duration).toBeLessThan(first.duration);
+  expect(after.start).toBe(first.start);
+  expect(after.note).toBe(first.note);
+  expect((await notesOf(baseURL!, takeId)).filter(({ id }) => id !== first.id)).toEqual(before.filter(({ id }) => id !== first.id));
+});
+
+test("the velocity readout stays where the drag began while the velocity changes", async ({ page, baseURL }) => {
+  await openPromotedTake(page, baseURL!);
+  await page.getByRole("button", { name: "Velocity", exact: true }).click();
+  const { x, y } = await center(page.locator(".roll-note").first());
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 2, y + 10, { steps: 2 });
+  const tooltip = page.locator(".velocity-tooltip");
+  await expect(tooltip).toBeVisible();
+  const first = (await tooltip.boundingBox())!;
+  const firstText = await tooltip.textContent();
+  await page.mouse.move(x + 30, y + 60, { steps: 6 });
+  await expect(tooltip).not.toHaveText(firstText!);
+  const second = (await tooltip.boundingBox())!;
+  expect(second.x).toBeCloseTo(first.x, 0);
+  expect(second.y).toBeCloseTo(first.y, 0);
+  await page.mouse.up();
+});
+
+test("moving a note to another pitch auditions it on the host without recording anything", async ({ page, baseURL }) => {
+  const sent: string[] = [];
+  page.on("websocket", (socket) => socket.on("framesent", (frame) => { if (String(frame.payload).includes("audition-note")) sent.push(String(frame.payload)); }));
+  await page.reload();
+  await expect(page.getByText(/connected \/\/ rev/i)).toBeVisible();
+  const takeId = await openPromotedTake(page, baseURL!);
+  const before = await notesOf(baseURL!, takeId);
+  const first = before[0]!;
+  const target = page.locator(`.roll-note[data-note="${first.note}"]`).first();
+  const { x, y } = await center(target);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await expect.poll(() => sent.length).toBe(1);
+  expect(JSON.parse(sent[0]!).command).toMatchObject({ type: "audition-note", takeId, note: first.note, velocity: first.velocity });
+  await page.mouse.move(x, y - 16 * 3, { steps: 6 });
+  await expect.poll(() => sent.map((frame) => JSON.parse(frame).command.note)).toContain(first.note + 3);
+  await page.mouse.up();
+  await expect.poll(async () => (await notesOf(baseURL!, takeId)).some((entry) => entry.note === first.note + 3)).toBe(true);
+  const rows = (await notesOf(baseURL!, takeId)).length;
+  expect(rows).toBe(before.length);
+});
+
+test("zoom buttons and Ctrl+wheel scale the roll while the keys stay pinned and the view stays on the same spot", async ({ page, baseURL }) => {
+  await openPromotedTake(page, baseURL!);
+  const scroller = page.locator(".roll-scroll");
+  const zoomX = async () => Number(await scroller.getAttribute("data-zoom-x"));
+  const rowHeight = async () => Number(await scroller.getAttribute("data-row-height"));
+  expect(await zoomX()).toBe(1);
+  const width = async () => (await page.locator(".roll-grid").boundingBox())!.width;
+  const baseWidth = await width();
+
+  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
+  await expect.poll(zoomX).toBeGreaterThan(1);
+  await expect.poll(rowHeight).toBeGreaterThan(16);
+  expect(await width()).toBeGreaterThan(baseWidth * 1.4);
+  await page.getByRole("button", { name: "Zoom out", exact: true }).click();
+  await expect.poll(zoomX).toBe(1);
+  await expect.poll(rowHeight).toBe(16);
+
+  const box = (await scroller.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, -300);
+  await page.keyboard.up("Control");
+  await expect.poll(zoomX).toBeGreaterThan(2);
+  expect(await rowHeight()).toBe(16);
+  await scroller.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+  const keys = (await page.locator(".roll-keys").boundingBox())!;
+  expect(keys.x).toBeCloseTo(box.x + 1, 0);
+
+  await page.keyboard.down("Control");
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, -300);
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("Control");
+  await expect.poll(rowHeight).toBeGreaterThan(16);
+});
+
+test("a two-finger pinch zooms the time axis or the pitch rows and a one-finger drag pans the zoomed roll", async ({ page, baseURL }) => {
+  const takeId = await openPromotedTake(page, baseURL!);
+  const untouched = await notesOf(baseURL!, takeId);
+  const session = await page.context().newCDPSession(page);
+  await session.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  const scroller = page.locator(".roll-scroll");
+  const box = (await scroller.boundingBox())!;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", points: Array<{ x: number; y: number; id: number }>) =>
+    session.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : points });
+  const attr = async (name: string) => Number(await scroller.getAttribute(name));
+
+  // Horizontal pinch spreads the time axis only.
+  await touch("touchStart", [{ x: cx - 40, y: cy, id: 1 }, { x: cx + 40, y: cy, id: 2 }]);
+  for (let step = 1; step <= 8; step += 1) await touch("touchMove", [{ x: cx - 40 - step * 15, y: cy, id: 1 }, { x: cx + 40 + step * 15, y: cy, id: 2 }]);
+  await touch("touchEnd", []);
+  await expect.poll(() => attr("data-zoom-x")).toBeGreaterThan(2.5);
+  expect(await attr("data-row-height")).toBe(16);
+
+  // A vertical pinch spreads the pitch rows only.
+  const zoomed = await attr("data-zoom-x");
+  await touch("touchStart", [{ x: cx, y: cy - 30, id: 1 }, { x: cx, y: cy + 30, id: 2 }]);
+  for (let step = 1; step <= 6; step += 1) await touch("touchMove", [{ x: cx, y: cy - 30 - step * 12, id: 1 }, { x: cx, y: cy + 30 + step * 12, id: 2 }]);
+  await touch("touchEnd", []);
+  await expect.poll(() => attr("data-row-height")).toBeGreaterThan(24);
+  expect(await attr("data-zoom-x")).toBe(zoomed);
+
+  // The notes did not move: a pinch never edits.
+  expect(await notesOf(baseURL!, takeId)).toEqual(untouched);
+
+  // One finger on the background pans the zoomed roll.
+  await scroller.evaluate((element) => { element.scrollLeft = 0; });
+  await touch("touchStart", [{ x: cx + 100, y: box.y + 6, id: 1 }]);
+  for (let step = 1; step <= 5; step += 1) await touch("touchMove", [{ x: cx + 100 - step * 30, y: box.y + 6, id: 1 }]);
+  await touch("touchEnd", []);
+  await expect.poll(() => scroller.evaluate((element) => element.scrollLeft)).toBeGreaterThan(80);
+});
+
+test("the roll runs to the bottom edge under the navigation icons and its last rows scroll clear of them", async ({ page }) => {
+  await openPromotedTake(page, (await page.evaluate(() => location.origin)));
+  const scroller = page.locator(".roll-scroll");
+  const viewport = page.viewportSize()!;
+  const box = (await scroller.boundingBox())!;
+  expect(box.y + box.height).toBeGreaterThanOrEqual(viewport.height - 1);
+  const nav = (await page.locator(".app-nav").boundingBox())!;
+  expect(nav.y).toBeGreaterThan(box.y + box.height / 2);
+  await scroller.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const lastKey = (await page.locator(".roll-keys span").last().boundingBox())!;
+  expect(lastKey.y + lastKey.height).toBeLessThanOrEqual(nav.y + 2);
+});

@@ -680,6 +680,7 @@ export class SimulatedHostEngine implements HostEngine {
         return reject("Loop sessions require host orchestration");
       case "get-take-notes":
       case "set-take-notes":
+      case "audition-note":
         return reject("Take editing requires host orchestration");
       case "prepare-loop-export":
       case "preview-loop-export":

@@ -138,7 +138,8 @@ The range does not change saved sample audio or generated drum-pattern velocity.
 
 ## Take editor
 
-Protocol 8 adds `get-take-notes` and `set-take-notes`. A take's recording stays
+Protocol 8 added `get-take-notes` and `set-take-notes`; protocol 9 adds
+`audition-note`. A take's recording stays
 host-owned: the host pairs attacks with releases into notes (`id`, `channel`,
 `note`, `velocity`, `start`, `duration`, with loop-fraction coordinates and gates
 that wrap the loop end kept as one note) and returns them with a per-take
@@ -164,6 +165,13 @@ edit, so a stale editor is refused with a reload message instead of overwriting.
   while playing disappears at the next rollover like any staged take.
 - Notes are interpreted in the take's own (source) coordinates, the same as the
   waveform lanes, regardless of the loop start marker.
+- `audition-note` (`takeId`, `channel`, `note`, `velocity`, `durationMs` 20-2000)
+  sounds one note in the take's own voice and level on its playback channel
+  (drums stay on channel 9) so a drag can be judged by ear. It changes no state:
+  nothing is recorded, the version does not move, no snapshot is broadcast, and
+  an unknown take is rejected. The host schedules the release itself, a repeat of
+  the same key restarts it, and Panic cancels pending releases. Like other
+  host-orchestrated commands it is refused while a session preview is active.
 
 ## Coordinates, playback, and export
 

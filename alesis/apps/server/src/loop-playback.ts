@@ -53,6 +53,7 @@ export class MidiLoopScheduler {
   private activeBends = new Map<string, { takeId: string; channel: number; value: number }>();
   private activeSustains = new Map<string, { takeId: string; channel: number; value: number }>();
   private takeChannels = new Map<string, number>();
+  private auditions = new Map<string, ReturnType<typeof setTimeout>>();
   /** Melodic channels the performer has played on; a loop there would share the performer's voice. */
   private liveChannels = new Set<number>();
   private appliedVoices = new Map<number, { bank: number; program: number }>();
@@ -316,6 +317,45 @@ export class MidiLoopScheduler {
     let version = this.recordingVersions.get(takeId);
     if (version === undefined) this.recordingVersions.set(takeId, version = ++this.versionCounter);
     return version;
+  }
+
+  /**
+   * Sounds one note in a take's own voice, level and channel without recording it, so an edit can be
+   * judged by ear. The release is scheduled here, so a dropped connection cannot leave it hanging.
+   */
+  auditionNote(snapshot: RuntimeSnapshot, { takeId, note, channel, velocity, durationMs }: { takeId: string; note: number; channel: number; velocity: number; durationMs: number }): boolean {
+    const take = [snapshot.capture.staged, snapshot.capture.previousStaged, ...snapshot.promoted].find((candidate) => candidate?.id === takeId);
+    if (!take) return false;
+    const audibleIds = new Set(this.audibleTakes(snapshot).map(({ take: audible }) => audible.id));
+    const outputChannel = channel === 9 ? 9 : this.channelFor(takeId, audibleIds);
+    const voice = take.voice;
+    if (outputChannel !== 9 && snapshot.synth.selectedId === "soundfont" && voice && voice.soundFontId === snapshot.synth.selectedSoundFontId) {
+      const applied = this.appliedVoices.get(outputChannel);
+      if (applied?.bank !== voice.bank || applied.program !== voice.program) {
+        this.appliedVoices.set(outputChannel, { bank: voice.bank, program: voice.program });
+        this.output.setChannelVoice(outputChannel, voice.bank, voice.program);
+      }
+    }
+    const key = `${outputChannel}:${note}`;
+    const pending = this.auditions.get(key);
+    if (pending) {
+      clearTimeout(pending);
+      this.output.dispatchMidi({ type: "note-off", channel: outputChannel, note });
+    }
+    this.output.dispatchMidi(remapMidiEvent({ type: "note-on", channel, note, velocity }, outputChannel, take.level));
+    const timer = setTimeout(() => {
+      this.auditions.delete(key);
+      this.output.dispatchMidi({ type: "note-off", channel: outputChannel, note });
+    }, durationMs);
+    timer.unref();
+    this.auditions.set(key, timer);
+    return true;
+  }
+
+  /** Silences auditioned notes now; a host panic has already stopped the renderer's voices. */
+  cancelAuditions(): void {
+    for (const timer of this.auditions.values()) clearTimeout(timer);
+    this.auditions.clear();
   }
 
   /** Commit a partial overdub before Stop or disabling; the rotating default still discards it. */

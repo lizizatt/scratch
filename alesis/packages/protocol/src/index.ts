@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 8 as const;
+export const PROTOCOL_VERSION = 9 as const;
 
 export const LOOP_SESSION_MAX_BYTES = 4 * 1024 * 1024;
 export const LOOP_SESSION_MAX_EVENTS_PER_TAKE = 32_768;
@@ -342,6 +342,7 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("delete-staged") }),
   z.object({ type: z.literal("promote-previous-staged") }),
   z.object({ type: z.literal("get-take-notes"), takeId: takeIdSchema }),
+  z.object({ type: z.literal("audition-note"), takeId: takeIdSchema, channel: midiChannel, note: midiByte, velocity: z.number().int().min(1).max(127), durationMs: z.number().int().min(20).max(2000) }),
   z.object({ type: z.literal("set-take-notes"), takeId: takeIdSchema, version: z.number().int().nonnegative(), notes: z.array(editableNoteSchema).max(MAX_EDITABLE_NOTES) }),
   z.object({ type: z.literal("set-take-level"), takeId: takeIdSchema, level: z.number().min(0).max(1) }),
   z.object({ type: z.literal("set-take-muted"), takeId: takeIdSchema, muted: z.boolean() }),

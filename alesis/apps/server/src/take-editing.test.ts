@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SilentAudioOutput, type AudioOutput } from "@alesis/audio";
 import { SimulatedHostEngine, type EngineResult, type MidiEvent } from "@alesis/engine";
 import type { EditableNote, EngineCommand } from "@alesis/protocol";
@@ -108,6 +108,61 @@ async function host() {
   const notesOf = async (takeId: string) => (await command({ type: "get-take-notes", takeId })).takeNotes!;
   return { engine, loops, played, command, until, run, play, recordStaged, notesOf };
 }
+
+describe("auditioning a note while editing", () => {
+  const audition = { takeId: "", note: 62, channel: 1, velocity: 100, durationMs: 300 };
+
+  it("sounds the note at the take's level without recording it, then releases it", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = await host();
+      const staged = await h.recordStaged();
+      await h.command({ type: "stop" });
+      const before = h.loops.exportRecordings([staged.id]).get(staged.id);
+      h.played.length = 0;
+
+      expect(h.loops.auditionNote(h.engine.runtimeSnapshot(), { ...audition, takeId: staged.id })).toBe(true);
+      expect(h.played).toEqual([expect.objectContaining({ type: "note-on", note: 62, velocity: 80 })]);
+      const channel = h.played[0]!.channel;
+      expect(channel).not.toBe(1);
+      await vi.advanceTimersByTimeAsync(300);
+      expect(h.played.at(-1)).toEqual({ type: "note-off", channel, note: 62 });
+      expect(h.loops.exportRecordings([staged.id]).get(staged.id)).toEqual(before);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("restarts a repeated note, keeps drums on the drum channel, and ignores unknown takes", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = await host();
+      const staged = await h.recordStaged();
+      await h.command({ type: "stop" });
+      h.played.length = 0;
+      h.loops.auditionNote(h.engine.runtimeSnapshot(), { ...audition, takeId: staged.id });
+      h.loops.auditionNote(h.engine.runtimeSnapshot(), { ...audition, takeId: staged.id });
+      expect(h.played.map(({ type }) => type)).toEqual(["note-on", "note-off", "note-on"]);
+
+      h.played.length = 0;
+      h.loops.auditionNote(h.engine.runtimeSnapshot(), { ...audition, takeId: staged.id, channel: 9, note: 38 });
+      expect(h.played[0]).toMatchObject({ type: "note-on", channel: 9, note: 38 });
+      expect(h.loops.auditionNote(h.engine.runtimeSnapshot(), { ...audition, takeId: "missing" })).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("drops the pending release when cancelled, as a host panic has already silenced the renderer", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = await host();
+      const staged = await h.recordStaged();
+      await h.command({ type: "stop" });
+      h.loops.auditionNote(h.engine.runtimeSnapshot(), { ...audition, takeId: staged.id });
+      h.played.length = 0;
+      h.loops.cancelAuditions();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(h.played).toEqual([]);
+    } finally { vi.useRealTimers(); }
+  });
+});
 
 describe("editing a take's notes through the host", () => {
   it("reads a staged take's notes and rejects unknown takes", async () => {

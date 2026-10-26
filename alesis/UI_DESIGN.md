@@ -135,11 +135,22 @@ floating bottom-left navigation, and no document-level page scrolling.
 - Pitch rows run down the grid and the loop runs left to right, with beat and
 	measure guides, the snap grid, and the playhead. Notes wrapped across the loop
 	end show in two pieces.
-- Drag a note to move it in time and pitch (all selected notes move together);
-	drag its right edge to resize; shift/ctrl-click adds to the selection.
-- Right-drag a note, or drag with the **Velocity** tool (for touch), to change its
-	velocity: dragging up raises it, down lowers it, and a tooltip shows the value.
-	This ignores the Options impact range.
+- Three icon tools choose what a plain drag does: **Move** (time and pitch; all
+	selected notes move together), **Velocity** and **Stretch** (length of every
+	selected note). In Move mode the right edge of a note still resizes it, and
+	shift/ctrl-click adds to the selection. A tap without movement changes nothing.
+- Dragging up or down with the **Velocity** tool, or right-dragging in any tool,
+	changes velocity: up raises it, down lowers it, and a tooltip fixed where the
+	drag began shows the value. This ignores the Options impact range.
+- Pressing a note, or dragging it to another pitch, sounds it in the take's own
+	voice (a short audition, never recorded), so edits can be judged by ear.
+- Zoom the time axis and the pitch rows independently: two-finger pinch (a
+	horizontal pinch zooms time, a vertical one zooms rows, a diagonal one both),
+	Ctrl+wheel (time) or Ctrl+Shift+wheel (rows), or the **Zoom in/out** buttons.
+	One finger on the background pans; the key labels stay pinned at the left. A
+	pinch never edits notes.
+- The roll fills the pane to the bottom edge with the navigation icons floating
+	over it; the lowest rows scroll clear of the icons.
 - **Snap to grid** (Off, 1/4, 1/8, 1/16, 1/32) quantizes drags and resizes;
 	**Quantize** snaps the starts of the selected notes, or all notes with none
 	selected. Delete removes the selection; Undo steps back through this visit's edits.

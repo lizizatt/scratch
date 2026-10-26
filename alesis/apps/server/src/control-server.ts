@@ -192,8 +192,11 @@ export async function createControlServer(
         });
       }
       const message = await pending;
-      snapshotPending = false;
-      broadcastSnapshotNow();
+      // An audition changes no state, and drags send many.
+      if (envelope.command.type !== "audition-note") {
+        snapshotPending = false;
+        broadcastSnapshotNow();
+      }
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
     });
     socket.on("close", () => {

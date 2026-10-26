@@ -75,6 +75,28 @@ describe("per-take voices on isolated playback channels", () => {
     expect(h.calls.indexOf(`voice ${violin} 0:40`)).toBeLessThan(h.calls.indexOf(`note ${violin} 64`));
   });
 
+  it("auditions on the take's pinned channel without repeating its voice, or on the global voice for another SoundFont", async () => {
+    const h = await host();
+    await h.command({ type: "play" });
+    h.play(60, 0.2, 0.4);
+    h.until(2.01);
+    await h.command({ type: "select-soundfont-preset", presetId: "0:40" });
+    await h.command({ type: "promote-staged" });
+    await h.command({ type: "stop" });
+    const take = h.engine.snapshot().promoted[0]!;
+    const channel = h.channelOf("0:0");
+    const audition = { takeId: take.id, note: 64, channel: 0, velocity: 90, durationMs: 50 };
+
+    h.calls.length = 0;
+    h.loops.auditionNote(h.engine.runtimeSnapshot(), audition);
+    expect(h.calls).toEqual([`note ${channel} 64`]);
+
+    await h.command({ type: "select-soundfont", soundFontId: "other" });
+    h.calls.length = 0;
+    h.loops.auditionNote(h.engine.runtimeSnapshot(), { ...audition, note: 65 });
+    expect(h.calls).toEqual([`note ${channel} 65`]);
+  });
+
   it("applies the voice before a rolled-over take's first notes", async () => {
     const h = await host();
     await h.command({ type: "play" });
