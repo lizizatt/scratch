@@ -101,6 +101,26 @@ preset editor is unavailable for this used unit, the host defaults to Strong
 mapping: positive note-on velocity becomes `min(127, round(1.5v + 10))`.
 Linear, a milder 1.35x Responsive curve, and Fixed 127 remain selectable.
 
+## USB foot switch (second sustain pedal)
+
+A PCsensor FootSwitch (USB `3553:b001`) enumerates as a keyboard that sends key
+`B` (evdev code 48): value 1 on press, repeats while held, 0 on release. The host
+reads it with `foot-switch-grab.py` (Python 3 standard library only, user in the
+`input` group), which grabs the device exclusively so the keystrokes never reach
+the kiosk browser, and turns it into a sustain pedal (CC64) held while the foot
+is down. It is OR-ed with the keytar's own pedal, so sustain lasts until both are
+up; with the foot switch idle the keytar pedal's messages pass through unchanged.
+A pedal still down when its reader exits or the device is unplugged is released.
+
+- `FOOT_SWITCH_DEVICE` overrides the device
+  (default `/dev/input/by-id/usb-PCsensor_FootSwitch-event-kbd`); `FOOT_SWITCH=off`
+  disables it. The host polls for the device every 2 s, so replugging needs no restart.
+- Any keyboard-style foot switch works if `FOOT_SWITCH_DEVICE` points at its
+  `-event-kbd` node. Switches that send a tap on each stomp (toggle) are not supported.
+- Verified on the Pi: the helper reports `down`/`up` for a held press, and a silent
+  host on the Pi logs two control-change events (press, release) from it. Audible
+  sustain through the SoundFont has not been checked.
+
 ## Power and storage behavior
 
 PiSugar S Plus has no battery-status data interface. Its documented battery

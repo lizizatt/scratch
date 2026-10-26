@@ -16,6 +16,8 @@ import { executeLoopCommand } from "./loop-commands.js";
 import { executeTakeNotesCommand } from "./take-editing.js";
 import { exportLoopSession, importLoopSession, prepareSessionAudio, type LoopSessionHost } from "./loop-session.js";
 import { Autosaver, defaultAutosavePath, readAutosave } from "./autosave.js";
+import { FootSwitch, defaultFootSwitchDevice } from "./foot-switch.js";
+import { SustainPedals } from "./sustain-pedals.js";
 import { MetronomeScheduler } from "./metronome.js";
 import { applyVelocityCurve, PerformanceRouter } from "./performance-router.js";
 import { DeviceHotplugCoordinator } from "./hotplug.js";
@@ -154,7 +156,8 @@ const hardwareProgramChangeNavigation = new HardwareProgramChangeNavigationMappe
 const advanceTransportClock = (): number => playback.advance();
 const metronome = new MetronomeScheduler(currentAudio);
 const playback = new TransportPlayback(engine, currentAudio, dispatchArpeggio, undefined, loops, metronome);
-const handleMidi = (event: MidiInputEvent): void => {
+const sustainPedals = new SustainPedals();
+const processMidi = (event: MidiInputEvent): void => {
   if (loopExports?.blocksPerformance()) return;
   if (event.type === "program-change") {
     handleProgramChange(event.program);
@@ -177,6 +180,24 @@ const handleMidi = (event: MidiInputEvent): void => {
     playback.handle(routedEvent);
   }
 };
+const handleMidi = (event: MidiInputEvent): void => {
+  if (event.type === "control-change" && event.controller === 64) {
+    const merged = sustainPedals.primary(event);
+    if (merged) processMidi(merged);
+    return;
+  }
+  processMidi(event);
+};
+// A USB foot button as a second sustain pedal, held down while the keytar's own pedal may also be.
+const footSwitch = process.env.FOOT_SWITCH === "off" ? undefined : new FootSwitch({
+  devicePath: process.env.FOOT_SWITCH_DEVICE ?? defaultFootSwitchDevice,
+  onChange(down) {
+    const sustain = sustainPedals.secondary(down);
+    if (sustain) processMidi(sustain);
+  },
+  log: (message) => console.log(message),
+});
+footSwitch?.start();
 let disconnectMidi = (): void => {};
 let midiConnected = false;
 const connectMidi = async (source: MidiSource): Promise<boolean> => {
@@ -355,6 +376,7 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
     try {
       const result = await importLoopSession(command.sessionJson, loopSessionHost);
       performanceRouter.panic();
+      sustainPedals.reset();
       drumPadNotes.panic(() => {});
       return result;
     } finally {
@@ -634,6 +656,7 @@ loopExports = new LoopExports({
     padPerformance?.reset();
     controlServer?.invalidateSamplePadHolds();
     performanceRouter.panic();
+    sustainPedals.reset();
     drumPadNotes.panic(() => {});
     samplePads.panic();
     loops.resetRecordingInput();
@@ -676,6 +699,7 @@ const panic = (): void => {
   playback.panic();
   controlServer?.invalidateSamplePadHolds();
   performanceRouter.panic();
+  sustainPedals.reset();
   drumPadNotes.panic((event) => dispatchDrumPadEvent(event, false));
   samplePads.panic();
   }, audio);
@@ -777,6 +801,7 @@ console.log(`SoundFont: ${defaultSoundFont?.name ?? "none"}${defaultSoundFont ? 
 async function shutdown(): Promise<void> {
   await loopExports?.close();
   playback.dispose();
+  footSwitch?.close();
   clearInterval(timer);
   if (hotplugTimer) clearInterval(hotplugTimer);
   if (midiDemoStart) clearTimeout(midiDemoStart);
