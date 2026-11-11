@@ -199,6 +199,7 @@ const footSwitch = process.env.FOOT_SWITCH === "off" ? undefined : new FootSwitc
   devicePath: process.env.FOOT_SWITCH_DEVICE ?? defaultFootSwitchDevice,
   onChange(down) {
     const sustain = sustainPedals.secondary(down);
+    console.log(`Foot switch ${down ? "down" : "up"}${sustain ? ` -> sustain ${sustain.value}` : " (sustain already in that state)"}`);
     if (sustain) processMidi(sustain);
   },
   log: (message) => console.log(message),
