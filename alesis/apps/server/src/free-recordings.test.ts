@@ -145,7 +145,7 @@ describe("journal and MIDI file", () => {
     await journalToMidi(path, join(directory, "big.mid"), { ...meta, durationMs: 1_000_000 });
     const parsed = parseMidi(await readFile(join(directory, "big.mid")));
     expect(parsed.tracks[0]!.filter((event) => event.type === "noteOn")).toHaveLength(100_000);
-  });
+  }, 60_000);
 });
 
 describe("free recordings", () => {

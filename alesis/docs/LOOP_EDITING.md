@@ -216,7 +216,7 @@ There is no duration cap. What bounds a recording, in the order you would meet i
 | Disk space | Recording is refused below 300 MB free and stops itself below 100 MB free, keeping everything up to then. The journal is about 16 bytes per event (roughly 2 MB per hour of dense playing); the MP3 is the large part (about 60 to 85 MB per hour). An MP3 render that cannot fit is refused with the numbers, and the MIDI stays. |
 | Events | One recording stops itself at 8,000,000 events (a 128 MB journal), far beyond hours of playing, as a guard against a stuck controller flooding the host. A warning shows from 80%. |
 | Memory | Constant. Events are streamed to disk, the display keeps 240 buckets, and rendering streams audio, so a 1-hour dense test peaked at 141 MB for the host process. |
-| Render time | About 134x real time on a workstation (one hour in 27 seconds). The Pi is untested; expect minutes per hour. A render with no output for two minutes is killed and reported as failed; Retry reruns it. |
+| Render time | About 134x real time on a workstation (one hour in 27 seconds). On the Pi 4 a 10-minute recording took 26 seconds (about 8 seconds of that is loading the SoundFont), so expect roughly 2 to 3 minutes per hour, at low priority. A render with no output for two minutes is killed and reported as failed; Retry reruns it. |
 | Power cut or crash | Recovered as MIDI, as above. A render in progress is simply not resumed. |
 
 ## Coordinates, playback, and export

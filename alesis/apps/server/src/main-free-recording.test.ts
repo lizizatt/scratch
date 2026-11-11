@@ -38,7 +38,7 @@ beforeAll(async () => {
   vi.spyOn(SoftwareVortex.prototype, "subscribe").mockImplementation(function (this: SoftwareVortex, listener) { input = listener; return subscribe.call(this, listener); });
   vi.spyOn(SilentAudioOutput.prototype, "dispatchMidi").mockImplementation(((event: MidiEvent) => { sounded.push(event.type); }) as never);
   await import("./main.js");
-});
+}, 60_000);
 
 afterAll(async () => {
   try {
