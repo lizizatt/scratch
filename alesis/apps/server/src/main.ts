@@ -5,7 +5,7 @@ import type { DrumKit, EngineCommand, EngineSnapshot, Readiness, SoundFontPreset
 import { existsSync } from "node:fs";
 import { copyFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createControlServer, type ControlServer } from "./control-server.js";
 import { createAudioHealthObserver } from "./audio-health.js";
@@ -27,6 +27,7 @@ import { padMidiInput, SamplePadService } from "./sample-pads.js";
 import { PadPerformance, padControlCommand } from "./pad-performance.js";
 import { LoopExports } from "./loop-export.js";
 import { FreeRecordings, type FreeRecordingContext } from "./free-recordings.js";
+import { createFileBrowser } from "./file-browser.js";
 import { randomUUID } from "node:crypto";
 
 let soundFonts = discoverSoundFonts();
@@ -135,7 +136,9 @@ samplePads = new SamplePadService(sampleLibrary, (state) => {
   : undefined);
 const performanceRouter = new PerformanceRouter();
 const drumPadNotes = new DrumPadNoteTracker();
-const freeRecordings = new FreeRecordings({ directory: process.env.ALESIS_FREE_RECORDING_DIR ?? join(homedir(), "alesis_free_recordings") });
+const freeRecordingDirectory = process.env.ALESIS_FREE_RECORDING_DIR ?? join(homedir(), "alesis_free_recordings");
+const exportDirectory = process.env.ALESIS_EXPORT_DIR ?? join(homedir(), "alesis_recordings");
+const freeRecordings = new FreeRecordings({ directory: freeRecordingDirectory });
 const dispatchPerformance = (event: MidiEvent, endsAtCycleBoundary = false): void => {
   if (loopExports?.blocksPerformance()) return;
   engine.markCaptureActivity();
@@ -706,7 +709,7 @@ loopExports = new LoopExports({
       ...(font ? { soundFontPath: font.path } : {}), ...(percussionSoundFontPath ? { percussionSoundFontPath } : {}) };
   },
   sampleRoot,
-  outputRoot: process.env.ALESIS_EXPORT_DIR ?? join(homedir(), "alesis_recordings"),
+  outputRoot: exportDirectory,
   output() {
     if (simulatedAudioMode) return new SimulatedLoopOutput();
     if (!discoveredAudioDevice) throw new Error("Audio output is unavailable");
@@ -730,7 +733,12 @@ loopExports = new LoopExports({
   },
 });
 await freeRecordings.init().catch((error) => console.error(`Free recordings are unavailable: ${error instanceof Error ? error.message : String(error)}`));
-controlServer = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeAndPersist, host, readiness, loopExports, freeRecordings);
+controlServer = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeAndPersist, host, readiness, loopExports, freeRecordings, createFileBrowser([
+  { id: "recordings", label: "Free recordings (.mid and .mp3)", directory: freeRecordingDirectory },
+  { id: "exports", label: "Exported loop tracks and mixes", directory: exportDirectory },
+  { id: "samples", label: "Sample library", directory: sampleRoot },
+  { id: "saved", label: "Autosaved loops and settings", directory: dirname(autosavePath) },
+]));
 padPerformance = new PadPerformance({
   snapshot: () => performanceSnapshot,
   samples: samplePads,

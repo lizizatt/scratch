@@ -207,6 +207,17 @@ ids are `jam-[A-Za-z0-9-]+`, anything else under `/recordings/` is 404).
   from the wall clock, with a numeric suffix on collisions; the Pi has no clock
   battery, so dates may be wrong but the timeline uses a monotonic clock.
 
+### Browsing saved files
+
+`GET /files/` is a small read-only page listing four folders: free recordings,
+exported loop tracks and mixes, the sample library, and the autosave and settings
+folder. Each folder lists its files with size and time (sortable by name or
+newest first), an audio preview for MP3s, and download links. Files are served
+with byte ranges and never as active content. Only those folders are reachable:
+`..`, encoded separators, symlinks, dotfiles and `.tmp`/`.part` files are refused,
+and only GET and HEAD are accepted. Like the rest of the app it has no login, so
+it is as private as the network the host listens on.
+
 ### Limits and failure behaviour
 
 There is no duration cap. What bounds a recording, in the order you would meet it:

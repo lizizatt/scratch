@@ -96,6 +96,14 @@ describe("free recording in the production host", () => {
     expect(mp3.status).toBe(206);
     expect(mp3.headers.get("content-range")).toMatch(/^bytes 0-9\/\d+$/);
     expect((await mp3.arrayBuffer()).byteLength).toBe(10);
+
+    const index = await (await download("/files/")).text();
+    expect(index).toContain('href="/files/recordings/"');
+    const listing = await (await download("/files/recordings/")).text();
+    expect(listing).toContain(`${item!.id}.mid`);
+    expect(listing).toContain(`${item!.id}.mp3`);
+    expect(listing).not.toContain(".journal.tmp");
+    expect(Buffer.from(await (await download(`/files/recordings/${item!.id}.mid`)).arrayBuffer()).subarray(0, 4).toString()).toBe("MThd");
   }, 60_000);
 
   it("refuses downloads of anything that is not a finished recording", async () => {

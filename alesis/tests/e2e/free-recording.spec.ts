@@ -152,3 +152,16 @@ test("the recording controls stay reachable and on screen at every viewport", as
     expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
   }
 });
+
+test("the saved files can be browsed from the app even with the service worker active", async ({ page, baseURL }) => {
+  await control(baseURL!, { type: "set-capture-mode", mode: "record" });
+  await page.reload();
+  await page.evaluate(async () => { await navigator.serviceWorker?.ready; });
+  const link = page.getByRole("link", { name: "Browse all saved files" });
+  await expect(link).toHaveAttribute("href", "/files/");
+  await page.goto("/files/");
+  await expect(page.getByRole("heading", { name: "Saved files" })).toBeVisible();
+  await page.getByRole("link", { name: /Free recordings/ }).click();
+  await expect(page.getByRole("navigation")).toContainText("All folders");
+  expect((await page.request.post("/files/recordings/")).status()).toBe(405);
+});

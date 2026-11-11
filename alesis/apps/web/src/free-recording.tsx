@@ -63,6 +63,7 @@ export function FreeRecordingPanel({ status, send }: { status: FreeRecordingStat
           {active ? `${active.noteCount} ${active.noteCount === 1 ? "note" : "notes"} · ${active.eventCount} events · saved as you play.` : "Records the notes you play, with their sound, as a .mid and an .mp3 when you press Stop."}
           {status.diskFreeBytes !== null && ` Disk: ${formatBytes(status.diskFreeBytes)} free${hoursOfRoom !== null ? ` (room for about ${hoursOfRoom} h of MP3)` : ""}.`}
         </div>
+        <a className="free-browse" href="/files/" target="_blank" rel="noreferrer">Browse all saved files</a>
         {active?.warning && <p className="free-warning" role="alert">{active.warning}</p>}
         {status.error && <p className="free-notice" role="status">{status.error}</p>}
       </section>

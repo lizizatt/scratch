@@ -1,6 +1,4 @@
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
-import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from "node:http";
+import { createServer, type Server as HttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import type { EngineResult, HostEngine } from "@alesis/engine";
@@ -16,6 +14,7 @@ import {
 } from "@alesis/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import sirv from "sirv";
+import { serveFile, type createFileBrowser } from "./file-browser.js";
 import type { FreeRecordings } from "./free-recordings.js";
 import type { LoopExports } from "./loop-export.js";
 
@@ -51,8 +50,9 @@ export async function createControlServer(
   readiness: Readiness = readyForDevelopment,
   exports?: Pick<LoopExports, "status" | "subscribe" | "disconnect">,
   freeRecordings?: Pick<FreeRecordings, "status" | "subscribe" | "resolveFile">,
+  fileBrowser?: ReturnType<typeof createFileBrowser>,
 ): Promise<ControlServer> {
-  const httpServer = createHttpServer(staticDirectory, readiness, freeRecordings);
+  const httpServer = createHttpServer(staticDirectory, readiness, freeRecordings, fileBrowser);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control", maxPayload: LOOP_SESSION_MAX_BYTES * 6 + 1024 });
   const results = new Map<string, ServerMessage>();
   const inFlight = new Map<string, Promise<ServerMessage>>();
@@ -333,41 +333,10 @@ async function executeEnvelope(
 
 const recordingPath = /^\/recordings\/(jam-[A-Za-z0-9-]{1,64})\.(mid|mp3)$/;
 
-/** Serves a finished recording as a download, honoring byte ranges so the MP3 can be previewed and resumed. */
-async function serveRecording(request: IncomingMessage, response: ServerResponse, file: { path: string; name: string }, extension: "mid" | "mp3"): Promise<void> {
-  try {
-    const { size } = await stat(file.path);
-    const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range ?? "");
-    let start = 0;
-    let end = size - 1;
-    if (range && (range[1] || range[2])) {
-      if (range[1]) { start = Number(range[1]); if (range[2]) end = Math.min(end, Number(range[2])); }
-      else { start = Math.max(0, size - Number(range[2])); }
-      if (start > end || start >= size) { response.writeHead(416, { "content-range": `bytes */${size}` }).end(); return; }
-    }
-    const partial = range !== null && (start !== 0 || end !== size - 1);
-    response.writeHead(partial ? 206 : 200, {
-      "content-type": extension === "mid" ? "audio/midi" : "audio/mpeg",
-      "content-length": end - start + 1,
-      "accept-ranges": "bytes",
-      "content-disposition": `attachment; filename="${file.name}"`,
-      "cache-control": "no-store",
-      ...partial ? { "content-range": `bytes ${start}-${end}/${size}` } : {},
-    });
-    if (request.method === "HEAD" || size === 0) { response.end(); return; }
-    const stream = createReadStream(file.path, { start, end });
-    stream.on("error", () => response.destroy());
-    response.on("close", () => stream.destroy());
-    stream.pipe(response);
-  } catch {
-    if (!response.headersSent) response.writeHead(404).end();
-    else response.destroy();
-  }
-}
-
-function createHttpServer(staticDirectory: string | undefined, readiness: Readiness, freeRecordings?: Pick<FreeRecordings, "resolveFile">): HttpServer {
+function createHttpServer(staticDirectory: string | undefined, readiness: Readiness, freeRecordings?: Pick<FreeRecordings, "resolveFile">, fileBrowser?: ReturnType<typeof createFileBrowser>): HttpServer {
   const serveStatic = staticDirectory ? sirv(staticDirectory, { single: true, dev: true }) : undefined;
   return createServer((request, response) => {
+    if (fileBrowser?.matches(request.url)) { void fileBrowser.handle(request, response); return; }
     const target = request.url?.split("?")[0] ?? "";
     const download = recordingPath.exec(target);
     if (target.startsWith("/recordings/")) {
@@ -375,7 +344,7 @@ function createHttpServer(staticDirectory: string | undefined, readiness: Readin
       const extension = download[2] as "mid" | "mp3";
       const file = request.method === "GET" || request.method === "HEAD" ? freeRecordings?.resolveFile(download[1]!, extension) : null;
       if (!file) { response.writeHead(404).end(); return; }
-      void serveRecording(request, response, file, extension);
+      void serveFile(request, response, { ...file, type: extension === "mid" ? "audio/midi" : "audio/mpeg", attachment: true });
       return;
     }
     if (request.url === "/health") {

@@ -316,3 +316,4 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .free-download, .free-render-button { display: inline-flex; align-items: center; gap: 4px; min-height: 34px; padding: 0 9px; border: 1px solid var(--cyan); border-radius: 6px; color: var(--cyan); font-size: 11px; text-decoration: none; }
 .free-download svg, .free-render-button svg { width: 15px; height: 15px; }
 @media (max-height: 500px) { .free-lane .waveform { height: 80px; } }
+.free-browse { justify-self: start; color: var(--cyan); font-size: 11px; }
