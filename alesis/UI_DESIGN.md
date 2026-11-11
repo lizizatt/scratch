@@ -160,6 +160,24 @@ floating bottom-left navigation, and no document-level page scrolling.
 	overdub the staged take stays, and only a pass that records new notes makes an
 	open editor stale.
 
+### Record mode (free recording)
+
+- A three-position **Replace / Overdub / Record** switch in the loop toolbar
+	replaces the old Overdub checkbox. Replace and Overdub swap at any time; Record
+	can only be entered or left while the transport is stopped, and nothing changes
+	while a recording runs.
+- In Record mode the transport controls become **Record** and **Stop**, the loop
+	lanes give way to one live lane, and Play is unavailable (the transport stays
+	stopped; the arpeggiator and pads still sound).
+- The lane fills left to right as you play, with elapsed time. When the axis fills
+	it merges neighbouring buckets and doubles its span rather than overflowing, so
+	any length stays on screen. A red **REC** timer shows in the status line on every
+	pane.
+- **Stop** saves a `.mid` and starts an `.mp3` render. The Recordings list below
+	shows each take with MIDI and MP3 download links, the render's progress or
+	failure (with **Retry**), and a delete button. The host's free disk space is
+	shown beside the lane.
+
 ## Accessibility
 
 - Icon controls have accessible names and tooltips.

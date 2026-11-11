@@ -202,7 +202,7 @@ export class SimulatedHostEngine implements HostEngine {
     next.monitorOnly = session.monitorOnly;
     next.capture = {
       loopStart: session.loopStart,
-      overdub: session.overdub, error: null,
+      overdub: session.overdub, freeRecord: next.capture.freeRecord, error: null,
       currentWaveform: [], hasCurrentEvents: false,
       staged: session.staged ? structuredClone(session.staged.take) : null,
       previousStaged: session.previousStaged ? structuredClone(session.previousStaged.take) : null,
@@ -453,6 +453,7 @@ export class SimulatedHostEngine implements HostEngine {
 
     switch (command.type) {
       case "play":
+        if (this.state.capture.freeRecord) return reject("Record mode captures a free recording; switch to Replace or Overdub to loop");
         if (this.state.transport.state === "stopped") {
           this.state.transport.origin = this.state.capture.loopStart;
           this.elapsedSeconds = 0;
@@ -474,6 +475,13 @@ export class SimulatedHostEngine implements HostEngine {
         break;
       case "set-overdub":
         this.state.capture.overdub = command.enabled;
+        this.state.capture.freeRecord = false;
+        this.syncStagedVoice();
+        break;
+      case "set-capture-mode":
+        if (this.state.transport.state !== "stopped") return reject("Stop the transport before changing the record mode");
+        this.state.capture.overdub = command.mode === "overdub";
+        this.state.capture.freeRecord = command.mode === "record";
         this.syncStagedVoice();
         break;
       case "set-loop-start":
@@ -682,6 +690,11 @@ export class SimulatedHostEngine implements HostEngine {
       case "set-take-notes":
       case "audition-note":
         return reject("Take editing requires host orchestration");
+      case "start-free-recording":
+      case "stop-free-recording":
+      case "render-free-recording":
+      case "delete-free-recording":
+        return reject("Free recording requires host orchestration");
       case "prepare-loop-export":
       case "preview-loop-export":
       case "publish-loop-export":

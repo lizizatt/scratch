@@ -8,6 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icon.svg"],
+      workbox: { navigateFallbackDenylist: [/^\/recordings\//, /^\/health/] },
       manifest: {
         name: "Alesis Loop Host",
         short_name: "Alesis",
@@ -27,6 +28,7 @@ export default defineConfig({
     proxy: {
       "/control": { target: "ws://127.0.0.1:8787", ws: true },
       "/health": { target: "http://127.0.0.1:8787" },
+      "/recordings": { target: "http://127.0.0.1:8787" },
     },
   },
 });

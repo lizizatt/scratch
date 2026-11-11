@@ -173,6 +173,52 @@ edit, so a stale editor is refused with a reload message instead of overwriting.
   the same key restarts it, and Panic cancels pending releases. Like other
   host-orchestrated commands it is refused while a session preview is active.
 
+## Free recording (Record mode)
+
+Protocol 10 adds `capture.freeRecord`, `set-capture-mode` (`replace`, `overdub`,
+`record`), `start-free-recording`, `stop-free-recording`, `render-free-recording`
+and `delete-free-recording`, a `free-recording-status` message (also in the first
+`snapshot`), and `GET /recordings/<id>.mid|.mp3` downloads (byte ranges supported;
+ids are `jam-[A-Za-z0-9-]+`, anything else under `/recordings/` is 404).
+`set-overdub` still works and leaves Record mode.
+
+- **What is recorded.** Every event the host sounds through the synth: keys,
+  arpeggiator output, pedals, bend, pressure and drum-pad hits, after the velocity
+  curve. Not recorded: pad samples, the metronome click, drum-pattern playback and
+  loops (the transport is stopped in this mode), and any external audio.
+- **Crash safety.** Events go to `<id>.journal`, a flat file of 16-byte records
+  flushed every 0.5 s and synced every 2 s. A power cut loses at most the last two
+  seconds. At boot the host finishes any unfinished journal into a `.mid`, marks it
+  recovered and leaves the MP3 for you to render. Stop closes held notes and the
+  sustain pedal; Panic does the same without stopping.
+- **MIDI.** A format-0 file at the app's BPM and time signature (960 ticks per
+  beat), with the voice and reverb/chorus sends at the start, so it lines up with
+  bars in a DAW. A preset or drum-kit change mid-recording becomes a program
+  change. Changing the synth or SoundFont ends the recording (one file renders
+  with one sound source); the command is refused while recording.
+- **MP3.** Rendered after Stop from the journal, with the voice, effect and synth
+  settings as they were when recording began (later knob moves are not applied).
+  FluidSynth (melodic font, plus the percussion font for channel 9) or Neon write
+  raw audio into named pipes that FFmpeg encodes directly, so no WAV or other audio
+  buffer exists on disk or in memory at any length. Renders run one at a time at
+  low priority, and are never started automatically at boot or shutdown.
+- **Files.** `~/alesis_free_recordings/<id>.{json,journal,mid,mp3}`
+  (`ALESIS_FREE_RECORDING_DIR` overrides it). `<id>` is `jam-YYYYMMDD-HHMMSS`
+  from the wall clock, with a numeric suffix on collisions; the Pi has no clock
+  battery, so dates may be wrong but the timeline uses a monotonic clock.
+
+### Limits and failure behaviour
+
+There is no duration cap. What bounds a recording, in the order you would meet it:
+
+| Resource | Behaviour |
+| --- | --- |
+| Disk space | Recording is refused below 300 MB free and stops itself below 100 MB free, keeping everything up to then. The journal is about 16 bytes per event (roughly 2 MB per hour of dense playing); the MP3 is the large part (about 60 to 85 MB per hour). An MP3 render that cannot fit is refused with the numbers, and the MIDI stays. |
+| Events | One recording stops itself at 8,000,000 events (a 128 MB journal), far beyond hours of playing, as a guard against a stuck controller flooding the host. A warning shows from 80%. |
+| Memory | Constant. Events are streamed to disk, the display keeps 240 buckets, and rendering streams audio, so a 1-hour dense test peaked at 141 MB for the host process. |
+| Render time | About 134x real time on a workstation (one hour in 27 seconds). The Pi is untested; expect minutes per hour. A render with no output for two minutes is killed and reported as failed; Retry reruns it. |
+| Power cut or crash | Recovered as MIDI, as above. A render in progress is simply not resumed. |
+
 ## Coordinates, playback, and export
 
 Stored raw MIDI, quantized MIDI and waveform summaries use fixed source-cycle

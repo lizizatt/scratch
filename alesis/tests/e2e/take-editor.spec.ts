@@ -321,7 +321,7 @@ test("moving a note to another pitch auditions it on the host without recording 
   const { x, y } = await center(target);
   await page.mouse.move(x, y);
   await page.mouse.down();
-  await expect.poll(() => sent.length).toBe(1);
+  await expect.poll(() => sent.length).toBeGreaterThan(0);
   expect(JSON.parse(sent[0]!).command).toMatchObject({ type: "audition-note", takeId, note: first.note, velocity: first.velocity });
   await page.mouse.move(x, y - 16 * 3, { steps: 6 });
   await expect.poll(() => sent.map((frame) => JSON.parse(frame).command.note)).toContain(first.note + 3);

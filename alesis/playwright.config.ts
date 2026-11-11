@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const port = Number(process.env.PORT ?? 8787);
 const baseURL = `http://127.0.0.1:${port}`;
@@ -20,6 +20,8 @@ process.env.SAMPLE_LIBRARY_DIR = sampleLibraryDirectory;
 process.env.ALESIS_SETTINGS_PATH = join(sampleLibraryDirectory, "playwright-settings-v1.json");
 process.env.ALESIS_AUTOSAVE_PATH = join(sampleLibraryDirectory, "playwright-autosave-v1.json");
 process.env.ALESIS_EXPORT_DIR = join(sampleLibraryDirectory, "promoted-exports");
+// Outside the sample library, whose catalog would otherwise list the rendered MP3s.
+process.env.ALESIS_FREE_RECORDING_DIR = join(sampleLibraryDirectory, "..", `${basename(sampleLibraryDirectory)}-free`);
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -37,6 +39,7 @@ export default defineConfig({
       ALESIS_SETTINGS_PATH: process.env.ALESIS_SETTINGS_PATH,
       ALESIS_AUTOSAVE_PATH: process.env.ALESIS_AUTOSAVE_PATH,
       ALESIS_EXPORT_DIR: process.env.ALESIS_EXPORT_DIR,
+      ALESIS_FREE_RECORDING_DIR: process.env.ALESIS_FREE_RECORDING_DIR,
     },
   },
   projects: [

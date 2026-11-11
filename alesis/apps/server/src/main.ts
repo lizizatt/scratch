@@ -26,6 +26,7 @@ import { defaultSettingsCachePath, loadSettingsCache, restoreSettingsCache, save
 import { padMidiInput, SamplePadService } from "./sample-pads.js";
 import { PadPerformance, padControlCommand } from "./pad-performance.js";
 import { LoopExports } from "./loop-export.js";
+import { FreeRecordings, type FreeRecordingContext } from "./free-recordings.js";
 import { randomUUID } from "node:crypto";
 
 let soundFonts = discoverSoundFonts();
@@ -134,18 +135,23 @@ samplePads = new SamplePadService(sampleLibrary, (state) => {
   : undefined);
 const performanceRouter = new PerformanceRouter();
 const drumPadNotes = new DrumPadNoteTracker();
+const freeRecordings = new FreeRecordings({ directory: process.env.ALESIS_FREE_RECORDING_DIR ?? join(homedir(), "alesis_free_recordings") });
 const dispatchPerformance = (event: MidiEvent, endsAtCycleBoundary = false): void => {
   if (loopExports?.blocksPerformance()) return;
   engine.markCaptureActivity();
   loops.record(event, engine.runtimeSnapshot(), endsAtCycleBoundary);
   audio.dispatchMidi(event);
+  freeRecordings.record(event);
 };
 const dispatchDrumPadEvent = (event: MidiEvent, playAudio: boolean): void => {
   if (loopExports?.blocksPerformance()) return;
   engine.dispatchMidi(event);
   engine.markCaptureActivity();
   loops.record(event, engine.runtimeSnapshot());
-  if (playAudio) audio.dispatchMidi(event);
+  if (playAudio) {
+    audio.dispatchMidi(event);
+    freeRecordings.record(event);
+  }
 };
 const dispatchArpeggio = (event: MidiEvent, endsAtCycleBoundary = false): void => {
   advanceTransportClock();
@@ -332,8 +338,58 @@ const loopSessionHost: LoopSessionHost = {
     });
   },
 };
+const freeRecordingContext = (): FreeRecordingContext => {
+  const snapshot = engine.snapshot();
+  const soundFont = snapshot.synth.selectedId === "soundfont" && snapshot.synth.selectedSoundFontId ? soundFontsById.get(snapshot.synth.selectedSoundFontId) : undefined;
+  if (snapshot.synth.selectedId === "soundfont" && !soundFont) throw new Error("No SoundFont is selected to record with");
+  const preset = snapshot.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
+  const kit = snapshot.pads.drumKits.find(({ id }) => id === snapshot.pads.selectedDrumKitId);
+  return {
+    bpm: snapshot.settings.bpm, beatsPerMeasure: snapshot.settings.beatsPerMeasure,
+    synth: { id: snapshot.synth.selectedId, soundFont: soundFont ? { id: soundFont.id, name: soundFont.name, path: soundFont.path } : null, params: { ...snapshot.synth.parameterValues } },
+    voice: soundFont && preset ? { bank: preset.bank, program: preset.program } : null,
+    kit: kit ? { program: kit.program } : null,
+    soundFontPath: soundFont?.path ?? null,
+    percussionSoundFontPath: percussionSoundFontPath ?? null,
+  };
+};
+// A preset or kit change mid-recording becomes a program change; a different synth or SoundFont ends the recording, since one file renders with one sound source.
+let recordedSound = "";
+let recordedPreset: string | null = null;
+let recordedKit: string | null = null;
+const soundKey = (snapshot: ReturnType<typeof engine.runtimeSnapshot>): string => `${snapshot.synth.selectedId}|${snapshot.synth.selectedSoundFontId}`;
+engine.subscribeRuntime((snapshot) => {
+  if (!freeRecordings.recording) return;
+  if (soundKey(snapshot) !== recordedSound) {
+    void freeRecordings.stop("The synth or SoundFont changed").catch((error) => console.error(`Unable to stop recording: ${String(error)}`));
+    return;
+  }
+  const full = engine.snapshot();
+  const preset = full.synth.soundFontPresets.find(({ id }) => id === snapshot.synth.selectedSoundFontPresetId);
+  const kit = full.pads.drumKits.find(({ id }) => id === snapshot.pads.selectedDrumKitId);
+  if (preset && preset.id !== recordedPreset) { recordedPreset = preset.id; freeRecordings.markVoice(preset.bank, preset.program); }
+  if (kit && kit.id !== recordedKit) { recordedKit = kit.id; freeRecordings.markKit(kit.program); }
+});
 const executeCommand = async (command: EngineCommand, source = "host"): Promise<EngineResult> => {
   const currentResult = () => ({ accepted: true, revision: engine.snapshot().revision, appliedCycle: engine.snapshot().transport.cycle });
+  const rejected = (error: string) => ({ ...currentResult(), accepted: false, error });
+  if (command.type === "start-free-recording") {
+    if (!engine.snapshot().capture.freeRecord) return rejected("Switch to Record mode before recording");
+    if (importingSession || hotplugBusy || Object.values(readiness).some((dependency) => !dependency.ready)) return rejected("Not Ready: the host is reconnecting or a dependency is unavailable");
+    if (loopExports?.blocksPerformance()) return rejected("Stop export preview before recording");
+    await freeRecordings.start(freeRecordingContext());
+    const snapshot = engine.runtimeSnapshot();
+    recordedSound = soundKey(snapshot);
+    recordedPreset = snapshot.synth.selectedSoundFontPresetId;
+    recordedKit = snapshot.pads.selectedDrumKitId;
+    return currentResult();
+  }
+  if (command.type === "stop-free-recording") { await freeRecordings.stop(); return currentResult(); }
+  if (command.type === "render-free-recording") { freeRecordings.render(command.id); return currentResult(); }
+  if (command.type === "delete-free-recording") { await freeRecordings.delete(command.id); return currentResult(); }
+  if (freeRecordings.recording && ["set-capture-mode", "set-overdub", "select-synth", "select-soundfont", "refresh-soundfonts", "import-loop-session", "export-loop-session"].includes(command.type)) {
+    return rejected("Stop the recording first");
+  }
   if (command.type === "stop" || command.type === "panic") {
     const wasPreview = loopExports?.blocksPerformance();
     const cancellation = loopExports?.cancel();
@@ -604,7 +660,7 @@ const autosaver = new Autosaver({
 });
 const autosaveCommandTypes = new Set<EngineCommand["type"]>([
   "stop", "promote-staged", "promote-previous-staged", "delete-staged", "delete-take", "undo-delete",
-  "set-take-level", "set-take-muted", "set-take-notes", "set-staged-audible", "set-overdub", "set-loop-start", "set-monitor-only",
+  "set-take-level", "set-take-muted", "set-take-notes", "set-staged-audible", "set-overdub", "set-capture-mode", "set-loop-start", "set-monitor-only",
 ]);
 const persistentCommandTypes = new Set<EngineCommand["type"]>([
   "import-loop-session",
@@ -672,7 +728,8 @@ loopExports = new LoopExports({
     if (!result.accepted) throw new Error(result.error ?? "Sample refresh failed");
   },
 });
-controlServer = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeAndPersist, host, readiness, loopExports);
+await freeRecordings.init().catch((error) => console.error(`Free recordings are unavailable: ${error instanceof Error ? error.message : String(error)}`));
+controlServer = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeAndPersist, host, readiness, loopExports, freeRecordings);
 padPerformance = new PadPerformance({
   snapshot: () => performanceSnapshot,
   samples: samplePads,
@@ -705,6 +762,7 @@ const panic = (): void => {
   performanceRouter.panic();
   sustainPedals.reset();
   loops.cancelAuditions();
+  freeRecordings.silence();
   drumPadNotes.panic((event) => dispatchDrumPadEvent(event, false));
   samplePads.panic();
   }, audio);
@@ -804,6 +862,7 @@ console.log(`Audio output: ${audio.name} (${audio.id})`);
 console.log(`SoundFont: ${defaultSoundFont?.name ?? "none"}${defaultSoundFont ? ` (${defaultSoundFont.path})` : ""}`);
 
 async function shutdown(): Promise<void> {
+  await freeRecordings.close();
   await loopExports?.close();
   playback.dispose();
   footSwitch?.close();

@@ -17,17 +17,18 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import type { EngineCommand, EngineSnapshot, ServerMessage, Settings as EngineSettings, Take, PadAction } from "@alesis/protocol";
+import type { EngineCommand, EngineSnapshot, FreeRecordingStatus, ServerMessage, Settings as EngineSettings, Take, PadAction } from "@alesis/protocol";
 import { assignedPadAction, LOOP_SESSION_MAX_BYTES, parseLoopSession } from "@alesis/protocol";
 import { useControlSocket, type ConnectionState } from "./use-control-socket";
 import { Waveform } from "./loop-interaction";
 import { LoopExportDialog } from "./loop-export-dialog";
 import { TakeEditor } from "./take-editor";
+import { CaptureModeSwitch, FreeRecordingPanel, RecordControls, formatDuration } from "./free-recording";
 
 type Pane = "settings" | "synth" | "pads" | "loops";
 
 export function App() {
-  const { snapshot, readiness, connection, lastError, lastMessage, loopExport, send } = useControlSocket();
+  const { snapshot, readiness, connection, lastError, lastMessage, loopExport, freeRecording, send } = useControlSocket();
   const [pane, setPane] = useState<Pane>("loops");
   const [editingTakeId, setEditingTakeId] = useState<string | null>(null);
   const goTo = (next: Pane): void => { setEditingTakeId(null); setPane(next); };
@@ -46,7 +47,7 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <div className="connection-line"><span className={`connection-dot ${connection}`} /> {connection} // rev {snapshot.revision} // MIDI {snapshot.engine.midiEventsReceived}{snapshot.engine.lastMidiEvent ? ` ${snapshot.engine.lastMidiEvent}` : ""}</div>
+      <div className="connection-line"><span className={`connection-dot ${connection}`} /> {connection} // rev {snapshot.revision} // MIDI {snapshot.engine.midiEventsReceived}{snapshot.engine.lastMidiEvent ? ` ${snapshot.engine.lastMidiEvent}` : ""}{freeRecording.active && <b className="rec-indicator" role="status" aria-label="Recording"> ● REC {formatDuration(freeRecording.active.elapsedMs)}</b>}</div>
       <div className="app-notices">
         {failures.length > 0 && <div className="readiness-line" role="alert"><strong>NOT READY</strong>{failures.map(([name, dependency]) => <span key={name}>{name}: {dependency.reason ?? "Unavailable"}</span>)}</div>}
         {lastError && lastError !== sampleExport.feedback?.message && <div className="error-line" role="alert">{lastError}</div>}
@@ -57,7 +58,7 @@ export function App() {
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
       {pane === "pads" && <PadsPane snapshot={snapshot} send={send} connection={connection} />}
-      {pane === "loops" && editingTakeId === null && <LoopPane snapshot={snapshot} send={send} sampleExport={sampleExport} triggerSampleExport={() => setExportTarget("sample")} triggerPromotedExport={() => setExportTarget("promoted")} editTake={setEditingTakeId} />}
+      {pane === "loops" && editingTakeId === null && <LoopPane snapshot={snapshot} send={send} freeRecording={freeRecording} sampleExport={sampleExport} triggerSampleExport={() => setExportTarget("sample")} triggerPromotedExport={() => setExportTarget("promoted")} editTake={setEditingTakeId} />}
       {pane === "loops" && editingTakeId !== null && <TakeEditor key={editingTakeId} snapshot={snapshot} send={send} takeId={editingTakeId} onBack={() => setEditingTakeId(null)} />}
       {exportTarget && <LoopExportDialog target={exportTarget} snapshot={snapshot} status={loopExport} send={send} onClose={() => setExportTarget(null)} onSaved={(message) => setSampleExport({ pending: false, feedback: { kind: message.includes("Warning:") ? "warning" : "success", message } })} />}
       <nav className="app-nav" aria-label="Application sections">
@@ -453,12 +454,15 @@ function PadEditor({ snapshot, send, pad, close }: PaneProps & { pad: number; cl
   </dialog>;
 }
 
-function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPromotedExport, editTake }: PaneProps & {
+function LoopPane({ snapshot, send, freeRecording, sampleExport, triggerSampleExport, triggerPromotedExport, editTake }: PaneProps & {
+  freeRecording: FreeRecordingStatus;
   sampleExport: SampleExportState;
   triggerSampleExport: () => void;
   triggerPromotedExport: () => void;
   editTake: (takeId: string) => void;
 }) {
+  const freeMode = snapshot.capture.freeRecord;
+  const recording = freeRecording.active !== null;
   const isPlaying = snapshot.transport.state !== "stopped";
   const captureProgress = isPlaying ? (snapshot.transport.origin + snapshot.transport.progress) % 1 : snapshot.capture.loopStart;
   const hasIncomingCapture = snapshot.capture.hasCurrentEvents || snapshot.capture.currentWaveform.some((sample) => sample !== 0);
@@ -479,6 +483,7 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
     <section className="pane loop-pane" aria-label="Looper">
       <header className="loop-toolbar">
         <div className="transport-controls">
+          {freeMode ? <RecordControls recording={recording} send={send} /> : <>
           <IconButton label="Stop" onClick={() => send({ type: "stop" })}><Square /></IconButton>
           <IconButton
             label={snapshot.transport.state === "playing" ? "Pause" : snapshot.transport.state === "paused" ? "Resume" : snapshot.transport.state === "counting-in" ? "Pause unavailable during count-in" : "Play"}
@@ -488,22 +493,23 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
           >{snapshot.transport.state === "playing" || snapshot.transport.state === "counting-in" ? <Pause /> : <Play />}</IconButton>
           <IconButton label="Monitor only" active={snapshot.monitorOnly} pressed={snapshot.monitorOnly} onClick={() => send({ type: "set-monitor-only", enabled: !snapshot.monitorOnly })}><Headphones /></IconButton>
           <IconButton label={snapshot.settings.metronomeEnabled ? "Mute metronome" : "Unmute metronome"} active={snapshot.settings.metronomeEnabled} pressed={snapshot.settings.metronomeEnabled} onClick={() => send({ type: "configure", settings: { metronomeEnabled: !snapshot.settings.metronomeEnabled } })}>{snapshot.settings.metronomeEnabled ? <Volume2 /> : <VolumeX />}</IconButton>
+          </>}
         </div>
-        <div className="transport-status">{snapshot.transport.state} // cycle {String(snapshot.transport.cycle + 1).padStart(2, "0")}</div>
-        <div className="export-actions">
+        <div className="transport-status">{freeMode ? (recording ? `recording // ${formatDuration(freeRecording.active!.elapsedMs)}` : "record mode // ready") : `${snapshot.transport.state} // cycle ${String(snapshot.transport.cycle + 1).padStart(2, "0")}`}</div>
+        {!freeMode && <div className="export-actions">
           <span className="sample-export-hint" aria-live="polite">{sampleExportDisabledReason ?? `${cycleSeconds.toFixed(1)}s loop cycle`}</span>
           <button className={`icon-button sample-export-button ${sampleExport.pending ? "exporting" : ""}`} type="button" aria-label={sampleExport.pending ? "Exporting…" : "Export loop to sample library"} title={sampleExport.pending ? "Exporting…" : "Export loop to sample library"} disabled={sampleExportDisabledReason !== null || sampleExport.pending} onClick={triggerSampleExport}>
             <Music2 />{sampleExport.pending && <span>Exporting…</span>}
           </button>
           <IconButton label="Save promoted tracks as MP3 files" disabled={snapshot.promoted.length === 0} onClick={triggerPromotedExport}><Download /></IconButton>
-        </div>
+        </div>}
       </header>
 
-      <LoopSessionControls snapshot={snapshot} send={send} />
+      <LoopSessionControls snapshot={snapshot} send={send} recording={recording} />
 
       {snapshot.capture.error && <p role="alert">{snapshot.capture.error}</p>}
 
-      <div className={`signal-stack ${snapshot.capture.overdub ? "overdub-stack" : ""}`}>
+      {freeMode ? <FreeRecordingPanel status={freeRecording} send={send} /> : <div className={`signal-stack ${snapshot.capture.overdub ? "overdub-stack" : ""}`}>
         {!snapshot.capture.overdub && <section className="current-capture live-capture">
           <div className="staging-lane">
             <span className="lane-label">Current capture // live</span>
@@ -545,13 +551,13 @@ function LoopPane({ snapshot, send, sampleExport, triggerSampleExport, triggerPr
           {snapshot.promoted.length === 0 && <div className="empty-list">PROMOTED TAKES APPEAR HERE</div>}
           {snapshot.promoted.map((take, index) => <TakeRow key={take.id} take={take} index={index} beatCount={beatCount} beatsPerMeasure={snapshot.settings.beatsPerMeasure} loopStart={snapshot.capture.loopStart} send={send} edit={() => editTake(take.id)} {...voiceLabelProps(snapshot, take)} />)}
         </section>
-      </div>
+      </div>}
       {snapshot.canUndoDelete && <button className="undo-button" type="button" onClick={() => send({ type: "undo-delete" })}><RotateCcw /> Undo delete</button>}
     </section>
   );
 }
 
-function LoopSessionControls({ snapshot, send }: PaneProps) {
+function LoopSessionControls({ snapshot, send, recording }: PaneProps & { recording: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const busy = useRef(false);
@@ -610,7 +616,7 @@ function LoopSessionControls({ snapshot, send }: PaneProps) {
     <div className="session-toolbar" role="toolbar" aria-label="Editable loop sessions">
       <button type="button" disabled={!stopped || pending} onClick={() => execute({ type: "export-loop-session" })}>Save loop session</button>
       <button type="button" disabled={!stopped || pending} onClick={() => input.current?.click()}>Load loop session</button>
-      <label className="overdub-toggle"><input aria-label="Overdub staged loop" type="checkbox" checked={snapshot.capture.overdub} onChange={(event) => send({ type: "set-overdub", enabled: event.target.checked })} /> Overdub</label>
+      <CaptureModeSwitch snapshot={snapshot} send={send} recording={recording} />
       <input ref={input} type="file" hidden accept=".json,application/json" aria-label="Loop session JSON file" onChange={(event) => { void chooseFile(event); }} />
       <span>{pending ? "Working…" : "Stop first · Completed takes only · MP3 is not editable"}</span>
     </div>

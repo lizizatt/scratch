@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 9 as const;
+export const PROTOCOL_VERSION = 10 as const;
 
 export const LOOP_SESSION_MAX_BYTES = 4 * 1024 * 1024;
 export const LOOP_SESSION_MAX_EVENTS_PER_TAKE = 32_768;
@@ -224,6 +224,8 @@ export const engineSnapshotSchema = z.object({
   capture: z.object({
     loopStart: loopPositionSchema.default(0),
     overdub: z.boolean().default(false),
+    /** Open-ended recording mode: Record/Stop write a .mid and .mp3 instead of looping. */
+    freeRecord: z.boolean().default(false),
     error: z.string().nullable().default(null),
     currentWaveform: waveformSchema,
     hasCurrentEvents: z.boolean(),
@@ -307,6 +309,45 @@ export const idleLoopExport: LoopExportStatus = { state: "idle", artifactId: nul
 export const loopArtifactInfoSchema = z.object({ artifactId: z.string().uuid(), durationSeconds: z.number().positive(), target: z.enum(["sample", "promoted"]) });
 export type LoopArtifactInfo = z.infer<typeof loopArtifactInfoSchema>;
 
+export const captureModeSchema = z.enum(["replace", "overdub", "record"]);
+export type CaptureMode = z.infer<typeof captureModeSchema>;
+export const freeRecordingIdSchema = z.string().regex(/^jam-[A-Za-z0-9-]{1,64}$/);
+export const FREE_RECORDING_WAVEFORM_BUCKETS = 240;
+export const freeRecordingItemSchema = z.object({
+  id: freeRecordingIdSchema,
+  name: z.string().min(1).max(128),
+  createdAt: z.string().max(64),
+  durationMs: z.number().nonnegative(),
+  noteCount: z.number().int().nonnegative(),
+  recovered: z.boolean(),
+  midiBytes: z.number().int().nonnegative(),
+  mp3: z.object({
+    state: z.enum(["none", "queued", "rendering", "ready", "failed"]),
+    bytes: z.number().int().nonnegative().nullable(),
+    progress: z.number().min(0).max(1).optional(),
+    error: z.string().max(512).optional(),
+  }),
+});
+export type FreeRecordingItem = z.infer<typeof freeRecordingItemSchema>;
+export const freeRecordingStatusSchema = z.object({
+  active: z.object({
+    id: freeRecordingIdSchema,
+    elapsedMs: z.number().nonnegative(),
+    noteCount: z.number().int().nonnegative(),
+    eventCount: z.number().int().nonnegative(),
+    /** Intensity per bucket, filled from the left; the full axis is `buckets` x `bucketMs`. */
+    waveform: waveformSchema,
+    bucketMs: z.number().positive(),
+    buckets: z.number().int().positive(),
+    warning: z.string().max(256).nullable(),
+  }).nullable(),
+  items: z.array(freeRecordingItemSchema).max(200),
+  diskFreeBytes: z.number().nonnegative().nullable(),
+  error: z.string().max(512).nullable(),
+});
+export type FreeRecordingStatus = z.infer<typeof freeRecordingStatusSchema>;
+export const idleFreeRecording: FreeRecordingStatus = { active: null, items: [], diskFreeBytes: null, error: null };
+
 const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("prepare-loop-export"), artifactId: z.string().uuid(), target: z.enum(["sample", "promoted"]), startBeat: z.number().int().nonnegative().max(1023).optional() }),
   z.object({ type: z.literal("preview-loop-export"), artifactId: z.string().uuid(), enabled: z.boolean() }),
@@ -318,6 +359,11 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("stop") }),
   z.object({ type: z.literal("set-loop-start"), position: loopPositionSchema }),
   z.object({ type: z.literal("set-overdub"), enabled: z.boolean() }),
+  z.object({ type: z.literal("set-capture-mode"), mode: captureModeSchema }),
+  z.object({ type: z.literal("start-free-recording") }),
+  z.object({ type: z.literal("stop-free-recording") }),
+  z.object({ type: z.literal("render-free-recording"), id: freeRecordingIdSchema }),
+  z.object({ type: z.literal("delete-free-recording"), id: freeRecordingIdSchema }),
   z.object({ type: z.literal("set-monitor-only"), enabled: z.boolean() }),
   z.object({ type: z.literal("configure"), settings: settingsSchema.partial(), clearAudio: z.boolean().optional() }),
   z.object({ type: z.literal("select-synth"), synthId: z.string().min(1) }),
@@ -362,8 +408,9 @@ export const commandEnvelopeSchema = z.object({
 });
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema, loopExport: loopExportStatusSchema.default(idleLoopExport) }),
+  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema, loopExport: loopExportStatusSchema.default(idleLoopExport), freeRecording: freeRecordingStatusSchema.default(idleFreeRecording) }),
   z.object({ type: z.literal("loop-export-status"), status: loopExportStatusSchema }),
+  z.object({ type: z.literal("free-recording-status"), status: freeRecordingStatusSchema }),
   z.object({ type: z.literal("snapshot-update"), update: snapshotUpdateSchema, readiness: readinessSchema }),
   z.object({
     type: z.literal("command-result"),

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
   PROTOCOL_VERSION,
+  idleFreeRecording,
   idleLoopExport,
+  type FreeRecordingStatus,
   type LoopExportStatus,
   serverMessageSchema,
   type EngineCommand,
@@ -21,6 +23,7 @@ export function useControlSocket(): {
   lastError: string | null;
   lastMessage: string | null;
   loopExport: LoopExportStatus;
+  freeRecording: FreeRecordingStatus;
   send: (command: EngineCommand, onResult?: CommandResultHandler) => string | null;
 } {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
@@ -29,6 +32,7 @@ export function useControlSocket(): {
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [loopExport, setLoopExport] = useState<LoopExportStatus>(idleLoopExport);
+  const [freeRecording, setFreeRecording] = useState<FreeRecordingStatus>(idleFreeRecording);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingResultsRef = useRef(new Map<string, CommandResultHandler>());
 
@@ -58,7 +62,9 @@ export function useControlSocket(): {
           setSnapshot(parsed.data.snapshot);
           setReadiness(parsed.data.readiness);
           setLoopExport(parsed.data.loopExport);
+          setFreeRecording(parsed.data.freeRecording);
         }
+        if (parsed.data.type === "free-recording-status") setFreeRecording(parsed.data.status);
         if (parsed.data.type === "loop-export-status") setLoopExport(parsed.data.status);
         if (parsed.data.type === "snapshot-update") {
           const update = parsed.data.update;
@@ -111,5 +117,5 @@ export function useControlSocket(): {
     return commandId;
   };
 
-  return { snapshot, readiness, connection, lastError, lastMessage, loopExport, send };
+  return { snapshot, readiness, connection, lastError, lastMessage, loopExport, freeRecording, send };
 }

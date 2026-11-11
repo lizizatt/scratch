@@ -1,4 +1,4 @@
-export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMeasure, loopStart, showLoopStart = false, live = false, progress, emptyLabel, label, onOpen, openLabel }: { samples: number[]; incomingSamples?: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; showLoopStart?: boolean; live?: boolean; progress?: number; emptyLabel?: string; label?: string; onOpen?: () => void; openLabel?: string }) {
+export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMeasure, loopStart, showLoopStart = false, live = false, progress, emptyLabel, label, onOpen, openLabel, span }: { samples: number[]; incomingSamples?: number[]; beatCount: number; beatsPerMeasure: number; loopStart: number; showLoopStart?: boolean; live?: boolean; progress?: number; emptyLabel?: string; label?: string; onOpen?: () => void; openLabel?: string; span?: number }) {
   const openable = onOpen ? {
     role: "button", tabIndex: 0, "aria-label": openLabel ?? "Edit take", onClick: onOpen,
     onKeyDown: (event: React.KeyboardEvent) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } },
@@ -10,7 +10,7 @@ export function Waveform({ samples, incomingSamples = [], beatCount, beatsPerMea
       </div>
       {[samples, incomingSamples].map((layer, layerIndex) => layer.length > 0 && <svg key={layerIndex} className={layerIndex === 0 ? "base-waveform" : "incoming-waveform"} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">{layer.map((sample, index) => {
         const amplitude = Math.abs(sample);
-        const x = layer.length === 1 ? 50 : index / (layer.length - 1) * 100;
+        const x = span !== undefined ? index / (span - 1) * 100 : layer.length === 1 ? 50 : index / (layer.length - 1) * 100;
         return <line className="intensity-sample" key={index} x1={x} x2={x} y1={50 - amplitude * 44} y2={50 + amplitude * 44} />;
       })}</svg>)}
       {samples.length === 0 && incomingSamples.length === 0 && <span>{emptyLabel}</span>}

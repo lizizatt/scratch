@@ -1,10 +1,13 @@
-import { createServer, type Server as HttpServer } from "node:http";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import type { EngineResult, HostEngine } from "@alesis/engine";
 import {
   commandEnvelopeSchema,
   LOOP_SESSION_MAX_BYTES,
+  idleFreeRecording,
   idleLoopExport,
   type CommandEnvelope,
   type EngineCommand,
@@ -13,9 +16,10 @@ import {
 } from "@alesis/protocol";
 import { WebSocket, WebSocketServer } from "ws";
 import sirv from "sirv";
+import type { FreeRecordings } from "./free-recordings.js";
 import type { LoopExports } from "./loop-export.js";
 
-const longCommand = (command: EngineCommand): boolean => ["export-mp3", "export-loop-sample", "prepare-loop-export", "publish-loop-export", "release-loop-export"].includes(command.type);
+const longCommand = (command: EngineCommand): boolean => ["export-mp3", "export-loop-sample", "prepare-loop-export", "publish-loop-export", "release-loop-export", "stop-free-recording", "delete-free-recording"].includes(command.type);
 
 export interface ControlServer {
   readonly port: number;
@@ -46,8 +50,9 @@ export async function createControlServer(
   host = "127.0.0.1",
   readiness: Readiness = readyForDevelopment,
   exports?: Pick<LoopExports, "status" | "subscribe" | "disconnect">,
+  freeRecordings?: Pick<FreeRecordings, "status" | "subscribe" | "resolveFile">,
 ): Promise<ControlServer> {
-  const httpServer = createHttpServer(staticDirectory, readiness);
+  const httpServer = createHttpServer(staticDirectory, readiness, freeRecordings);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control", maxPayload: LOOP_SESSION_MAX_BYTES * 6 + 1024 });
   const results = new Map<string, ServerMessage>();
   const inFlight = new Map<string, Promise<ServerMessage>>();
@@ -75,7 +80,7 @@ export async function createControlServer(
   };
 
   const broadcastSnapshotNow = (): void => {
-    const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport } satisfies ServerMessage);
+    const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport, freeRecording: freeRecordings?.status() ?? idleFreeRecording } satisfies ServerMessage);
     webSocketServer.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) client.send(payload);
     });
@@ -121,12 +126,16 @@ export async function createControlServer(
     const payload = JSON.stringify({ type: "loop-export-status", status } satisfies ServerMessage);
     for (const socket of webSocketServer.clients) if (socket.readyState === WebSocket.OPEN) socket.send(payload);
   });
+  const unsubscribeFreeRecordings = freeRecordings?.subscribe((status) => {
+    const payload = JSON.stringify({ type: "free-recording-status", status } satisfies ServerMessage);
+    for (const socket of webSocketServer.clients) if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+  });
   webSocketServer.on("connection", (socket) => {
     const connectionId = randomUUID();
     socket.on("error", () => { /* Payload-limit/protocol errors close only this connection. */ });
     const connection: ConnectionState = { id: connectionId, heldSamplePads: new Set<number>(), cleanup: null };
     connections.add(connection);
-    socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport } satisfies ServerMessage));
+    socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport, freeRecording: freeRecordings?.status() ?? idleFreeRecording } satisfies ServerMessage));
     socket.on("message", async (data) => {
       const envelope = parseEnvelope(data.toString());
       if (!envelope) {
@@ -281,6 +290,7 @@ export async function createControlServer(
     async close() {
       unsubscribe();
       unsubscribeExports?.();
+      unsubscribeFreeRecordings?.();
       if (snapshotTimer) clearTimeout(snapshotTimer);
       const connectionCleanups = [...connections].map(queueConnectionCleanup);
       for (const client of webSocketServer.clients) client.terminate();
@@ -321,9 +331,53 @@ async function executeEnvelope(
   }
 }
 
-function createHttpServer(staticDirectory: string | undefined, readiness: Readiness): HttpServer {
+const recordingPath = /^\/recordings\/(jam-[A-Za-z0-9-]{1,64})\.(mid|mp3)$/;
+
+/** Serves a finished recording as a download, honoring byte ranges so the MP3 can be previewed and resumed. */
+async function serveRecording(request: IncomingMessage, response: ServerResponse, file: { path: string; name: string }, extension: "mid" | "mp3"): Promise<void> {
+  try {
+    const { size } = await stat(file.path);
+    const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range ?? "");
+    let start = 0;
+    let end = size - 1;
+    if (range && (range[1] || range[2])) {
+      if (range[1]) { start = Number(range[1]); if (range[2]) end = Math.min(end, Number(range[2])); }
+      else { start = Math.max(0, size - Number(range[2])); }
+      if (start > end || start >= size) { response.writeHead(416, { "content-range": `bytes */${size}` }).end(); return; }
+    }
+    const partial = range !== null && (start !== 0 || end !== size - 1);
+    response.writeHead(partial ? 206 : 200, {
+      "content-type": extension === "mid" ? "audio/midi" : "audio/mpeg",
+      "content-length": end - start + 1,
+      "accept-ranges": "bytes",
+      "content-disposition": `attachment; filename="${file.name}"`,
+      "cache-control": "no-store",
+      ...partial ? { "content-range": `bytes ${start}-${end}/${size}` } : {},
+    });
+    if (request.method === "HEAD" || size === 0) { response.end(); return; }
+    const stream = createReadStream(file.path, { start, end });
+    stream.on("error", () => response.destroy());
+    response.on("close", () => stream.destroy());
+    stream.pipe(response);
+  } catch {
+    if (!response.headersSent) response.writeHead(404).end();
+    else response.destroy();
+  }
+}
+
+function createHttpServer(staticDirectory: string | undefined, readiness: Readiness, freeRecordings?: Pick<FreeRecordings, "resolveFile">): HttpServer {
   const serveStatic = staticDirectory ? sirv(staticDirectory, { single: true, dev: true }) : undefined;
   return createServer((request, response) => {
+    const target = request.url?.split("?")[0] ?? "";
+    const download = recordingPath.exec(target);
+    if (target.startsWith("/recordings/")) {
+      if (!download) { response.writeHead(404).end(); return; }
+      const extension = download[2] as "mid" | "mp3";
+      const file = request.method === "GET" || request.method === "HEAD" ? freeRecordings?.resolveFile(download[1]!, extension) : null;
+      if (!file) { response.writeHead(404).end(); return; }
+      void serveRecording(request, response, file, extension);
+      return;
+    }
     if (request.url === "/health") {
       const ready = Object.values(readiness).every((dependency) => dependency.ready);
       response.writeHead(ready ? 200 : 503, { "content-type": "application/json" });

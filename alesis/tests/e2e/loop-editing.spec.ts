@@ -94,7 +94,7 @@ test("overdub presents the staged take as current capture without displaced lane
   expect((await control(baseURL!)).capture.staged).toEqual(before.capture.staged);
   await expect(page.locator(".current-capture .waveform svg")).toBeVisible();
   await page.screenshot({ path: `artifacts/ui-qa/overdub-${info.project.name}.png` });
-  await page.getByLabel("Overdub staged loop").click();
+  await page.getByLabel("Replace staged loop").click();
   await expect(page.locator(".previous-staged-capture")).toBeVisible();
   expect((await control(baseURL!)).capture.previousStaged).toEqual(before.capture.previousStaged);
 });
@@ -128,7 +128,7 @@ test("stable overdub, marker and velocity floor survive browser reload and sessi
   expect(saved.staged!.rawRecording.some(({ event }) => event.type === "note-on" && event.velocity > 0)).toBe(true);
   const cache = JSON.parse(await readFile(process.env.ALESIS_SETTINGS_PATH!, "utf8"));
   expect(cache.settings.minimumVelocity).toBe(72);
-  await page.getByLabel("Overdub staged loop").click();
+  await page.getByLabel("Replace staged loop").click();
   await expect(page.getByLabel("Overdub staged loop")).not.toBeChecked();
   await control(baseURL!, { type: "set-loop-start", position: 0 });
   await control(baseURL!, { type: "configure", settings: { minimumVelocity: 1 } });
