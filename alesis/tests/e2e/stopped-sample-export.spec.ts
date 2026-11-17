@@ -85,8 +85,8 @@ test("exports a completed demo take while stopped without restarting transport",
     await exportButton.click();
     await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
     const feedback = page.locator(".sample-export-feedback");
-    await expect(feedback).toHaveText(/^Saved Loop \d{4,}\.mp3 to the sample library\.$/, { timeout: 30_000 });
-    const filename = (await feedback.textContent())!.match(/^Saved (Loop \d{4,}\.mp3) to the sample library\.$/)![1]!;
+    await expect(feedback).toHaveText(/^Saved Loop \d{4,}\.mp3 to the sample library\.(?: The loop was also saved as "[^"]+" so you can keep editing it\.)?$/, { timeout: 30_000 });
+    const filename = (await feedback.textContent())!.match(/^Saved (Loop \d{4,}\.mp3) to the sample library\.(?: The loop was also saved as "[^"]+" so you can keep editing it\.)?$/)![1]!;
     exportedPath = join(sampleRoot, filename);
     expect((await stat(exportedPath)).size).toBeGreaterThan(1_000);
     const after = await control(baseURL!);

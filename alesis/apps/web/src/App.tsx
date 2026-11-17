@@ -17,18 +17,19 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import type { EngineCommand, EngineSnapshot, FreeRecordingStatus, ServerMessage, Settings as EngineSettings, Take, PadAction } from "@alesis/protocol";
+import type { EngineCommand, EngineSnapshot, FreeRecordingStatus, SavedLoopsStatus, ServerMessage, Settings as EngineSettings, Take, PadAction } from "@alesis/protocol";
 import { assignedPadAction, LOOP_SESSION_MAX_BYTES, parseLoopSession } from "@alesis/protocol";
 import { useControlSocket, type ConnectionState } from "./use-control-socket";
 import { Waveform } from "./loop-interaction";
 import { LoopExportDialog } from "./loop-export-dialog";
 import { TakeEditor } from "./take-editor";
 import { CaptureModeSwitch, FreeRecordingPanel, RecordControls, formatDuration } from "./free-recording";
+import { SavedLoopsPanel } from "./saved-loops";
 
 type Pane = "settings" | "synth" | "pads" | "loops";
 
 export function App() {
-  const { snapshot, readiness, connection, lastError, lastMessage, loopExport, freeRecording, send } = useControlSocket();
+  const { snapshot, readiness, connection, lastError, lastMessage, loopExport, freeRecording, savedLoops, send } = useControlSocket();
   const [pane, setPane] = useState<Pane>("loops");
   const [editingTakeId, setEditingTakeId] = useState<string | null>(null);
   const goTo = (next: Pane): void => { setEditingTakeId(null); setPane(next); };
@@ -58,7 +59,7 @@ export function App() {
       {pane === "settings" && <SettingsPane snapshot={snapshot} send={send} />}
       {pane === "synth" && <SynthPane snapshot={snapshot} send={send} />}
       {pane === "pads" && <PadsPane snapshot={snapshot} send={send} connection={connection} />}
-      {pane === "loops" && editingTakeId === null && <LoopPane snapshot={snapshot} send={send} freeRecording={freeRecording} sampleExport={sampleExport} triggerSampleExport={() => setExportTarget("sample")} triggerPromotedExport={() => setExportTarget("promoted")} editTake={setEditingTakeId} />}
+      {pane === "loops" && editingTakeId === null && <LoopPane snapshot={snapshot} send={send} freeRecording={freeRecording} savedLoops={savedLoops} sampleExport={sampleExport} triggerSampleExport={() => setExportTarget("sample")} triggerPromotedExport={() => setExportTarget("promoted")} editTake={setEditingTakeId} />}
       {pane === "loops" && editingTakeId !== null && <TakeEditor key={editingTakeId} snapshot={snapshot} send={send} takeId={editingTakeId} onBack={() => setEditingTakeId(null)} />}
       {exportTarget && <LoopExportDialog target={exportTarget} snapshot={snapshot} status={loopExport} send={send} onClose={() => setExportTarget(null)} onSaved={(message) => setSampleExport({ pending: false, feedback: { kind: message.includes("Warning:") ? "warning" : "success", message } })} />}
       <nav className="app-nav" aria-label="Application sections">
@@ -454,8 +455,9 @@ function PadEditor({ snapshot, send, pad, close }: PaneProps & { pad: number; cl
   </dialog>;
 }
 
-function LoopPane({ snapshot, send, freeRecording, sampleExport, triggerSampleExport, triggerPromotedExport, editTake }: PaneProps & {
+function LoopPane({ snapshot, send, freeRecording, savedLoops, sampleExport, triggerSampleExport, triggerPromotedExport, editTake }: PaneProps & {
   freeRecording: FreeRecordingStatus;
+  savedLoops: SavedLoopsStatus;
   sampleExport: SampleExportState;
   triggerSampleExport: () => void;
   triggerPromotedExport: () => void;
@@ -505,7 +507,7 @@ function LoopPane({ snapshot, send, freeRecording, sampleExport, triggerSampleEx
         </div>}
       </header>
 
-      <LoopSessionControls snapshot={snapshot} send={send} recording={recording} />
+      <LoopSessionControls snapshot={snapshot} send={send} recording={recording} savedLoops={savedLoops} />
 
       {snapshot.capture.error && <p role="alert">{snapshot.capture.error}</p>}
 
@@ -557,7 +559,7 @@ function LoopPane({ snapshot, send, freeRecording, sampleExport, triggerSampleEx
   );
 }
 
-function LoopSessionControls({ snapshot, send, recording }: PaneProps & { recording: boolean }) {
+function LoopSessionControls({ snapshot, send, recording, savedLoops }: PaneProps & { recording: boolean; savedLoops: SavedLoopsStatus }) {
   const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const busy = useRef(false);
@@ -618,8 +620,9 @@ function LoopSessionControls({ snapshot, send, recording }: PaneProps & { record
       <button type="button" disabled={!stopped || pending} onClick={() => input.current?.click()}>Load loop session</button>
       <CaptureModeSwitch snapshot={snapshot} send={send} recording={recording} />
       <input ref={input} type="file" hidden accept=".json,application/json" aria-label="Loop session JSON file" onChange={(event) => { void chooseFile(event); }} />
-      <span>{pending ? "Working…" : "Stop first · Completed takes only · MP3 is not editable"}</span>
+      <span>{pending ? "Working…" : "Stop first · Completed takes only"}</span>
     </div>
+    <SavedLoopsPanel snapshot={snapshot} status={savedLoops} send={send} recording={recording} />
     {feedback && <div className={`session-feedback ${feedback.error ? "error" : "success"}`} role={feedback.error ? "alert" : "status"}>{feedback.text}</div>}
     <dialog ref={dialog} className="save-dialog session-dialog" aria-labelledby="load-session-title" onCancel={() => setUpload(null)}>
       <h2 id="load-session-title">Replace completed takes?</h2>

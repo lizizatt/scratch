@@ -7,6 +7,7 @@ import {
   LOOP_SESSION_MAX_BYTES,
   idleFreeRecording,
   idleLoopExport,
+  idleSavedLoops,
   type CommandEnvelope,
   type EngineCommand,
   type Readiness,
@@ -17,6 +18,7 @@ import sirv from "sirv";
 import { serveFile, type createFileBrowser } from "./file-browser.js";
 import type { FreeRecordings } from "./free-recordings.js";
 import type { LoopExports } from "./loop-export.js";
+import type { LoopLibrary } from "./loop-library.js";
 
 const longCommand = (command: EngineCommand): boolean => ["export-mp3", "export-loop-sample", "prepare-loop-export", "publish-loop-export", "release-loop-export", "stop-free-recording", "delete-free-recording"].includes(command.type);
 
@@ -51,6 +53,7 @@ export async function createControlServer(
   exports?: Pick<LoopExports, "status" | "subscribe" | "disconnect">,
   freeRecordings?: Pick<FreeRecordings, "status" | "subscribe" | "resolveFile">,
   fileBrowser?: ReturnType<typeof createFileBrowser>,
+  loopLibrary?: Pick<LoopLibrary, "status" | "subscribe">,
 ): Promise<ControlServer> {
   const httpServer = createHttpServer(staticDirectory, readiness, freeRecordings, fileBrowser);
   const webSocketServer = new WebSocketServer({ server: httpServer, path: "/control", maxPayload: LOOP_SESSION_MAX_BYTES * 6 + 1024 });
@@ -80,7 +83,7 @@ export async function createControlServer(
   };
 
   const broadcastSnapshotNow = (): void => {
-    const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport, freeRecording: freeRecordings?.status() ?? idleFreeRecording } satisfies ServerMessage);
+    const payload = JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport, freeRecording: freeRecordings?.status() ?? idleFreeRecording, savedLoops: loopLibrary?.status() ?? idleSavedLoops } satisfies ServerMessage);
     webSocketServer.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) client.send(payload);
     });
@@ -130,12 +133,16 @@ export async function createControlServer(
     const payload = JSON.stringify({ type: "free-recording-status", status } satisfies ServerMessage);
     for (const socket of webSocketServer.clients) if (socket.readyState === WebSocket.OPEN) socket.send(payload);
   });
+  const unsubscribeLoopLibrary = loopLibrary?.subscribe((status) => {
+    const payload = JSON.stringify({ type: "saved-loops-status", status } satisfies ServerMessage);
+    for (const socket of webSocketServer.clients) if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+  });
   webSocketServer.on("connection", (socket) => {
     const connectionId = randomUUID();
     socket.on("error", () => { /* Payload-limit/protocol errors close only this connection. */ });
     const connection: ConnectionState = { id: connectionId, heldSamplePads: new Set<number>(), cleanup: null };
     connections.add(connection);
-    socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport, freeRecording: freeRecordings?.status() ?? idleFreeRecording } satisfies ServerMessage));
+    socket.send(JSON.stringify({ type: "snapshot", snapshot: engine.snapshot(), readiness, loopExport: exports?.status() ?? idleLoopExport, freeRecording: freeRecordings?.status() ?? idleFreeRecording, savedLoops: loopLibrary?.status() ?? idleSavedLoops } satisfies ServerMessage));
     socket.on("message", async (data) => {
       const envelope = parseEnvelope(data.toString());
       if (!envelope) {
@@ -143,7 +150,7 @@ export async function createControlServer(
         return;
       }
 
-      const sessionCommand = envelope.command.type === "export-loop-session" || envelope.command.type === "import-loop-session";
+      const sessionCommand = ["export-loop-session", "import-loop-session", "save-loop", "load-saved-loop"].includes(envelope.command.type);
       const ownedCommand = sessionCommand || longCommand(envelope.command) || envelope.command.type === "preview-loop-export";
       const resultKey = ownedCommand ? `${connectionId}:${envelope.commandId}` : envelope.commandId;
       const cached = results.get(resultKey);
@@ -215,7 +222,7 @@ export async function createControlServer(
 
   const executeTrackedCommand = async (command: EngineCommand, source?: string): Promise<EngineResult> => {
     const before = engine.snapshot();
-    if ((command.type === "import-loop-session" || command.type === "export-loop-session") && before.transport.state !== "stopped") {
+    if (["import-loop-session", "export-loop-session", "save-loop", "load-saved-loop"].includes(command.type) && before.transport.state !== "stopped") {
       return { accepted: false, revision: before.revision, appliedCycle: before.transport.cycle, error: "Stop transport before saving or loading a loop session" };
     }
     const result = command.type === "trigger-sample-pad" || command.type === "release-sample-pad" || longCommand(command) || command.type === "preview-loop-export"
@@ -291,6 +298,7 @@ export async function createControlServer(
       unsubscribe();
       unsubscribeExports?.();
       unsubscribeFreeRecordings?.();
+      unsubscribeLoopLibrary?.();
       if (snapshotTimer) clearTimeout(snapshotTimer);
       const connectionCleanups = [...connections].map(queueConnectionCleanup);
       for (const client of webSocketServer.clients) client.terminate();

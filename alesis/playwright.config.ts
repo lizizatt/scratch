@@ -22,6 +22,7 @@ process.env.ALESIS_AUTOSAVE_PATH = join(sampleLibraryDirectory, "playwright-auto
 process.env.ALESIS_EXPORT_DIR = join(sampleLibraryDirectory, "promoted-exports");
 // Outside the sample library, whose catalog would otherwise list the rendered MP3s.
 process.env.ALESIS_FREE_RECORDING_DIR = join(sampleLibraryDirectory, "..", `${basename(sampleLibraryDirectory)}-free`);
+process.env.ALESIS_LOOP_LIBRARY_DIR = join(sampleLibraryDirectory, "..", `${basename(sampleLibraryDirectory)}-loops`);
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -40,6 +41,7 @@ export default defineConfig({
       ALESIS_AUTOSAVE_PATH: process.env.ALESIS_AUTOSAVE_PATH,
       ALESIS_EXPORT_DIR: process.env.ALESIS_EXPORT_DIR,
       ALESIS_FREE_RECORDING_DIR: process.env.ALESIS_FREE_RECORDING_DIR,
+      ALESIS_LOOP_LIBRARY_DIR: process.env.ALESIS_LOOP_LIBRARY_DIR,
     },
   },
   projects: [

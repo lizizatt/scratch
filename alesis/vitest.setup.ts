@@ -7,4 +7,5 @@ import { afterAll } from "vitest";
 const directory = mkdtempSync(join(tmpdir(), "alesis-test-autosave-"));
 process.env.ALESIS_AUTOSAVE_PATH = join(directory, "autosave.json");
 process.env.ALESIS_FREE_RECORDING_DIR = join(directory, "free-recordings");
+process.env.ALESIS_LOOP_LIBRARY_DIR = join(directory, "saved-loops");
 afterAll(() => rmSync(directory, { recursive: true, force: true }));

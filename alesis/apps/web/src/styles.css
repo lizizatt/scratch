@@ -317,3 +317,16 @@ svg { width: 21px; height: 21px; stroke-width: 1.7; }
 .free-download svg, .free-render-button svg { width: 15px; height: 15px; }
 @media (max-height: 500px) { .free-lane .waveform { height: 80px; } }
 .free-browse { justify-self: start; color: var(--cyan); font-size: 11px; }
+
+/* Saved loops on the host */
+.saved-loops { flex-shrink: 0; font-size: 11px; }
+.saved-loops summary { min-height: 32px; display: flex; align-items: center; color: var(--cyan); cursor: pointer; }
+.saved-loops-save { display: flex; gap: 8px; align-items: center; margin: 4px 0 8px; }
+.saved-loops-save input { flex: 1 1 auto; min-width: 0; min-height: 36px; padding: 0 8px; color: var(--text); border: 1px solid var(--line); border-radius: 6px; background: #000; }
+.saved-loops-save button, .saved-loops-list button:not(.icon-button) { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 10px; font-size: 11px; }
+.saved-loops-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.saved-loops-list li { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; }
+.saved-loop-title { display: grid; min-width: 0; }
+.saved-loop-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-loop-title small { color: var(--dim); font-size: 10px; }
+.saved-loops-list svg { width: 15px; height: 15px; }

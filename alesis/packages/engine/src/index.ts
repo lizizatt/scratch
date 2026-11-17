@@ -685,6 +685,9 @@ export class SimulatedHostEngine implements HostEngine {
         return reject("Loop sample export requires the host sample service");
       case "export-loop-session":
       case "import-loop-session":
+      case "save-loop":
+      case "load-saved-loop":
+      case "delete-saved-loop":
         return reject("Loop sessions require host orchestration");
       case "get-take-notes":
       case "set-take-notes":

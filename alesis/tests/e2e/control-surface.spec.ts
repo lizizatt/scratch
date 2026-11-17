@@ -575,7 +575,7 @@ test("keeps loop export feedback across pane switches and finds it in Pads", asy
     const feedback = page.locator(".sample-export-feedback");
     await expect(feedback).toContainText("Saved ", { timeout: 30_000 });
     const message = (await feedback.textContent())?.trim() ?? "";
-    const savedFile = message.match(/^Saved ([^/\\]+\.mp3)(?:\. Warning:.*| to the sample library\.)$/);
+    const savedFile = message.match(/^Saved ([^/\\]+\.mp3)(?:\. Warning:.*| to the sample library\.(?: The loop was also saved as "[^"]+" so you can keep editing it\.)?)$/);
     expect(savedFile, `Expected a generated MP3 filename in export feedback: ${message}`).not.toBeNull();
     const filename = savedFile![1]!;
     expect(basename(filename)).toBe(filename);

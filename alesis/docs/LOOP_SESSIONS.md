@@ -30,6 +30,30 @@ takes and the musical settings.
   the SoundFont was removed) the file is kept as `autosave-loop-session-v1.json.rejected`
   and the error is logged.
 
+## Saved loops on the host
+
+Protocol 11 adds `save-loop` (name), `load-saved-loop` and `delete-saved-loop`, and
+a `saved-loops-status` message (also in the first `snapshot`). Loops are plain v1
+session files in `~/alesis_loops/<name>.json` (`ALESIS_LOOP_LIBRARY_DIR`
+overrides it), so they can also be copied in or out by hand; the folder is
+rescanned at boot and after every change, and a file that cannot be read is listed
+as unreadable rather than hidden. A name is the same kind of name exports use
+(letters, digits, spaces, `-`, `_`, up to 80), and saving under an existing name
+replaces it. Writes are atomic.
+
+- Saving and opening need the transport stopped and no recording running, exactly
+  like the file-based save and load, and opening runs the normal load path: the
+  current completed takes and musical settings are replaced.
+- Every MP3 export (sample, promoted tracks, or the legacy commands) also saves the
+  loop it came from under the export's name (a sample without a name uses the
+  generated sample name), because an MP3 cannot be edited again. A failure to do so
+  never fails the export; the message says it could not be kept. The loop is saved
+  as it is at publish time, which is the same state unless it was edited between
+  preparing and saving the export.
+- The UI has a **Saved loops** list in the loop pane: name box and Save, then each
+  loop with Open and Delete. The browser download/upload buttons remain.
+- The file browser lists the folder at `/files/loops/`.
+
 ## Included
 
 - Every promoted take, including muted/zero-level takes, and both staged slots;

@@ -15,4 +15,5 @@ export default async function globalTeardown(): Promise<void> {
   }
   rmSync(resolved, { recursive: true, force: true });
   rmSync(`${resolved}-free`, { recursive: true, force: true });
+  rmSync(`${resolved}-loops`, { recursive: true, force: true });
 }

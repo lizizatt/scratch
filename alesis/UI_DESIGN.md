@@ -160,6 +160,15 @@ floating bottom-left navigation, and no document-level page scrolling.
 	overdub the staged take stays, and only a pass that records new notes makes an
 	open editor stale.
 
+### Saved loops
+
+- **Saved loops** (loop pane, collapsed by default) keeps loops on the host. Type
+	a name and press **Save loop**, then **Open** any saved loop to carry on editing
+	it; **Delete** removes it. Saving and opening need the transport stopped, and
+	opening asks first because it replaces the current takes.
+- Every MP3 export also saves its loop under the export's name, so exported work
+	can always be reopened here.
+
 ### Record mode (free recording)
 
 - A three-position **Replace / Overdub / Record** switch in the loop toolbar

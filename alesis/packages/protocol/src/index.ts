@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PROTOCOL_VERSION = 10 as const;
+export const PROTOCOL_VERSION = 11 as const;
 
 export const LOOP_SESSION_MAX_BYTES = 4 * 1024 * 1024;
 export const LOOP_SESSION_MAX_EVENTS_PER_TAKE = 32_768;
@@ -309,6 +309,25 @@ export const idleLoopExport: LoopExportStatus = { state: "idle", artifactId: nul
 export const loopArtifactInfoSchema = z.object({ artifactId: z.string().uuid(), durationSeconds: z.number().positive(), target: z.enum(["sample", "promoted"]) });
 export type LoopArtifactInfo = z.infer<typeof loopArtifactInfoSchema>;
 
+/** A loop kept on the host so it can be reopened and edited later; the id is the name it was saved under. */
+export const savedLoopSchema = z.object({
+  id: exportNameSchema,
+  savedAt: z.string().max(64),
+  bytes: z.number().int().nonnegative(),
+  takeCount: z.number().int().nonnegative(),
+  bpm: z.number().int().min(30).max(300),
+  loopMeasures: z.number().int().min(1).max(128),
+  beatsPerMeasure: z.number().int().min(1).max(16),
+});
+export type SavedLoop = z.infer<typeof savedLoopSchema>;
+export const savedLoopsStatusSchema = z.object({
+  items: z.array(savedLoopSchema).max(500),
+  /** Files that could not be read, so a damaged one is visible instead of silently missing. */
+  unreadable: z.array(z.string().max(128)).max(50),
+});
+export type SavedLoopsStatus = z.infer<typeof savedLoopsStatusSchema>;
+export const idleSavedLoops: SavedLoopsStatus = { items: [], unreadable: [] };
+
 export const captureModeSchema = z.enum(["replace", "overdub", "record"]);
 export type CaptureMode = z.infer<typeof captureModeSchema>;
 export const freeRecordingIdSchema = z.string().regex(/^jam-[A-Za-z0-9-]{1,64}$/);
@@ -397,6 +416,9 @@ const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("export-mp3"), name: exportNameSchema }),
   z.object({ type: z.literal("export-loop-sample"), name: exportNameSchema.optional() }),
   z.object({ type: z.literal("export-loop-session") }),
+  z.object({ type: z.literal("save-loop"), name: exportNameSchema }),
+  z.object({ type: z.literal("load-saved-loop"), id: exportNameSchema }),
+  z.object({ type: z.literal("delete-saved-loop"), id: exportNameSchema }),
   // File validation belongs in the executor so invalid uploads are recoverable command errors.
   z.object({ type: z.literal("import-loop-session"), sessionJson: z.string() }),
 ]);
@@ -408,7 +430,8 @@ export const commandEnvelopeSchema = z.object({
 });
 
 export const serverMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema, loopExport: loopExportStatusSchema.default(idleLoopExport), freeRecording: freeRecordingStatusSchema.default(idleFreeRecording) }),
+  z.object({ type: z.literal("snapshot"), snapshot: engineSnapshotSchema, readiness: readinessSchema, loopExport: loopExportStatusSchema.default(idleLoopExport), freeRecording: freeRecordingStatusSchema.default(idleFreeRecording), savedLoops: savedLoopsStatusSchema.default(idleSavedLoops) }),
+  z.object({ type: z.literal("saved-loops-status"), status: savedLoopsStatusSchema }),
   z.object({ type: z.literal("loop-export-status"), status: loopExportStatusSchema }),
   z.object({ type: z.literal("free-recording-status"), status: freeRecordingStatusSchema }),
   z.object({ type: z.literal("snapshot-update"), update: snapshotUpdateSchema, readiness: readinessSchema }),

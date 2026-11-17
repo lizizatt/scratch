@@ -1,11 +1,11 @@
 import { SimulatedHostEngine, type EngineResult, type MidiEvent } from "@alesis/engine";
 import { discoverCm108AudioDevice, discoverSoundFontPresets, discoverSoundFonts, FluidSynthOutput, SampleLibrary, SamplePlayer, SilentAudioOutput, PcmLoopOutput, SimulatedLoopOutput, type AlsaAudioDevice, type AudioOutput } from "@alesis/audio";
 import { AlsaSequencerMidiSource, discoverVortexSequencerPort, SoftwareVortex, type AlsaSequencerPort, type MidiInputEvent, type MidiSource } from "@alesis/midi";
-import type { DrumKit, EngineCommand, EngineSnapshot, Readiness, SoundFontPreset } from "@alesis/protocol";
+import { exportNameSchema, type DrumKit, type EngineCommand, type EngineSnapshot, type Readiness, type SoundFontPreset } from "@alesis/protocol";
 import { existsSync } from "node:fs";
 import { copyFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createControlServer, type ControlServer } from "./control-server.js";
 import { createAudioHealthObserver } from "./audio-health.js";
@@ -28,6 +28,7 @@ import { PadPerformance, padControlCommand } from "./pad-performance.js";
 import { LoopExports } from "./loop-export.js";
 import { FreeRecordings, type FreeRecordingContext } from "./free-recordings.js";
 import { createFileBrowser } from "./file-browser.js";
+import { LoopLibrary } from "./loop-library.js";
 import { randomUUID } from "node:crypto";
 
 let soundFonts = discoverSoundFonts();
@@ -139,6 +140,8 @@ const drumPadNotes = new DrumPadNoteTracker();
 const freeRecordingDirectory = process.env.ALESIS_FREE_RECORDING_DIR ?? join(homedir(), "alesis_free_recordings");
 const exportDirectory = process.env.ALESIS_EXPORT_DIR ?? join(homedir(), "alesis_recordings");
 const freeRecordings = new FreeRecordings({ directory: freeRecordingDirectory });
+const loopLibraryDirectory = process.env.ALESIS_LOOP_LIBRARY_DIR ?? join(homedir(), "alesis_loops");
+const loopLibrary = new LoopLibrary({ directory: loopLibraryDirectory });
 const dispatchPerformance = (event: MidiEvent, endsAtCycleBoundary = false): void => {
   if (loopExports?.blocksPerformance()) return;
   engine.markCaptureActivity();
@@ -374,6 +377,19 @@ engine.subscribeRuntime((snapshot) => {
   if (preset && preset.id !== recordedPreset) { recordedPreset = preset.id; freeRecordings.markVoice(preset.bank, preset.program); }
   if (kit && kit.id !== recordedKit) { recordedKit = kit.id; freeRecordings.markKit(kit.program); }
 });
+/** An exported MP3 cannot be edited again, so the loop it came from is kept alongside under the same name. */
+const keepLoopWithExport = async (name: string | undefined): Promise<string> => {
+  const id = exportNameSchema.safeParse(name);
+  if (!id.success) return "";
+  try {
+    await loopLibrary.save(id.data, exportLoopSession(loopSessionHost, { whileRunning: true }).sessionJson!);
+    return ` The loop was also saved as "${id.data}" so you can keep editing it.`;
+  } catch (error) {
+    // Drum-only sample exports have no takes to keep; anything else is reported without failing the export.
+    return error instanceof Error && error.message.startsWith("No completed takes") ? "" : " The loop could not also be saved for editing.";
+  }
+};
+const exportedName = (explicit: string | undefined, paths: readonly string[]): string | undefined => explicit ?? (paths[0] ? basename(paths[0]).replace(/\.[^.]+$/, "") : undefined);
 const executeCommand = async (command: EngineCommand, source = "host"): Promise<EngineResult> => {
   const currentResult = () => ({ accepted: true, revision: engine.snapshot().revision, appliedCycle: engine.snapshot().transport.cycle });
   const rejected = (error: string) => ({ ...currentResult(), accepted: false, error });
@@ -391,9 +407,15 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
   if (command.type === "stop-free-recording") { await freeRecordings.stop(); return currentResult(); }
   if (command.type === "render-free-recording") { freeRecordings.render(command.id); return currentResult(); }
   if (command.type === "delete-free-recording") { await freeRecordings.delete(command.id); return currentResult(); }
-  if (freeRecordings.recording && ["set-capture-mode", "set-overdub", "select-synth", "select-soundfont", "refresh-soundfonts", "import-loop-session", "export-loop-session"].includes(command.type)) {
+  if (freeRecordings.recording && ["set-capture-mode", "set-overdub", "select-synth", "select-soundfont", "refresh-soundfonts", "import-loop-session", "export-loop-session", "save-loop", "load-saved-loop"].includes(command.type)) {
     return rejected("Stop the recording first");
   }
+  if (command.type === "save-loop") {
+    const saved = await loopLibrary.save(command.name, exportLoopSession(loopSessionHost).sessionJson!);
+    return { ...currentResult(), message: `Saved loop "${saved.id}". Open it again from Saved loops.` };
+  }
+  if (command.type === "load-saved-loop") return executeCommand({ type: "import-loop-session", sessionJson: await loopLibrary.read(command.id) }, source);
+  if (command.type === "delete-saved-loop") { await loopLibrary.delete(command.id); return currentResult(); }
   if (command.type === "stop" || command.type === "panic") {
     const wasPreview = loopExports?.blocksPerformance();
     const cancellation = loopExports?.cancel();
@@ -418,7 +440,7 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
   if (command.type === "release-loop-export") { await loopExports!.release(source, command.artifactId); return currentResult(); }
   if (command.type === "publish-loop-export") {
     const result = await loopExports!.publish(source, command.artifactId, command.name);
-    return { ...currentResult(), message: result.message };
+    return { ...currentResult(), message: result.message + await keepLoopWithExport(exportedName(command.name, result.paths)) };
   }
   if (command.type === "play" && Object.values(readiness).some((dependency) => !dependency.ready)) {
     const snapshot = engine.snapshot();
@@ -488,7 +510,7 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
     await loopExports!.prepare(source, { artifactId: id, target: "promoted" });
     try {
       const result = await loopExports!.publish(source, id, command.name);
-      return { ...currentResult(), message: result.message };
+      return { ...currentResult(), message: result.message + await keepLoopWithExport(command.name) };
     } finally { await loopExports!.release(source, id); }
   }
   if (command.type === "export-loop-sample") {
@@ -496,7 +518,7 @@ const executeCommand = async (command: EngineCommand, source = "host"): Promise<
     await loopExports!.prepare(source, { artifactId: id, target: "sample" });
     try {
       const result = await loopExports!.publish(source, id, command.name);
-      return { ...currentResult(), message: result.message };
+      return { ...currentResult(), message: result.message + await keepLoopWithExport(exportedName(command.name, result.paths)) };
     } finally { await loopExports!.release(source, id); }
   }
   if (command.type === "configure-arpeggiator") {
@@ -668,6 +690,7 @@ const autosaveCommandTypes = new Set<EngineCommand["type"]>([
 ]);
 const persistentCommandTypes = new Set<EngineCommand["type"]>([
   "import-loop-session",
+  "load-saved-loop",
   "configure",
   "select-synth",
   "select-soundfont",
@@ -732,13 +755,15 @@ loopExports = new LoopExports({
     if (!result.accepted) throw new Error(result.error ?? "Sample refresh failed");
   },
 });
+await loopLibrary.init().catch((error) => console.error(`Saved loops are unavailable: ${error instanceof Error ? error.message : String(error)}`));
 await freeRecordings.init().catch((error) => console.error(`Free recordings are unavailable: ${error instanceof Error ? error.message : String(error)}`));
 controlServer = await createControlServer(engine, Number(process.env.PORT ?? 8787), webDirectory, executeAndPersist, host, readiness, loopExports, freeRecordings, createFileBrowser([
+  { id: "loops", label: "Saved loops (editable)", directory: loopLibraryDirectory },
   { id: "recordings", label: "Free recordings (.mid and .mp3)", directory: freeRecordingDirectory },
   { id: "exports", label: "Exported loop tracks and mixes", directory: exportDirectory },
   { id: "samples", label: "Sample library", directory: sampleRoot },
   { id: "saved", label: "Autosaved loops and settings", directory: dirname(autosavePath) },
-]));
+]), loopLibrary);
 padPerformance = new PadPerformance({
   snapshot: () => performanceSnapshot,
   samples: samplePads,

@@ -3,8 +3,10 @@ import {
   PROTOCOL_VERSION,
   idleFreeRecording,
   idleLoopExport,
+  idleSavedLoops,
   type FreeRecordingStatus,
   type LoopExportStatus,
+  type SavedLoopsStatus,
   serverMessageSchema,
   type EngineCommand,
   type EngineSnapshot,
@@ -24,6 +26,7 @@ export function useControlSocket(): {
   lastMessage: string | null;
   loopExport: LoopExportStatus;
   freeRecording: FreeRecordingStatus;
+  savedLoops: SavedLoopsStatus;
   send: (command: EngineCommand, onResult?: CommandResultHandler) => string | null;
 } {
   const [snapshot, setSnapshot] = useState<EngineSnapshot | null>(null);
@@ -33,6 +36,7 @@ export function useControlSocket(): {
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [loopExport, setLoopExport] = useState<LoopExportStatus>(idleLoopExport);
   const [freeRecording, setFreeRecording] = useState<FreeRecordingStatus>(idleFreeRecording);
+  const [savedLoops, setSavedLoops] = useState<SavedLoopsStatus>(idleSavedLoops);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingResultsRef = useRef(new Map<string, CommandResultHandler>());
 
@@ -63,8 +67,10 @@ export function useControlSocket(): {
           setReadiness(parsed.data.readiness);
           setLoopExport(parsed.data.loopExport);
           setFreeRecording(parsed.data.freeRecording);
+          setSavedLoops(parsed.data.savedLoops);
         }
         if (parsed.data.type === "free-recording-status") setFreeRecording(parsed.data.status);
+        if (parsed.data.type === "saved-loops-status") setSavedLoops(parsed.data.status);
         if (parsed.data.type === "loop-export-status") setLoopExport(parsed.data.status);
         if (parsed.data.type === "snapshot-update") {
           const update = parsed.data.update;
@@ -117,5 +123,5 @@ export function useControlSocket(): {
     return commandId;
   };
 
-  return { snapshot, readiness, connection, lastError, lastMessage, loopExport, freeRecording, send };
+  return { snapshot, readiness, connection, lastError, lastMessage, loopExport, freeRecording, savedLoops, send };
 }
